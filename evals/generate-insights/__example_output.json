@@ -1,0 +1,14 @@
+{
+  "insights": [
+    {
+      "category": "strength",
+      "severity": "moderate",
+      "description": "Competitor spends 68% of match time in closed guard bottom and successfully attempts 3 sweeps.",
+      "suggestion": "Continue drilling closed guard sweeps as a primary scoring threat.",
+      "concept_tags": ["bottom_offense", "timing"],
+      "evidence_segment_ids": ["seg-001", "seg-002"],
+      "evidence_event_ids": ["evt-001"],
+      "confidence": 0.85
+    }
+  ]
+}
