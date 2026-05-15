@@ -61,6 +61,10 @@ export const scanUrl = inngest.createFunction(
         })
       } catch (err: unknown) {
         await db.update(videos).set({ status: 'failed' }).where(eq(videos.id, videoId))
+        const msg = err instanceof Error ? err.message : String(err)
+        if (msg.includes('10800') || msg.includes('fewer than') || msg.includes('images in your request')) {
+          throw new NonRetriableError('Stream is too long — Gemini supports up to 3 hours of video. Try splitting the recording into individual mat sessions.')
+        }
         throw err
       }
 

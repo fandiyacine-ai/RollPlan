@@ -227,7 +227,7 @@ function UrlAnalysisTab() {
         {urls.length < 10 && (
           <button onClick={addUrl} className="text-sm text-muted-foreground hover:text-foreground transition-colors">+ Add another URL</button>
         )}
-        <p className="text-xs text-muted-foreground">YouTube, direct video links. Long streams (2–4 hrs) supported — Gemini will scan the full recording.</p>
+        <p className="text-xs text-muted-foreground">YouTube or direct video links. Maximum 3 hours per URL — for longer events, split by mat or time block.</p>
       </div>
 
       <SharedFields format={format} setFormat={setFormat} sourceType={sourceType} setSourceType={setSourceType} />
