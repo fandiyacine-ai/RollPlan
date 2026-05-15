@@ -4,13 +4,17 @@ import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
 import { videos, matches, positionSegments, matchEvents, insights, aiCallLogs } from '../lib/db/schema'
 import { eq } from 'drizzle-orm'
-import { google, anthropic, GEMINI_VIDEO_MODEL, CLAUDE_SYNTHESIS_MODEL, estimateCostUsd } from '../lib/ai/clients'
+import { google, anthropic, GEMINI_URL_SCAN_MODEL, CLAUDE_SYNTHESIS_MODEL, estimateCostUsd } from '../lib/ai/clients'
 import { UrlScanOutputSchema, FoundMatch } from '../lib/ai/schemas/url-scan'
 import { MatchExtractionOutputSchema } from '../lib/ai/schemas/match-extraction'
 import { InsightsOutputSchema } from '../lib/ai/schemas/insights'
 import { buildScanUrlSystemPrompt, buildScanUrlUserPrompt, SCAN_URL_PROMPT_VERSION } from '../lib/ai/prompts/scan-url'
 import { buildExtractMatchSystemPrompt, buildExtractMatchUserPrompt, EXTRACT_MATCH_PROMPT_VERSION } from '../lib/ai/prompts/extract-match'
 import { buildGenerateInsightsSystemPrompt, GENERATE_INSIGHTS_PROMPT_VERSION } from '../lib/ai/prompts/generate-insights'
+
+function videoFilePart(url: string) {
+  return { type: 'file' as const, data: new URL(url), mediaType: 'video/mp4' as const }
+}
 
 export const scanUrl = inngest.createFunction(
   {
@@ -35,14 +39,14 @@ export const scanUrl = inngest.createFunction(
 
       try {
         const { object, usage } = await generateObject({
-          model: google(GEMINI_VIDEO_MODEL),
+          model: google(GEMINI_URL_SCAN_MODEL),
           schema: UrlScanOutputSchema,
           maxRetries: 0,
           system: buildScanUrlSystemPrompt(),
           messages: [{
             role: 'user',
             content: [
-              { type: 'file', data: new URL(video.publicUrl), mediaType: 'video/mp4' },
+              videoFilePart(video.publicUrl),
               { type: 'text', text: buildScanUrlUserPrompt(athleteName) },
             ],
           }],
@@ -51,11 +55,11 @@ export const scanUrl = inngest.createFunction(
 
         await db.insert(aiCallLogs).values({
           jobId: videoId,
-          model: GEMINI_VIDEO_MODEL,
+          model: GEMINI_URL_SCAN_MODEL,
           promptVersion: SCAN_URL_PROMPT_VERSION,
           tokensIn: usage.inputTokens ?? 0,
           tokensOut: usage.outputTokens ?? 0,
-          costUsdEstimate: estimateCostUsd(GEMINI_VIDEO_MODEL, usage.inputTokens ?? 0, usage.outputTokens ?? 0),
+          costUsdEstimate: estimateCostUsd(GEMINI_URL_SCAN_MODEL, usage.inputTokens ?? 0, usage.outputTokens ?? 0),
           latencyMs: Date.now() - start,
           status: 'success',
         })
@@ -105,14 +109,14 @@ export const scanUrl = inngest.createFunction(
 
         try {
           const result = await generateObject({
-            model: google(GEMINI_VIDEO_MODEL),
+            model: google(GEMINI_URL_SCAN_MODEL),
             schema: MatchExtractionOutputSchema,
             maxRetries: 0,
             system: buildExtractMatchSystemPrompt(),
             messages: [{
               role: 'user',
               content: [
-                { type: 'file', data: new URL(video.publicUrl), mediaType: 'video/mp4' },
+                videoFilePart(video.publicUrl),
                 {
                   type: 'text',
                   text: buildExtractMatchUserPrompt({
@@ -166,11 +170,11 @@ export const scanUrl = inngest.createFunction(
 
         await db.insert(aiCallLogs).values({
           jobId: match.id,
-          model: GEMINI_VIDEO_MODEL,
+          model: GEMINI_URL_SCAN_MODEL,
           promptVersion: EXTRACT_MATCH_PROMPT_VERSION,
           tokensIn: extractUsage.inputTokens ?? 0,
           tokensOut: extractUsage.outputTokens ?? 0,
-          costUsdEstimate: estimateCostUsd(GEMINI_VIDEO_MODEL, extractUsage.inputTokens ?? 0, extractUsage.outputTokens ?? 0),
+          costUsdEstimate: estimateCostUsd(GEMINI_URL_SCAN_MODEL, extractUsage.inputTokens ?? 0, extractUsage.outputTokens ?? 0),
           latencyMs: Date.now() - extractStart,
           status: 'success',
         })
