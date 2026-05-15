@@ -22,6 +22,7 @@ export const matches = pgTable('matches', {
   status: matchStatusEnum('status').notNull().default('pending'),
   analysisVersion: text('analysis_version'),
   promptVersion: text('prompt_version'),
+  eventName: text('event_name'),
   userNotes: text('user_notes'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })

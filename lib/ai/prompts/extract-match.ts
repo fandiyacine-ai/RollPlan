@@ -24,14 +24,27 @@ ${buildTaxonomyPromptBlock()}
 - If you cannot confidently classify a position, use transition.`
 }
 
+function formatTimestamp(seconds: number): string {
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = Math.floor(seconds % 60)
+  return h > 0
+    ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+    : `${m}:${String(s).padStart(2, '0')}`
+}
+
 export function buildExtractMatchUserPrompt(params: {
   competitorDescription: string
   format: 'gi' | 'no_gi'
   ruleset: string
   durationSeconds?: number
+  timestampRange?: { startSeconds: number; endSeconds: number }
 }): string {
   return `Analyse this BJJ match video.
 
+${params.timestampRange
+    ? `Focus only on the match segment from ${formatTimestamp(params.timestampRange.startSeconds)} to ${formatTimestamp(params.timestampRange.endSeconds)}. Ignore all footage outside this range.`
+    : ''}
 Competitor to track: ${params.competitorDescription}
 Format: ${params.format === 'gi' ? 'Gi' : 'No-Gi'}
 Ruleset: ${params.ruleset.toUpperCase()}

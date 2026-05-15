@@ -39,6 +39,7 @@ export default async function PlayerCardPage() {
       status: matches.status,
       format: matches.format,
       context: matches.context,
+      eventName: matches.eventName,
       createdAt: matches.createdAt,
       filename: videos.originalFilename,
     })
@@ -85,7 +86,9 @@ export default async function PlayerCardPage() {
                     {match.filename ?? 'Untitled match'}
                   </p>
                   <p className="text-xs text-muted-foreground capitalize">
-                    {match.format === 'no_gi' ? 'No-Gi' : 'Gi'} · {match.context} · {match.createdAt.toLocaleDateString()}
+                    {match.format === 'no_gi' ? 'No-Gi' : 'Gi'} · {match.context}
+                    {match.eventName ? ` · ${match.eventName}` : ''}
+                    {' · '}{match.createdAt.toLocaleDateString()}
                   </p>
                 </div>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_BADGE[match.status]}`}>
