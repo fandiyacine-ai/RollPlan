@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 
 type SourceType = 'own_competition' | 'own_sparring' | 'opponent'
+type Format = 'gi' | 'no_gi'
 type UploadState = 'idle' | 'uploading' | 'success' | 'error'
 
 const SOURCE_LABELS: Record<SourceType, string> = {
@@ -15,6 +16,7 @@ const SOURCE_LABELS: Record<SourceType, string> = {
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null)
   const [sourceType, setSourceType] = useState<SourceType>('own_competition')
+  const [format, setFormat] = useState<Format>('gi')
   const [state, setState] = useState<UploadState>('idle')
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -38,6 +40,7 @@ export default function UploadPage() {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('sourceType', sourceType)
+    formData.append('format', format)
 
     await new Promise<void>((resolve, reject) => {
       const xhr = new XMLHttpRequest()
@@ -119,6 +122,25 @@ export default function UploadPage() {
             <p className="text-sm text-muted-foreground">or click to browse — MP4, MOV, AVI up to 2 GB</p>
           </div>
         )}
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Format</label>
+        <div className="flex gap-4">
+          {(['gi', 'no_gi'] as Format[]).map((f) => (
+            <label key={f} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="format"
+                value={f}
+                checked={format === f}
+                onChange={() => setFormat(f)}
+                className="accent-foreground"
+              />
+              <span className="text-sm">{f === 'gi' ? 'Gi' : 'No-Gi'}</span>
+            </label>
+          ))}
+        </div>
       </div>
 
       <div className="space-y-2">

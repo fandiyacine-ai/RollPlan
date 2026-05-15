@@ -10,7 +10,7 @@ export const matchStatusEnum = pgEnum('match_status', ['pending', 'processing', 
 export const matches = pgTable('matches', {
   id: uuid('id').defaultRandom().primaryKey(),
   videoId: uuid('video_id').notNull().references(() => videos.id, { onDelete: 'cascade' }),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
   competitorUserId: uuid('competitor_user_id').references(() => users.id),
   competitorLabel: text('competitor_label'),
   opponentLabel: text('opponent_label').notNull(),

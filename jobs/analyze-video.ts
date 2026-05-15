@@ -1,7 +1,13 @@
+import { generateObject } from 'ai'
 import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
-import { videos, matches } from '../lib/db/schema'
+import { videos, matches, positionSegments, matchEvents, insights, aiCallLogs } from '../lib/db/schema'
 import { eq } from 'drizzle-orm'
+import { google, anthropic, GEMINI_VIDEO_MODEL, CLAUDE_SYNTHESIS_MODEL, estimateCostUsd } from '../lib/ai/clients'
+import { MatchExtractionOutputSchema } from '../lib/ai/schemas/match-extraction'
+import { InsightsOutputSchema } from '../lib/ai/schemas/insights'
+import { buildExtractMatchSystemPrompt, buildExtractMatchUserPrompt, EXTRACT_MATCH_PROMPT_VERSION } from '../lib/ai/prompts/extract-match'
+import { buildGenerateInsightsSystemPrompt, GENERATE_INSIGHTS_PROMPT_VERSION } from '../lib/ai/prompts/generate-insights'
 
 export const analyzeVideo = inngest.createFunction(
   {
@@ -20,23 +26,149 @@ export const analyzeVideo = inngest.createFunction(
       }
     })
 
-    // Thumbnail generation step (ffmpeg — implemented in week 2)
     await step.run('generate-thumbnail', async () => {
-      // TODO: implement ffmpeg thumbnail at 50% mark
       return { thumbnailKey: null }
     })
 
-    // Gemini extraction step (implemented in week 3)
     await step.run('extract-positions-events', async () => {
-      // TODO: call Gemini 2.0 Flash with extract-match prompt
-      // Write position_segments and events rows in a transaction
-      return { segmentCount: 0, eventCount: 0 }
+      const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
+      if (!video?.publicUrl) throw new Error('Video has no public URL')
+
+      const match = await db.query.matches.findFirst({ where: eq(matches.id, matchId) })
+      if (!match) throw new Error(`Match ${matchId} not found`)
+
+      await db.update(matches).set({ status: 'processing' }).where(eq(matches.id, matchId))
+      await db.update(videos).set({ status: 'processing' }).where(eq(videos.id, videoId))
+
+      const start = Date.now()
+      const { object, usage } = await generateObject({
+        model: google(GEMINI_VIDEO_MODEL),
+        schema: MatchExtractionOutputSchema,
+        system: buildExtractMatchSystemPrompt(),
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'file',
+              data: new URL(video.publicUrl),
+              mediaType: video.contentType as `${string}/${string}`,
+            },
+            {
+              type: 'text',
+              text: buildExtractMatchUserPrompt({
+                competitorDescription: match.competitorLabel ?? 'the main competitor',
+                format: match.format,
+                ruleset: match.ruleset,
+                durationSeconds: video.durationSeconds ?? undefined,
+              }),
+            },
+          ],
+        }],
+      })
+
+      await db.transaction(async (tx) => {
+        if (object.positions.length > 0) {
+          await tx.insert(positionSegments).values(
+            object.positions.map((p) => ({
+              matchId,
+              startSeconds: p.start_seconds,
+              endSeconds: p.end_seconds,
+              positionId: p.position_id,
+              userRole: p.user_role,
+              dominance: p.dominance,
+              confidence: p.confidence,
+            }))
+          )
+        }
+        if (object.events.length > 0) {
+          await tx.insert(matchEvents).values(
+            object.events.map((e) => ({
+              matchId,
+              timestampSeconds: e.timestamp_seconds,
+              eventTypeId: e.event_type_id,
+              actor: e.actor,
+              outcome: e.outcome,
+              techniqueLabel: e.technique_label ?? null,
+              confidence: e.confidence,
+            }))
+          )
+        }
+      })
+
+      await db.insert(aiCallLogs).values({
+        jobId: matchId,
+        model: GEMINI_VIDEO_MODEL,
+        promptVersion: EXTRACT_MATCH_PROMPT_VERSION,
+        tokensIn: usage.inputTokens ?? 0,
+        tokensOut: usage.outputTokens ?? 0,
+        costUsdEstimate: estimateCostUsd(GEMINI_VIDEO_MODEL, usage.inputTokens ?? 0, usage.outputTokens ?? 0),
+        latencyMs: Date.now() - start,
+        status: 'success',
+      })
+
+      return { segmentCount: object.positions.length, eventCount: object.events.length }
     })
 
-    // Insight generation sub-step (implemented in week 4)
     await step.run('generate-insights', async () => {
-      // TODO: call Claude Sonnet with generate-insights prompt
-      return { insightCount: 0 }
+      const segments = await db.query.positionSegments.findMany({ where: eq(positionSegments.matchId, matchId) })
+      const events = await db.query.matchEvents.findMany({ where: eq(matchEvents.matchId, matchId) })
+
+      const matchData = {
+        segments: segments.map((s) => ({
+          id: s.id,
+          start_seconds: s.startSeconds,
+          end_seconds: s.endSeconds,
+          position_id: s.positionId,
+          user_role: s.userRole,
+          dominance: s.dominance,
+          confidence: s.confidence,
+        })),
+        events: events.map((e) => ({
+          id: e.id,
+          timestamp_seconds: e.timestampSeconds,
+          event_type_id: e.eventTypeId,
+          actor: e.actor,
+          outcome: e.outcome,
+          technique_label: e.techniqueLabel,
+          confidence: e.confidence,
+        })),
+      }
+
+      const start = Date.now()
+      const { object, usage } = await generateObject({
+        model: anthropic(CLAUDE_SYNTHESIS_MODEL),
+        schema: InsightsOutputSchema,
+        system: buildGenerateInsightsSystemPrompt(),
+        prompt: JSON.stringify(matchData),
+      })
+
+      await db.insert(insights).values(
+        object.insights.map((insight) => ({
+          matchId,
+          category: insight.category,
+          severity: insight.severity,
+          description: insight.description,
+          suggestion: insight.suggestion,
+          conceptTags: insight.concept_tags,
+          evidenceSegmentIds: insight.evidence_segment_ids,
+          evidenceEventIds: insight.evidence_event_ids,
+          confidence: insight.confidence,
+          promptVersion: GENERATE_INSIGHTS_PROMPT_VERSION,
+        }))
+      )
+
+      await db.insert(aiCallLogs).values({
+        jobId: matchId,
+        model: CLAUDE_SYNTHESIS_MODEL,
+        promptVersion: GENERATE_INSIGHTS_PROMPT_VERSION,
+        tokensIn: usage.inputTokens ?? 0,
+        tokensOut: usage.outputTokens ?? 0,
+        costUsdEstimate: estimateCostUsd(CLAUDE_SYNTHESIS_MODEL, usage.inputTokens ?? 0, usage.outputTokens ?? 0),
+        latencyMs: Date.now() - start,
+        status: 'success',
+      })
+
+      return { insightCount: object.insights.length }
     })
 
     await step.run('mark-analysed', async () => {
