@@ -44,6 +44,7 @@ export const analyzeVideo = inngest.createFunction(
       const { object, usage } = await generateObject({
         model: google(GEMINI_VIDEO_MODEL),
         schema: MatchExtractionOutputSchema,
+        maxRetries: 0,
         system: buildExtractMatchSystemPrompt(),
         messages: [{
           role: 'user',
@@ -138,6 +139,7 @@ export const analyzeVideo = inngest.createFunction(
       const { object, usage } = await generateObject({
         model: anthropic(CLAUDE_SYNTHESIS_MODEL),
         schema: InsightsOutputSchema,
+        maxRetries: 0,
         system: buildGenerateInsightsSystemPrompt(),
         prompt: JSON.stringify(matchData),
       })
