@@ -227,7 +227,7 @@ function UrlAnalysisTab() {
         {urls.length < 10 && (
           <button onClick={addUrl} className="text-sm text-muted-foreground hover:text-foreground transition-colors">+ Add another URL</button>
         )}
-        <p className="text-xs text-muted-foreground">YouTube or direct video links. Maximum 3 hours per URL — for longer events, split by mat or time block.</p>
+        <p className="text-xs text-muted-foreground">YouTube or direct video links. Maximum ~1 hour per URL — for full tournament streams, split by mat or time block.</p>
       </div>
 
       <SharedFields format={format} setFormat={setFormat} sourceType={sourceType} setSourceType={setSourceType} />

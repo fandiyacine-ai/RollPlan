@@ -69,6 +69,9 @@ export const scanUrl = inngest.createFunction(
         if (msg.includes('10800') || msg.includes('fewer than') || msg.includes('images in your request')) {
           throw new NonRetriableError('Stream is too long — Gemini supports up to 3 hours of video. Try splitting the recording into individual mat sessions.')
         }
+        if (msg.includes('Resource has been exhausted') || msg.includes('RESOURCE_EXHAUSTED')) {
+          throw new NonRetriableError('Video is too long to process in one call — keep each URL under ~1 hour. For full tournament streams, submit individual mat recordings split by time block.')
+        }
         throw err
       }
 
