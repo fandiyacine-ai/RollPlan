@@ -6,7 +6,7 @@ export const videoStatusEnum = pgEnum('video_status', ['uploaded', 'processing',
 
 export const videos = pgTable('videos', {
   id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
   r2Key: text('r2_key').notNull(),
   originalFilename: text('original_filename').notNull(),
   durationSeconds: integer('duration_seconds'),
