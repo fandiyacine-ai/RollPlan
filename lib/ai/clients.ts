@@ -11,7 +11,7 @@ export const anthropic = createAnthropic({
 
 // gemini-2.0-flash: best available flash model with video understanding
 // Upgrade to gemini-3-flash when available (one config change)
-export const GEMINI_VIDEO_MODEL = 'gemini-2.0-flash'
+export const GEMINI_VIDEO_MODEL = 'gemini-2.0-flash-lite'
 export const CLAUDE_SYNTHESIS_MODEL = 'claude-sonnet-4-6'
 
 export const TOKEN_COST_PER_M = {
