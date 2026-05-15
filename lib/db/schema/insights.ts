@@ -12,6 +12,7 @@ export const insights = pgTable('insights', {
   evidenceSegmentIds: jsonb('evidence_segment_ids').notNull().default([]), // string[]
   evidenceEventIds: jsonb('evidence_event_ids').notNull().default([]), // string[]
   confidence: real('confidence').notNull(),
+  youtubeSearchQuery: text('youtube_search_query'),
   promptVersion: text('prompt_version').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })

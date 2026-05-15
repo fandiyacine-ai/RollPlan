@@ -10,6 +10,7 @@ const InsightSchema = z.object({
   evidence_segment_ids: z.array(z.string()),
   evidence_event_ids: z.array(z.string()),
   confidence: z.number().min(0).max(1),
+  youtube_search_query: z.string().optional().describe('Short YouTube search query to find a tutorial for the suggested technique (e.g. "deep half guard entries BJJ tutorial")'),
 }).refine(
   d => d.evidence_segment_ids.length > 0 || d.evidence_event_ids.length > 0,
   { message: 'Every insight must reference at least one evidence_segment_id or evidence_event_id' }

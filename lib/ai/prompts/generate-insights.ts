@@ -14,5 +14,6 @@ ${buildTaxonomyPromptBlock()}
 - Focus on what is actionable and competition-relevant, not narrative.
 - Express uncertainty via the confidence field (0.0–1.0). NEVER hedge in the description or suggestion.
 - Descriptions should be crisp, specific claims: "X% of time in position Y" not "seems to like position Y".
-- If the data is insufficient to make a claim, do not make it.`
+- If the data is insufficient to make a claim, do not make it.
+- For every insight with a suggestion, include a youtube_search_query: a short search string (5–8 words) that would find a relevant BJJ tutorial on YouTube. Focus on the specific technique or position in the suggestion. Example: "deep half guard sweep entries BJJ tutorial".`
 }

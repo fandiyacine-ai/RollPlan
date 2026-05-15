@@ -189,6 +189,7 @@ export const analyzeVideo = inngest.createFunction(
           evidenceSegmentIds: insight.evidence_segment_ids,
           evidenceEventIds: insight.evidence_event_ids,
           confidence: insight.confidence,
+          youtubeSearchQuery: insight.youtube_search_query ?? null,
           promptVersion: GENERATE_INSIGHTS_PROMPT_VERSION,
         }))
       )
