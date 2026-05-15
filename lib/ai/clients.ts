@@ -10,7 +10,7 @@ export const anthropic = createAnthropic({
 })
 
 export const GEMINI_VIDEO_MODEL = 'gemini-2.5-flash'
-export const GEMINI_URL_SCAN_MODEL = 'gemini-2.0-flash'
+export const GEMINI_URL_SCAN_MODEL = 'gemini-2.5-flash'
 export const CLAUDE_SYNTHESIS_MODEL = 'claude-sonnet-4-6'
 
 export const TOKEN_COST_PER_M = {
