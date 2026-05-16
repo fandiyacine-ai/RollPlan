@@ -14,7 +14,7 @@ function fmt(seconds: number): string {
 }
 
 export async function POST(req: NextRequest) {
-  const { matchId, message, currentTimestampSeconds = 0 } = await req.json()
+  const { matchId, message, currentTimestampSeconds = 0, frameDataUrl } = await req.json()
 
   if (!matchId || !message?.trim()) {
     return new Response(JSON.stringify({ error: 'matchId and message are required' }), { status: 400 })
@@ -87,7 +87,13 @@ Coaching guidelines:
   const result = streamText({
     model: anthropic(CLAUDE_SYNTHESIS_MODEL),
     system,
-    prompt: message,
+    messages: [{
+      role: 'user',
+      content: [
+        ...(frameDataUrl ? [{ type: 'image' as const, image: new URL(frameDataUrl) }] : []),
+        { type: 'text' as const, text: message },
+      ],
+    }],
     maxOutputTokens: 400,
   })
 

@@ -6,7 +6,7 @@ import Link from 'next/link'
 type Segment = { id: string; startSeconds: number; endSeconds: number; positionId: string; userRole: string; dominance: string }
 type Event = { id: string; timestampSeconds: number; eventTypeId: string; actor: string; outcome: string; techniqueLabel: string | null }
 type Insight = { id: string; category: string; severity: string; description: string; suggestion: string }
-type Message = { role: 'user' | 'coach'; text: string }
+type Message = { role: 'user' | 'coach'; text: string; frameDataUrl?: string }
 type Lang = 'en' | 'fi' | 'fr' | 'pt' | 'es' | 'ja'
 
 const LANG_LABELS: Record<Lang, string> = { en: 'EN', fi: 'FI', fr: 'FR', pt: 'PT', es: 'ES', ja: 'JA' }
@@ -27,6 +27,21 @@ function isYouTubeUrl(url: string) {
 
 declare global {
   interface Window { YT: any; onYouTubeIframeAPIReady: () => void }
+}
+
+function captureFrame(videoEl: HTMLVideoElement): string | null {
+  try {
+    if (videoEl.readyState < 2) return null
+    const maxW = 1280
+    const scale = Math.min(1, maxW / videoEl.videoWidth)
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(videoEl.videoWidth * scale)
+    canvas.height = Math.round(videoEl.videoHeight * scale)
+    canvas.getContext('2d')?.drawImage(videoEl, 0, 0, canvas.width, canvas.height)
+    return canvas.toDataURL('image/jpeg', 0.75)
+  } catch {
+    return null
+  }
 }
 
 async function playBase64Mp3(base64: string, onEnd: () => void, onError: () => void): Promise<HTMLAudioElement> {
@@ -76,6 +91,12 @@ export default function CoachSession({
   const isYouTube = videoUrl ? isYouTubeUrl(videoUrl) : false
   const youtubeId = videoUrl && isYouTube ? extractYouTubeId(videoUrl) : null
   const currentSegment = segments.find(s => s.startSeconds <= currentTime && s.endSeconds >= currentTime)
+  const duration = Math.max(
+    ...(segments.length > 0 ? segments.map(s => s.endSeconds) : [0]),
+    ...(events.length > 0 ? events.map(e => e.timestampSeconds) : [0]),
+    currentTime + 1,
+    60,
+  )
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
@@ -135,14 +156,15 @@ export default function CoachSession({
 
   const sendMessage = useCallback(async (userMessage: string) => {
     if (!userMessage.trim() || isLoading) return
-    setMessages(prev => [...prev, { role: 'user', text: userMessage }])
+    const frameDataUrl = !isYouTube && videoRef.current ? captureFrame(videoRef.current) : null
+    setMessages(prev => [...prev, { role: 'user', text: userMessage, frameDataUrl: frameDataUrl ?? undefined }])
     setIsLoading(true)
 
     try {
       const res = await fetch('/api/coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ matchId: match.id, message: userMessage, currentTimestampSeconds: currentTime }),
+        body: JSON.stringify({ matchId: match.id, message: userMessage, currentTimestampSeconds: currentTime, frameDataUrl }),
       })
       if (!res.ok || !res.body) {
         setMessages(prev => [...prev, { role: 'coach', text: 'Something went wrong. Try again.' }])
@@ -256,18 +278,66 @@ export default function CoachSession({
                   className="w-full aspect-video rounded-lg bg-black flex-shrink-0"
                   onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime ?? 0)} />
               )}
-              <div className="flex items-center gap-2 mt-2 mb-2 text-xs text-muted-foreground flex-shrink-0">
-                <span className="font-mono">{fmt(currentTime)}</span>
-                {currentSegment && (
-                  <span className="px-2 py-0.5 bg-muted rounded-full capitalize">
-                    {currentSegment.positionId.replace(/_/g, ' ')} · {currentSegment.userRole} · {currentSegment.dominance}
-                  </span>
+
+              {/* Visual scrubber */}
+              <div className="mt-3 flex-shrink-0">
+                <div
+                  className="relative h-7 rounded-full overflow-hidden cursor-pointer bg-muted group"
+                  onClick={e => {
+                    const rect = e.currentTarget.getBoundingClientRect()
+                    seekTo(((e.clientX - rect.left) / rect.width) * duration)
+                  }}
+                >
+                  {segments.map(s => (
+                    <div key={s.id}
+                      className={`absolute top-0 h-full ${
+                        s.dominance === 'dominant' ? 'bg-green-400' :
+                        s.dominance === 'inferior' ? 'bg-red-400' : 'bg-gray-300'
+                      } opacity-70`}
+                      style={{ left: `${s.startSeconds / duration * 100}%`, width: `${Math.max((s.endSeconds - s.startSeconds) / duration * 100, 0.3)}%` }}
+                    />
+                  ))}
+                  {events.map(e => (
+                    <div key={e.id}
+                      className={`absolute top-1/2 w-2 h-2 rounded-full border-2 border-background ${e.actor === 'user' ? 'bg-blue-500' : 'bg-orange-500'}`}
+                      style={{ left: `${e.timestampSeconds / duration * 100}%`, transform: 'translate(-50%, -50%)' }}
+                    />
+                  ))}
+                  <div
+                    className="absolute top-0 w-0.5 h-full bg-white shadow-[0_0_4px_rgba(0,0,0,0.4)] pointer-events-none"
+                    style={{ left: `${Math.min(currentTime / duration * 100, 100)}%` }}
+                  />
+                </div>
+                <div className="flex items-center gap-3 mt-1.5 text-[10px] text-muted-foreground">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-green-400 inline-block opacity-70" />Dominant</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-red-400 inline-block opacity-70" />Inferior</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-gray-300 inline-block" />Neutral</span>
+                  <span className="flex items-center gap-1 ml-auto"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />You</span>
+                  <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-orange-500 inline-block" />Opponent</span>
+                </div>
+              </div>
+
+              {/* Current position HUD */}
+              <div className="flex items-center gap-2.5 mt-3 mb-2 flex-shrink-0 min-h-[28px]">
+                <span className="font-mono text-base font-bold tabular-nums">{fmt(currentTime)}</span>
+                {currentSegment ? (
+                  <>
+                    <span className="w-px h-4 bg-border flex-shrink-0" />
+                    <span className="capitalize font-semibold text-sm truncate">{currentSegment.positionId.replace(/_/g, ' ')}</span>
+                    <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold flex-shrink-0 ${
+                      currentSegment.dominance === 'dominant' ? 'bg-green-100 text-green-700' :
+                      currentSegment.dominance === 'inferior' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
+                    }`}>{currentSegment.dominance}</span>
+                    <span className="text-xs text-muted-foreground flex-shrink-0 capitalize">{currentSegment.userRole}</span>
+                  </>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Transition</span>
                 )}
               </div>
 
-              {/* Timeline */}
+              {/* Timeline list */}
               {timeline.length > 0 && (
-                <div className="flex-1 overflow-y-auto border rounded-lg divide-y text-xs">
+                <div className="flex-1 overflow-y-auto rounded-lg border divide-y text-xs">
                   {timeline.map((item, i) => {
                     const isActive = item.type === 'segment'
                       ? item.time <= currentTime && (timeline[i + 1]?.time ?? Infinity) > currentTime
@@ -275,17 +345,20 @@ export default function CoachSession({
                     const dot = item.type === 'segment'
                       ? item.dominance === 'dominant' ? 'bg-green-400'
                         : item.dominance === 'inferior' ? 'bg-red-400' : 'bg-gray-300'
-                      : item.actor === 'user' ? 'bg-blue-400' : 'bg-orange-400'
+                      : item.actor === 'user' ? 'bg-blue-500' : 'bg-orange-500'
                     return (
                       <button
                         key={i}
                         onClick={() => seekTo(item.time)}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-muted ${isActive ? 'bg-muted' : ''}`}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-muted/60 ${isActive ? 'bg-muted' : ''}`}
                       >
                         <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dot}`} />
-                        <span className="font-mono text-muted-foreground w-10 flex-shrink-0">{fmt(item.time)}</span>
+                        <span className="font-mono text-muted-foreground w-10 flex-shrink-0 tabular-nums">{fmt(item.time)}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 font-semibold tracking-wide ${
+                          item.type === 'segment' ? 'bg-violet-100 text-violet-700' : 'bg-amber-100 text-amber-700'
+                        }`}>{item.type === 'segment' ? 'POS' : 'EVT'}</span>
                         <span className="capitalize font-medium truncate">{item.label}</span>
-                        <span className="text-muted-foreground ml-auto flex-shrink-0 capitalize">{item.sub}</span>
+                        <span className="text-muted-foreground ml-auto flex-shrink-0 capitalize text-[11px]">{item.sub}</span>
                       </button>
                     )
                   })}
@@ -312,6 +385,9 @@ export default function CoachSession({
                   <div className="w-6 h-6 rounded-full bg-foreground text-background flex items-center justify-center text-xs flex-shrink-0 mt-0.5">C</div>
                 )}
                 <div className={`rounded-2xl px-3.5 py-2 text-sm max-w-[85%] leading-relaxed ${msg.role === 'user' ? 'bg-foreground text-background rounded-tr-sm' : 'bg-muted rounded-tl-sm'}`}>
+                  {msg.role === 'user' && msg.frameDataUrl && (
+                    <img src={msg.frameDataUrl} alt="frame" className="rounded-lg mb-2 max-w-full opacity-90" />
+                  )}
                   {msg.text || <span className="opacity-40">thinking…</span>}
                 </div>
               </div>
@@ -329,6 +405,15 @@ export default function CoachSession({
           {/* Controls */}
           <div className="border-t pt-3 mt-2 space-y-2 flex-shrink-0">
             {ttsError && <p className="text-xs text-red-500">{ttsError}</p>}
+            {videoUrl && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" className={isYouTube ? 'opacity-30' : 'opacity-70'}><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+                {isYouTube
+                  ? <span className="opacity-50">Frame capture unavailable for YouTube videos</span>
+                  : <span>Frame sent with each question</span>
+                }
+              </div>
+            )}
 
             {speechSupported && (
               <div className="flex items-center gap-3">
