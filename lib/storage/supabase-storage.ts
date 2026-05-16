@@ -12,12 +12,14 @@ export function generateVideoPath(filename: string): string {
   return `uploads/${Date.now()}.${ext}`
 }
 
-export async function getSignedUploadUrl(path: string): Promise<{ signedUrl: string; token: string }> {
-  const { data, error } = await supabase.storage.from(BUCKET).createSignedUploadUrl(path)
-  if (error || !data) throw new Error(error?.message ?? 'Failed to create signed upload URL')
-  return { signedUrl: data.signedUrl, token: data.token }
-}
-
-export function getPublicUrl(path: string): string {
+export async function uploadVideo(
+  path: string,
+  buffer: Buffer,
+  contentType: string
+): Promise<string> {
+  const { error } = await supabase.storage
+    .from(BUCKET)
+    .upload(path, buffer, { contentType, upsert: false })
+  if (error) throw new Error(error.message)
   return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
 }

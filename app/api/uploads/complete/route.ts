@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '../../../../lib/db'
 import { videos, matches } from '../../../../lib/db/schema'
-import { getPublicUrl } from '../../../../lib/storage/supabase-storage'
+import { getPublicVideoUrl } from '../../../../lib/storage/r2'
 import { inngest } from '../../../../lib/inngest'
 import { eq } from 'drizzle-orm'
 
@@ -13,9 +13,9 @@ export async function POST(req: NextRequest) {
 
     if (!videoId || !path) return NextResponse.json({ error: 'videoId and path are required' }, { status: 400 })
 
-    const publicUrl = getPublicUrl(path)
+    const publicUrl = await getPublicVideoUrl(path)
 
-    await db.update(videos).set({ publicUrl }).where(eq(videos.id, videoId))
+    await db.update(videos).set({ publicUrl, status: 'uploaded' }).where(eq(videos.id, videoId))
 
     const context = sourceType === 'own_sparring' ? 'sparring' : 'competition'
 

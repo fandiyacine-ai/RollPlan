@@ -32,3 +32,15 @@ export function generateVideoKey(userId: string, filename: string): string {
   const timestamp = Date.now()
   return `videos/${userId}/${timestamp}.${ext}`
 }
+
+export function generateAnonymousVideoKey(filename: string): string {
+  const ext = filename.split('.').pop() ?? 'mp4'
+  return `uploads/${Date.now()}.${ext}`
+}
+
+export async function getPublicVideoUrl(key: string): Promise<string> {
+  const base = process.env.R2_PUBLIC_URL
+  if (base) return `${base.replace(/\/$/, '')}/${key}`
+  const command = new GetObjectCommand({ Bucket: process.env.R2_BUCKET_NAME!, Key: key })
+  return getSignedUrl(r2, command, { expiresIn: 604800 })
+}
