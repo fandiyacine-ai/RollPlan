@@ -19,8 +19,8 @@ const CONFUSION_PRONE = new Set([
   'turtle', 'north_south', 'half_guard', 'butterfly_guard', 'knee_on_belly',
 ])
 
-function videoFilePart(url: string) {
-  return { type: 'file' as const, data: new URL(url), mediaType: 'video/mp4' as const }
+function videoFilePart(url: string, contentType = 'video/mp4') {
+  return { type: 'file' as const, data: new URL(url), mediaType: contentType as `${string}/${string}` }
 }
 
 export const scanUrl = inngest.createFunction(
@@ -53,7 +53,7 @@ export const scanUrl = inngest.createFunction(
           messages: [{
             role: 'user',
             content: [
-              videoFilePart(video.publicUrl),
+              videoFilePart(video.publicUrl, video.contentType),
               { type: 'text', text: buildScanUrlUserPrompt(athleteName) },
             ],
           }],
@@ -126,7 +126,7 @@ export const scanUrl = inngest.createFunction(
             messages: [{
               role: 'user',
               content: [
-                videoFilePart(video.publicUrl),
+                videoFilePart(video.publicUrl, video.contentType),
                 {
                   type: 'text',
                   text: buildExtractMatchUserPrompt({
@@ -204,7 +204,7 @@ export const scanUrl = inngest.createFunction(
               messages: [{
                 role: 'user',
                 content: [
-                  videoFilePart(video.publicUrl),
+                  videoFilePart(video.publicUrl, video.contentType),
                   { type: 'text', text: buildVerifyPositionsUserPrompt(
                     toVerify.map((s, i) => ({
                       index: i,

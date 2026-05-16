@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 
 type Tab = 'file' | 'url'
+type ScanMode = 'single' | 'scan'
 type SourceType = 'own_competition' | 'own_sparring' | 'opponent'
 type Format = 'gi' | 'no_gi'
 type UploadState = 'idle' | 'uploading' | 'success' | 'error'
@@ -38,6 +39,9 @@ function buildAppearanceHint(color: AppearanceColor | null, side: StartingSide |
 
 function FileUploadTab() {
   const [file, setFile] = useState<File | null>(null)
+  const [scanMode, setScanMode] = useState<ScanMode>('single')
+  const [athleteName, setAthleteName] = useState('')
+  const [eventName, setEventName] = useState('')
   const [sourceType, setSourceType] = useState<SourceType>('own_competition')
   const [format, setFormat] = useState<Format>('gi')
   const [appearanceColor, setAppearanceColor] = useState<AppearanceColor | null>(null)
@@ -58,6 +62,7 @@ function FileUploadTab() {
 
   async function upload() {
     if (!file) return
+    if (scanMode === 'scan' && !athleteName.trim()) { setError('Athlete name is required for full mat scan'); return }
     setState('uploading')
     setProgress(0)
     setError(null)
@@ -65,18 +70,18 @@ function FileUploadTab() {
     const hint = buildAppearanceHint(appearanceColor, startingSide)
 
     try {
-      // Step 1: get a presigned upload URL (small JSON request — no file body)
+      // Step 1: get a presigned R2 upload URL
       const presignRes = await fetch('/api/uploads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size, sourceType, format, appearanceHint: hint || undefined }),
+        body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size, sourceType, format }),
       })
       const presignData = await presignRes.json()
       if (!presignRes.ok) { setError(presignData.error ?? 'Failed to prepare upload'); setState('error'); return }
 
       const { uploadUrl, path, videoId } = presignData
 
-      // Step 2: upload directly to Supabase (bypasses Railway — no size limit)
+      // Step 2: upload directly to R2 (bypasses Railway — no size limit)
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest()
         xhr.upload.onprogress = (e) => {
@@ -93,7 +98,12 @@ function FileUploadTab() {
       const completeRes = await fetch('/api/uploads/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videoId, path, sourceType, format, appearanceHint: hint || undefined }),
+        body: JSON.stringify({
+          videoId, path, sourceType, format,
+          appearanceHint: hint || undefined,
+          scanMode,
+          ...(scanMode === 'scan' ? { athleteName: athleteName.trim(), eventName: eventName.trim() || undefined } : {}),
+        }),
       })
       if (!completeRes.ok) {
         const d = await completeRes.json().catch(() => ({}))
@@ -113,10 +123,19 @@ function FileUploadTab() {
     return (
       <div className="rounded-lg border border-green-200 bg-green-50 p-8 text-center space-y-4">
         <div className="text-4xl">✓</div>
-        <p className="font-medium text-green-800">Video uploaded successfully!</p>
-        <p className="text-sm text-muted-foreground">Analysis will begin shortly.</p>
+        {scanMode === 'scan' ? (
+          <>
+            <p className="font-medium text-green-800">Scanning for {athleteName}&apos;s matches…</p>
+            <p className="text-sm text-muted-foreground">Gemini will find all matches in the recording. This may take several minutes.</p>
+          </>
+        ) : (
+          <>
+            <p className="font-medium text-green-800">Video uploaded successfully!</p>
+            <p className="text-sm text-muted-foreground">Analysis will begin shortly.</p>
+          </>
+        )}
         <div className="flex gap-3 justify-center pt-2">
-          <button onClick={() => { setFile(null); setState('idle'); setProgress(0) }} className="px-4 py-2 rounded-md border text-sm hover:bg-muted transition-colors">Upload another</button>
+          <button onClick={() => { setFile(null); setState('idle'); setProgress(0); setAthleteName(''); setEventName('') }} className="px-4 py-2 rounded-md border text-sm hover:bg-muted transition-colors">Upload another</button>
           <button onClick={() => router.push('/player-card')} className="px-4 py-2 rounded-md bg-foreground text-background text-sm hover:opacity-90 transition-opacity">View Player Card</button>
         </div>
       </div>
@@ -145,6 +164,52 @@ function FileUploadTab() {
           </div>
         )}
       </div>
+
+      <div className="space-y-3">
+        <label className="text-sm font-medium">Recording type</label>
+        <div className="flex rounded-lg border overflow-hidden">
+          {(['single', 'scan'] as ScanMode[]).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setScanMode(mode)}
+              className={`flex-1 py-2 text-sm transition-colors ${scanMode === mode ? 'bg-foreground text-background font-medium' : 'hover:bg-muted'}`}
+            >
+              {mode === 'single' ? 'Single match clip' : 'Full mat / session'}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {scanMode === 'single'
+            ? 'The whole video contains one match.'
+            : 'Gemini scans the full recording and extracts every match for the specified athlete.'}
+        </p>
+      </div>
+
+      {scanMode === 'scan' && (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Athlete name <span className="text-red-500">*</span></label>
+            <input
+              type="text"
+              value={athleteName}
+              onChange={(e) => setAthleteName(e.target.value)}
+              placeholder="Name as shown on screen (e.g. David Smith)"
+              className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Event name <span className="text-muted-foreground font-normal">(optional)</span></label>
+            <input
+              type="text"
+              value={eventName}
+              onChange={(e) => setEventName(e.target.value)}
+              placeholder="e.g. Pan Ams 2026"
+              className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            />
+          </div>
+        </div>
+      )}
 
       <SharedFields format={format} setFormat={setFormat} sourceType={sourceType} setSourceType={setSourceType}
         appearanceColor={appearanceColor} setAppearanceColor={setAppearanceColor}
