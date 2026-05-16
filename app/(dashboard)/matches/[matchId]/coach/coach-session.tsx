@@ -198,6 +198,20 @@ export default function CoachSession({
 
   const stopListening = useCallback(() => { recognitionRef.current?.stop(); setIsListening(false) }, [])
 
+  const seekTo = useCallback((seconds: number) => {
+    if (isYouTube && ytPlayerRef.current?.seekTo) {
+      ytPlayerRef.current.seekTo(seconds, true)
+    } else if (videoRef.current) {
+      videoRef.current.currentTime = seconds
+    }
+    setCurrentTime(seconds)
+  }, [isYouTube])
+
+  const timeline = [
+    ...segments.map(s => ({ type: 'segment' as const, time: s.startSeconds, label: s.positionId.replace(/_/g, ' '), sub: `${s.userRole} · ${s.dominance}`, dominance: s.dominance, actor: null as string | null })),
+    ...events.map(e => ({ type: 'event' as const, time: e.timestampSeconds, label: e.techniqueLabel ?? e.eventTypeId.replace(/_/g, ' '), sub: `${e.actor} · ${e.outcome}`, dominance: null as string | null, actor: e.actor })),
+  ].sort((a, b) => a.time - b.time)
+
   const handleTextSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!textInput.trim()) return
@@ -229,27 +243,54 @@ export default function CoachSession({
       {/* Body: video left, chat right */}
       <div className="flex flex-1 overflow-hidden gap-4 pt-3">
 
-        {/* Left — video */}
-        <div className="flex flex-col w-[55%] flex-shrink-0">
+        {/* Left — video + timeline */}
+        <div className="flex flex-col w-[55%] flex-shrink-0 overflow-hidden">
           {videoUrl ? (
             <>
               {isYouTube && youtubeId ? (
-                <div className="aspect-video rounded-lg overflow-hidden bg-black w-full">
+                <div className="aspect-video rounded-lg overflow-hidden bg-black w-full flex-shrink-0">
                   <div id="yt-player" className="w-full h-full" />
                 </div>
               ) : (
                 <video ref={videoRef} src={videoUrl} controls
-                  className="w-full aspect-video rounded-lg bg-black"
+                  className="w-full aspect-video rounded-lg bg-black flex-shrink-0"
                   onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime ?? 0)} />
               )}
-              <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2 mt-2 mb-2 text-xs text-muted-foreground flex-shrink-0">
                 <span className="font-mono">{fmt(currentTime)}</span>
                 {currentSegment && (
-                  <span className="px-2 py-0.5 bg-muted rounded-full">
-                    {currentSegment.positionId} · {currentSegment.userRole} · {currentSegment.dominance}
+                  <span className="px-2 py-0.5 bg-muted rounded-full capitalize">
+                    {currentSegment.positionId.replace(/_/g, ' ')} · {currentSegment.userRole} · {currentSegment.dominance}
                   </span>
                 )}
               </div>
+
+              {/* Timeline */}
+              {timeline.length > 0 && (
+                <div className="flex-1 overflow-y-auto border rounded-lg divide-y text-xs">
+                  {timeline.map((item, i) => {
+                    const isActive = item.type === 'segment'
+                      ? item.time <= currentTime && (timeline[i + 1]?.time ?? Infinity) > currentTime
+                      : Math.abs(item.time - currentTime) < 2
+                    const dot = item.type === 'segment'
+                      ? item.dominance === 'dominant' ? 'bg-green-400'
+                        : item.dominance === 'inferior' ? 'bg-red-400' : 'bg-gray-300'
+                      : item.actor === 'user' ? 'bg-blue-400' : 'bg-orange-400'
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => seekTo(item.time)}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-muted ${isActive ? 'bg-muted' : ''}`}
+                      >
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dot}`} />
+                        <span className="font-mono text-muted-foreground w-10 flex-shrink-0">{fmt(item.time)}</span>
+                        <span className="capitalize font-medium truncate">{item.label}</span>
+                        <span className="text-muted-foreground ml-auto flex-shrink-0 capitalize">{item.sub}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </>
           ) : (
             <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">No video available</div>
