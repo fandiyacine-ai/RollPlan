@@ -30,10 +30,10 @@ export const scanUrl = inngest.createFunction(
     triggers: [{ event: 'url/submitted' }],
   },
   async ({ event, step }: {
-    event: { data: { videoId: string; athleteName: string; format: string; sourceType: string; eventName?: string } }
+    event: { data: { videoId: string; athleteName: string; format: string; sourceType: string; eventName?: string; appearanceHint?: string } }
     step: any
   }) => {
-    const { videoId, athleteName, format, sourceType, eventName } = event.data
+    const { videoId, athleteName, format, sourceType, eventName, appearanceHint } = event.data
 
     const foundMatches: FoundMatch[] = await step.run('scan-for-matches', async () => {
       const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
@@ -130,7 +130,7 @@ export const scanUrl = inngest.createFunction(
                 {
                   type: 'text',
                   text: buildExtractMatchUserPrompt({
-                    competitorDescription: athleteName,
+                    competitorDescription: [athleteName, appearanceHint].filter(Boolean).join(' — '),
                     format: format as 'gi' | 'no_gi',
                     ruleset: 'ibjjf',
                     timestampRange: { startSeconds: found.start_seconds, endSeconds: found.end_seconds },

@@ -7,7 +7,7 @@ export const maxDuration = 30
 
 export async function POST(req: NextRequest) {
   try {
-    const { athleteName, urls, format, sourceType, eventName } = await req.json()
+    const { athleteName, urls, format, sourceType, eventName, appearanceHint } = await req.json()
 
     if (!athleteName?.trim()) return NextResponse.json({ error: 'Athlete name is required' }, { status: 400 })
     if (!Array.isArray(urls) || urls.length === 0) return NextResponse.json({ error: 'At least one URL is required' }, { status: 400 })
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
       try {
         await inngest.send({
           name: 'url/submitted',
-          data: { videoId: video.id, athleteName: athleteName.trim(), format: format ?? 'gi', sourceType: sourceType ?? 'own_competition', eventName: eventName?.trim() || undefined },
+          data: { videoId: video.id, athleteName: athleteName.trim(), format: format ?? 'gi', sourceType: sourceType ?? 'own_competition', eventName: eventName?.trim() || undefined, appearanceHint: appearanceHint?.trim() || undefined },
         })
       } catch {
         // Inngest not configured — analysis won't start but record was created

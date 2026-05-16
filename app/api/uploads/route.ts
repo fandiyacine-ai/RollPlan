@@ -12,6 +12,7 @@ export async function POST(req: NextRequest) {
     const file = formData.get('file') as File | null
     const sourceType = (formData.get('sourceType') as string) ?? 'own_competition'
     const format = (formData.get('format') as string) ?? 'gi'
+    const appearanceHint = (formData.get('appearanceHint') as string | null) ?? undefined
 
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     if (!file.type.startsWith('video/')) return NextResponse.json({ error: 'Only video files are accepted' }, { status: 400 })
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
     }).returning()
 
     try {
-      await inngest.send({ name: 'video/uploaded', data: { videoId: video.id, matchId: match.id } })
+      await inngest.send({ name: 'video/uploaded', data: { videoId: video.id, matchId: match.id, appearanceHint } })
     } catch {
       // Inngest not configured — analysis won't start but upload succeeded
     }

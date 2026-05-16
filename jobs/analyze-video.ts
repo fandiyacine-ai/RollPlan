@@ -28,8 +28,8 @@ export const analyzeVideo = inngest.createFunction(
     name: 'Analyse Match Video',
     triggers: [{ event: 'video/uploaded' }],
   },
-  async ({ event, step }: { event: { data: { videoId: string; matchId: string } }; step: any }) => {
-    const { videoId, matchId } = event.data
+  async ({ event, step }: { event: { data: { videoId: string; matchId: string; appearanceHint?: string } }; step: any }) => {
+    const { videoId, matchId, appearanceHint } = event.data
 
     await step.run('validate-video', async () => {
       const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
@@ -75,7 +75,7 @@ export const analyzeVideo = inngest.createFunction(
               {
                 type: 'text',
                 text: buildExtractMatchUserPrompt({
-                  competitorDescription: match.competitorLabel ?? 'the main competitor',
+                  competitorDescription: [match.competitorLabel ?? 'the main competitor', appearanceHint].filter(Boolean).join(' — '),
                   format: match.format,
                   ruleset: match.ruleset,
                   durationSeconds: video.durationSeconds ?? undefined,

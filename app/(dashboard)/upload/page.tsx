@@ -7,6 +7,8 @@ type Tab = 'file' | 'url'
 type SourceType = 'own_competition' | 'own_sparring' | 'opponent'
 type Format = 'gi' | 'no_gi'
 type UploadState = 'idle' | 'uploading' | 'success' | 'error'
+type AppearanceColor = 'blue_gi' | 'white_gi' | 'dark_rash' | 'light_rash' | 'other'
+type StartingSide = 'left' | 'right'
 
 const SOURCE_LABELS: Record<SourceType, string> = {
   own_competition: 'My competition match',
@@ -14,10 +16,32 @@ const SOURCE_LABELS: Record<SourceType, string> = {
   opponent: 'Opponent footage',
 }
 
+const COLOR_OPTIONS: { value: AppearanceColor; label: string; bg: string }[] = [
+  { value: 'blue_gi',    label: 'Blue Gi',    bg: 'bg-blue-600' },
+  { value: 'white_gi',   label: 'White Gi',   bg: 'bg-white border border-gray-300' },
+  { value: 'dark_rash',  label: 'Dark Rash',  bg: 'bg-gray-800' },
+  { value: 'light_rash', label: 'Light Rash', bg: 'bg-gray-200 border border-gray-300' },
+  { value: 'other',      label: 'Other',      bg: 'bg-gradient-to-br from-purple-400 to-pink-400' },
+]
+
+const COLOR_HINT: Record<AppearanceColor, string> = {
+  blue_gi: 'blue gi', white_gi: 'white gi', dark_rash: 'dark rashguard',
+  light_rash: 'light rashguard', other: 'other-coloured kit',
+}
+
+function buildAppearanceHint(color: AppearanceColor | null, side: StartingSide | null): string {
+  const parts: string[] = []
+  if (color) parts.push(COLOR_HINT[color])
+  if (side) parts.push(`starts on the ${side} side of the mat`)
+  return parts.join(', ')
+}
+
 function FileUploadTab() {
   const [file, setFile] = useState<File | null>(null)
   const [sourceType, setSourceType] = useState<SourceType>('own_competition')
   const [format, setFormat] = useState<Format>('gi')
+  const [appearanceColor, setAppearanceColor] = useState<AppearanceColor | null>(null)
+  const [startingSide, setStartingSide] = useState<StartingSide | null>(null)
   const [state, setState] = useState<UploadState>('idle')
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -42,6 +66,8 @@ function FileUploadTab() {
     formData.append('file', file)
     formData.append('sourceType', sourceType)
     formData.append('format', format)
+    const hint = buildAppearanceHint(appearanceColor, startingSide)
+    if (hint) formData.append('appearanceHint', hint)
 
     await new Promise<void>((resolve, reject) => {
       const xhr = new XMLHttpRequest()
@@ -102,7 +128,9 @@ function FileUploadTab() {
         )}
       </div>
 
-      <SharedFields format={format} setFormat={setFormat} sourceType={sourceType} setSourceType={setSourceType} />
+      <SharedFields format={format} setFormat={setFormat} sourceType={sourceType} setSourceType={setSourceType}
+        appearanceColor={appearanceColor} setAppearanceColor={setAppearanceColor}
+        startingSide={startingSide} setStartingSide={setStartingSide} />
 
       {error && <p className="text-sm text-red-500">{error}</p>}
 
@@ -128,6 +156,8 @@ function UrlAnalysisTab() {
   const [urls, setUrls] = useState([''])
   const [sourceType, setSourceType] = useState<SourceType>('own_competition')
   const [format, setFormat] = useState<Format>('gi')
+  const [appearanceColor, setAppearanceColor] = useState<AppearanceColor | null>(null)
+  const [startingSide, setStartingSide] = useState<StartingSide | null>(null)
   const [state, setState] = useState<UploadState>('idle')
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
@@ -156,7 +186,7 @@ function UrlAnalysisTab() {
       const res = await fetch('/api/analyse-urls', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ athleteName: athleteName.trim(), urls: validUrls, format, sourceType, eventName: eventName.trim() || undefined }),
+        body: JSON.stringify({ athleteName: athleteName.trim(), urls: validUrls, format, sourceType, eventName: eventName.trim() || undefined, appearanceHint: buildAppearanceHint(appearanceColor, startingSide) || undefined }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'Submission failed'); setState('error'); return }
@@ -230,7 +260,9 @@ function UrlAnalysisTab() {
         <p className="text-xs text-muted-foreground">YouTube or direct video links. Maximum ~1 hour per URL — for full tournament streams, split by mat or time block.</p>
       </div>
 
-      <SharedFields format={format} setFormat={setFormat} sourceType={sourceType} setSourceType={setSourceType} />
+      <SharedFields format={format} setFormat={setFormat} sourceType={sourceType} setSourceType={setSourceType}
+        appearanceColor={appearanceColor} setAppearanceColor={setAppearanceColor}
+        startingSide={startingSide} setStartingSide={setStartingSide} />
 
       {error && <p className="text-sm text-red-500">{error}</p>}
 
@@ -245,12 +277,58 @@ function UrlAnalysisTab() {
   )
 }
 
-function SharedFields({ format, setFormat, sourceType, setSourceType }: {
+function SharedFields({
+  format, setFormat, sourceType, setSourceType,
+  appearanceColor, setAppearanceColor, startingSide, setStartingSide,
+}: {
   format: Format; setFormat: (f: Format) => void
   sourceType: SourceType; setSourceType: (s: SourceType) => void
+  appearanceColor: AppearanceColor | null; setAppearanceColor: (c: AppearanceColor | null) => void
+  startingSide: StartingSide | null; setStartingSide: (s: StartingSide | null) => void
 }) {
   return (
     <>
+      <div className="space-y-3">
+        <div>
+          <label className="text-sm font-medium">What are you wearing?</label>
+          <p className="text-xs text-muted-foreground mt-0.5">Helps the AI pick the right athlete in the video</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {COLOR_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setAppearanceColor(appearanceColor === opt.value ? null : opt.value)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm transition-all ${
+                appearanceColor === opt.value
+                  ? 'border-foreground bg-foreground text-background font-medium'
+                  : 'border-border hover:border-foreground/40'
+              }`}
+            >
+              <span className={`w-3 h-3 rounded-full flex-shrink-0 ${opt.bg}`} />
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          {(['left', 'right'] as StartingSide[]).map((side) => (
+            <button
+              key={side}
+              type="button"
+              onClick={() => setStartingSide(startingSide === side ? null : side)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition-all ${
+                startingSide === side
+                  ? 'border-foreground bg-foreground text-background font-medium'
+                  : 'border-border hover:border-foreground/40'
+              }`}
+            >
+              {side === 'left' ? '← ' : '→ '}Starts {side}
+            </button>
+          ))}
+          <span className="self-center text-xs text-muted-foreground">side of the mat</span>
+        </div>
+      </div>
+
       <div className="space-y-2">
         <label className="text-sm font-medium">Format</label>
         <div className="flex gap-4">
