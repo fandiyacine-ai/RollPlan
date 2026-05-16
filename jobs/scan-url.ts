@@ -7,10 +7,17 @@ import { eq } from 'drizzle-orm'
 import { google, anthropic, GEMINI_URL_SCAN_MODEL, CLAUDE_SYNTHESIS_MODEL, estimateCostUsd } from '../lib/ai/clients'
 import { UrlScanOutputSchema, FoundMatch } from '../lib/ai/schemas/url-scan'
 import { MatchExtractionOutputSchema } from '../lib/ai/schemas/match-extraction'
+import { PositionVerificationSchema } from '../lib/ai/schemas/position-verification'
 import { InsightsOutputSchema } from '../lib/ai/schemas/insights'
 import { buildScanUrlSystemPrompt, buildScanUrlUserPrompt, SCAN_URL_PROMPT_VERSION } from '../lib/ai/prompts/scan-url'
 import { buildExtractMatchSystemPrompt, buildExtractMatchUserPrompt, EXTRACT_MATCH_PROMPT_VERSION } from '../lib/ai/prompts/extract-match'
+import { buildVerifyPositionsSystemPrompt, buildVerifyPositionsUserPrompt, VERIFY_POSITIONS_PROMPT_VERSION } from '../lib/ai/prompts/verify-positions'
 import { buildGenerateInsightsSystemPrompt, GENERATE_INSIGHTS_PROMPT_VERSION } from '../lib/ai/prompts/generate-insights'
+
+const CONFUSION_PRONE = new Set([
+  'closed_guard', 'back_control', 'mount', 'side_control',
+  'turtle', 'north_south', 'half_guard', 'butterfly_guard', 'knee_on_belly',
+])
 
 function videoFilePart(url: string) {
   return { type: 'file' as const, data: new URL(url), mediaType: 'video/mp4' as const }
@@ -181,6 +188,64 @@ export const scanUrl = inngest.createFunction(
           latencyMs: Date.now() - extractStart,
           status: 'success',
         })
+
+        // Verify positions — targeted second pass on confusion-prone / low-confidence segments
+        try {
+          const allSegments = await db.query.positionSegments.findMany({ where: eq(positionSegments.matchId, match.id) })
+          const toVerify = allSegments.filter(s => s.confidence < 0.75 || CONFUSION_PRONE.has(s.positionId))
+
+          if (toVerify.length > 0) {
+            const verifyStart = Date.now()
+            const { object: verifyObject, usage: verifyUsage } = await generateObject({
+              model: google(GEMINI_URL_SCAN_MODEL),
+              schema: PositionVerificationSchema,
+              maxRetries: 0,
+              system: buildVerifyPositionsSystemPrompt(),
+              messages: [{
+                role: 'user',
+                content: [
+                  videoFilePart(video.publicUrl),
+                  { type: 'text', text: buildVerifyPositionsUserPrompt(
+                    toVerify.map((s, i) => ({
+                      index: i,
+                      positionId: s.positionId,
+                      userRole: s.userRole,
+                      dominance: s.dominance,
+                      startSeconds: s.startSeconds,
+                      endSeconds: s.endSeconds,
+                      confidence: s.confidence,
+                    }))
+                  )},
+                ],
+              }],
+            })
+
+            for (const review of verifyObject.reviews) {
+              if (!review.confirmed && review.corrected_position_id && review.confidence >= 0.8) {
+                const seg = toVerify[review.segment_index]
+                if (!seg) continue
+                await db.update(positionSegments).set({
+                  positionId: review.corrected_position_id,
+                  ...(review.corrected_dominance ? { dominance: review.corrected_dominance } : {}),
+                  confidence: review.confidence,
+                }).where(eq(positionSegments.id, seg.id))
+              }
+            }
+
+            await db.insert(aiCallLogs).values({
+              jobId: match.id,
+              model: GEMINI_URL_SCAN_MODEL,
+              promptVersion: VERIFY_POSITIONS_PROMPT_VERSION,
+              tokensIn: verifyUsage.inputTokens ?? 0,
+              tokensOut: verifyUsage.outputTokens ?? 0,
+              costUsdEstimate: estimateCostUsd(GEMINI_URL_SCAN_MODEL, verifyUsage.inputTokens ?? 0, verifyUsage.outputTokens ?? 0),
+              latencyMs: Date.now() - verifyStart,
+              status: 'success',
+            })
+          }
+        } catch {
+          // Verification is best-effort — don't fail the match
+        }
 
         // Generate insights
         const segments = await db.query.positionSegments.findMany({ where: eq(positionSegments.matchId, match.id) })

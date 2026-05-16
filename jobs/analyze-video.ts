@@ -6,9 +6,16 @@ import { videos, matches, positionSegments, matchEvents, insights, aiCallLogs } 
 import { eq } from 'drizzle-orm'
 import { google, anthropic, GEMINI_VIDEO_MODEL, CLAUDE_SYNTHESIS_MODEL, estimateCostUsd } from '../lib/ai/clients'
 import { MatchExtractionOutputSchema } from '../lib/ai/schemas/match-extraction'
+import { PositionVerificationSchema } from '../lib/ai/schemas/position-verification'
 import { InsightsOutputSchema } from '../lib/ai/schemas/insights'
 import { buildExtractMatchSystemPrompt, buildExtractMatchUserPrompt, EXTRACT_MATCH_PROMPT_VERSION } from '../lib/ai/prompts/extract-match'
+import { buildVerifyPositionsSystemPrompt, buildVerifyPositionsUserPrompt, VERIFY_POSITIONS_PROMPT_VERSION } from '../lib/ai/prompts/verify-positions'
 import { buildGenerateInsightsSystemPrompt, GENERATE_INSIGHTS_PROMPT_VERSION } from '../lib/ai/prompts/generate-insights'
+
+const CONFUSION_PRONE = new Set([
+  'closed_guard', 'back_control', 'mount', 'side_control',
+  'turtle', 'north_south', 'half_guard', 'butterfly_guard', 'knee_on_belly',
+])
 
 async function markFailed(matchId: string, videoId: string) {
   await db.update(matches).set({ status: 'failed' }).where(eq(matches.id, matchId))
@@ -133,6 +140,77 @@ export const analyzeVideo = inngest.createFunction(
       })
 
       return { segmentCount: object.positions.length, eventCount: object.events.length }
+    })
+
+    await step.run('verify-positions', async () => {
+      const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
+      if (!video?.publicUrl) return { corrections: 0, skipped: true }
+
+      const allSegments = await db.query.positionSegments.findMany({ where: eq(positionSegments.matchId, matchId) })
+      const toVerify = allSegments.filter(s => s.confidence < 0.75 || CONFUSION_PRONE.has(s.positionId))
+      if (toVerify.length === 0) return { corrections: 0 }
+
+      const start = Date.now()
+      let verifyObject: Awaited<ReturnType<typeof generateObject<typeof PositionVerificationSchema>>>['object']
+      let verifyUsage: Awaited<ReturnType<typeof generateObject<typeof PositionVerificationSchema>>>['usage']
+
+      try {
+        const result = await generateObject({
+          model: google(GEMINI_VIDEO_MODEL),
+          schema: PositionVerificationSchema,
+          maxRetries: 0,
+          system: buildVerifyPositionsSystemPrompt(),
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'file', data: new URL(video.publicUrl), mediaType: video.contentType as `${string}/${string}` },
+              { type: 'text', text: buildVerifyPositionsUserPrompt(
+                toVerify.map((s, i) => ({
+                  index: i,
+                  positionId: s.positionId,
+                  userRole: s.userRole,
+                  dominance: s.dominance,
+                  startSeconds: s.startSeconds,
+                  endSeconds: s.endSeconds,
+                  confidence: s.confidence,
+                }))
+              )},
+            ],
+          }],
+        })
+        verifyObject = result.object
+        verifyUsage = result.usage
+      } catch {
+        // Verification is best-effort — don't fail the job
+        return { corrections: 0, error: 'verification_failed' }
+      }
+
+      let corrections = 0
+      for (const review of verifyObject.reviews) {
+        if (!review.confirmed && review.corrected_position_id && review.confidence >= 0.8) {
+          const seg = toVerify[review.segment_index]
+          if (!seg) continue
+          await db.update(positionSegments).set({
+            positionId: review.corrected_position_id,
+            ...(review.corrected_dominance ? { dominance: review.corrected_dominance } : {}),
+            confidence: review.confidence,
+          }).where(eq(positionSegments.id, seg.id))
+          corrections++
+        }
+      }
+
+      await db.insert(aiCallLogs).values({
+        jobId: matchId,
+        model: GEMINI_VIDEO_MODEL,
+        promptVersion: VERIFY_POSITIONS_PROMPT_VERSION,
+        tokensIn: verifyUsage.inputTokens ?? 0,
+        tokensOut: verifyUsage.outputTokens ?? 0,
+        costUsdEstimate: estimateCostUsd(GEMINI_VIDEO_MODEL, verifyUsage.inputTokens ?? 0, verifyUsage.outputTokens ?? 0),
+        latencyMs: Date.now() - start,
+        status: 'success',
+      })
+
+      return { corrections, reviewed: toVerify.length }
     })
 
     await step.run('generate-insights', async () => {
