@@ -90,11 +90,7 @@ Coaching guidelines:
     messages: [{
       role: 'user',
       content: [
-        ...(frameDataUrl ? [{
-          type: 'image' as const,
-          image: frameDataUrl.replace(/^data:image\/\w+;base64,/, ''),
-          mimeType: 'image/jpeg' as const,
-        }] : []),
+        ...(frameDataUrl ? [{ type: 'image' as const, image: frameDataUrl }] : []),
         { type: 'text' as const, text: message },
       ],
     }],
