@@ -173,7 +173,7 @@ export default function CoachSession({
     const recognition = new SR()
     recognition.lang = LANG_STT[lang]
     recognition.interimResults = true
-    recognition.continuous = false
+    recognition.continuous = true
     let finalTranscript = ''
     recognition.onresult = (e: any) => {
       let interim = ''
@@ -187,7 +187,10 @@ export default function CoachSession({
       setIsListening(false); setLiveTranscript('')
       if (finalTranscript.trim()) sendMessage(finalTranscript.trim())
     }
-    recognition.onerror = () => { setIsListening(false); setLiveTranscript('') }
+    recognition.onerror = (e: any) => {
+      if (e.error === 'no-speech') return
+      setIsListening(false); setLiveTranscript('')
+    }
     recognitionRef.current = recognition
     recognition.start()
     setIsListening(true)
