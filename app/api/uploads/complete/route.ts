@@ -1,32 +1,45 @@
-import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '../../../../lib/db'
-import { videos } from '../../../../lib/db/schema'
+import { videos, matches } from '../../../../lib/db/schema'
+import { getPublicUrl } from '../../../../lib/storage/supabase-storage'
 import { inngest } from '../../../../lib/inngest'
+import { eq } from 'drizzle-orm'
+
+export const maxDuration = 30
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  try {
+    const { videoId, path, sourceType, format, appearanceHint } = await req.json()
 
-  const { r2Key, originalFilename, contentType, sizeBytes, sourceType } = await req.json()
+    if (!videoId || !path) return NextResponse.json({ error: 'videoId and path are required' }, { status: 400 })
 
-  // Look up the db user record
-  const { users } = await import('../../../../lib/db/schema')
-  const { eq } = await import('drizzle-orm')
-  const user = await db.query.users.findFirst({ where: eq(users.clerkId, userId) })
-  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    const publicUrl = getPublicUrl(path)
 
-  const [video] = await db.insert(videos).values({
-    userId: user.id,
-    r2Key,
-    originalFilename,
-    contentType,
-    sizeBytes,
-    sourceType,
-    status: 'uploaded',
-  }).returning()
+    await db.update(videos).set({ publicUrl }).where(eq(videos.id, videoId))
 
-  await inngest.send({ name: 'video/uploaded', data: { videoId: video.id } })
+    const context = sourceType === 'own_sparring' ? 'sparring' : 'competition'
 
-  return NextResponse.json({ videoId: video.id })
+    const [match] = await db.insert(matches).values({
+      videoId,
+      userId: null,
+      competitorLabel: 'you',
+      opponentLabel: 'unknown',
+      format: (format ?? 'gi') as 'gi' | 'no_gi',
+      context: context as 'competition' | 'sparring',
+      ruleset: 'ibjjf',
+      status: 'pending',
+    }).returning()
+
+    try {
+      await inngest.send({ name: 'video/uploaded', data: { videoId, matchId: match.id, appearanceHint } })
+    } catch {
+      // Inngest not configured — upload succeeded but analysis won't start
+    }
+
+    return NextResponse.json({ videoId, matchId: match.id })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[uploads/complete]', message)
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
 }

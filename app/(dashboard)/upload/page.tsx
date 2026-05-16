@@ -62,33 +62,51 @@ function FileUploadTab() {
     setProgress(0)
     setError(null)
 
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('sourceType', sourceType)
-    formData.append('format', format)
     const hint = buildAppearanceHint(appearanceColor, startingSide)
-    if (hint) formData.append('appearanceHint', hint)
 
-    await new Promise<void>((resolve, reject) => {
-      const xhr = new XMLHttpRequest()
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100))
-      }
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          setState('success')
-          resolve()
-        } else {
-          const msg = (() => { try { return JSON.parse(xhr.responseText)?.error } catch { return null } })() ?? 'Upload failed'
-          setError(msg)
-          setState('error')
-          reject()
+    try {
+      // Step 1: get a presigned upload URL (small JSON request — no file body)
+      const presignRes = await fetch('/api/uploads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size, sourceType, format, appearanceHint: hint || undefined }),
+      })
+      const presignData = await presignRes.json()
+      if (!presignRes.ok) { setError(presignData.error ?? 'Failed to prepare upload'); setState('error'); return }
+
+      const { uploadUrl, path, videoId } = presignData
+
+      // Step 2: upload directly to Supabase (bypasses Railway — no size limit)
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100))
         }
+        xhr.onload = () => xhr.status < 300 ? resolve() : reject(new Error(`Storage upload failed: ${xhr.status}`))
+        xhr.onerror = () => reject(new Error('Network error during upload'))
+        xhr.open('PUT', uploadUrl)
+        xhr.setRequestHeader('Content-Type', file.type)
+        xhr.send(file)
+      })
+
+      // Step 3: notify server to set publicUrl and trigger analysis
+      const completeRes = await fetch('/api/uploads/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoId, path, sourceType, format, appearanceHint: hint || undefined }),
+      })
+      if (!completeRes.ok) {
+        const d = await completeRes.json().catch(() => ({}))
+        setError(d.error ?? 'Upload complete but analysis could not start')
+        setState('error')
+        return
       }
-      xhr.onerror = () => { setError('Network error — check your connection'); setState('error'); reject() }
-      xhr.open('POST', '/api/uploads')
-      xhr.send(formData)
-    }).catch(() => {})
+
+      setState('success')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed')
+      setState('error')
+    }
   }
 
   if (state === 'success') {
