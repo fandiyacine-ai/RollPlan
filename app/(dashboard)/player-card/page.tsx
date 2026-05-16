@@ -1,6 +1,7 @@
 import { db } from '../../../lib/db'
 import { matches, insights, videos } from '../../../lib/db/schema'
 import { desc, eq, inArray } from 'drizzle-orm'
+import Link from 'next/link'
 import RefreshPoller from './refresh-poller'
 
 export const dynamic = 'force-dynamic'
@@ -91,9 +92,19 @@ export default async function PlayerCardPage() {
                     {' · '}{match.createdAt.toLocaleDateString()}
                   </p>
                 </div>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_BADGE[match.status]}`}>
-                  {match.status}
-                </span>
+                <div className="flex items-center gap-2">
+                  {match.status === 'analysed' && (
+                    <Link
+                      href={`/matches/${match.id}/coach`}
+                      className="text-xs px-3 py-1 rounded-full bg-foreground text-background font-medium hover:opacity-90 transition-opacity"
+                    >
+                      Coach
+                    </Link>
+                  )}
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_BADGE[match.status]}`}>
+                    {match.status}
+                  </span>
+                </div>
               </div>
 
               {match.status === 'analysed' && matchInsights.length === 0 && (
