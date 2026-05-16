@@ -1,6 +1,6 @@
 import { db } from '../../../lib/db'
 import { matches, insights, videos } from '../../../lib/db/schema'
-import { desc, eq, inArray } from 'drizzle-orm'
+import { desc, eq, inArray, isNull } from 'drizzle-orm'
 import Link from 'next/link'
 import RefreshPoller from './refresh-poller'
 
@@ -49,6 +49,21 @@ export default async function PlayerCardPage() {
     .orderBy(desc(matches.createdAt))
     .limit(10)
 
+  // Videos that are still being scanned (no match records created yet)
+  const scanningVideos = await db
+    .select({
+      id: videos.id,
+      originalFilename: videos.originalFilename,
+      sourceType: videos.sourceType,
+      status: videos.status,
+      uploadedAt: videos.uploadedAt,
+    })
+    .from(videos)
+    .leftJoin(matches, eq(matches.videoId, videos.id))
+    .where(isNull(matches.id))
+    .orderBy(desc(videos.uploadedAt))
+    .limit(5)
+
   const analysedIds = recentMatches
     .filter((m) => m.status === 'analysed')
     .map((m) => m.id)
@@ -57,11 +72,11 @@ export default async function PlayerCardPage() {
     ? await db.select().from(insights).where(inArray(insights.matchId, analysedIds))
     : []
 
-  const isProcessing = recentMatches.some(
-    (m) => m.status === 'pending' || m.status === 'processing'
-  )
+  const isProcessing =
+    scanningVideos.length > 0 ||
+    recentMatches.some((m) => m.status === 'pending' || m.status === 'processing')
 
-  if (recentMatches.length === 0) {
+  if (recentMatches.length === 0 && scanningVideos.length === 0) {
     return (
       <div className="space-y-4 max-w-2xl">
         <h1 className="text-2xl font-bold">Player Card</h1>
@@ -75,6 +90,26 @@ export default async function PlayerCardPage() {
       <h1 className="text-2xl font-bold">Player Card</h1>
 
       {isProcessing && <RefreshPoller />}
+
+      {scanningVideos.length > 0 && (
+        <div className="space-y-2">
+          {scanningVideos.map((v) => (
+            <div key={v.id} className="rounded-lg border border-dashed p-4 flex items-center justify-between gap-4">
+              <div>
+                <p className="font-medium text-sm truncate max-w-xs">
+                  {v.originalFilename}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {v.sourceType === 'public_url' ? 'Scanning URL for matches…' : 'Queued for analysis…'}
+                </p>
+              </div>
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-100 text-blue-700 flex-shrink-0">
+                scanning
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="space-y-8">
         {recentMatches.map((match) => {
