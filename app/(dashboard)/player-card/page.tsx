@@ -1,7 +1,7 @@
 import React from 'react'
 import { db } from '../../../lib/db'
 import { matches, insights, videos, positionSegments, matchEvents, users } from '../../../lib/db/schema'
-import { desc, eq, inArray, isNull, and, ne } from 'drizzle-orm'
+import { desc, eq, inArray, isNull, and, ne, or } from 'drizzle-orm'
 import Link from 'next/link'
 import RefreshPoller from './refresh-poller'
 import { DeleteMatchButton } from './delete-match-button'
@@ -54,6 +54,10 @@ export default async function PlayerCardPage() {
     ? [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || clerkUser.emailAddresses?.[0]?.emailAddress || 'Athlete'
     : 'Athlete'
 
+  const matchFilter = dbUser
+    ? or(eq(matches.userId, dbUser.id), isNull(matches.userId))
+    : isNull(matches.userId)
+
   const recentMatches = await db
     .select({
       id: matches.id,
@@ -70,10 +74,15 @@ export default async function PlayerCardPage() {
     })
     .from(matches)
     .leftJoin(videos, eq(matches.videoId, videos.id))
+    .where(matchFilter)
     .orderBy(desc(matches.createdAt))
     .limit(20)
 
   // Videos with no matches: split into actively processing vs failed
+  const videoFilter = dbUser
+    ? or(eq(videos.userId, dbUser.id), isNull(videos.userId))
+    : isNull(videos.userId)
+
   const videosWithNoMatches = await db
     .select({
       id: videos.id,
@@ -84,7 +93,7 @@ export default async function PlayerCardPage() {
     })
     .from(videos)
     .leftJoin(matches, eq(matches.videoId, videos.id))
-    .where(and(isNull(matches.id), ne(videos.status, 'analysed')))
+    .where(and(isNull(matches.id), ne(videos.status, 'analysed'), videoFilter))
     .orderBy(desc(videos.uploadedAt))
     .limit(20)
 
