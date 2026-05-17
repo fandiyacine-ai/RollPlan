@@ -8,7 +8,7 @@ type ScanMode = 'single' | 'scan'
 type SourceType = 'own_competition' | 'own_sparring' | 'opponent'
 type Format = 'gi' | 'no_gi'
 type UploadState = 'idle' | 'uploading' | 'success' | 'error'
-type AppearanceColor = 'blue_gi' | 'white_gi' | 'dark_rash' | 'light_rash' | 'other'
+type AppearanceColor = 'blue_gi' | 'white_gi' | 'black_gi' | 'dark_rash' | 'light_rash' | 'other'
 type StartingSide = 'left' | 'right'
 
 const SOURCE_LABELS: Record<SourceType, string> = {
@@ -20,14 +20,15 @@ const SOURCE_LABELS: Record<SourceType, string> = {
 const COLOR_OPTIONS: { value: AppearanceColor; label: string; bg: string }[] = [
   { value: 'blue_gi',    label: 'Blue Gi',    bg: 'bg-blue-600' },
   { value: 'white_gi',   label: 'White Gi',   bg: 'bg-white border border-gray-300' },
+  { value: 'black_gi',   label: 'Black Gi',   bg: 'bg-neutral-900' },
   { value: 'dark_rash',  label: 'Dark Rash',  bg: 'bg-gray-800' },
   { value: 'light_rash', label: 'Light Rash', bg: 'bg-gray-200 border border-gray-300' },
   { value: 'other',      label: 'Other',      bg: 'bg-gradient-to-br from-purple-400 to-pink-400' },
 ]
 
 const COLOR_HINT: Record<AppearanceColor, string> = {
-  blue_gi: 'blue gi', white_gi: 'white gi', dark_rash: 'dark rashguard',
-  light_rash: 'light rashguard', other: 'other-coloured kit',
+  blue_gi: 'blue gi', white_gi: 'white gi', black_gi: 'black gi',
+  dark_rash: 'dark rashguard', light_rash: 'light rashguard', other: 'other-coloured kit',
 }
 
 function buildAppearanceHint(color: AppearanceColor | null, side: StartingSide | null): string {
