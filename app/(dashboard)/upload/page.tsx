@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 type Tab = 'file' | 'url'
@@ -53,6 +53,7 @@ function extractYouTubeId(url: string): string | null {
 
 function FileUploadTab() {
   const [file, setFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [scanMode, setScanMode] = useState<ScanMode>('single')
   const [athleteName, setAthleteName] = useState('')
   const [eventName, setEventName] = useState('')
@@ -66,6 +67,13 @@ function FileUploadTab() {
   const [isDragging, setIsDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
+
+  useEffect(() => {
+    if (!file) { setPreviewUrl(null); return }
+    const url = URL.createObjectURL(file)
+    setPreviewUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file])
 
   function pickFile(f: File) {
     if (!f.type.startsWith('video/')) { setError('Only video files are accepted'); return }
@@ -178,6 +186,21 @@ function FileUploadTab() {
           </div>
         )}
       </div>
+
+      {previewUrl && (
+        <div className="rounded-md border overflow-hidden bg-black">
+          <video
+            src={previewUrl}
+            className="w-full max-h-48 object-contain"
+            preload="metadata"
+            muted
+            playsInline
+          />
+          <p className="px-3 py-2 text-xs text-muted-foreground bg-muted/50">
+            Use the appearance options below to tell the AI which athlete is <strong>you</strong> in this video.
+          </p>
+        </div>
+      )}
 
       <div className="space-y-3">
         <label className="text-sm font-medium">Recording type</label>
