@@ -12,10 +12,21 @@ export function isYouTubeUrl(url: string): boolean {
   return /(?:youtube\.com\/watch|youtu\.be\/)/i.test(url)
 }
 
+// Gemini's responseSchema is a strict subset of JSON Schema.
+// Strip fields it rejects: additionalProperties, $schema, $defs, minItems, maxItems, minimum, maximum.
+function sanitizeForGemini(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(sanitizeForGemini)
+  if (node === null || typeof node !== 'object') return node
+  const out: Record<string, unknown> = {}
+  const BLOCKED = new Set(['additionalProperties', '$schema', '$defs', '$ref', 'minItems', 'maxItems', 'minimum', 'maximum', 'minLength', 'maxLength', 'pattern', 'const'])
+  for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+    if (!BLOCKED.has(k)) out[k] = sanitizeForGemini(v)
+  }
+  return out
+}
+
 function buildGeminiSchema(schema: z.ZodTypeAny): unknown {
-  const js = z.toJSONSchema(schema) as Record<string, unknown>
-  delete js['$schema']
-  return js
+  return sanitizeForGemini(z.toJSONSchema(schema))
 }
 
 export async function geminiVideoObject<T extends z.ZodTypeAny>(
