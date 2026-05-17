@@ -338,7 +338,9 @@ export default async function PlayerCardPage() {
         {/* ── RIGHT: Match Feed Timeline ── */}
         <div className="w-full lg:w-72 xl:w-80 flex-shrink-0 lg:sticky lg:top-20">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Match Feed</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              Match Feed {recentMatches.length > 0 && <span className="font-normal opacity-50">({recentMatches.length})</span>}
+            </h2>
             <ClearAllButton />
           </div>
 
@@ -350,20 +352,35 @@ export default async function PlayerCardPage() {
                 <div className="absolute left-[6px] top-5 bottom-8 w-px bg-border/60" />
               )}
               <div>
-                {recentMatches.map((match) => {
-                  const matchSegs = allSegments.filter(s => s.matchId === match.id)
-                  const matchInsightsList = allInsights.filter(i => i.matchId === match.id)
-                  return (
-                    <TimelineMatchItem
-                      key={match.id}
-                      match={match}
-                      segments={matchSegs}
-                      insightsList={matchInsightsList}
-                      thumbnailUrl={match.videoPublicUrl ?? null}
-                      deleteButton={<DeleteMatchButton matchId={match.id} videoId={match.videoId ?? ''} />}
-                    />
-                  )
-                })}
+                {(() => {
+                  let lastYear: number | null = null
+                  return recentMatches.map((match) => {
+                    const matchYear = match.createdAt.getFullYear()
+                    const showYear = matchYear !== lastYear
+                    lastYear = matchYear
+                    const matchSegs = allSegments.filter(s => s.matchId === match.id)
+                    const matchInsightsList = allInsights.filter(i => i.matchId === match.id)
+                    return (
+                      <div key={match.id}>
+                        {showYear && (
+                          <div className="relative pl-7 pb-2 pt-1">
+                            <div className="absolute left-0 top-[14px] w-3 h-3 rounded-full bg-background border border-border/60 z-10" />
+                            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
+                              {matchYear}
+                            </span>
+                          </div>
+                        )}
+                        <TimelineMatchItem
+                          match={match}
+                          segments={matchSegs}
+                          insightsList={matchInsightsList}
+                          thumbnailUrl={match.videoPublicUrl ?? null}
+                          deleteButton={<DeleteMatchButton matchId={match.id} videoId={match.videoId ?? ''} />}
+                        />
+                      </div>
+                    )
+                  })
+                })()}
               </div>
             </div>
           )}
@@ -433,7 +450,7 @@ function TimelineMatchItem({
     eventName: string | null; createdAt: Date
   }
   segments: { endSeconds: number; startSeconds: number; positionId: string; dominance: string }[]
-  insightsList: { id: string; category: string; description: string }[]
+  insightsList: { id: string; category: string; description: string; confidence: number }[]
   thumbnailUrl: string | null
   deleteButton: React.ReactNode
 }) {
@@ -450,6 +467,10 @@ function TimelineMatchItem({
     ?? insightsList.find(i => i.category === 'opportunity')
     ?? insightsList[0]
   const extraCount = insightsList.length - 1
+
+  const avgConfidence = insightsList.length > 0
+    ? Math.round(insightsList.reduce((acc, i) => acc + i.confidence, 0) / insightsList.length * 100)
+    : null
 
   const title = matchTitle(match)
 
@@ -509,6 +530,17 @@ function TimelineMatchItem({
                 <>
                   <span className="opacity-40">·</span>
                   <span className="truncate">{POSITION_MAP[topPos] ?? topPos}</span>
+                </>
+              )}
+              {avgConfidence !== null && (
+                <>
+                  <span className="opacity-40">·</span>
+                  <span className="inline-flex items-center gap-0.5">
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" className="opacity-60">
+                      <path d="M12 2L9.19 8.63L2 9.24l5.46 4.73L5.82 21 12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2z"/>
+                    </svg>
+                    <span>{avgConfidence}%</span>
+                  </span>
                 </>
               )}
             </div>
