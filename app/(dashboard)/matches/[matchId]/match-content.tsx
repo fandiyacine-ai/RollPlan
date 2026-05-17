@@ -17,7 +17,7 @@ type InsightRow = {
 
 type SpatialData = {
   roi: { x1: number; y1: number; x2: number; y2: number }
-  athlete: { x: number; y: number }
+  athlete: { x1: number; y1: number; x2: number; y2: number }
 }
 
 function formatTime(seconds: number): string {
@@ -79,35 +79,26 @@ function drawOverlay(canvas: HTMLCanvasElement, spatial: SpatialData) {
   ctx.textBaseline = 'middle'
   ctx.fillText(label, rx + 6, ry - 10)
 
-  // Athlete position marker
-  const ax = athlete.x * W
-  const ay = athlete.y * H
-  ctx.beginPath()
-  ctx.arc(ax, ay, 20, 0, Math.PI * 2)
-  ctx.strokeStyle = 'rgba(239,68,68,0.4)'
-  ctx.lineWidth = 7
-  ctx.stroke()
-  ctx.beginPath()
-  ctx.arc(ax, ay, 10, 0, Math.PI * 2)
-  ctx.fillStyle = '#ef4444'
-  ctx.fill()
-  ctx.beginPath()
-  ctx.arc(ax, ay, 10, 0, Math.PI * 2)
-  ctx.strokeStyle = 'white'
-  ctx.lineWidth = 2
-  ctx.stroke()
+  // Red athlete box (athlete already destructured above)
+  const abx = athlete.x1 * W, aby = athlete.y1 * H
+  const abw = (athlete.x2 - athlete.x1) * W, abh = (athlete.y2 - athlete.y1) * H
+  ctx.strokeStyle = '#ef4444'
+  ctx.lineWidth = 2.5
+  ctx.setLineDash([6, 3])
+  ctx.strokeRect(abx, aby, abw, abh)
+  ctx.setLineDash([])
 
-  // "YOU" badge
+  // "YOU" label above athlete box
   ctx.font = 'bold 11px sans-serif'
   const yw = ctx.measureText('YOU').width
   ctx.fillStyle = '#ef4444'
   ctx.beginPath()
-  ctx.roundRect(ax + 16, ay - 9, yw + 10, 18, 3)
+  ctx.roundRect(abx, aby - 20, yw + 10, 20, [3, 3, 0, 0])
   ctx.fill()
   ctx.fillStyle = 'white'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'middle'
-  ctx.fillText('YOU', ax + 21, ay)
+  ctx.fillText('YOU', abx + 5, aby - 10)
 }
 
 export function MatchContent({

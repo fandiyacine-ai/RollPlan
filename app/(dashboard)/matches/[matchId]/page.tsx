@@ -205,7 +205,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
             videoUrl={video?.publicUrl ?? null}
             matchInsights={matchInsights}
             segmentsById={Object.fromEntries(segments.map((s) => [s.id, { id: s.id, startSeconds: s.startSeconds, endSeconds: s.endSeconds }]))}
-            spatialData={(match.spatialData as { roi: { x1: number; y1: number; x2: number; y2: number }; athlete: { x: number; y: number } } | null) ?? null}
+            spatialData={(match.spatialData as { roi: { x1: number; y1: number; x2: number; y2: number }; athlete: { x1: number; y1: number; x2: number; y2: number } } | null) ?? null}
           />
         </>
       )}

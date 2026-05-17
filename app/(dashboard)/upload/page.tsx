@@ -13,7 +13,7 @@ type StartingSide = 'left' | 'right'
 type Rect = { x1: number; y1: number; x2: number; y2: number }
 type Pt = { x: number; y: number }
 type Frame = { dataUrl: string; naturalW: number; naturalH: number; label?: 'entry' }
-type SpatialData = { roi: Rect; athlete: Pt }
+type SpatialData = { roi: Rect; athlete: Rect }
 type FrameResult = { spatialHint: string; athleteImageBase64: string; spatialData: SpatialData }
 
 const SOURCE_LABELS: Record<SourceType, string> = {
@@ -43,16 +43,14 @@ function buildAppearanceHint(color: AppearanceColor | null, side: StartingSide |
   return parts.join(', ')
 }
 
-function buildSpatialHint(roi: Rect, athlete: Pt): string {
-  const l = Math.round(Math.min(roi.x1, roi.x2) * 100)
-  const r = Math.round(Math.max(roi.x1, roi.x2) * 100)
-  const t = Math.round(Math.min(roi.y1, roi.y2) * 100)
-  const b = Math.round(Math.max(roi.y1, roi.y2) * 100)
-  const ax = Math.round(athlete.x * 100)
-  const ay = Math.round(athlete.y * 100)
-  const hPos = athlete.x < (Math.min(roi.x1, roi.x2) + Math.max(roi.x1, roi.x2)) / 2 ? 'left' : 'right'
-  const vPos = athlete.y < (Math.min(roi.y1, roi.y2) + Math.max(roi.y1, roi.y2)) / 2 ? 'upper' : 'lower'
-  return `Focus ONLY on the match within the region spanning ${l}%–${r}% of frame width and ${t}%–${b}% of frame height — ignore all athletes and matches outside this area. Within that mat, the competitor to track is on the ${hPos} ${vPos} side (full-frame position: ${ax}% from left, ${ay}% from top).`
+function buildSpatialHint(roi: Rect, athlete: Rect): string {
+  const l = Math.round(roi.x1 * 100), r = Math.round(roi.x2 * 100)
+  const t = Math.round(roi.y1 * 100), b = Math.round(roi.y2 * 100)
+  const al = Math.round(athlete.x1 * 100), ar = Math.round(athlete.x2 * 100)
+  const at_ = Math.round(athlete.y1 * 100), ab = Math.round(athlete.y2 * 100)
+  const cx = (athlete.x1 + athlete.x2) / 2
+  const hPos = cx < (roi.x1 + roi.x2) / 2 ? 'left' : 'right'
+  return `Focus ONLY on the match within the region spanning ${l}%–${r}% of frame width and ${t}%–${b}% of frame height — ignore all athletes and matches outside this area. Within that mat, the competitor to track is the athlete on the ${hPos} side, inside the bounding box spanning ${al}%–${ar}% horizontally and ${at_}%–${ab}% vertically.`
 }
 
 function extractYouTubeId(url: string): string | null {
@@ -118,19 +116,22 @@ async function extractFramesAt(
   }
 }
 
-function cropFrame(frame: Frame, pt: Pt): Promise<string> {
+// Crop the exact bounding box the user drew, scaled to at most 400px on the longer side.
+function cropAthleteBox(frame: Frame, box: Rect): Promise<string> {
   return new Promise((resolve, reject) => {
-    const CROP = Math.min(380, frame.naturalW, frame.naturalH)
-    const cx = Math.round(pt.x * frame.naturalW)
-    const cy = Math.round(pt.y * frame.naturalH)
-    const sx = Math.max(0, Math.min(cx - CROP / 2, frame.naturalW - CROP))
-    const sy = Math.max(0, Math.min(cy - CROP / 2, frame.naturalH - CROP))
+    const sx = Math.round(box.x1 * frame.naturalW)
+    const sy = Math.round(box.y1 * frame.naturalH)
+    const sw = Math.max(4, Math.round((box.x2 - box.x1) * frame.naturalW))
+    const sh = Math.max(4, Math.round((box.y2 - box.y1) * frame.naturalH))
+    const scale = Math.min(400 / sw, 400 / sh, 1)
+    const dw = Math.max(1, Math.round(sw * scale))
+    const dh = Math.max(1, Math.round(sh * scale))
     const img = new Image()
     img.onload = () => {
       const c = document.createElement('canvas')
-      c.width = CROP; c.height = CROP
-      c.getContext('2d')!.drawImage(img, sx, sy, CROP, CROP, 0, 0, CROP, CROP)
-      resolve(c.toDataURL('image/jpeg', 0.8).replace(/^data:image\/jpeg;base64,/, ''))
+      c.width = dw; c.height = dh
+      c.getContext('2d')!.drawImage(img, sx, sy, sw, sh, 0, 0, dw, dh)
+      resolve(c.toDataURL('image/jpeg', 0.85).replace(/^data:image\/jpeg;base64,/, ''))
     }
     img.onerror = reject
     img.src = frame.dataUrl
@@ -149,7 +150,6 @@ function FrameSelector({
   onComplete: (result: FrameResult | null) => void
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const justFinishedRoi = useRef(false)
   const [frames, setFrames] = useState<Frame[]>([])
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
   const [phase, setPhase] = useState<SelectorPhase>('loading')
@@ -157,7 +157,7 @@ function FrameSelector({
   const [roi, setRoi] = useState<Rect | null>(null)
   const [dragStart, setDragStart] = useState<Pt | null>(null)
   const [dragCurrent, setDragCurrent] = useState<Pt | null>(null)
-  const [athletePt, setAthletePt] = useState<Pt | null>(null)
+  const [athleteBox, setAthleteBox] = useState<Rect | null>(null)
   const [canvasDims, setCanvasDims] = useState({ w: 0, h: 0 })
 
   useEffect(() => {
@@ -191,7 +191,7 @@ function FrameSelector({
   async function refreshFrames() {
     setLoadingFrames(true)
     setSelectedIdx(null)
-    setRoi(null); setDragStart(null); setDragCurrent(null); setAthletePt(null)
+    setRoi(null); setDragStart(null); setDragCurrent(null); setAthleteBox(null)
     setPhase('pick-frame')
     onComplete(null)
     try {
@@ -204,7 +204,7 @@ function FrameSelector({
 
   function selectFrame(idx: number) {
     setSelectedIdx(idx)
-    setRoi(null); setDragStart(null); setDragCurrent(null); setAthletePt(null)
+    setRoi(null); setDragStart(null); setDragCurrent(null); setAthleteBox(null)
     setCanvasDims({ w: 0, h: 0 })
     setPhase('draw-roi')
     onComplete(null)
@@ -218,8 +218,11 @@ function FrameSelector({
     const W = canvas.width, H = canvas.height
     ctx.clearRect(0, 0, W, H)
 
+    // Green ROI box — use committed roi or live drag in draw-roi phase
     const activeRoi: Rect | null = roi
-      ?? (dragStart && dragCurrent ? { x1: dragStart.x, y1: dragStart.y, x2: dragCurrent.x, y2: dragCurrent.y } : null)
+      ?? (phase === 'draw-roi' && dragStart && dragCurrent
+          ? { x1: dragStart.x, y1: dragStart.y, x2: dragCurrent.x, y2: dragCurrent.y }
+          : null)
 
     if (!activeRoi) return
 
@@ -238,35 +241,36 @@ function FrameSelector({
     ctx.lineWidth = 2
     ctx.strokeRect(rx, ry, rw, rh)
 
-    if (athletePt) {
-      const px = athletePt.x * W
-      const py = athletePt.y * H
-      ctx.beginPath()
-      ctx.arc(px, py, 22, 0, Math.PI * 2)
-      ctx.strokeStyle = 'rgba(239,68,68,0.45)'
-      ctx.lineWidth = 6
-      ctx.stroke()
-      ctx.beginPath()
-      ctx.arc(px, py, 14, 0, Math.PI * 2)
-      ctx.strokeStyle = 'white'
-      ctx.lineWidth = 2
-      ctx.stroke()
-      ctx.beginPath()
-      ctx.arc(px, py, 10, 0, Math.PI * 2)
-      ctx.fillStyle = '#ef4444'
-      ctx.fill()
+    // Red athlete box — use committed box or live drag in mark-athlete phase
+    const activeAthleteBox: Rect | null = athleteBox
+      ?? (phase === 'mark-athlete' && dragStart && dragCurrent
+          ? { x1: Math.min(dragStart.x, dragCurrent.x), y1: Math.min(dragStart.y, dragCurrent.y),
+              x2: Math.max(dragStart.x, dragCurrent.x), y2: Math.max(dragStart.y, dragCurrent.y) }
+          : null)
+
+    if (activeAthleteBox) {
+      const ax = activeAthleteBox.x1 * W
+      const ay = activeAthleteBox.y1 * H
+      const aw = (activeAthleteBox.x2 - activeAthleteBox.x1) * W
+      const ah = (activeAthleteBox.y2 - activeAthleteBox.y1) * H
+      ctx.strokeStyle = '#ef4444'
+      ctx.lineWidth = 2.5
+      ctx.setLineDash([6, 3])
+      ctx.strokeRect(ax, ay, aw, ah)
+      ctx.setLineDash([])
+      // "YOU" label above the box
       ctx.font = 'bold 11px sans-serif'
       const lw = ctx.measureText('YOU').width
       ctx.fillStyle = '#ef4444'
       ctx.beginPath()
-      ctx.roundRect(px + 18, py - 9, lw + 10, 18, 3)
+      ctx.roundRect(ax, ay - 20, lw + 10, 20, [3, 3, 0, 0])
       ctx.fill()
       ctx.fillStyle = 'white'
       ctx.textAlign = 'left'
       ctx.textBaseline = 'middle'
-      ctx.fillText('YOU', px + 23, py)
+      ctx.fillText('YOU', ax + 5, ay - 10)
     }
-  }, [roi, dragStart, dragCurrent, athletePt, canvasDims])
+  }, [roi, dragStart, dragCurrent, athleteBox, canvasDims, phase])
 
   function getPoint(e: React.MouseEvent<HTMLCanvasElement>): Pt {
     const r = canvasRef.current!.getBoundingClientRect()
@@ -274,50 +278,51 @@ function FrameSelector({
   }
 
   function handleMouseDown(e: React.MouseEvent<HTMLCanvasElement>) {
-    if (phase !== 'draw-roi') return
+    if (phase !== 'draw-roi' && phase !== 'mark-athlete') return
     e.preventDefault()
     setDragStart(getPoint(e))
     setDragCurrent(null)
   }
 
   function handleMouseMove(e: React.MouseEvent<HTMLCanvasElement>) {
-    if (phase !== 'draw-roi' || !dragStart) return
+    if ((phase !== 'draw-roi' && phase !== 'mark-athlete') || !dragStart) return
     setDragCurrent(getPoint(e))
   }
 
-  function handleMouseUp(e: React.MouseEvent<HTMLCanvasElement>) {
-    if (phase !== 'draw-roi' || !dragStart) return
+  async function handleMouseUp(e: React.MouseEvent<HTMLCanvasElement>) {
+    if (!dragStart) return
     const end = getPoint(e)
-    if (Math.abs(end.x - dragStart.x) < 0.04 || Math.abs(end.y - dragStart.y) < 0.04) {
-      setDragStart(null); setDragCurrent(null); return
-    }
-    setRoi({ x1: dragStart.x, y1: dragStart.y, x2: end.x, y2: end.y })
-    setDragStart(null); setDragCurrent(null)
-    justFinishedRoi.current = true
-    setPhase('mark-athlete')
-  }
 
-  async function handleClick(e: React.MouseEvent<HTMLCanvasElement>) {
-    if (justFinishedRoi.current) { justFinishedRoi.current = false; return }
-    if (phase !== 'mark-athlete' || !roi || !selectedFrame) return
-    const pt = getPoint(e)
-    if (
-      pt.x < Math.min(roi.x1, roi.x2) || pt.x > Math.max(roi.x1, roi.x2) ||
-      pt.y < Math.min(roi.y1, roi.y2) || pt.y > Math.max(roi.y1, roi.y2)
-    ) return
-    setAthletePt(pt)
-    setPhase('done')
-    const athleteImageBase64 = await cropFrame(selectedFrame, pt)
-    const normalizedRoi: Rect = {
-      x1: Math.min(roi.x1, roi.x2), y1: Math.min(roi.y1, roi.y2),
-      x2: Math.max(roi.x1, roi.x2), y2: Math.max(roi.y1, roi.y2),
+    if (phase === 'draw-roi') {
+      if (Math.abs(end.x - dragStart.x) < 0.04 || Math.abs(end.y - dragStart.y) < 0.04) {
+        setDragStart(null); setDragCurrent(null); return
+      }
+      setRoi({ x1: dragStart.x, y1: dragStart.y, x2: end.x, y2: end.y })
+      setDragStart(null); setDragCurrent(null)
+      setPhase('mark-athlete')
+    } else if (phase === 'mark-athlete' && roi && selectedFrame) {
+      if (Math.abs(end.x - dragStart.x) < 0.03 || Math.abs(end.y - dragStart.y) < 0.03) {
+        setDragStart(null); setDragCurrent(null); return
+      }
+      const box: Rect = {
+        x1: Math.min(dragStart.x, end.x), y1: Math.min(dragStart.y, end.y),
+        x2: Math.max(dragStart.x, end.x), y2: Math.max(dragStart.y, end.y),
+      }
+      const normalizedRoi: Rect = {
+        x1: Math.min(roi.x1, roi.x2), y1: Math.min(roi.y1, roi.y2),
+        x2: Math.max(roi.x1, roi.x2), y2: Math.max(roi.y1, roi.y2),
+      }
+      setAthleteBox(box)
+      setDragStart(null); setDragCurrent(null)
+      setPhase('done')
+      const athleteImageBase64 = await cropAthleteBox(selectedFrame, box)
+      onComplete({ spatialHint: buildSpatialHint(normalizedRoi, box), athleteImageBase64, spatialData: { roi: normalizedRoi, athlete: box } })
     }
-    onComplete({ spatialHint: buildSpatialHint(roi, pt), athleteImageBase64, spatialData: { roi: normalizedRoi, athlete: pt } })
   }
 
   function reset() {
     setSelectedIdx(null)
-    setRoi(null); setDragStart(null); setDragCurrent(null); setAthletePt(null)
+    setRoi(null); setDragStart(null); setDragCurrent(null); setAthleteBox(null)
     setPhase('pick-frame')
     onComplete(null)
   }
@@ -396,8 +401,8 @@ function FrameSelector({
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium">
-              {phase === 'draw-roi' && 'Step 1 of 2 — Drag to draw a box around your mat'}
-              {phase === 'mark-athlete' && 'Step 2 of 2 — Click on yourself inside the green box'}
+              {phase === 'draw-roi' && 'Step 1 of 2 — Drag to draw a green box around your mat'}
+              {phase === 'mark-athlete' && 'Step 2 of 2 — Drag to draw a red box around yourself'}
             </p>
             <button type="button" onClick={reset} className="text-xs text-muted-foreground hover:text-foreground underline transition-colors">
               Change frame
@@ -414,16 +419,15 @@ function FrameSelector({
             <canvas
               ref={canvasRef}
               className="absolute inset-0 w-full h-full"
-              style={{ cursor: phase === 'draw-roi' ? 'crosshair' : 'pointer' }}
+              style={{ cursor: 'crosshair' }}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
-              onClick={handleClick}
             />
           </div>
           <p className="text-xs text-muted-foreground">
             {phase === 'draw-roi' && 'Outline the mat — the AI will ignore other matches in the background.'}
-            {phase === 'mark-athlete' && 'Click directly on yourself inside the green box.'}
+            {phase === 'mark-athlete' && 'Draw a tight red box around yourself — this photo is sent to the AI as your visual reference.'}
           </p>
         </div>
       )}
@@ -464,7 +468,9 @@ function FileUploadTab() {
   function handleFrameComplete(result: FrameResult | null) {
     setFrameResult(result)
     if (result?.spatialData) {
-      const autoSide: StartingSide = result.spatialData.athlete.x < 0.5 ? 'left' : 'right'
+      const { x1, x2 } = result.spatialData.athlete
+      const centerX = (x1 + x2) / 2
+      const autoSide: StartingSide = centerX < 0.5 ? 'left' : 'right'
       setStartingSide(autoSide)
       setStartingSideAuto(true)
     } else {
