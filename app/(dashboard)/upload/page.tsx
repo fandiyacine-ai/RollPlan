@@ -188,16 +188,18 @@ function FileUploadTab() {
       </div>
 
       {previewUrl && (
-        <div className="rounded-md border overflow-hidden bg-black">
-          <video
-            src={previewUrl}
-            className="w-full max-h-48 object-contain"
-            preload="metadata"
-            muted
-            playsInline
-          />
-          <p className="px-3 py-2 text-xs text-muted-foreground bg-muted/50">
-            Use the appearance options below to tell the AI which athlete is <strong>you</strong> in this video.
+        <div className="space-y-1.5">
+          <div className="rounded-md border overflow-hidden bg-black">
+            <video
+              src={previewUrl}
+              className="w-full max-h-48 object-contain"
+              preload="metadata"
+              muted
+              playsInline
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Use the <strong>appearance options below</strong> to tell the AI which athlete is you in this video.
           </p>
         </div>
       )}
