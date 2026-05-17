@@ -667,13 +667,13 @@ function FileUploadTab() {
             <label className="text-sm font-medium">Athlete name <span className="text-red-500">*</span></label>
             <input type="text" value={athleteName} onChange={(e) => setAthleteName(e.target.value)}
               placeholder="Name as shown on screen (e.g. David Smith)"
-              className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20" />
+              className="w-full rounded-md border bg-muted text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Event name <span className="text-muted-foreground font-normal">(optional)</span></label>
             <input type="text" value={eventName} onChange={(e) => setEventName(e.target.value)}
               placeholder="e.g. Pan Ams 2026"
-              className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20" />
+              className="w-full rounded-md border bg-muted text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
           </div>
         </div>
       )}
@@ -697,7 +697,7 @@ function FileUploadTab() {
       )}
 
       <button onClick={upload} disabled={!file || state === 'uploading'}
-        className="w-full py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-40 hover:opacity-90 transition-opacity">
+        className="w-full py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-bold disabled:opacity-40 hover:opacity-90 transition-opacity shadow-[0_0_20px_rgba(180,130,20,0.25)]">
         {state === 'uploading' ? 'Uploading…' : 'Upload Video'}
       </button>
     </div>
@@ -766,7 +766,7 @@ function UrlAnalysisTab() {
         <label className="text-sm font-medium">Athlete name <span className="text-red-500">*</span></label>
         <input type="text" value={athleteName} onChange={(e) => setAthleteName(e.target.value)}
           placeholder="Name as shown on screen (e.g. David Smith)"
-          className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20" />
+          className="w-full rounded-md border bg-muted text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
         <p className="text-xs text-muted-foreground">Must match exactly what appears in the tournament overlay</p>
       </div>
 
@@ -774,7 +774,7 @@ function UrlAnalysisTab() {
         <label className="text-sm font-medium">Event name <span className="text-muted-foreground font-normal">(optional)</span></label>
         <input type="text" value={eventName} onChange={(e) => setEventName(e.target.value)}
           placeholder="e.g. Pan Ams 2026, IBJJF Worlds 2026"
-          className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20" />
+          className="w-full rounded-md border bg-muted text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
       </div>
 
       <div className="space-y-2">
@@ -787,7 +787,7 @@ function UrlAnalysisTab() {
                 <div className="flex gap-2">
                   <input type="url" value={url} onChange={(e) => updateUrl(i, e.target.value)}
                     placeholder="https://youtube.com/watch?v=... or direct video URL"
-                    className="flex-1 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20" />
+                    className="flex-1 rounded-md border bg-muted text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
                   {urls.length > 1 && (
                     <button onClick={() => removeUrl(i)} className="px-3 py-2 rounded-md border text-sm text-muted-foreground hover:bg-muted transition-colors">✕</button>
                   )}
@@ -820,7 +820,7 @@ function UrlAnalysisTab() {
       {error && <p className="text-sm text-rose-400">{error}</p>}
 
       <button onClick={submit} disabled={state === 'uploading'}
-        className="w-full py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-40 hover:opacity-90 transition-opacity">
+        className="w-full py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-bold disabled:opacity-40 hover:opacity-90 transition-opacity shadow-[0_0_20px_rgba(180,130,20,0.25)]">
         {state === 'uploading' ? 'Submitting…' : 'Analyse Stream'}
       </button>
     </div>
@@ -851,7 +851,7 @@ function SharedFields({
           onChange={(e) => setSelfDescription(e.target.value)}
           rows={2}
           placeholder="e.g. I am wearing a black gi, standing on the left side. The referee is in white."
-          className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+          className="w-full rounded-md border bg-muted text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
         />
         <p className="text-xs text-muted-foreground">Free text hint to help the AI distinguish you from opponents and referees.</p>
       </div>
@@ -896,7 +896,7 @@ function SharedFields({
         <div className="flex gap-4">
           {(['gi', 'no_gi'] as Format[]).map((f) => (
             <label key={f} className="flex items-center gap-2 cursor-pointer">
-              <input type="radio" name="format" value={f} checked={format === f} onChange={() => setFormat(f)} className="accent-foreground" />
+              <input type="radio" name="format" value={f} checked={format === f} onChange={() => setFormat(f)} className="accent-primary" />
               <span className="text-sm">{f === 'gi' ? 'Gi' : 'No-Gi'}</span>
             </label>
           ))}
@@ -908,7 +908,7 @@ function SharedFields({
         <div className="flex flex-col gap-2">
           {(Object.keys(SOURCE_LABELS) as SourceType[]).map((type) => (
             <label key={type} className="flex items-center gap-3 cursor-pointer">
-              <input type="radio" name="sourceType" value={type} checked={sourceType === type} onChange={() => setSourceType(type)} className="accent-foreground" />
+              <input type="radio" name="sourceType" value={type} checked={sourceType === type} onChange={() => setSourceType(type)} className="accent-primary" />
               <span className="text-sm">{SOURCE_LABELS[type]}</span>
             </label>
           ))}

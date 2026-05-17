@@ -26,7 +26,7 @@ export function ClearAllButton() {
         }
       }}
       disabled={pending}
-      className="text-xs px-3 py-1.5 rounded-full border border-red-200 text-red-600 font-medium hover:bg-red-50 transition-colors disabled:opacity-40"
+      className="text-xs px-3 py-1.5 rounded-full border border-zinc-700 text-zinc-500 font-medium hover:border-rose-800/60 hover:text-rose-400 transition-colors disabled:opacity-40"
     >
       {pending ? 'Clearing…' : 'Clear all data'}
     </button>
