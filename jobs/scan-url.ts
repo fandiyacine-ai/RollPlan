@@ -159,7 +159,8 @@ export const scanUrl = inngest.createFunction(
               videoUrl: video.publicUrl,
               videoOptions: { fps: 1.0, startSeconds: clipStart, endSeconds: found.end_seconds },
               userPrompt: buildExtractMatchUserPrompt({
-                competitorDescription: [athleteName, appearanceHint].filter(Boolean).join(' — '),
+                competitorDescription: athleteName,
+                appearanceHint: appearanceHint || undefined,
                 format: format as 'gi' | 'no_gi',
                 ruleset: 'ibjjf',
                 timestampRange: { startSeconds: 0, endSeconds: found.end_seconds - clipStart },
@@ -192,7 +193,8 @@ export const scanUrl = inngest.createFunction(
                   {
                     type: 'text',
                     text: buildExtractMatchUserPrompt({
-                      competitorDescription: [athleteName, appearanceHint].filter(Boolean).join(' — '),
+                      competitorDescription: athleteName,
+                      appearanceHint: appearanceHint || undefined,
                       format: format as 'gi' | 'no_gi',
                       ruleset: 'ibjjf',
                       timestampRange: { startSeconds: found.start_seconds, endSeconds: found.end_seconds },

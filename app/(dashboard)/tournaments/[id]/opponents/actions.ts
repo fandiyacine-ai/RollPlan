@@ -37,6 +37,7 @@ export async function submitScoutUrls(tournamentId: string, opponentId: string, 
 
   const athleteName = opponent.opponentLabel
   const format = (formData.get('format') as string) || 'gi'
+  const appearanceHint = (formData.get('appearanceHint') as string)?.trim() || undefined
 
   const userId = await getOrCreateDbUserId()
 
@@ -64,6 +65,7 @@ export async function submitScoutUrls(tournamentId: string, opponentId: string, 
           format,
           sourceType: 'opponent',
           tournamentOpponentId: opponentId,
+          appearanceHint,
         },
       })
     } catch {

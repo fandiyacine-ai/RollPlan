@@ -77,6 +77,7 @@ function formatTimestamp(seconds: number): string {
 
 export function buildExtractMatchUserPrompt(params: {
   competitorDescription: string
+  appearanceHint?: string
   format: 'gi' | 'no_gi'
   ruleset: string
   durationSeconds?: number
@@ -88,6 +89,7 @@ ${params.timestampRange
     ? `Focus only on the match segment from ${formatTimestamp(params.timestampRange.startSeconds)} to ${formatTimestamp(params.timestampRange.endSeconds)}. Ignore all footage outside this range.`
     : ''}
 Competitor to track: ${params.competitorDescription}
+${params.appearanceHint ? `CRITICAL — Visual identification: The competitor you must track is wearing ${params.appearanceHint}. Use this as the deciding factor if both athletes look similar. Do NOT swap athletes mid-match.` : ''}
 Format: ${params.format === 'gi' ? 'Gi' : 'No-Gi'}
 Ruleset: ${params.ruleset.toUpperCase()}
 ${params.durationSeconds ? `Duration: approximately ${Math.round(params.durationSeconds / 60)} minutes` : ''}

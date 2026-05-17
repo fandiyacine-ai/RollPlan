@@ -3,6 +3,30 @@
 import { useState } from 'react'
 import { addOpponent, submitScoutUrls, deleteOpponent } from './actions'
 
+type AppearanceColor = 'blue_gi' | 'white_gi' | 'black_gi' | 'dark_rash' | 'light_rash' | 'other'
+type StartingSide = 'left' | 'right'
+
+const COLOR_OPTIONS: { value: AppearanceColor; label: string; bg: string }[] = [
+  { value: 'blue_gi',    label: 'Blue Gi',    bg: 'bg-blue-600' },
+  { value: 'white_gi',   label: 'White Gi',   bg: 'bg-white border border-gray-300' },
+  { value: 'black_gi',   label: 'Black Gi',   bg: 'bg-neutral-900' },
+  { value: 'dark_rash',  label: 'Dark Rash',  bg: 'bg-gray-800' },
+  { value: 'light_rash', label: 'Light Rash', bg: 'bg-gray-200 border border-gray-300' },
+  { value: 'other',      label: 'Other',      bg: 'bg-gradient-to-br from-purple-400 to-pink-400' },
+]
+
+const COLOR_HINT: Record<AppearanceColor, string> = {
+  blue_gi: 'blue gi', white_gi: 'white gi', black_gi: 'black gi',
+  dark_rash: 'dark rashguard', light_rash: 'light rashguard', other: 'other-coloured kit',
+}
+
+function buildAppearanceHint(color: AppearanceColor | null, side: StartingSide | null): string {
+  const parts: string[] = []
+  if (color) parts.push(COLOR_HINT[color])
+  if (side) parts.push(`starts on the ${side} side of the mat`)
+  return parts.join(', ')
+}
+
 export function DeleteOpponentButton({ opponentId, tournamentId }: { opponentId: string; tournamentId: string }) {
   const [pending, setPending] = useState(false)
 
@@ -99,6 +123,8 @@ export function ScoutForm({
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState(false)
   const [done, setDone] = useState(false)
+  const [appearanceColor, setAppearanceColor] = useState<AppearanceColor | null>(null)
+  const [startingSide, setStartingSide] = useState<StartingSide | null>(null)
 
   if (done) {
     return <span className="text-xs text-green-700 font-medium">Scanning queued ✓</span>
@@ -118,6 +144,7 @@ export function ScoutForm({
   return (
     <form
       action={async (fd) => {
+        fd.set('appearanceHint', buildAppearanceHint(appearanceColor, startingSide))
         setPending(true)
         await submitScoutUrls(tournamentId, opponentId, fd)
         setOpen(false)
@@ -148,6 +175,45 @@ export function ScoutForm({
           placeholder="https://youtube.com/watch?v=..."
           className="w-full rounded-md border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
         />
+      </div>
+      <div className="space-y-1.5">
+        <div>
+          <p className="text-xs text-muted-foreground font-medium">Opponent&apos;s appearance in video</p>
+          <p className="text-xs text-muted-foreground">Helps the AI identify which athlete is {opponentName}</p>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {COLOR_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setAppearanceColor(appearanceColor === opt.value ? null : opt.value)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs transition-all ${
+                appearanceColor === opt.value
+                  ? 'border-foreground bg-foreground text-background font-medium'
+                  : 'border-border hover:border-foreground/40'
+              }`}
+            >
+              <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${opt.bg}`} />
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-1.5">
+          {(['left', 'right'] as StartingSide[]).map((side) => (
+            <button
+              key={side}
+              type="button"
+              onClick={() => setStartingSide(startingSide === side ? null : side)}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs transition-all ${
+                startingSide === side
+                  ? 'border-foreground bg-foreground text-background font-medium'
+                  : 'border-border hover:border-foreground/40'
+              }`}
+            >
+              {side === 'left' ? '← ' : '→ '}Starts {side}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="flex gap-2 justify-end">
         <button

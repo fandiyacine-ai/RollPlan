@@ -38,6 +38,19 @@ function buildAppearanceHint(color: AppearanceColor | null, side: StartingSide |
   return parts.join(', ')
 }
 
+function extractYouTubeId(url: string): string | null {
+  try {
+    const u = new URL(url)
+    if (u.hostname.includes('youtu.be')) return u.pathname.slice(1).split('/')[0] ?? null
+    if (u.hostname.includes('youtube.com')) {
+      if (u.pathname.startsWith('/watch')) return u.searchParams.get('v')
+      const m = u.pathname.match(/\/(?:live|embed|v)\/([^/?]+)/)
+      return m?.[1] ?? null
+    }
+  } catch {}
+  return null
+}
+
 function FileUploadTab() {
   const [file, setFile] = useState<File | null>(null)
   const [scanMode, setScanMode] = useState<ScanMode>('single')
@@ -322,21 +335,39 @@ function UrlAnalysisTab() {
 
       <div className="space-y-2">
         <label className="text-sm font-medium">Stream URLs <span className="text-red-500">*</span></label>
-        <div className="space-y-2">
-          {urls.map((url, i) => (
-            <div key={i} className="flex gap-2">
-              <input
-                type="url"
-                value={url}
-                onChange={(e) => updateUrl(i, e.target.value)}
-                placeholder="https://youtube.com/watch?v=... or direct video URL"
-                className="flex-1 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
-              />
-              {urls.length > 1 && (
-                <button onClick={() => removeUrl(i)} className="px-3 py-2 rounded-md border text-sm text-muted-foreground hover:bg-muted transition-colors">✕</button>
-              )}
-            </div>
-          ))}
+        <div className="space-y-3">
+          {urls.map((url, i) => {
+            const ytId = extractYouTubeId(url.trim())
+            return (
+              <div key={i} className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={url}
+                    onChange={(e) => updateUrl(i, e.target.value)}
+                    placeholder="https://youtube.com/watch?v=... or direct video URL"
+                    className="flex-1 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  />
+                  {urls.length > 1 && (
+                    <button onClick={() => removeUrl(i)} className="px-3 py-2 rounded-md border text-sm text-muted-foreground hover:bg-muted transition-colors">✕</button>
+                  )}
+                </div>
+                {ytId && (
+                  <div className="flex items-center gap-3 rounded-md border bg-muted/30 p-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`}
+                      alt="YouTube thumbnail"
+                      className="w-24 h-14 object-cover rounded flex-shrink-0 bg-muted"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Use the appearance options below to tell the AI which athlete is <strong>you</strong> in this video.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
         {urls.length < 10 && (
           <button onClick={addUrl} className="text-sm text-muted-foreground hover:text-foreground transition-colors">+ Add another URL</button>
