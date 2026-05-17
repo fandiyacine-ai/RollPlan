@@ -31,12 +31,14 @@ export const scanUrl = inngest.createFunction(
     triggers: [{ event: 'url/submitted' }],
   },
   async ({ event, step }: {
-    event: { data: { videoId: string; userId?: string; athleteName: string; format: string; sourceType: string; eventName?: string; appearanceHint?: string; athleteImageBase64?: string; tournamentOpponentId?: string } }
+    event: { data: { videoId: string; userId?: string; athleteName: string; format: string; sourceType: string; eventName?: string; appearanceHint?: string; athleteImageBase64?: string; tournamentOpponentId?: string; skipScan?: boolean } }
     step: any
   }) => {
-    const { videoId, userId, athleteName, format, sourceType, eventName, appearanceHint, athleteImageBase64, tournamentOpponentId } = event.data
+    const { videoId, userId, athleteName, format, sourceType, eventName, appearanceHint, athleteImageBase64, tournamentOpponentId, skipScan } = event.data
 
-    const foundMatches: FoundMatch[] = await step.run('scan-for-matches', async () => {
+    const foundMatches: FoundMatch[] = skipScan
+      ? [{ start_seconds: 0, end_seconds: 999999, opponent_name: 'unknown', round_or_bracket: null }]
+      : await step.run('scan-for-matches', async () => {
       const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
       if (!video?.publicUrl) throw new Error('Video has no public URL')
 
@@ -153,22 +155,26 @@ export const scanUrl = inngest.createFunction(
           if (isYT) {
             // Trim the YouTube video to just this match window. Gemini reports timestamps
             // relative to the clip start, so we shift them back to absolute after.
-            const clipStart = found.start_seconds
+            const clipStart = skipScan ? 0 : found.start_seconds
+            const videoOptions = skipScan
+              ? { fps: 1.0 }
+              : { fps: 1.0, startSeconds: clipStart, endSeconds: found.end_seconds }
             const result = await geminiVideoObject(GEMINI_URL_SCAN_MODEL, {
               system: buildExtractMatchSystemPrompt(),
               videoUrl: video.publicUrl,
-              videoOptions: { fps: 1.0, startSeconds: clipStart, endSeconds: found.end_seconds },
+              videoOptions,
               userPrompt: buildExtractMatchUserPrompt({
                 competitorDescription: athleteName,
                 appearanceHint: appearanceHint || undefined,
                 format: format as 'gi' | 'no_gi',
                 ruleset: 'ibjjf',
-                timestampRange: { startSeconds: 0, endSeconds: found.end_seconds - clipStart },
+                timestampRange: skipScan ? undefined : { startSeconds: 0, endSeconds: found.end_seconds - clipStart },
               }),
               schema: MatchExtractionOutputSchema,
               referenceImageBase64: athleteImageBase64 || undefined,
             })
-            extractObject = {
+            // Only shift timestamps if we trimmed the clip (not when skipScan)
+            extractObject = skipScan ? result.object : {
               ...result.object,
               positions: result.object.positions.map(p => ({
                 ...p,

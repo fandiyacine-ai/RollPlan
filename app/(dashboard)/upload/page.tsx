@@ -710,10 +710,13 @@ function FileUploadTab() {
 
 // ─── URL analysis tab ─────────────────────────────────────────────────────────
 
+type UrlScanMode = 'single' | 'stream'
+
 function UrlAnalysisTab() {
   const [athleteName, setAthleteName] = useState('')
   const [eventName, setEventName] = useState('')
   const [urls, setUrls] = useState([''])
+  const [urlScanMode, setUrlScanMode] = useState<UrlScanMode>('single')
   const [sourceType, setSourceType] = useState<SourceType>('own_competition')
   const [format, setFormat] = useState<Format>('gi')
   const [appearanceColor, setAppearanceColor] = useState<AppearanceColor | null>(null)
@@ -729,7 +732,7 @@ function UrlAnalysisTab() {
 
   async function submit() {
     const validUrls = urls.map((u) => u.trim()).filter(Boolean)
-    if (!athleteName.trim()) { setError('Athlete name is required'); return }
+    if (urlScanMode === 'stream' && !athleteName.trim()) { setError('Athlete name is required for tournament streams'); return }
     if (validUrls.length === 0) { setError('At least one URL is required'); return }
     setState('uploading'); setError(null)
     try {
@@ -737,7 +740,11 @@ function UrlAnalysisTab() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          athleteName: athleteName.trim(), urls: validUrls, format, sourceType,
+          athleteName: athleteName.trim() || 'competitor',
+          urls: validUrls,
+          format,
+          sourceType,
+          skipScan: urlScanMode === 'single',
           eventName: eventName.trim() || undefined,
           appearanceHint: [selfDescription.trim(), buildAppearanceHint(appearanceColor, startingSide)].filter(Boolean).join(' ') || undefined,
         }),
@@ -754,11 +761,18 @@ function UrlAnalysisTab() {
     return (
       <div className="rounded-lg border border-emerald-800/50 bg-emerald-950/40 p-8 text-center space-y-4">
         <div className="text-4xl">✓</div>
-        <p className="font-medium text-emerald-400">{urls.filter(Boolean).length} stream{urls.filter(Boolean).length > 1 ? 's' : ''} submitted for analysis!</p>
-        <p className="text-sm text-muted-foreground">Gemini will scan for {athleteName}&apos;s matches. This may take several minutes.</p>
+        {urlScanMode === 'single'
+          ? <p className="font-medium text-emerald-400">Match submitted — analysis starting shortly.</p>
+          : <p className="font-medium text-emerald-400">{urls.filter(Boolean).length} stream{urls.filter(Boolean).length > 1 ? 's' : ''} submitted for analysis!</p>
+        }
+        <p className="text-sm text-muted-foreground">
+          {urlScanMode === 'single'
+            ? "You'll see it appear in your Match Feed when ready."
+            : `Gemini will scan for ${athleteName}'s matches. This may take several minutes.`}
+        </p>
         <div className="flex gap-3 justify-center pt-2">
           <Button variant="outline" onClick={() => { setUrls(['']); setAthleteName(''); setEventName(''); setState('idle') }}>Submit more</Button>
-          <Button onClick={() => router.push('/player-card')}>View My Stats</Button>
+          <Button onClick={() => router.push('/player-card')}>View My Matches</Button>
         </div>
       </div>
     )
@@ -766,12 +780,32 @@ function UrlAnalysisTab() {
 
   return (
     <div className="space-y-6">
+      {/* Recording type */}
       <div className="space-y-2">
-        <label className="text-sm font-medium">Athlete name <span className="text-red-500">*</span></label>
-        <Input type="text" value={athleteName} onChange={(e) => setAthleteName(e.target.value)}
-          placeholder="Name as shown on screen (e.g. David Smith)" />
-        <p className="text-xs text-muted-foreground">Must match exactly what appears in the tournament overlay</p>
+        <label className="text-sm font-medium">Recording type</label>
+        <div className="flex rounded-lg border overflow-hidden">
+          {([['single', 'Single match clip'], ['stream', 'Full tournament stream']] as [UrlScanMode, string][]).map(([mode, label]) => (
+            <button key={mode} type="button" onClick={() => setUrlScanMode(mode)}
+              className={`flex-1 py-2 text-sm transition-colors ${urlScanMode === mode ? 'bg-primary text-primary-foreground font-medium' : 'hover:bg-muted'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {urlScanMode === 'single'
+            ? 'The entire video is one match — AI analyses it directly with no scan step.'
+            : 'Full mat recording or event stream — AI scans for the athlete\'s matches first, then analyses each one.'}
+        </p>
       </div>
+
+      {urlScanMode === 'stream' && (
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Athlete name <span className="text-red-500">*</span></label>
+          <Input type="text" value={athleteName} onChange={(e) => setAthleteName(e.target.value)}
+            placeholder="Name as shown on screen (e.g. David Smith)" />
+          <p className="text-xs text-muted-foreground">Must match exactly what appears in the tournament overlay</p>
+        </div>
+      )}
 
       <div className="space-y-2">
         <label className="text-sm font-medium">Event name <span className="text-muted-foreground font-normal">(optional)</span></label>
