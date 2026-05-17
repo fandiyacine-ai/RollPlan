@@ -39,7 +39,7 @@ export function DeleteOpponentButton({ opponentId, tournamentId }: { opponentId:
       }}
       disabled={pending}
       aria-label="Delete opponent"
-      className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
+      className="p-1.5 rounded-md text-muted-foreground hover:text-rose-400 hover:bg-rose-950/30 transition-colors disabled:opacity-40"
     >
       <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
@@ -56,7 +56,7 @@ export function AddOpponentForm({ tournamentId }: { tournamentId: string }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="text-sm px-4 py-2 rounded-full bg-foreground text-background font-medium hover:opacity-90 transition-opacity"
+        className="text-sm px-4 py-2 rounded-full bg-primary text-primary-foreground font-medium hover:opacity-90 transition-opacity"
       >
         + Add Opponent
       </button>
@@ -80,7 +80,7 @@ export function AddOpponentForm({ tournamentId }: { tournamentId: string }) {
           name="name"
           required
           placeholder="e.g. João Silva"
-          className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+          className="w-full rounded-md border px-3 py-2 text-sm bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
         />
       </div>
       <div className="space-y-1">
@@ -88,7 +88,7 @@ export function AddOpponentForm({ tournamentId }: { tournamentId: string }) {
         <input
           name="notes"
           placeholder="e.g. #3 seed, black belt 5 years"
-          className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+          className="w-full rounded-md border px-3 py-2 text-sm bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
         />
       </div>
       <div className="flex gap-2 justify-end">
@@ -102,7 +102,7 @@ export function AddOpponentForm({ tournamentId }: { tournamentId: string }) {
         <button
           type="submit"
           disabled={pending}
-          className="text-sm px-3 py-1.5 rounded-full bg-foreground text-background font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+          className="text-sm px-3 py-1.5 rounded-full bg-primary text-primary-foreground font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
         >
           {pending ? 'Adding…' : 'Add'}
         </button>
@@ -127,7 +127,7 @@ export function ScoutForm({
   const [startingSide, setStartingSide] = useState<StartingSide | null>(null)
 
   if (done) {
-    return <span className="text-xs text-green-700 font-medium">Scanning queued ✓</span>
+    return <span className="text-xs text-emerald-400 font-medium">Scanning queued ✓</span>
   }
 
   if (!open) {
@@ -160,7 +160,7 @@ export function ScoutForm({
         <select
           name="format"
           defaultValue="gi"
-          className="w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+          className="w-full rounded-md border px-3 py-1.5 text-sm bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
         >
           <option value="gi">Gi</option>
           <option value="no_gi">No-Gi</option>
@@ -173,7 +173,7 @@ export function ScoutForm({
           required
           rows={4}
           placeholder="https://youtube.com/watch?v=..."
-          className="w-full rounded-md border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+          className="w-full rounded-md border px-3 py-2 text-sm font-mono bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
         />
       </div>
       <div className="space-y-1.5">
@@ -189,7 +189,7 @@ export function ScoutForm({
               onClick={() => setAppearanceColor(appearanceColor === opt.value ? null : opt.value)}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs transition-all ${
                 appearanceColor === opt.value
-                  ? 'border-foreground bg-foreground text-background font-medium'
+                  ? 'border-primary bg-primary text-primary-foreground font-medium'
                   : 'border-border hover:border-foreground/40'
               }`}
             >
@@ -206,7 +206,7 @@ export function ScoutForm({
               onClick={() => setStartingSide(startingSide === side ? null : side)}
               className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs transition-all ${
                 startingSide === side
-                  ? 'border-foreground bg-foreground text-background font-medium'
+                  ? 'border-primary bg-primary text-primary-foreground font-medium'
                   : 'border-border hover:border-foreground/40'
               }`}
             >
@@ -226,7 +226,7 @@ export function ScoutForm({
         <button
           type="submit"
           disabled={pending}
-          className="text-xs px-3 py-1.5 rounded-full bg-foreground text-background font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+          className="text-xs px-3 py-1.5 rounded-full bg-primary text-primary-foreground font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
         >
           {pending ? 'Submitting…' : 'Submit'}
         </button>

@@ -39,15 +39,16 @@ export function Nav() {
             )
           })}
         </div>
-      </div>
 
-      <div className="flex items-center gap-3">
         <Link
           href="/upload"
           className="text-sm px-3 py-1.5 rounded-md bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
         >
-          Analyse Match
+          + Analyse Footage
         </Link>
+      </div>
+
+      <div className="flex items-center gap-3">
         <UserButton />
       </div>
     </nav>

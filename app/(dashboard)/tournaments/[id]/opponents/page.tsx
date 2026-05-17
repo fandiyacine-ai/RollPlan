@@ -51,9 +51,19 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
       </div>
 
       {opponents.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-10 text-center text-muted-foreground">
-          <p className="font-medium">No opponents yet</p>
-          <p className="text-sm mt-1">Add an opponent and submit their footage to start scouting.</p>
+        <div className="bg-card border border-border/60 rounded-xl p-8 text-center">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <span className="text-primary text-sm font-semibold">Step 2 of 3</span>
+            <div className="flex items-center gap-1">
+              <span className="text-primary text-lg">●</span>
+              <span className="text-primary text-lg">●</span>
+              <span className="text-muted-foreground/40 text-lg">●</span>
+            </div>
+          </div>
+          <h3 className="text-lg font-semibold mb-2">Who are you facing?</h3>
+          <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+            Add the athletes you might meet in your bracket. Once you add them, scout their footage and the AI will build you a gameplan for each.
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
