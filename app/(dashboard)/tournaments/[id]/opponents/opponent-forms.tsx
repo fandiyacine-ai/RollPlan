@@ -185,7 +185,7 @@ export function ScoutForm({
               </svg>
               <span className="text-sm font-medium">Smoothcomp stream</span>
             </div>
-            <p className="text-xs text-muted-foreground">Live stream import</p>
+            <p className="text-xs text-muted-foreground">Recorded stream import</p>
             <span className="inline-block text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-950/60 text-amber-400 border border-amber-800/40">
               Not available yet
             </span>
