@@ -6,7 +6,7 @@ import { Toaster } from 'sonner'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
-const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-brand', weight: ['700', '800'] })
+const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-brand', weight: ['700'] })
 
 export const metadata: Metadata = {
   title: 'FrameMatters — AI BJJ Match Analysis',
