@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { db } from '../../../../../lib/db'
 import { tournamentOpponents, videos } from '../../../../../lib/db/schema'
 import { inngest } from '../../../../../lib/inngest'
+import { getOrCreateDbUserId } from '../../../../../lib/db/get-user'
 
 export async function addOpponent(tournamentId: string, formData: FormData) {
   const name = (formData.get('name') as string)?.trim()
@@ -36,11 +37,13 @@ export async function submitScoutUrls(tournamentId: string, opponentId: string, 
   const athleteName = opponent.opponentLabel
   const format = (formData.get('format') as string) || 'gi'
 
+  const userId = await getOrCreateDbUserId()
+
   for (const url of urls) {
     try { new URL(url) } catch { throw new Error(`Invalid URL: ${url}`) }
 
     const [video] = await db.insert(videos).values({
-      userId: null,
+      userId,
       r2Key: `url/${Date.now()}-${Math.random().toString(36).slice(2)}`,
       originalFilename: url,
       contentType: 'video/mp4',
@@ -55,6 +58,7 @@ export async function submitScoutUrls(tournamentId: string, opponentId: string, 
         name: 'url/submitted',
         data: {
           videoId: video.id,
+          userId,
           athleteName,
           format,
           sourceType: 'opponent',

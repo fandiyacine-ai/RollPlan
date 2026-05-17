@@ -1,66 +1,73 @@
 import { db } from '../../../lib/db'
-import { matches, insights, videos, positionSegments } from '../../../lib/db/schema'
+import { matches, insights, videos, positionSegments, matchEvents, users } from '../../../lib/db/schema'
 import { desc, eq, inArray, isNull } from 'drizzle-orm'
 import Link from 'next/link'
 import RefreshPoller from './refresh-poller'
 import { POSITIONS } from '../../../lib/taxonomy/positions'
+import { auth, currentUser } from '@clerk/nextjs/server'
 
 export const dynamic = 'force-dynamic'
 
 const POSITION_MAP = Object.fromEntries(POSITIONS.map((p) => [p.id, p.name]))
 
-const CATEGORY_LABEL: Record<string, string> = {
-  strength: 'Strength',
-  mistake: 'Mistake',
-  opportunity: 'Opportunity',
-  pattern: 'Pattern',
-}
-
-const CATEGORY_COLORS: Record<string, string> = {
-  strength: 'bg-green-50 border-green-200 text-green-800',
-  mistake: 'bg-red-50 border-red-200 text-red-800',
-  opportunity: 'bg-blue-50 border-blue-200 text-blue-800',
-  pattern: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-}
-
-const SEVERITY_DOT: Record<string, string> = {
-  critical: 'bg-red-500',
-  moderate: 'bg-yellow-500',
-  minor: 'bg-gray-400',
+const BELT_COLORS: Record<string, string> = {
+  white: 'bg-gray-100 text-gray-700',
+  blue: 'bg-blue-100 text-blue-700',
+  purple: 'bg-purple-100 text-purple-700',
+  brown: 'bg-amber-800 text-white',
+  black: 'bg-gray-900 text-white',
 }
 
 const STATUS_BADGE: Record<string, string> = {
-  pending: 'bg-gray-100 text-gray-600',
-  processing: 'bg-blue-100 text-blue-700',
+  pending: 'bg-gray-100 text-gray-500',
+  processing: 'bg-blue-100 text-blue-600',
   analysed: 'bg-green-100 text-green-700',
-  failed: 'bg-red-100 text-red-700',
+  failed: 'bg-red-100 text-red-600',
 }
 
-function formatTime(seconds: number): string {
-  if (seconds < 60) return `${Math.round(seconds)}s`
-  const m = Math.floor(seconds / 60)
-  const s = Math.round(seconds % 60)
-  return s > 0 ? `${m}m ${s}s` : `${m}m`
+function fmt(s: number): string {
+  if (s < 60) return `${Math.round(s)}s`
+  const m = Math.floor(s / 60)
+  const sec = Math.round(s % 60)
+  return sec > 0 ? `${m}m ${sec}s` : `${m}m`
+}
+
+function initials(name: string): string {
+  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
 }
 
 export default async function PlayerCardPage() {
+  const { userId: clerkId } = await auth()
+  const clerkUser = clerkId ? await currentUser() : null
+
+  // Try to get DB user for profile fields (belt, gym, etc.)
+  let dbUser: typeof users.$inferSelect | null = null
+  if (clerkId) {
+    dbUser = await db.query.users.findFirst({ where: eq(users.clerkId, clerkId) }) ?? null
+  }
+
+  const displayName = clerkUser
+    ? [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || clerkUser.emailAddresses?.[0]?.emailAddress || 'Athlete'
+    : 'Athlete'
+
   const recentMatches = await db
     .select({
       id: matches.id,
       status: matches.status,
       format: matches.format,
       context: matches.context,
+      ruleset: matches.ruleset,
       eventName: matches.eventName,
       opponentLabel: matches.opponentLabel,
+      competitorLabel: matches.competitorLabel,
       createdAt: matches.createdAt,
       filename: videos.originalFilename,
     })
     .from(matches)
     .leftJoin(videos, eq(matches.videoId, videos.id))
     .orderBy(desc(matches.createdAt))
-    .limit(10)
+    .limit(20)
 
-  // Videos scanning (no match records yet)
   const scanningVideos = await db
     .select({
       id: videos.id,
@@ -75,20 +82,28 @@ export default async function PlayerCardPage() {
     .orderBy(desc(videos.uploadedAt))
     .limit(5)
 
-  const analysedIds = recentMatches
-    .filter((m) => m.status === 'analysed')
-    .map((m) => m.id)
+  const analysedIds = recentMatches.filter((m) => m.status === 'analysed').map((m) => m.id)
 
-  const [allInsights, allSegments] = await Promise.all([
+  const [allInsights, allSegments, allEvents] = await Promise.all([
     analysedIds.length > 0
       ? db.select().from(insights).where(inArray(insights.matchId, analysedIds))
       : Promise.resolve([]),
     analysedIds.length > 0
       ? db.select().from(positionSegments).where(inArray(positionSegments.matchId, analysedIds))
       : Promise.resolve([]),
+    analysedIds.length > 0
+      ? db.select().from(matchEvents).where(inArray(matchEvents.matchId, analysedIds))
+      : Promise.resolve([]),
   ])
 
-  // Aggregate position stats across all analysed matches
+  // ---------- Aggregate stats ----------
+  const totalAnalyzedTime = allSegments.reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
+  const totalDominantTime = allSegments.filter(s => s.dominance === 'dominant').reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
+  const totalInferiorTime = allSegments.filter(s => s.dominance === 'inferior').reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
+  const dominancePct = totalAnalyzedTime > 0 ? Math.round((totalDominantTime / totalAnalyzedTime) * 100) : 0
+  const subAttempts = allEvents.filter(e => e.actor === 'user' && e.eventTypeId.includes('submission')).length
+
+  // ---------- Position breakdown ----------
   const positionStats: Record<string, { total: number; dominant: number; neutral: number; inferior: number }> = {}
   for (const seg of allSegments) {
     const dur = seg.endSeconds - seg.startSeconds
@@ -99,16 +114,21 @@ export default async function PlayerCardPage() {
     positionStats[seg.positionId][seg.dominance as 'dominant' | 'neutral' | 'inferior'] += dur
   }
 
-  const topPositions = Object.entries(positionStats)
-    .sort((a, b) => b[1].total - a[1].total)
-    .slice(0, 8)
-  const maxPositionTime = topPositions[0]?.[1].total ?? 1
+  const sortedPositions = Object.entries(positionStats).sort((a, b) => b[1].total - a[1].total)
+  const maxPositionTime = sortedPositions[0]?.[1].total ?? 1
 
-  const totalAnalyzedTime = allSegments.reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
-  const totalDominantTime = allSegments.filter(s => s.dominance === 'dominant').reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
-  const totalInferiorTime = allSegments.filter(s => s.dominance === 'inferior').reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
-  const dominancePct = totalAnalyzedTime > 0 ? Math.round((totalDominantTime / totalAnalyzedTime) * 100) : 0
-  const inferiorPct = totalAnalyzedTime > 0 ? Math.round((totalInferiorTime / totalAnalyzedTime) * 100) : 0
+  // ---------- Your Game: strengths / vulnerabilities ----------
+  const positionsWithEnoughTime = sortedPositions.filter(([, s]) => s.total > 30)
+  const strengths = positionsWithEnoughTime
+    .map(([id, s]) => ({ id, domPct: Math.round((s.dominant / s.total) * 100), total: s.total }))
+    .filter(p => p.domPct >= 50)
+    .sort((a, b) => b.domPct - a.domPct)
+    .slice(0, 3)
+  const vulnerabilities = positionsWithEnoughTime
+    .map(([id, s]) => ({ id, infPct: Math.round((s.inferior / s.total) * 100), total: s.total }))
+    .filter(p => p.infPct >= 30)
+    .sort((a, b) => b.infPct - a.infPct)
+    .slice(0, 3)
 
   const isProcessing =
     scanningVideos.length > 0 ||
@@ -116,48 +136,80 @@ export default async function PlayerCardPage() {
 
   if (recentMatches.length === 0 && scanningVideos.length === 0) {
     return (
-      <div className="space-y-4 max-w-2xl">
-        <h1 className="text-2xl font-bold">Player Card</h1>
-        <p className="text-muted-foreground">Upload a match video to get started.</p>
-        <Link href="/upload" className="inline-block text-sm px-4 py-2 rounded-full bg-foreground text-background font-medium hover:opacity-90 transition-opacity">
-          Upload Match
-        </Link>
+      <div className="space-y-6 max-w-2xl">
+        <ProfileHeader name={displayName} dbUser={dbUser} />
+        <div className="rounded-lg border border-dashed p-12 text-center">
+          <p className="text-muted-foreground text-sm mb-4">No match footage analysed yet.</p>
+          <Link href="/upload" className="inline-block text-sm px-4 py-2 rounded-full bg-foreground text-background font-medium hover:opacity-90 transition-opacity">
+            Upload Match
+          </Link>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <h1 className="text-2xl font-bold">Player Card</h1>
-
       {isProcessing && <RefreshPoller />}
 
-      {/* Stats summary */}
+      {/* ── Profile header ── */}
+      <ProfileHeader name={displayName} dbUser={dbUser} />
+
+      {/* ── Stats strip ── */}
       {analysedIds.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-lg border p-4">
-            <p className="text-xs text-muted-foreground">Matches Analysed</p>
-            <p className="text-2xl font-bold mt-1">{analysedIds.length}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">of {recentMatches.length} shown</p>
+        <div className="grid grid-cols-4 gap-3">
+          <StatTile label="Matches" value={String(analysedIds.length)} sub={`of ${recentMatches.length} loaded`} />
+          <StatTile label="Mat Time" value={fmt(totalAnalyzedTime)} />
+          <StatTile label="Dominant" value={`${dominancePct}%`} sub={`${100 - dominancePct - Math.round((totalInferiorTime / totalAnalyzedTime) * 100)}% neutral`} accent={dominancePct >= 55 ? 'green' : dominancePct < 40 ? 'red' : undefined} />
+          <StatTile label="Sub Attempts" value={String(subAttempts)} />
+        </div>
+      )}
+
+      {/* ── Your Game ── */}
+      {(strengths.length > 0 || vulnerabilities.length > 0) && (
+        <div className="rounded-lg border overflow-hidden">
+          <div className="px-4 py-2.5 border-b bg-muted/40">
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Your Game</h2>
           </div>
-          <div className="rounded-lg border p-4">
-            <p className="text-xs text-muted-foreground">Time Analysed</p>
-            <p className="text-2xl font-bold mt-1">{formatTime(totalAnalyzedTime)}</p>
-          </div>
-          <div className="rounded-lg border p-4">
-            <p className="text-xs text-muted-foreground">Dominant</p>
-            <p className="text-2xl font-bold mt-1">{dominancePct}%</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{inferiorPct}% inferior</p>
+          <div className="grid grid-cols-2 divide-x">
+            <div className="p-4 space-y-2.5">
+              <p className="text-xs font-semibold text-green-700 uppercase tracking-wide">Strengths</p>
+              {strengths.length > 0 ? strengths.map(p => (
+                <div key={p.id} className="flex items-center justify-between gap-2">
+                  <span className="text-sm truncate">{POSITION_MAP[p.id] ?? p.id}</span>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div className="h-full bg-green-500 rounded-full" style={{ width: `${p.domPct}%` }} />
+                    </div>
+                    <span className="text-xs font-semibold text-green-700 w-8 text-right tabular-nums">{p.domPct}%</span>
+                  </div>
+                </div>
+              )) : <p className="text-xs text-muted-foreground">Not enough data yet</p>}
+            </div>
+            <div className="p-4 space-y-2.5">
+              <p className="text-xs font-semibold text-red-700 uppercase tracking-wide">Vulnerabilities</p>
+              {vulnerabilities.length > 0 ? vulnerabilities.map(p => (
+                <div key={p.id} className="flex items-center justify-between gap-2">
+                  <span className="text-sm truncate">{POSITION_MAP[p.id] ?? p.id}</span>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div className="h-full bg-red-400 rounded-full" style={{ width: `${p.infPct}%` }} />
+                    </div>
+                    <span className="text-xs font-semibold text-red-600 w-8 text-right tabular-nums">{p.infPct}%</span>
+                  </div>
+                </div>
+              )) : <p className="text-xs text-muted-foreground">Not enough data yet</p>}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Position heat map */}
-      {topPositions.length > 0 && (
+      {/* ── Position breakdown ── */}
+      {sortedPositions.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Position Heat Map</h2>
-          <div className="space-y-2.5">
-            {topPositions.map(([posId, stats]) => {
+          <SectionHeader title="Position Breakdown" sub="All analysed matches combined" />
+          <div className="space-y-2">
+            {sortedPositions.slice(0, 8).map(([posId, stats]) => {
               const barPct = (stats.total / maxPositionTime) * 100
               const domPct = (stats.dominant / stats.total) * 100
               const infPct = (stats.inferior / stats.total) * 100
@@ -165,11 +217,11 @@ export default async function PlayerCardPage() {
               return (
                 <div key={posId}>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium">{POSITION_MAP[posId] ?? posId}</span>
-                    <span className="text-xs text-muted-foreground tabular-nums">{formatTime(stats.total)}</span>
+                    <span className="text-sm">{POSITION_MAP[posId] ?? posId}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">{fmt(stats.total)}</span>
                   </div>
                   <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                    <div className="h-full flex rounded-full overflow-hidden" style={{ width: `${barPct}%` }}>
+                    <div className="h-full flex" style={{ width: `${barPct}%` }}>
                       <div className="bg-green-500" style={{ width: `${domPct}%` }} />
                       <div className="bg-gray-300" style={{ width: `${neuPct}%` }} />
                       <div className="bg-red-400" style={{ width: `${infPct}%` }} />
@@ -180,148 +232,260 @@ export default async function PlayerCardPage() {
             })}
           </div>
           <div className="flex items-center gap-4 pt-1 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-sm bg-green-500 inline-block" /> Dominant
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-sm bg-gray-300 inline-block" /> Neutral
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-sm bg-red-400 inline-block" /> Inferior
-            </span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-green-500 inline-block" /> Dominant</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-gray-300 inline-block" /> Neutral</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-red-400 inline-block" /> Inferior</span>
           </div>
         </div>
       )}
 
-      {/* Scanning videos */}
+      {/* ── Scanning videos ── */}
       {scanningVideos.length > 0 && (
         <div className="space-y-2">
+          <SectionHeader title="In Progress" />
           {scanningVideos.map((v) => (
             <div key={v.id} className="rounded-lg border border-dashed p-4 flex items-center justify-between gap-4">
               <div>
                 <p className="font-medium text-sm truncate max-w-xs">{v.originalFilename}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {v.sourceType === 'public_url' ? 'Scanning URL for matches…' : 'Queued for analysis…'}
+                  {v.sourceType === 'public_url' ? 'Scanning for matches…' : 'Queued for analysis…'}
                 </p>
               </div>
-              <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-100 text-blue-700 flex-shrink-0">
-                scanning
-              </span>
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-100 text-blue-700 flex-shrink-0">scanning</span>
             </div>
           ))}
         </div>
       )}
 
-      {/* Recent matches */}
-      <div className="space-y-1">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">Recent Matches</h2>
-        <div className="space-y-6">
+      {/* ── Match history ── */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <SectionHeader title="Match History" />
+          <Link href="/upload" className="text-xs px-3 py-1.5 rounded-full border font-medium hover:bg-muted transition-colors">
+            + Add footage
+          </Link>
+        </div>
+        <div className="space-y-3">
           {recentMatches.map((match) => {
-            const matchInsights = allInsights.filter((i) => i.matchId === match.id)
+            const matchSegs = allSegments.filter(s => s.matchId === match.id)
+            const matchEvts = allEvents.filter(e => e.matchId === match.id)
+            const matchInsightsList = allInsights.filter(i => i.matchId === match.id)
             return (
-              <div key={match.id} className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0">
-                    {match.status === 'analysed' ? (
-                      <Link href={`/matches/${match.id}`} className="font-medium text-sm hover:underline truncate block max-w-xs">
-                        {match.opponentLabel ? `vs. ${match.opponentLabel}` : (match.filename ?? 'Untitled match')}
-                      </Link>
-                    ) : (
-                      <p className="font-medium text-sm truncate max-w-xs">
-                        {match.opponentLabel ? `vs. ${match.opponentLabel}` : (match.filename ?? 'Untitled match')}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground capitalize mt-0.5">
-                      {match.format === 'no_gi' ? 'No-Gi' : 'Gi'} · {match.context}
-                      {match.eventName ? ` · ${match.eventName}` : ''}
-                      {' · '}{match.createdAt.toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {match.status === 'analysed' && (
-                      <>
-                        <Link
-                          href={`/matches/${match.id}`}
-                          className="text-xs px-3 py-1 rounded-full border font-medium hover:bg-muted transition-colors"
-                        >
-                          Details
-                        </Link>
-                        <Link
-                          href={`/matches/${match.id}/coach`}
-                          className="text-xs px-3 py-1 rounded-full bg-foreground text-background font-medium hover:opacity-90 transition-opacity"
-                        >
-                          Coach
-                        </Link>
-                      </>
-                    )}
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_BADGE[match.status]}`}>
-                      {match.status}
-                    </span>
-                  </div>
-                </div>
-
-                {match.status === 'analysed' && matchInsights.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No insights generated.</p>
-                )}
-
-                {matchInsights.length > 0 && (
-                  <div className="space-y-2">
-                    {matchInsights.slice(0, 3).map((insight) => (
-                      <div
-                        key={insight.id}
-                        className={`rounded-lg border p-4 space-y-1 ${CATEGORY_COLORS[insight.category] ?? 'bg-muted border-muted'}`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${SEVERITY_DOT[insight.severity] ?? 'bg-gray-400'}`} />
-                          <span className="text-xs font-semibold uppercase tracking-wide">
-                            {CATEGORY_LABEL[insight.category] ?? insight.category}
-                          </span>
-                          <span className="text-xs opacity-60 ml-auto">
-                            {Math.round(insight.confidence * 100)}% confidence
-                          </span>
-                        </div>
-                        <p className="text-sm font-medium">{insight.description}</p>
-                        <p className="text-sm opacity-80">{insight.suggestion}</p>
-                        {insight.youtubeSearchQuery && (
-                          <a
-                            href={`https://www.youtube.com/results?search_query=${encodeURIComponent(insight.youtubeSearchQuery)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs font-medium mt-1 opacity-70 hover:opacity-100 transition-opacity"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-                            Watch technique
-                          </a>
-                        )}
-                      </div>
-                    ))}
-                    {matchInsights.length > 3 && (
-                      <Link
-                        href={`/matches/${match.id}`}
-                        className="text-xs text-muted-foreground hover:text-foreground"
-                      >
-                        +{matchInsights.length - 3} more insights →
-                      </Link>
-                    )}
-                  </div>
-                )}
-
-                {(match.status === 'pending' || match.status === 'processing') && (
-                  <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground text-center">
-                    Analysis in progress…
-                  </div>
-                )}
-
-                {match.status === 'failed' && (
-                  <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                    Analysis failed. Try uploading again.
-                  </div>
-                )}
-              </div>
+              <MatchCard
+                key={match.id}
+                match={match}
+                segments={matchSegs}
+                events={matchEvts}
+                insights={matchInsightsList}
+              />
             )
           })}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Sub-components ──
+
+function ProfileHeader({ name, dbUser }: { name: string; dbUser: typeof users.$inferSelect | null }) {
+  const belt = dbUser?.belt
+  const gym = dbUser?.gym
+  const style = dbUser?.primaryStyle
+
+  return (
+    <div className="flex items-center gap-4">
+      <div className="w-14 h-14 rounded-full bg-foreground text-background flex items-center justify-center text-lg font-bold flex-shrink-0">
+        {initials(name)}
+      </div>
+      <div className="flex-1 min-w-0">
+        <h1 className="text-xl font-bold truncate">{name}</h1>
+        <div className="flex items-center gap-2 mt-1 flex-wrap">
+          {belt && (
+            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${BELT_COLORS[belt] ?? 'bg-muted text-foreground'}`}>
+              {belt.charAt(0).toUpperCase() + belt.slice(1)} Belt
+            </span>
+          )}
+          {style && (
+            <span className="text-xs text-muted-foreground capitalize">
+              {style === 'no_gi' ? 'No-Gi' : style === 'both' ? 'Gi & No-Gi' : 'Gi'}
+            </span>
+          )}
+          {gym && <span className="text-xs text-muted-foreground truncate">{gym}</span>}
+          {!belt && !gym && (
+            <Link href="#" className="text-xs text-muted-foreground hover:text-foreground">
+              Add profile details →
+            </Link>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StatTile({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: 'green' | 'red' }) {
+  return (
+    <div className="rounded-lg border p-4">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={`text-2xl font-bold mt-1 tabular-nums ${accent === 'green' ? 'text-green-700' : accent === 'red' ? 'text-red-600' : ''}`}>{value}</p>
+      {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
+    </div>
+  )
+}
+
+function SectionHeader({ title, sub }: { title: string; sub?: string }) {
+  return (
+    <div>
+      <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{title}</h2>
+      {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
+    </div>
+  )
+}
+
+function MatchCard({
+  match,
+  segments,
+  events,
+  insights: matchInsights,
+}: {
+  match: {
+    id: string; status: string; format: string; context: string; ruleset: string
+    eventName: string | null; opponentLabel: string; competitorLabel: string | null
+    createdAt: Date; filename: string | null
+  }
+  segments: { endSeconds: number; startSeconds: number; positionId: string; dominance: string }[]
+  events: { eventTypeId: string; actor: string; outcome: string; techniqueLabel: string | null }[]
+  insights: { id: string; category: string; severity: string; description: string; suggestion: string; youtubeSearchQuery: string | null }[]
+}) {
+  const totalTime = segments.reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
+  const domTime = segments.filter(s => s.dominance === 'dominant').reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
+  const domPct = totalTime > 0 ? Math.round((domTime / totalTime) * 100) : null
+
+  // Top position by time
+  const posByTime: Record<string, number> = {}
+  for (const s of segments) {
+    posByTime[s.positionId] = (posByTime[s.positionId] ?? 0) + (s.endSeconds - s.startSeconds)
+  }
+  const topPos = Object.entries(posByTime).sort((a, b) => b[1] - a[1])[0]?.[0]
+
+  // Key event: first successful user submission attempt
+  const keyEvent = events.find(e => e.actor === 'user' && e.eventTypeId.includes('submission') && e.outcome === 'successful')
+    ?? events.find(e => e.actor === 'user' && e.eventTypeId.includes('submission'))
+
+  const isAnalysed = match.status === 'analysed'
+
+  return (
+    <div className="rounded-lg border overflow-hidden">
+      {/* Match header */}
+      <div className="px-4 py-3 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            {isAnalysed ? (
+              <Link href={`/matches/${match.id}`} className="font-semibold text-sm hover:underline">
+                vs. {match.opponentLabel}
+              </Link>
+            ) : (
+              <span className="font-semibold text-sm">vs. {match.opponentLabel}</span>
+            )}
+            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${STATUS_BADGE[match.status]}`}>
+              {match.status}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {match.format === 'no_gi' ? 'No-Gi' : 'Gi'}
+            {' · '}{match.ruleset.toUpperCase()}
+            {match.eventName ? ` · ${match.eventName}` : ''}
+            {' · '}{match.createdAt.toLocaleDateString()}
+          </p>
+        </div>
+        {isAnalysed && (
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <Link
+              href={`/matches/${match.id}`}
+              className="text-xs px-2.5 py-1 rounded-full border font-medium hover:bg-muted transition-colors"
+            >
+              Details
+            </Link>
+            <Link
+              href={`/matches/${match.id}/coach`}
+              className="text-xs px-2.5 py-1 rounded-full bg-foreground text-background font-medium hover:opacity-90 transition-opacity"
+            >
+              Coach
+            </Link>
+          </div>
+        )}
+      </div>
+
+      {/* Match stats strip — only for analysed matches */}
+      {isAnalysed && segments.length > 0 && (
+        <div className="px-4 pb-3 space-y-2">
+          {/* Dominance bar */}
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${domPct !== null && domPct >= 55 ? 'bg-green-500' : domPct !== null && domPct < 40 ? 'bg-red-400' : 'bg-gray-400'}`}
+                style={{ width: `${domPct ?? 50}%` }}
+              />
+            </div>
+            <span className="text-xs font-semibold tabular-nums w-10 text-right text-muted-foreground">
+              {domPct !== null ? `${domPct}% dom` : '—'}
+            </span>
+          </div>
+
+          {/* Quick stats pills */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs bg-muted px-2 py-0.5 rounded-full">{fmt(totalTime)}</span>
+            {topPos && (
+              <span className="text-xs bg-muted px-2 py-0.5 rounded-full truncate max-w-[160px]">
+                {POSITION_MAP[topPos] ?? topPos}
+              </span>
+            )}
+            {keyEvent && (
+              <span className="text-xs bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full truncate max-w-[160px]">
+                {keyEvent.techniqueLabel ?? keyEvent.eventTypeId.replace(/_/g, ' ')}
+                {keyEvent.outcome === 'successful' ? ' ✓' : ''}
+              </span>
+            )}
+          </div>
+
+          {/* Insights */}
+          {matchInsights.length > 0 && (
+            <div className="space-y-1 pt-1">
+              {matchInsights.slice(0, 2).map((insight) => (
+                <div key={insight.id} className="flex items-start gap-2 text-xs">
+                  <span className={`mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                    insight.category === 'strength' ? 'bg-green-500' :
+                    insight.category === 'mistake' ? 'bg-red-400' :
+                    insight.category === 'opportunity' ? 'bg-blue-400' : 'bg-yellow-400'
+                  }`} />
+                  <span className="text-muted-foreground leading-relaxed line-clamp-2">{insight.description}</span>
+                </div>
+              ))}
+              {matchInsights.length > 2 && (
+                <Link href={`/matches/${match.id}`} className="text-xs text-muted-foreground hover:text-foreground">
+                  +{matchInsights.length - 2} more insights →
+                </Link>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {(match.status === 'pending' || match.status === 'processing') && (
+        <div className="px-4 pb-3">
+          <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground text-center">
+            Analysis in progress…
+          </div>
+        </div>
+      )}
+
+      {match.status === 'failed' && (
+        <div className="px-4 pb-3">
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+            Analysis failed. Try uploading again.
+          </div>
+        </div>
+      )}
     </div>
   )
 }

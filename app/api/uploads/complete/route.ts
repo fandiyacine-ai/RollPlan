@@ -3,6 +3,7 @@ import { db } from '../../../../lib/db'
 import { videos, matches } from '../../../../lib/db/schema'
 import { getPublicVideoUrl } from '../../../../lib/storage/r2'
 import { inngest } from '../../../../lib/inngest'
+import { getOrCreateDbUserId } from '../../../../lib/db/get-user'
 import { eq } from 'drizzle-orm'
 
 export const maxDuration = 30
@@ -13,6 +14,7 @@ export async function POST(req: NextRequest) {
 
     if (!videoId || !path) return NextResponse.json({ error: 'videoId and path are required' }, { status: 400 })
 
+    const userId = await getOrCreateDbUserId()
     const publicUrl = await getPublicVideoUrl(path)
     await db.update(videos).set({ publicUrl, status: 'uploaded' }).where(eq(videos.id, videoId))
 
@@ -23,6 +25,7 @@ export async function POST(req: NextRequest) {
           name: 'url/submitted',
           data: {
             videoId,
+            userId,
             athleteName,
             format: format ?? 'gi',
             sourceType: sourceType ?? 'own_competition',
@@ -39,7 +42,7 @@ export async function POST(req: NextRequest) {
     const context = sourceType === 'own_sparring' ? 'sparring' : 'competition'
     const [match] = await db.insert(matches).values({
       videoId,
-      userId: null,
+      userId,
       competitorLabel: 'you',
       opponentLabel: 'unknown',
       format: (format ?? 'gi') as 'gi' | 'no_gi',

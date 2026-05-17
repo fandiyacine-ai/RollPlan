@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '../../../lib/db'
 import { videos } from '../../../lib/db/schema'
 import { inngest } from '../../../lib/inngest'
+import { getOrCreateDbUserId } from '../../../lib/db/get-user'
 
 export const maxDuration = 30
 
@@ -19,11 +20,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const userId = await getOrCreateDbUserId()
     const videoIds: string[] = []
 
     for (const url of urls) {
       const [video] = await db.insert(videos).values({
-        userId: null,
+        userId,
         r2Key: `url/${Date.now()}-${Math.random().toString(36).slice(2)}`,
         originalFilename: url,
         contentType: 'video/mp4',
@@ -38,7 +40,7 @@ export async function POST(req: NextRequest) {
       try {
         await inngest.send({
           name: 'url/submitted',
-          data: { videoId: video.id, athleteName: athleteName.trim(), format: format ?? 'gi', sourceType: sourceType ?? 'own_competition', eventName: eventName?.trim() || undefined, appearanceHint: appearanceHint?.trim() || undefined },
+          data: { videoId: video.id, userId, athleteName: athleteName.trim(), format: format ?? 'gi', sourceType: sourceType ?? 'own_competition', eventName: eventName?.trim() || undefined, appearanceHint: appearanceHint?.trim() || undefined },
         })
       } catch {
         // Inngest not configured — analysis won't start but record was created
