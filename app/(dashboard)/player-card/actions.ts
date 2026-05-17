@@ -6,6 +6,18 @@ import { matches, videos } from '../../../lib/db/schema'
 import { and, eq, count } from 'drizzle-orm'
 import { getOrCreateDbUserId } from '../../../lib/db/get-user'
 
+export async function deleteAllPlayerData(): Promise<{ error?: string }> {
+  try {
+    const userId = await getOrCreateDbUserId()
+    await db.delete(matches).where(eq(matches.userId, userId))
+    await db.delete(videos).where(eq(videos.userId, userId))
+    revalidatePath('/player-card')
+    return {}
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 export async function deleteMatch(matchId: string, videoId: string): Promise<{ error?: string }> {
   try {
     const userId = await getOrCreateDbUserId()

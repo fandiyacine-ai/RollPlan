@@ -5,6 +5,7 @@ import { desc, eq, inArray, isNull } from 'drizzle-orm'
 import Link from 'next/link'
 import RefreshPoller from './refresh-poller'
 import { DeleteMatchButton } from './delete-match-button'
+import { ClearAllButton } from './clear-all-button'
 import { POSITIONS } from '../../../lib/taxonomy/positions'
 import { auth, currentUser } from '@clerk/nextjs/server'
 
@@ -264,9 +265,12 @@ export default async function PlayerCardPage() {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <SectionHeader title="Match History" />
-          <Link href="/upload" className="text-xs px-3 py-1.5 rounded-full border font-medium hover:bg-muted transition-colors">
-            + Add footage
-          </Link>
+          <div className="flex items-center gap-2">
+            <ClearAllButton />
+            <Link href="/upload" className="text-xs px-3 py-1.5 rounded-full border font-medium hover:bg-muted transition-colors">
+              + Add footage
+            </Link>
+          </div>
         </div>
         <div className="space-y-3">
           {recentMatches.map((match) => {
