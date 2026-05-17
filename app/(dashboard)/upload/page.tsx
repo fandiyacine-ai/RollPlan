@@ -925,7 +925,10 @@ export default function UploadPage() {
   const [tab, setTab] = useState<Tab>('file')
   return (
     <div className="max-w-xl space-y-6">
-      <h1 className="text-2xl font-bold">Add Match Footage</h1>
+      <div>
+        <h1 className="text-2xl font-bold">Analyse My Match</h1>
+        <p className="text-sm text-muted-foreground mt-1">Your footage will be processed by <span className="font-medium text-foreground/70">Google Gemini AI</span>. You can delete it at any time.</p>
+      </div>
       <div className="flex rounded-lg border overflow-hidden">
         {(['file', 'url'] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)}

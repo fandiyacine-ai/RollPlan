@@ -27,7 +27,7 @@ const BELT_STYLE: Record<string, { bg: string; text: string }> = {
 const STATUS_CHIP: Record<string, string> = {
   pending:    'bg-zinc-800 text-zinc-400',
   processing: 'bg-blue-950 text-blue-400 border border-blue-800/50',
-  analysed:   'bg-emerald-950 text-emerald-400 border border-emerald-800/50',
+  analysed:   'bg-muted text-muted-foreground border border-border',
   failed:     'bg-rose-950 text-rose-400 border border-rose-800/50',
 }
 

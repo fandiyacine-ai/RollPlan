@@ -16,7 +16,7 @@ const EVENT_MAP = Object.fromEntries(EVENT_TYPES.map((e) => [e.id, e.name]))
 const STATUS_BADGE: Record<string, string> = {
   pending: 'bg-zinc-800 text-zinc-400 border border-zinc-700',
   processing: 'bg-blue-950 text-blue-400 border border-blue-800/50',
-  analysed: 'bg-emerald-950 text-emerald-400 border border-emerald-800/50',
+  analysed: 'bg-muted text-muted-foreground border border-border',
   failed: 'bg-rose-950 text-rose-400 border border-rose-800/50',
 }
 
@@ -72,7 +72,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
       {/* Header */}
       <div>
         <Link href="/player-card" className="text-xs text-muted-foreground hover:text-foreground inline-block mb-3">
-          ← My Game
+          ← My Matches
         </Link>
         <div className="flex items-start justify-between gap-4">
           <div>

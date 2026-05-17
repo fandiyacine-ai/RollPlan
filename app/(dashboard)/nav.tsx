@@ -7,7 +7,7 @@ import { ThemeToggle } from './theme-toggle'
 import { buttonVariants } from '@/components/ui/button'
 
 const NAV = [
-  { href: '/player-card', label: 'My Game' },
+  { href: '/player-card', label: 'My Matches' },
   { href: '/tournaments', label: 'Scout Opponent' },
 ]
 
@@ -46,7 +46,7 @@ export function Nav() {
           href="/upload"
           className={buttonVariants({ size: 'sm' })}
         >
-          + Analyse Footage
+          + Analyse My Match
         </Link>
       </div>
 

@@ -31,7 +31,7 @@ export function ClearAllButton() {
       }}
       disabled={pending}
     >
-      {pending ? 'Clearing…' : 'Clear all data'}
+      {pending ? 'Deleting…' : 'Delete all data'}
     </Button>
   )
 }
