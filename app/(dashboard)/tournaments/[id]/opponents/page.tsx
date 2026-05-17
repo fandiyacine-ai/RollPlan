@@ -50,23 +50,31 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
         <AddOpponentForm tournamentId={tournamentId} />
       </div>
 
-      {/* Smoothcomp teaser */}
-      <div className="rounded-xl border border-border/50 bg-card p-4 flex gap-3">
-        <div className="mt-0.5 flex-shrink-0">
-          <span className="inline-flex w-7 h-7 rounded-lg bg-amber-950/60 border border-amber-800/40 items-center justify-center">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>
-            </svg>
+      {/* Smoothcomp stream — disabled form */}
+      <div className="rounded-xl border border-border/50 bg-card p-4 space-y-3 opacity-60">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold">Add Smoothcomp stream</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Paste a recorded stream URL — the AI will find every match your opponent competed in and build a gameplan.
+            </p>
+          </div>
+          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border flex-shrink-0 ml-3">
+            Coming soon
           </span>
         </div>
-        <div>
-          <div className="flex items-center gap-2 mb-0.5">
-            <p className="text-sm font-semibold">Smoothcomp stream analysis — coming soon</p>
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-950/60 text-amber-400 border border-amber-800/40">In development</span>
-          </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Soon you'll be able to drop a Smoothcomp event link and we'll automatically pull every match your opponent competed in — no manual uploads needed. For now, paste YouTube links in the Scout dialog.
-          </p>
+        <div className="flex gap-2">
+          <input
+            disabled
+            placeholder="https://smoothcomp.com/en/event/..."
+            className="flex-1 h-9 rounded-lg border border-input bg-muted px-3 text-sm text-muted-foreground placeholder:text-muted-foreground/50 cursor-not-allowed"
+          />
+          <button
+            disabled
+            className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium cursor-not-allowed opacity-50"
+          >
+            Analyse
+          </button>
         </div>
       </div>
 
