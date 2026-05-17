@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { UserButton } from '@clerk/nextjs'
 import { ThemeToggle } from './theme-toggle'
+import { buttonVariants } from '@/components/ui/button'
 
 const NAV = [
   { href: '/player-card', label: 'My Game' },
@@ -43,7 +44,7 @@ export function Nav() {
 
         <Link
           href="/upload"
-          className="text-sm px-3 py-1.5 rounded-md bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
+          className={buttonVariants({ size: 'sm' })}
         >
           + Analyse Footage
         </Link>

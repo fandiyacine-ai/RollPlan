@@ -3,6 +3,7 @@ import { db } from '../../../lib/db'
 import { matches, insights, videos, positionSegments, matchEvents, users } from '../../../lib/db/schema'
 import { desc, eq, inArray, isNull, and, ne, or } from 'drizzle-orm'
 import Link from 'next/link'
+import { buttonVariants } from '../../../components/ui/button'
 import RefreshPoller from './refresh-poller'
 import { DeleteMatchButton } from './delete-match-button'
 import { DeleteVideoButton } from './delete-video-button'
@@ -173,7 +174,7 @@ export default async function PlayerCardPage() {
           <p className="text-muted-foreground text-sm">No match footage analysed yet.</p>
           <Link
             href="/upload"
-            className="inline-block text-sm px-5 py-2 rounded-full bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
+            className={buttonVariants({ size: 'sm', className: 'rounded-full' })}
           >
             Analyse your first match
           </Link>
@@ -553,10 +554,10 @@ function TimelineMatchItem({
         {/* Actions */}
         {isAnalysed && (
           <div className="px-3 py-2 border-t border-border/40 flex items-center gap-1.5">
-            <Link href={`/matches/${match.id}`} className="text-[11px] px-2 py-1 rounded-md border border-border/60 font-medium hover:bg-muted transition-colors">
+            <Link href={`/matches/${match.id}`} className={buttonVariants({ variant: 'outline', size: 'xs' })}>
               Full Review
             </Link>
-            <Link href={`/matches/${match.id}/coach`} className="text-[11px] px-2 py-1 rounded-md bg-primary/15 text-primary font-semibold hover:bg-primary/25 transition-colors">
+            <Link href={`/matches/${match.id}/coach`} className={buttonVariants({ size: 'xs' })}>
               Ask Coach
             </Link>
           </div>

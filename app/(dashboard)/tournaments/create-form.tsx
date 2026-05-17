@@ -3,13 +3,33 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createTournament, deleteTournament } from './actions'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog'
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from '@/components/ui/select'
 
 export function DeleteTournamentButton({ id }: { id: string }) {
   const [pending, setPending] = useState(false)
   const router = useRouter()
 
   return (
-    <button
+    <Button
+      variant="ghost"
+      size="icon-sm"
       onClick={async (e) => {
         e.preventDefault()
         e.stopPropagation()
@@ -20,12 +40,12 @@ export function DeleteTournamentButton({ id }: { id: string }) {
       }}
       disabled={pending}
       aria-label="Delete tournament"
-      className="p-1.5 rounded-md text-muted-foreground hover:text-rose-400 hover:bg-rose-950/30 transition-colors disabled:opacity-40"
+      className="text-muted-foreground hover:text-rose-400 hover:bg-rose-950/30"
     >
       <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
       </svg>
-    </button>
+    </Button>
   )
 }
 
@@ -41,108 +61,98 @@ export function CreateTournamentForm() {
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [ruleset, setRuleset] = useState('ibjjf')
   const router = useRouter()
 
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="text-sm px-4 py-2 rounded-full bg-primary text-primary-foreground font-medium hover:opacity-90 transition-opacity"
-      >
-        + New Tournament
-      </button>
-    )
-  }
-
   return (
-    <form
-      action={async (fd) => {
-        setPending(true)
-        setError(null)
-        const result = await createTournament(fd)
-        if (result.error) {
-          setError(result.error)
-          setPending(false)
-        } else if (result.tournamentId) {
-          router.push(`/tournaments/${result.tournamentId}/opponents`)
-        }
-      }}
-      className="rounded-lg border p-5 space-y-4 max-w-lg"
-    >
-      <h2 className="font-semibold">New Tournament</h2>
-
-      <div className="space-y-1">
-        <label className="text-xs font-medium text-muted-foreground">Name *</label>
-        <input
-          name="name"
-          required
-          placeholder="e.g. AJP Grand Slam Abu Dhabi"
-          className="w-full rounded-md border px-3 py-2 text-sm bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Event Date</label>
-          <input
-            name="eventDate"
-            type="date"
-            className="w-full rounded-md border px-3 py-2 text-sm bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
-        </div>
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Ruleset</label>
-          <select
-            name="ruleset"
-            defaultValue="ibjjf"
-            className="w-full rounded-md border px-3 py-2 text-sm bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-          >
-            {RULESET_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <label className="text-xs font-medium text-muted-foreground">Division</label>
-        <input
-          name="division"
-          placeholder="e.g. Adult Male Black Belt –85 kg"
-          className="w-full rounded-md border px-3 py-2 text-sm bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-        />
-      </div>
-
-      <div className="space-y-1">
-        <label className="text-xs font-medium text-muted-foreground">Notes</label>
-        <textarea
-          name="notes"
-          rows={2}
-          placeholder="Any context about this tournament"
-          className="w-full rounded-md border px-3 py-2 text-sm bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
-        />
-      </div>
-
-      {error && (
-        <p className="text-sm text-rose-400 rounded-md border border-rose-800/50 bg-rose-950/40 px-3 py-2">{error}</p>
-      )}
-
-      <div className="flex gap-2 justify-end">
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className="text-sm px-4 py-2 rounded-full border font-medium hover:bg-muted transition-colors"
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setError(null); setPending(false) } }}>
+      <DialogTrigger>
+        <Button size="sm">+ New Tournament</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>New Tournament</DialogTitle>
+        </DialogHeader>
+        <form
+          id="create-tournament-form"
+          action={async (fd) => {
+            fd.set('ruleset', ruleset)
+            setPending(true)
+            setError(null)
+            const result = await createTournament(fd)
+            if (result.error) {
+              setError(result.error)
+              setPending(false)
+            } else if (result.tournamentId) {
+              setOpen(false)
+              router.push(`/tournaments/${result.tournamentId}/opponents`)
+            }
+          }}
+          className="space-y-4"
         >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={pending}
-          className="text-sm px-4 py-2 rounded-full bg-primary text-primary-foreground font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-        >
-          {pending ? 'Creating…' : 'Create'}
-        </button>
-      </div>
-    </form>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Name *</label>
+            <Input
+              name="name"
+              required
+              placeholder="e.g. AJP Grand Slam Abu Dhabi"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Event Date</label>
+              <Input
+                name="eventDate"
+                type="date"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Ruleset</label>
+              <Select value={ruleset} onValueChange={(v) => { if (v !== null) setRuleset(v) }}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {RULESET_OPTIONS.map(o => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Division</label>
+            <Input
+              name="division"
+              placeholder="e.g. Adult Male Black Belt –85 kg"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Notes</label>
+            <textarea
+              name="notes"
+              rows={2}
+              placeholder="Any context about this tournament"
+              className="w-full rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 resize-none"
+            />
+          </div>
+
+          {error && (
+            <p className="text-sm text-destructive">{error}</p>
+          )}
+        </form>
+        <DialogFooter>
+          <DialogClose>
+            <Button variant="outline" type="button">Cancel</Button>
+          </DialogClose>
+          <Button type="submit" form="create-tournament-form" disabled={pending}>
+            {pending ? 'Creating…' : 'Create'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

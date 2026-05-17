@@ -3,6 +3,7 @@ import { matches, videos, positionSegments, matchEvents, insights } from '../../
 import { eq, asc } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { buttonVariants } from '@/components/ui/button'
 import { MatchContent } from './match-content'
 import { POSITIONS } from '../../../../lib/taxonomy/positions'
 import { EVENT_TYPES } from '../../../../lib/taxonomy/events'
@@ -95,7 +96,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
             {match.status === 'analysed' && (
               <Link
                 href={`/matches/${matchId}/coach`}
-                className="text-xs px-3 py-1.5 rounded-full bg-primary text-primary-foreground font-medium hover:opacity-90 transition-opacity"
+                className={buttonVariants({ size: 'sm' })}
               >
                 Ask Coach
               </Link>

@@ -2,6 +2,24 @@
 
 import { useState } from 'react'
 import { addOpponent, submitScoutUrls, deleteOpponent } from './actions'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog'
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from '@/components/ui/select'
 
 type AppearanceColor = 'blue_gi' | 'white_gi' | 'black_gi' | 'dark_rash' | 'light_rash' | 'other'
 type StartingSide = 'left' | 'right'
@@ -31,7 +49,9 @@ export function DeleteOpponentButton({ opponentId, tournamentId }: { opponentId:
   const [pending, setPending] = useState(false)
 
   return (
-    <button
+    <Button
+      variant="ghost"
+      size="icon-sm"
       onClick={async () => {
         if (!confirm('Delete this opponent and all their scouted footage? This cannot be undone.')) return
         setPending(true)
@@ -39,12 +59,12 @@ export function DeleteOpponentButton({ opponentId, tournamentId }: { opponentId:
       }}
       disabled={pending}
       aria-label="Delete opponent"
-      className="p-1.5 rounded-md text-muted-foreground hover:text-rose-400 hover:bg-rose-950/30 transition-colors disabled:opacity-40"
+      className="text-muted-foreground hover:text-rose-400 hover:bg-rose-950/30"
     >
       <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
       </svg>
-    </button>
+    </Button>
   )
 }
 
@@ -52,62 +72,51 @@ export function AddOpponentForm({ tournamentId }: { tournamentId: string }) {
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState(false)
 
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="text-sm px-4 py-2 rounded-full bg-primary text-primary-foreground font-medium hover:opacity-90 transition-opacity"
-      >
-        + Add Opponent
-      </button>
-    )
-  }
-
   return (
-    <form
-      action={async (fd) => {
-        setPending(true)
-        await addOpponent(tournamentId, fd)
-        setOpen(false)
-        setPending(false)
-      }}
-      className="rounded-lg border p-4 space-y-3 max-w-md"
-    >
-      <h3 className="font-semibold text-sm">Add Opponent</h3>
-      <div className="space-y-1">
-        <label className="text-xs font-medium text-muted-foreground">Name *</label>
-        <input
-          name="name"
-          required
-          placeholder="e.g. João Silva"
-          className="w-full rounded-md border px-3 py-2 text-sm bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-        />
-      </div>
-      <div className="space-y-1">
-        <label className="text-xs font-medium text-muted-foreground">Seeding notes</label>
-        <input
-          name="notes"
-          placeholder="e.g. #3 seed, black belt 5 years"
-          className="w-full rounded-md border px-3 py-2 text-sm bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-        />
-      </div>
-      <div className="flex gap-2 justify-end">
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className="text-sm px-3 py-1.5 rounded-full border font-medium hover:bg-muted transition-colors"
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setPending(false) }}>
+      <DialogTrigger>
+        <Button size="sm">+ Add Opponent</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add Opponent</DialogTitle>
+        </DialogHeader>
+        <form
+          id="add-opponent-form"
+          action={async (fd) => {
+            setPending(true)
+            await addOpponent(tournamentId, fd)
+            setOpen(false)
+            setPending(false)
+          }}
+          className="space-y-3"
         >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={pending}
-          className="text-sm px-3 py-1.5 rounded-full bg-primary text-primary-foreground font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-        >
-          {pending ? 'Adding…' : 'Add'}
-        </button>
-      </div>
-    </form>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Name *</label>
+            <Input
+              name="name"
+              required
+              placeholder="e.g. João Silva"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Seeding notes</label>
+            <Input
+              name="notes"
+              placeholder="e.g. #3 seed, black belt 5 years"
+            />
+          </div>
+        </form>
+        <DialogFooter>
+          <DialogClose>
+            <Button variant="outline" type="button">Cancel</Button>
+          </DialogClose>
+          <Button type="submit" form="add-opponent-form" disabled={pending}>
+            {pending ? 'Adding…' : 'Add'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -125,112 +134,104 @@ export function ScoutForm({
   const [done, setDone] = useState(false)
   const [appearanceColor, setAppearanceColor] = useState<AppearanceColor | null>(null)
   const [startingSide, setStartingSide] = useState<StartingSide | null>(null)
+  const [format, setFormat] = useState('gi')
 
   if (done) {
     return <span className="text-xs text-emerald-400 font-medium">Scanning queued ✓</span>
   }
 
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="text-xs px-3 py-1 rounded-full border font-medium hover:bg-muted transition-colors"
-      >
-        Scout footage
-      </button>
-    )
-  }
-
   return (
-    <form
-      action={async (fd) => {
-        fd.set('appearanceHint', buildAppearanceHint(appearanceColor, startingSide))
-        setPending(true)
-        await submitScoutUrls(tournamentId, opponentId, fd)
-        setOpen(false)
-        setDone(true)
-      }}
-      className="mt-3 space-y-3 rounded-lg border p-4 bg-muted/30"
-    >
-      <p className="text-xs font-medium">
-        Submit footage URLs for <span className="font-semibold">{opponentName}</span>
-      </p>
-      <div className="space-y-1">
-        <label className="text-xs text-muted-foreground">Format</label>
-        <select
-          name="format"
-          defaultValue="gi"
-          className="w-full rounded-md border px-3 py-1.5 text-sm bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setPending(false) }}>
+      <DialogTrigger>
+        <Button variant="outline" size="xs">Scout footage</Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Submit footage for {opponentName}</DialogTitle>
+        </DialogHeader>
+        <form
+          id="scout-form"
+          action={async (fd) => {
+            fd.set('appearanceHint', buildAppearanceHint(appearanceColor, startingSide))
+            fd.set('format', format)
+            setPending(true)
+            await submitScoutUrls(tournamentId, opponentId, fd)
+            setOpen(false)
+            setDone(true)
+          }}
+          className="space-y-3"
         >
-          <option value="gi">Gi</option>
-          <option value="no_gi">No-Gi</option>
-        </select>
-      </div>
-      <div className="space-y-1">
-        <label className="text-xs text-muted-foreground">Video URLs (one per line, max 10)</label>
-        <textarea
-          name="urls"
-          required
-          rows={4}
-          placeholder="https://youtube.com/watch?v=..."
-          className="w-full rounded-md border px-3 py-2 text-sm font-mono bg-muted text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
-        />
-      </div>
-      <div className="space-y-1.5">
-        <div>
-          <p className="text-xs text-muted-foreground font-medium">Opponent&apos;s appearance in video</p>
-          <p className="text-xs text-muted-foreground">Helps the AI identify which athlete is {opponentName}</p>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {COLOR_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => setAppearanceColor(appearanceColor === opt.value ? null : opt.value)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs transition-all ${
-                appearanceColor === opt.value
-                  ? 'border-primary bg-primary text-primary-foreground font-medium'
-                  : 'border-border hover:border-foreground/40'
-              }`}
-            >
-              <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${opt.bg}`} />
-              {opt.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-1.5">
-          {(['left', 'right'] as StartingSide[]).map((side) => (
-            <button
-              key={side}
-              type="button"
-              onClick={() => setStartingSide(startingSide === side ? null : side)}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs transition-all ${
-                startingSide === side
-                  ? 'border-primary bg-primary text-primary-foreground font-medium'
-                  : 'border-border hover:border-foreground/40'
-              }`}
-            >
-              {side === 'left' ? '← ' : '→ '}Starts {side}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="flex gap-2 justify-end">
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className="text-xs px-3 py-1.5 rounded-full border font-medium hover:bg-muted transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={pending}
-          className="text-xs px-3 py-1.5 rounded-full bg-primary text-primary-foreground font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-        >
-          {pending ? 'Submitting…' : 'Submit'}
-        </button>
-      </div>
-    </form>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Format</label>
+            <Select value={format} onValueChange={(v) => { if (v !== null) setFormat(v) }}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="gi">Gi</SelectItem>
+                <SelectItem value="no_gi">No-Gi</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Video URLs (one per line, max 10)</label>
+            <textarea
+              name="urls"
+              required
+              rows={4}
+              placeholder="https://youtube.com/watch?v=..."
+              className="w-full rounded-lg border border-input bg-muted text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring/50 resize-none"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <div>
+              <p className="text-xs text-muted-foreground font-medium">Opponent&apos;s appearance in video</p>
+              <p className="text-xs text-muted-foreground">Helps the AI identify which athlete is {opponentName}</p>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {COLOR_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setAppearanceColor(appearanceColor === opt.value ? null : opt.value)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs transition-all ${
+                    appearanceColor === opt.value
+                      ? 'border-primary bg-primary text-primary-foreground font-medium'
+                      : 'border-border hover:border-foreground/40'
+                  }`}
+                >
+                  <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${opt.bg}`} />
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-1.5">
+              {(['left', 'right'] as StartingSide[]).map((side) => (
+                <button
+                  key={side}
+                  type="button"
+                  onClick={() => setStartingSide(startingSide === side ? null : side)}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs transition-all ${
+                    startingSide === side
+                      ? 'border-primary bg-primary text-primary-foreground font-medium'
+                      : 'border-border hover:border-foreground/40'
+                  }`}
+                >
+                  {side === 'left' ? '← ' : '→ '}Starts {side}
+                </button>
+              ))}
+            </div>
+          </div>
+        </form>
+        <DialogFooter>
+          <DialogClose>
+            <Button variant="outline" type="button">Cancel</Button>
+          </DialogClose>
+          <Button type="submit" form="scout-form" disabled={pending}>
+            {pending ? 'Submitting…' : 'Submit'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

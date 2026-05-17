@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 type Tab = 'file' | 'url'
 type ScanMode = 'single' | 'scan'
@@ -613,9 +615,8 @@ function FileUploadTab() {
           </>
         )}
         <div className="flex gap-3 justify-center pt-2">
-          <button onClick={() => { setFile(null); setFrameResult(null); setState('idle'); setProgress(0); setAthleteName(''); setEventName('') }}
-            className="px-4 py-2 rounded-md border text-sm hover:bg-muted transition-colors">Upload another</button>
-          <button onClick={() => router.push('/player-card')} className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity">View My Stats</button>
+          <Button variant="outline" onClick={() => { setFile(null); setFrameResult(null); setState('idle'); setProgress(0); setAthleteName(''); setEventName('') }}>Upload another</Button>
+          <Button onClick={() => router.push('/player-card')}>View My Stats</Button>
         </div>
       </div>
     )
@@ -665,15 +666,13 @@ function FileUploadTab() {
         <div className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Athlete name <span className="text-red-500">*</span></label>
-            <input type="text" value={athleteName} onChange={(e) => setAthleteName(e.target.value)}
-              placeholder="Name as shown on screen (e.g. David Smith)"
-              className="w-full rounded-md border bg-muted text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+            <Input type="text" value={athleteName} onChange={(e) => setAthleteName(e.target.value)}
+              placeholder="Name as shown on screen (e.g. David Smith)" />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Event name <span className="text-muted-foreground font-normal">(optional)</span></label>
-            <input type="text" value={eventName} onChange={(e) => setEventName(e.target.value)}
-              placeholder="e.g. Pan Ams 2026"
-              className="w-full rounded-md border bg-muted text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+            <Input type="text" value={eventName} onChange={(e) => setEventName(e.target.value)}
+              placeholder="e.g. Pan Ams 2026" />
           </div>
         </div>
       )}
@@ -685,7 +684,7 @@ function FileUploadTab() {
         startingSideAuto={startingSideAuto}
         selfDescription={selfDescription} setSelfDescription={setSelfDescription} />
 
-      {error && <p className="text-sm text-rose-400">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       {state === 'uploading' && (
         <div className="space-y-1">
@@ -696,10 +695,9 @@ function FileUploadTab() {
         </div>
       )}
 
-      <button onClick={upload} disabled={!file || state === 'uploading'}
-        className="w-full py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-bold disabled:opacity-40 hover:opacity-90 transition-opacity shadow-[0_0_20px_rgba(180,130,20,0.25)]">
+      <Button onClick={upload} disabled={!file || state === 'uploading'} className="w-full shadow-[0_0_20px_rgba(180,130,20,0.25)]" size="lg">
         {state === 'uploading' ? 'Uploading…' : 'Upload Video'}
-      </button>
+      </Button>
     </div>
   )
 }
@@ -753,8 +751,8 @@ function UrlAnalysisTab() {
         <p className="font-medium text-emerald-400">{urls.filter(Boolean).length} stream{urls.filter(Boolean).length > 1 ? 's' : ''} submitted for analysis!</p>
         <p className="text-sm text-muted-foreground">Gemini will scan for {athleteName}&apos;s matches. This may take several minutes.</p>
         <div className="flex gap-3 justify-center pt-2">
-          <button onClick={() => { setUrls(['']); setAthleteName(''); setEventName(''); setState('idle') }} className="px-4 py-2 rounded-md border text-sm hover:bg-muted transition-colors">Submit more</button>
-          <button onClick={() => router.push('/player-card')} className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity">View My Stats</button>
+          <Button variant="outline" onClick={() => { setUrls(['']); setAthleteName(''); setEventName(''); setState('idle') }}>Submit more</Button>
+          <Button onClick={() => router.push('/player-card')}>View My Stats</Button>
         </div>
       </div>
     )
@@ -764,17 +762,15 @@ function UrlAnalysisTab() {
     <div className="space-y-6">
       <div className="space-y-2">
         <label className="text-sm font-medium">Athlete name <span className="text-red-500">*</span></label>
-        <input type="text" value={athleteName} onChange={(e) => setAthleteName(e.target.value)}
-          placeholder="Name as shown on screen (e.g. David Smith)"
-          className="w-full rounded-md border bg-muted text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+        <Input type="text" value={athleteName} onChange={(e) => setAthleteName(e.target.value)}
+          placeholder="Name as shown on screen (e.g. David Smith)" />
         <p className="text-xs text-muted-foreground">Must match exactly what appears in the tournament overlay</p>
       </div>
 
       <div className="space-y-2">
         <label className="text-sm font-medium">Event name <span className="text-muted-foreground font-normal">(optional)</span></label>
-        <input type="text" value={eventName} onChange={(e) => setEventName(e.target.value)}
-          placeholder="e.g. Pan Ams 2026, IBJJF Worlds 2026"
-          className="w-full rounded-md border bg-muted text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+        <Input type="text" value={eventName} onChange={(e) => setEventName(e.target.value)}
+          placeholder="e.g. Pan Ams 2026, IBJJF Worlds 2026" />
       </div>
 
       <div className="space-y-2">
@@ -785,11 +781,11 @@ function UrlAnalysisTab() {
             return (
               <div key={i} className="space-y-2">
                 <div className="flex gap-2">
-                  <input type="url" value={url} onChange={(e) => updateUrl(i, e.target.value)}
+                  <Input type="url" value={url} onChange={(e) => updateUrl(i, e.target.value)}
                     placeholder="https://youtube.com/watch?v=... or direct video URL"
-                    className="flex-1 rounded-md border bg-muted text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                    className="flex-1" />
                   {urls.length > 1 && (
-                    <button onClick={() => removeUrl(i)} className="px-3 py-2 rounded-md border text-sm text-muted-foreground hover:bg-muted transition-colors">✕</button>
+                    <Button variant="outline" onClick={() => removeUrl(i)}>✕</Button>
                   )}
                 </div>
                 {ytId && (
@@ -817,12 +813,11 @@ function UrlAnalysisTab() {
         startingSide={startingSide} setStartingSide={setStartingSide}
         selfDescription={selfDescription} setSelfDescription={setSelfDescription} />
 
-      {error && <p className="text-sm text-rose-400">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <button onClick={submit} disabled={state === 'uploading'}
-        className="w-full py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-bold disabled:opacity-40 hover:opacity-90 transition-opacity shadow-[0_0_20px_rgba(180,130,20,0.25)]">
+      <Button onClick={submit} disabled={state === 'uploading'} className="w-full shadow-[0_0_20px_rgba(180,130,20,0.25)]" size="lg">
         {state === 'uploading' ? 'Submitting…' : 'Analyse Stream'}
-      </button>
+      </Button>
     </div>
   )
 }
