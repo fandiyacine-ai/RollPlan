@@ -454,10 +454,10 @@ function TimelineMatchItem({
   const title = matchTitle(match)
 
   const dotColor = match.status === 'analysed'
-    ? 'border-emerald-500 bg-emerald-950'
+    ? 'border-border bg-card'
     : match.status === 'failed'
-    ? 'border-rose-500 bg-rose-950'
-    : 'border-blue-500 bg-blue-950'
+    ? 'border-rose-500/60 bg-rose-950/50'
+    : 'border-blue-500/60 bg-blue-950/50'
 
   return (
     <div className="relative pl-7 pb-4">
@@ -497,7 +497,7 @@ function TimelineMatchItem({
           <div className="px-3 py-2 border-t border-border/40 space-y-1.5">
             <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
               <div
-                className={`h-full rounded-full ${domPct !== null && domPct >= 55 ? 'bg-emerald-500' : domPct !== null && domPct < 40 ? 'bg-rose-500' : 'bg-zinc-500'}`}
+                className="h-full rounded-full bg-foreground/50"
                 style={{ width: `${domPct ?? 50}%` }}
               />
             </div>
@@ -519,11 +519,7 @@ function TimelineMatchItem({
         {topInsight && (
           <div className="px-3 py-2.5 border-t border-border/40">
             <div className="flex items-start gap-1.5">
-              <span className={`w-1.5 h-1.5 rounded-full mt-1 flex-shrink-0 ${
-                topInsight.category === 'strength' ? 'bg-emerald-400'
-                : topInsight.category === 'mistake' ? 'bg-rose-400'
-                : 'bg-blue-400'
-              }`} />
+              <span className="w-1.5 h-1.5 rounded-full mt-1 flex-shrink-0 bg-muted-foreground/50" />
               <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
                 {topInsight.description}
               </p>
