@@ -79,6 +79,9 @@ export const scanUrl = inngest.createFunction(
         if (msg.includes('Resource has been exhausted') || msg.includes('RESOURCE_EXHAUSTED')) {
           throw new NonRetriableError('Video is too long to process in one call — keep each URL under ~1 hour. For full tournament streams, submit individual mat recordings split by time block.')
         }
+        if (msg.includes('input token count exceeds') || msg.includes('maximum number of tokens allowed')) {
+          throw new NonRetriableError('Video is too long for a single analysis pass (exceeded 1M token limit). Submit the recording split into ~1-hour segments — most Smoothcomp streams have separate mat recordings you can link directly.')
+        }
         throw err
       }
 
