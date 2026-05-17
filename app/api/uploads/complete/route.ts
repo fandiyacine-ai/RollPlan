@@ -10,13 +10,17 @@ export const maxDuration = 30
 
 export async function POST(req: NextRequest) {
   try {
-    const { videoId, path, sourceType, format, appearanceHint, athleteImageBase64, spatialData, scanMode, athleteName, eventName } = await req.json()
+    const { videoId, path, sourceType, format, appearanceHint, athleteImageBase64, spatialData, scanMode, athleteName, eventName, durationSeconds } = await req.json()
 
     if (!videoId || !path) return NextResponse.json({ error: 'videoId and path are required' }, { status: 400 })
 
     const userId = await getOrCreateDbUserId()
     const publicUrl = await getPublicVideoUrl(path)
-    await db.update(videos).set({ publicUrl, status: 'uploaded' }).where(eq(videos.id, videoId))
+    await db.update(videos).set({
+      publicUrl,
+      status: 'uploaded',
+      ...(durationSeconds ? { durationSeconds } : {}),
+    }).where(eq(videos.id, videoId))
 
     if (scanMode === 'scan') {
       if (!athleteName) return NextResponse.json({ error: 'athleteName required for scan mode' }, { status: 400 })

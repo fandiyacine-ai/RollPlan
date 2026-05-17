@@ -51,14 +51,14 @@ ${BJJ_POSITION_VISUAL_GUIDE}
 ## Your task
 
 1. First, identify the competitor of interest using the provided description and any reference image. There are exactly TWO athletes — one is "user", the other is "opponent". State in competitor_identifier which visual features (gi colour, body position, side of frame) confirm which athlete is the user.
-2. Segment the entire match timeline into position_segments — every second of the match must be covered.
+2. Segment the ENTIRE video from second 0 to the very last second — every second must fall into exactly one segment. No gaps. Pre-match standing/bowing = standing/neutral. Post-match celebration = standing/neutral. Do not stop early.
 3. Identify discrete events (submission attempts, sweeps, passes, takedowns, escapes, etc.).
 4. Apply the self-review checklist above before finalising your output.
 5. Output ONLY valid JSON matching the required schema. No prose outside the JSON.
 
 ## Rules
 - NEVER use position or event type IDs not in the taxonomy above.
-- Segments must not overlap and must cover the full match duration.
+- Segments must not overlap. They must start at 0 and collectively span the FULL video duration with no gaps. If the video duration is given, your last segment must end at that exact second.
 - user_role refers to the competitor of interest's role (top/bottom/neutral/standing).
 - dominance: dominant = competitor has clear control; inferior = opponent has clear control; neutral = neither.
 - confidence reflects your certainty about the classification, not about whether the action happened.
@@ -102,7 +102,7 @@ Competitor to track: ${params.competitorDescription}
 ${params.appearanceHint ? `CRITICAL — Visual identification (apply for the ENTIRE match):\n${params.appearanceHint}\nIf a reference photo was provided above, that photo shows the user — match their exact appearance. Use these constraints as the deciding factor whenever the two athletes look similar or swap positions. Do NOT swap who is "user" and who is "opponent" at any point.` : ''}
 Format: ${params.format === 'gi' ? 'Gi' : 'No-Gi'}
 Ruleset: ${params.ruleset.toUpperCase()}
-${params.durationSeconds ? `Duration: approximately ${Math.round(params.durationSeconds / 60)} minutes` : ''}
+${params.durationSeconds ? `IMPORTANT — Video duration: exactly ${params.durationSeconds} seconds (${formatTimestamp(params.durationSeconds)}). Your segments must start at 0 and the last segment must end at ${params.durationSeconds}. Do not stop short.` : ''}
 
 Output the full structured JSON with positions and events.`
 }

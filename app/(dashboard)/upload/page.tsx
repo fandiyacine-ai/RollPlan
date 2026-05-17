@@ -71,6 +71,18 @@ function randomFractions(count = 4): number[] {
     .sort((a, b) => a - b)
 }
 
+function getVideoDuration(file: File): Promise<number | null> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file)
+    const vid = document.createElement('video')
+    vid.muted = true
+    vid.preload = 'metadata'
+    vid.onloadedmetadata = () => { URL.revokeObjectURL(url); resolve(Math.round(vid.duration)) }
+    vid.onerror = () => { URL.revokeObjectURL(url); resolve(null) }
+    vid.src = url
+  })
+}
+
 // Always include early absolute-second frames (athletes entering mat) + fraction-based match frames.
 // Entry frames are sorted first; duplicates within 3s are dropped.
 async function extractFramesAt(
@@ -537,6 +549,7 @@ function FileUploadTab() {
 
     const appearanceStr = buildAppearanceHint(appearanceColor, startingSide)
     const hint = [selfDescription.trim(), appearanceStr, frameResult?.spatialHint].filter(Boolean).join(' ')
+    const durationSeconds = await getVideoDuration(file)
 
     try {
       const presignRes = await fetch('/api/uploads', {
@@ -567,6 +580,7 @@ function FileUploadTab() {
           appearanceHint: hint || undefined,
           athleteImageBase64: frameResult?.athleteImageBase64 || undefined,
           spatialData: frameResult?.spatialData || undefined,
+          durationSeconds: durationSeconds ?? undefined,
           scanMode,
           ...(scanMode === 'scan' ? { athleteName: athleteName.trim(), eventName: eventName.trim() || undefined } : {}),
         }),
