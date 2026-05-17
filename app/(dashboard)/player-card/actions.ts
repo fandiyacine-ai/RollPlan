@@ -18,6 +18,17 @@ export async function deleteAllPlayerData(): Promise<{ error?: string }> {
   }
 }
 
+export async function deleteVideo(videoId: string): Promise<{ error?: string }> {
+  try {
+    const userId = await getOrCreateDbUserId()
+    await db.delete(videos).where(and(eq(videos.id, videoId), eq(videos.userId, userId)))
+    revalidatePath('/player-card')
+    return {}
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 export async function deleteMatch(matchId: string, videoId: string): Promise<{ error?: string }> {
   try {
     const userId = await getOrCreateDbUserId()

@@ -1,10 +1,11 @@
 import React from 'react'
 import { db } from '../../../lib/db'
 import { matches, insights, videos, positionSegments, matchEvents, users } from '../../../lib/db/schema'
-import { desc, eq, inArray, isNull } from 'drizzle-orm'
+import { desc, eq, inArray, isNull, and, ne } from 'drizzle-orm'
 import Link from 'next/link'
 import RefreshPoller from './refresh-poller'
 import { DeleteMatchButton } from './delete-match-button'
+import { DeleteVideoButton } from './delete-video-button'
 import { ClearAllButton } from './clear-all-button'
 import { POSITIONS } from '../../../lib/taxonomy/positions'
 import { auth, currentUser } from '@clerk/nextjs/server'
@@ -72,7 +73,8 @@ export default async function PlayerCardPage() {
     .orderBy(desc(matches.createdAt))
     .limit(20)
 
-  const scanningVideos = await db
+  // Videos with no matches: split into actively processing vs failed
+  const videosWithNoMatches = await db
     .select({
       id: videos.id,
       originalFilename: videos.originalFilename,
@@ -82,9 +84,12 @@ export default async function PlayerCardPage() {
     })
     .from(videos)
     .leftJoin(matches, eq(matches.videoId, videos.id))
-    .where(isNull(matches.id))
+    .where(and(isNull(matches.id), ne(videos.status, 'analysed')))
     .orderBy(desc(videos.uploadedAt))
-    .limit(5)
+    .limit(20)
+
+  const scanningVideos = videosWithNoMatches.filter(v => v.status !== 'failed')
+  const failedVideos = videosWithNoMatches.filter(v => v.status === 'failed')
 
   const analysedIds = recentMatches.filter((m) => m.status === 'analysed').map((m) => m.id)
 
@@ -138,7 +143,7 @@ export default async function PlayerCardPage() {
     scanningVideos.length > 0 ||
     recentMatches.some((m) => m.status === 'pending' || m.status === 'processing')
 
-  if (recentMatches.length === 0 && scanningVideos.length === 0) {
+  if (recentMatches.length === 0 && scanningVideos.length === 0 && failedVideos.length === 0) {
     return (
       <div className="space-y-6 max-w-2xl">
         <ProfileHeader name={displayName} dbUser={dbUser} />
@@ -256,6 +261,22 @@ export default async function PlayerCardPage() {
                 </p>
               </div>
               <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-100 text-blue-700 flex-shrink-0">scanning</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Failed uploads ── */}
+      {failedVideos.length > 0 && (
+        <div className="space-y-2">
+          <SectionHeader title="Failed" sub="These scans did not complete — remove them or resubmit the URL" />
+          {failedVideos.map((v) => (
+            <div key={v.id} className="rounded-lg border border-red-200 bg-red-50/40 p-4 flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="font-medium text-sm truncate">{v.originalFilename}</p>
+                <p className="text-xs text-red-600 mt-0.5">Analysis failed</p>
+              </div>
+              <DeleteVideoButton videoId={v.id} />
             </div>
           ))}
         </div>
