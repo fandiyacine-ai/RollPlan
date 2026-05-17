@@ -2,6 +2,11 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
+import { POSITIONS } from '../../../../../lib/taxonomy/positions'
+import { EVENT_TYPES } from '../../../../../lib/taxonomy/events'
+
+const POSITION_MAP = Object.fromEntries(POSITIONS.map(p => [p.id, p.name]))
+const EVENT_MAP = Object.fromEntries(EVENT_TYPES.map(e => [e.id, e.name]))
 
 type Segment = { id: string; startSeconds: number; endSeconds: number; positionId: string; userRole: string; dominance: string }
 type Event = { id: string; timestampSeconds: number; eventTypeId: string; actor: string; outcome: string; techniqueLabel: string | null }
@@ -15,6 +20,12 @@ const LANG_STT: Record<Lang, string> = { en: 'en-US', fi: 'fi-FI', fr: 'fr-FR', 
 function fmt(s: number) {
   const m = Math.floor(s / 60)
   return `${m}:${Math.floor(s % 60).toString().padStart(2, '0')}`
+}
+
+function oppositeRole(role: string): string {
+  if (role === 'top') return 'bottom'
+  if (role === 'bottom') return 'top'
+  return role
 }
 
 function extractYouTubeId(url: string) {
@@ -230,8 +241,8 @@ export default function CoachSession({
   }, [isYouTube])
 
   const timeline = [
-    ...segments.map(s => ({ type: 'segment' as const, time: s.startSeconds, label: s.positionId.replace(/_/g, ' '), sub: `${s.userRole} · ${s.dominance}`, dominance: s.dominance, actor: null as string | null })),
-    ...events.map(e => ({ type: 'event' as const, time: e.timestampSeconds, label: e.techniqueLabel ?? e.eventTypeId.replace(/_/g, ' '), sub: `${e.actor} · ${e.outcome}`, dominance: null as string | null, actor: e.actor })),
+    ...segments.map(s => ({ type: 'segment' as const, time: s.startSeconds, label: POSITION_MAP[s.positionId] ?? s.positionId.replace(/_/g, ' '), sub: `${s.userRole} · ${s.dominance}`, dominance: s.dominance, actor: null as string | null })),
+    ...events.map(e => ({ type: 'event' as const, time: e.timestampSeconds, label: e.techniqueLabel ?? EVENT_MAP[e.eventTypeId] ?? e.eventTypeId.replace(/_/g, ' '), sub: `${e.actor} · ${e.outcome}`, dominance: null as string | null, actor: e.actor })),
   ].sort((a, b) => a.time - b.time)
 
   const handleTextSubmit = (e: React.FormEvent) => {
@@ -274,9 +285,31 @@ export default function CoachSession({
                   <div id="yt-player" className="w-full h-full" />
                 </div>
               ) : (
-                <video ref={videoRef} src={videoUrl} controls
-                  className="w-full aspect-video rounded-lg bg-black flex-shrink-0"
-                  onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime ?? 0)} />
+                <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-black flex-shrink-0">
+                  <video ref={videoRef} src={videoUrl} controls
+                    className="w-full h-full"
+                    onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime ?? 0)} />
+                  {currentSegment && (
+                    <div className="absolute top-2 left-0 right-0 flex justify-between px-2 pointer-events-none">
+                      <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold backdrop-blur-sm ${
+                        currentSegment.dominance === 'dominant' ? 'bg-blue-600/80 text-white' :
+                        currentSegment.dominance === 'inferior' ? 'bg-blue-600/50 text-white/90' : 'bg-blue-600/60 text-white'
+                      }`}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-300 inline-block" />
+                        {match.competitorLabel ?? 'YOU'} · {currentSegment.userRole}
+                        {currentSegment.dominance === 'dominant' && ' ✓'}
+                      </div>
+                      <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold backdrop-blur-sm ${
+                        currentSegment.dominance === 'inferior' ? 'bg-orange-600/80 text-white' :
+                        currentSegment.dominance === 'dominant' ? 'bg-orange-600/50 text-white/90' : 'bg-orange-600/60 text-white'
+                      }`}>
+                        {match.opponentLabel} · {oppositeRole(currentSegment.userRole)}
+                        {currentSegment.dominance === 'inferior' && ' ✓'}
+                        <span className="w-1.5 h-1.5 rounded-full bg-orange-300 inline-block" />
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Visual scrubber */}
@@ -318,20 +351,27 @@ export default function CoachSession({
               </div>
 
               {/* Current position HUD */}
-              <div className="flex items-center gap-2.5 mt-3 mb-2 flex-shrink-0 min-h-[28px]">
-                <span className="font-mono text-base font-bold tabular-nums">{fmt(currentTime)}</span>
+              <div className="flex items-center gap-2 mt-3 mb-2 flex-shrink-0 min-h-[32px]">
+                <span className="font-mono text-sm font-bold tabular-nums text-muted-foreground w-10 flex-shrink-0">{fmt(currentTime)}</span>
                 {currentSegment ? (
                   <>
-                    <span className="w-px h-4 bg-border flex-shrink-0" />
-                    <span className="capitalize font-semibold text-sm truncate">{currentSegment.positionId.replace(/_/g, ' ')}</span>
-                    <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold flex-shrink-0 ${
-                      currentSegment.dominance === 'dominant' ? 'bg-green-100 text-green-700' :
-                      currentSegment.dominance === 'inferior' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
-                    }`}>{currentSegment.dominance}</span>
-                    <span className="text-xs text-muted-foreground flex-shrink-0 capitalize">{currentSegment.userRole}</span>
+                    <span className="font-semibold text-sm truncate flex-1">{POSITION_MAP[currentSegment.positionId] ?? currentSegment.positionId.replace(/_/g, ' ')}</span>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold bg-blue-100 text-blue-700`}>
+                        {match.competitorLabel ?? 'YOU'} · {currentSegment.userRole}
+                      </span>
+                      <span className="text-muted-foreground text-xs">vs</span>
+                      <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-orange-100 text-orange-700">
+                        {match.opponentLabel} · {oppositeRole(currentSegment.userRole)}
+                      </span>
+                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold flex-shrink-0 ${
+                        currentSegment.dominance === 'dominant' ? 'bg-green-100 text-green-700' :
+                        currentSegment.dominance === 'inferior' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'
+                      }`}>{currentSegment.dominance}</span>
+                    </div>
                   </>
                 ) : (
-                  <span className="text-xs text-muted-foreground">Transition</span>
+                  <span className="text-xs text-muted-foreground">Transition / no segment</span>
                 )}
               </div>
 
