@@ -1,7 +1,7 @@
 import { db } from '../../../../../lib/db'
 import { tournamentOpponents, matches } from '../../../../../lib/db/schema'
 import { eq, count } from 'drizzle-orm'
-import { AddOpponentForm, ScoutForm } from './opponent-forms'
+import { AddOpponentForm, ScoutForm, DeleteOpponentButton } from './opponent-forms'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
@@ -91,6 +91,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
                       opponentId={opp.id}
                       opponentName={opp.opponentLabel}
                     />
+                    <DeleteOpponentButton opponentId={opp.id} tournamentId={tournamentId} />
                   </div>
                 </div>
               </div>

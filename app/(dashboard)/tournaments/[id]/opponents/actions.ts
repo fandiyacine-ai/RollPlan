@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '../../../../../lib/db'
 import { tournamentOpponents, videos } from '../../../../../lib/db/schema'
+import { eq } from 'drizzle-orm'
 import { inngest } from '../../../../../lib/inngest'
 import { getOrCreateDbUserId } from '../../../../../lib/db/get-user'
 
@@ -71,4 +72,14 @@ export async function submitScoutUrls(tournamentId: string, opponentId: string, 
   }
 
   revalidatePath(`/tournaments/${tournamentId}/opponents`)
+}
+
+export async function deleteOpponent(opponentId: string, tournamentId: string): Promise<{ error?: string }> {
+  try {
+    await db.delete(tournamentOpponents).where(eq(tournamentOpponents.id, opponentId))
+    revalidatePath(`/tournaments/${tournamentId}/opponents`)
+    return {}
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
 }

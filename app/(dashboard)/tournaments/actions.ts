@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '../../../lib/db'
 import { tournaments } from '../../../lib/db/schema'
+import { eq, and } from 'drizzle-orm'
 import { getOrCreateDbUserId } from '../../../lib/db/get-user'
 
 export async function createTournament(
@@ -28,5 +29,16 @@ export async function createTournament(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return { error: message }
+  }
+}
+
+export async function deleteTournament(id: string): Promise<{ error?: string }> {
+  try {
+    const userId = await getOrCreateDbUserId()
+    await db.delete(tournaments).where(and(eq(tournaments.id, id), eq(tournaments.userId, userId)))
+    revalidatePath('/tournaments')
+    return {}
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) }
   }
 }

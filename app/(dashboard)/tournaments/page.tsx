@@ -2,7 +2,7 @@ import { db } from '../../../lib/db'
 import { tournaments } from '../../../lib/db/schema'
 import { desc } from 'drizzle-orm'
 import Link from 'next/link'
-import { CreateTournamentForm } from './create-form'
+import { CreateTournamentForm, DeleteTournamentButton } from './create-form'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,9 +51,12 @@ export default async function TournamentsPage() {
                     {t.eventDate ? ` · ${new Date(t.eventDate).toLocaleDateString()}` : ''}
                   </p>
                 </div>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_BADGE[t.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                  {t.status}
-                </span>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_BADGE[t.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                    {t.status}
+                  </span>
+                  <DeleteTournamentButton id={t.id} />
+                </div>
               </div>
             </Link>
           ))}
