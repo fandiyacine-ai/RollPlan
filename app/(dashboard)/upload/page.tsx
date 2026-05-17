@@ -12,7 +12,7 @@ type AppearanceColor = 'blue_gi' | 'white_gi' | 'black_gi' | 'dark_rash' | 'ligh
 type StartingSide = 'left' | 'right'
 type Rect = { x1: number; y1: number; x2: number; y2: number }
 type Pt = { x: number; y: number }
-type Frame = { dataUrl: string; naturalW: number; naturalH: number }
+type Frame = { dataUrl: string; naturalW: number; naturalH: number; label?: 'entry' }
 type SpatialData = { roi: Rect; athlete: Pt }
 type FrameResult = { spatialHint: string; athleteImageBase64: string; spatialData: SpatialData }
 
@@ -73,7 +73,13 @@ function randomFractions(count = 4): number[] {
     .sort((a, b) => a - b)
 }
 
-async function extractFramesAt(file: File, fractions: number[]): Promise<Frame[]> {
+// Always include early absolute-second frames (athletes entering mat) + fraction-based match frames.
+// Entry frames are sorted first; duplicates within 3s are dropped.
+async function extractFramesAt(
+  file: File,
+  fractions: number[],
+  earlySeconds: number[] = [3, 8, 16],
+): Promise<Frame[]> {
   const url = URL.createObjectURL(file)
   try {
     const vid = document.createElement('video')
@@ -86,15 +92,25 @@ async function extractFramesAt(file: File, fractions: number[]): Promise<Frame[]
       setTimeout(() => rej(new Error('timeout')), 10000)
     })
     const duration = vid.duration
+
+    const slots: Array<{ secs: number; label?: 'entry' }> = []
+    for (const s of earlySeconds) {
+      if (s < duration - 0.5) slots.push({ secs: s, label: 'entry' })
+    }
+    for (const f of fractions) {
+      const secs = Math.max(0.5, duration * f)
+      if (!slots.some(t => Math.abs(t.secs - secs) < 3)) slots.push({ secs })
+    }
+    slots.sort((a, b) => a.secs - b.secs)
+
     const frames: Frame[] = []
-    for (const frac of fractions) {
-      vid.currentTime = Math.max(0.5, duration * frac)
+    for (const { secs, label } of slots) {
+      vid.currentTime = secs
       await new Promise<void>((res) => { vid.onseeked = () => res() })
       const c = document.createElement('canvas')
-      c.width = vid.videoWidth
-      c.height = vid.videoHeight
+      c.width = vid.videoWidth; c.height = vid.videoHeight
       c.getContext('2d')!.drawImage(vid, 0, 0)
-      frames.push({ dataUrl: c.toDataURL('image/jpeg', 0.75), naturalW: vid.videoWidth, naturalH: vid.videoHeight })
+      frames.push({ dataUrl: c.toDataURL('image/jpeg', 0.75), naturalW: vid.videoWidth, naturalH: vid.videoHeight, label })
     }
     return frames
   } finally {
@@ -179,7 +195,7 @@ function FrameSelector({
     setPhase('pick-frame')
     onComplete(null)
     try {
-      const newFrames = await extractFramesAt(videoFile, randomFractions())
+      const newFrames = await extractFramesAt(videoFile, randomFractions(), [3, 8, 16])
       setFrames(newFrames)
     } finally {
       setLoadingFrames(false)
@@ -334,21 +350,41 @@ function FrameSelector({
               {loadingFrames ? 'Loading…' : '↻ New frames'}
             </button>
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {frames.map((f, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => selectFrame(i)}
-                className={`flex-shrink-0 rounded overflow-hidden border-2 transition-all ${
-                  selectedIdx === i && phase === 'done' ? 'border-green-500' : 'border-transparent hover:border-foreground/40'
-                }`}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={f.dataUrl} alt={`Frame ${i + 1}`} className="h-20 w-auto object-cover block" draggable={false} />
-              </button>
-            ))}
+          <div className="flex gap-2 overflow-x-auto pb-1 items-end">
+            {frames.map((f, i) => {
+              const isFirstMatch = f.label !== 'entry' && (i === 0 || frames[i - 1].label === 'entry')
+              return (
+                <div key={i} className="flex items-end gap-2 flex-shrink-0">
+                  {/* Divider between entry and match frames */}
+                  {isFirstMatch && frames.some(fr => fr.label === 'entry') && (
+                    <div className="self-stretch flex flex-col items-center justify-center gap-1 px-0.5">
+                      <div className="w-px h-full bg-border" />
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => selectFrame(i)}
+                    className={`relative rounded overflow-hidden border-2 transition-all ${
+                      selectedIdx === i && phase === 'done' ? 'border-green-500' : 'border-transparent hover:border-foreground/40'
+                    }`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={f.dataUrl} alt={`Frame ${i + 1}`} className="h-20 w-auto object-cover block" draggable={false} />
+                    {f.label === 'entry' && (
+                      <span className="absolute bottom-1 left-1 text-[9px] font-bold uppercase bg-green-500 text-white px-1 py-0.5 rounded leading-none tracking-wide">
+                        Entry
+                      </span>
+                    )}
+                  </button>
+                </div>
+              )
+            })}
           </div>
+          {frames.some(f => f.label === 'entry') && phase === 'pick-frame' && (
+            <p className="text-xs text-muted-foreground">
+              <span className="text-green-700 font-medium">Entry frames</span> show athletes walking onto the mat — easiest to identify yourself before the match starts.
+            </p>
+          )}
           {phase === 'done' && (
             <p className="text-xs text-green-700 font-medium">Mat region and athlete position saved.</p>
           )}
@@ -407,6 +443,7 @@ function FileUploadTab() {
   const [format, setFormat] = useState<Format>('gi')
   const [appearanceColor, setAppearanceColor] = useState<AppearanceColor | null>(null)
   const [startingSide, setStartingSide] = useState<StartingSide | null>(null)
+  const [startingSideAuto, setStartingSideAuto] = useState(false)
   const [selfDescription, setSelfDescription] = useState('')
   const [state, setState] = useState<UploadState>('idle')
   const [progress, setProgress] = useState(0)
@@ -420,7 +457,19 @@ function FileUploadTab() {
     if (f.size > 2 * 1024 * 1024 * 1024) { setError('File must be under 2 GB'); return }
     setFile(f)
     setFrameResult(null)
+    setStartingSideAuto(false)
     setError(null)
+  }
+
+  function handleFrameComplete(result: FrameResult | null) {
+    setFrameResult(result)
+    if (result?.spatialData) {
+      const autoSide: StartingSide = result.spatialData.athlete.x < 0.5 ? 'left' : 'right'
+      setStartingSide(autoSide)
+      setStartingSideAuto(true)
+    } else {
+      setStartingSideAuto(false)
+    }
   }
 
   async function upload() {
@@ -523,7 +572,7 @@ function FileUploadTab() {
         )}
       </div>
 
-      {file && <FrameSelector videoFile={file} onComplete={setFrameResult} />}
+      {file && <FrameSelector videoFile={file} onComplete={handleFrameComplete} />}
 
       <div className="space-y-3">
         <label className="text-sm font-medium">Recording type</label>
@@ -559,7 +608,9 @@ function FileUploadTab() {
 
       <SharedFields format={format} setFormat={setFormat} sourceType={sourceType} setSourceType={setSourceType}
         appearanceColor={appearanceColor} setAppearanceColor={setAppearanceColor}
-        startingSide={startingSide} setStartingSide={setStartingSide}
+        startingSide={startingSide}
+        setStartingSide={(s) => { setStartingSide(s); setStartingSideAuto(false) }}
+        startingSideAuto={startingSideAuto}
         selfDescription={selfDescription} setSelfDescription={setSelfDescription} />
 
       {error && <p className="text-sm text-red-500">{error}</p>}
@@ -709,12 +760,14 @@ function UrlAnalysisTab() {
 function SharedFields({
   format, setFormat, sourceType, setSourceType,
   appearanceColor, setAppearanceColor, startingSide, setStartingSide,
+  startingSideAuto = false,
   selfDescription, setSelfDescription,
 }: {
   format: Format; setFormat: (f: Format) => void
   sourceType: SourceType; setSourceType: (s: SourceType) => void
   appearanceColor: AppearanceColor | null; setAppearanceColor: (c: AppearanceColor | null) => void
   startingSide: StartingSide | null; setStartingSide: (s: StartingSide | null) => void
+  startingSideAuto?: boolean
   selfDescription: string; setSelfDescription: (v: string) => void
 }) {
   return (
@@ -746,16 +799,24 @@ function SharedFields({
             </button>
           ))}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {(['left', 'right'] as StartingSide[]).map((side) => (
             <button key={side} type="button"
               onClick={() => setStartingSide(startingSide === side ? null : side)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition-all ${startingSide === side ? 'border-foreground bg-foreground text-background font-medium' : 'border-border hover:border-foreground/40'}`}>
               {side === 'left' ? '← ' : '→ '}Starts {side}
+              {startingSide === side && startingSideAuto && (
+                <span className="text-[10px] opacity-70 font-normal">(auto)</span>
+              )}
             </button>
           ))}
           <span className="self-center text-xs text-muted-foreground">side of the mat</span>
         </div>
+        {startingSideAuto && startingSide && (
+          <p className="text-xs text-green-700">
+            Auto-detected from your frame selection — tap to override.
+          </p>
+        )}
       </div>
 
       <div className="space-y-2">
