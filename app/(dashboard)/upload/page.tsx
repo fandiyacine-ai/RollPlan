@@ -116,21 +116,73 @@ async function extractFramesAt(
   }
 }
 
-// Crop the exact bounding box the user drew, scaled to at most 400px on the longer side.
-function cropAthleteBox(frame: Frame, box: Rect): Promise<string> {
+// Build an annotated reference image: the full frame with green mat box and red "YOU" label drawn on it.
+// This gives the AI full spatial context — both athletes visible, mat area highlighted, and the user
+// unambiguously labelled — which is far more reliable for identity tracking than a small crop.
+function buildAnnotatedRefImageBase64(frame: Frame, roi: Rect, athleteBox: Rect): Promise<string> {
   return new Promise((resolve, reject) => {
-    const sx = Math.round(box.x1 * frame.naturalW)
-    const sy = Math.round(box.y1 * frame.naturalH)
-    const sw = Math.max(4, Math.round((box.x2 - box.x1) * frame.naturalW))
-    const sh = Math.max(4, Math.round((box.y2 - box.y1) * frame.naturalH))
-    const scale = Math.min(400 / sw, 400 / sh, 1)
-    const dw = Math.max(1, Math.round(sw * scale))
-    const dh = Math.max(1, Math.round(sh * scale))
+    const maxW = 900
+    const scale = Math.min(1, maxW / frame.naturalW)
+    const dw = Math.round(frame.naturalW * scale)
+    const dh = Math.round(frame.naturalH * scale)
     const img = new Image()
     img.onload = () => {
       const c = document.createElement('canvas')
       c.width = dw; c.height = dh
-      c.getContext('2d')!.drawImage(img, sx, sy, sw, sh, 0, 0, dw, dh)
+      const ctx = c.getContext('2d')!
+      ctx.drawImage(img, 0, 0, dw, dh)
+      const W = dw, H = dh
+
+      const rx = Math.min(roi.x1, roi.x2) * W
+      const ry = Math.min(roi.y1, roi.y2) * H
+      const rw = Math.abs(roi.x2 - roi.x1) * W
+      const rh = Math.abs(roi.y2 - roi.y1) * H
+
+      // Dim outside ROI
+      ctx.fillStyle = 'rgba(0,0,0,0.38)'
+      ctx.fillRect(0, 0, W, ry)
+      ctx.fillRect(0, ry + rh, W, H - ry - rh)
+      ctx.fillRect(0, ry, rx, rh)
+      ctx.fillRect(rx + rw, ry, W - rx - rw, rh)
+
+      // Green mat box
+      ctx.strokeStyle = '#4ade80'
+      ctx.lineWidth = 3
+      ctx.setLineDash([8, 4])
+      ctx.strokeRect(rx + 1.5, ry + 1.5, rw - 3, rh - 3)
+      ctx.setLineDash([])
+      ctx.font = 'bold 12px sans-serif'
+      const mlw = ctx.measureText('YOUR MAT').width
+      ctx.fillStyle = '#4ade80'
+      ctx.beginPath()
+      ctx.roundRect(rx, Math.max(0, ry - 22), mlw + 12, 22, [3])
+      ctx.fill()
+      ctx.fillStyle = '#000'
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
+      ctx.fillText('YOUR MAT', rx + 6, Math.max(11, ry - 11))
+
+      // Red athlete box — thick stroke for prominence
+      const ax = Math.min(athleteBox.x1, athleteBox.x2) * W
+      const ay = Math.min(athleteBox.y1, athleteBox.y2) * H
+      const aw = Math.abs(athleteBox.x2 - athleteBox.x1) * W
+      const ah = Math.abs(athleteBox.y2 - athleteBox.y1) * H
+      ctx.strokeStyle = '#ef4444'
+      ctx.lineWidth = 4
+      ctx.strokeRect(ax, ay, aw, ah)
+
+      // Large "YOU" label
+      ctx.font = 'bold 15px sans-serif'
+      const youText = '⬅ YOU — track this person'
+      const ylw = ctx.measureText(youText).width
+      const labelY = Math.max(0, ay - 26)
+      ctx.fillStyle = '#ef4444'
+      ctx.beginPath()
+      ctx.roundRect(ax, labelY, ylw + 12, 26, [3])
+      ctx.fill()
+      ctx.fillStyle = '#fff'
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
+      ctx.fillText(youText, ax + 6, labelY + 13)
+
       resolve(c.toDataURL('image/jpeg', 0.85).replace(/^data:image\/jpeg;base64,/, ''))
     }
     img.onerror = reject
@@ -315,7 +367,7 @@ function FrameSelector({
       setAthleteBox(box)
       setDragStart(null); setDragCurrent(null)
       setPhase('done')
-      const athleteImageBase64 = await cropAthleteBox(selectedFrame, box)
+      const athleteImageBase64 = await buildAnnotatedRefImageBase64(selectedFrame, normalizedRoi, box)
       onComplete({ spatialHint: buildSpatialHint(normalizedRoi, box), athleteImageBase64, spatialData: { roi: normalizedRoi, athlete: box } })
     }
   }

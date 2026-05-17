@@ -204,7 +204,13 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
           <MatchContent
             videoUrl={video?.publicUrl ?? null}
             matchInsights={matchInsights}
-            segmentsById={Object.fromEntries(segments.map((s) => [s.id, { id: s.id, startSeconds: s.startSeconds, endSeconds: s.endSeconds }]))}
+            segments={segments.map((s) => ({
+              id: s.id,
+              startSeconds: s.startSeconds,
+              endSeconds: s.endSeconds,
+              userBbox: (s.userBbox as { x1: number; y1: number; x2: number; y2: number } | null) ?? null,
+              opponentBbox: (s.opponentBbox as { x1: number; y1: number; x2: number; y2: number } | null) ?? null,
+            }))}
             spatialData={(match.spatialData as { roi: { x1: number; y1: number; x2: number; y2: number }; athlete: { x1: number; y1: number; x2: number; y2: number } } | null) ?? null}
           />
         </>

@@ -1,8 +1,16 @@
 'use client'
 
-import { useRef, useState, useEffect, useCallback } from 'react'
+import { useRef, useState, useEffect, useMemo } from 'react'
 
-type SegmentRef = { id: string; startSeconds: number; endSeconds: number }
+type Bbox = { x1: number; y1: number; x2: number; y2: number }
+
+type SegmentRef = {
+  id: string
+  startSeconds: number
+  endSeconds: number
+  userBbox: Bbox | null
+  opponentBbox: Bbox | null
+}
 
 type InsightRow = {
   id: string
@@ -16,8 +24,8 @@ type InsightRow = {
 }
 
 type SpatialData = {
-  roi: { x1: number; y1: number; x2: number; y2: number }
-  athlete: { x1: number; y1: number; x2: number; y2: number }
+  roi: Bbox
+  athlete: Bbox
 }
 
 function formatTime(seconds: number): string {
@@ -40,7 +48,7 @@ const SEVERITY_DOT: Record<string, string> = {
   minor: 'bg-gray-400',
 }
 
-function drawOverlay(canvas: HTMLCanvasElement, spatial: SpatialData) {
+function drawSpatialOverlay(canvas: HTMLCanvasElement, spatial: SpatialData) {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   const W = canvas.width, H = canvas.height
@@ -66,7 +74,7 @@ function drawOverlay(canvas: HTMLCanvasElement, spatial: SpatialData) {
   ctx.strokeRect(rx + 1.5, ry + 1.5, rw - 3, rh - 3)
   ctx.setLineDash([])
 
-  // "YOUR MAT" label top-left of box
+  // "YOUR MAT" label
   ctx.font = 'bold 11px sans-serif'
   const label = 'YOUR MAT'
   const lw = ctx.measureText(label).width
@@ -79,7 +87,7 @@ function drawOverlay(canvas: HTMLCanvasElement, spatial: SpatialData) {
   ctx.textBaseline = 'middle'
   ctx.fillText(label, rx + 6, ry - 10)
 
-  // Red athlete box (athlete already destructured above)
+  // Red athlete box
   const abx = athlete.x1 * W, aby = athlete.y1 * H
   const abw = (athlete.x2 - athlete.x1) * W, abh = (athlete.y2 - athlete.y1) * H
   ctx.strokeStyle = '#ef4444'
@@ -101,15 +109,65 @@ function drawOverlay(canvas: HTMLCanvasElement, spatial: SpatialData) {
   ctx.fillText('YOU', abx + 5, aby - 10)
 }
 
+function drawBboxes(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  userBbox: Bbox | null,
+  opponentBbox: Bbox | null,
+) {
+  ctx.font = 'bold 11px sans-serif'
+
+  if (userBbox) {
+    const x = userBbox.x1 * W, y = userBbox.y1 * H
+    const w = (userBbox.x2 - userBbox.x1) * W, h = (userBbox.y2 - userBbox.y1) * H
+    ctx.strokeStyle = '#4ade80'
+    ctx.lineWidth = 2.5
+    ctx.setLineDash([6, 3])
+    ctx.strokeRect(x, y, w, h)
+    ctx.setLineDash([])
+    const lw = ctx.measureText('YOU').width
+    const labelY = Math.max(0, y - 20)
+    ctx.fillStyle = '#4ade80'
+    ctx.beginPath()
+    ctx.roundRect(x, labelY, lw + 10, 20, [3, 3, 0, 0])
+    ctx.fill()
+    ctx.fillStyle = '#000'
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('YOU', x + 5, labelY + 10)
+  }
+
+  if (opponentBbox) {
+    const x = opponentBbox.x1 * W, y = opponentBbox.y1 * H
+    const w = (opponentBbox.x2 - opponentBbox.x1) * W, h = (opponentBbox.y2 - opponentBbox.y1) * H
+    ctx.strokeStyle = '#ef4444'
+    ctx.lineWidth = 2.5
+    ctx.setLineDash([6, 3])
+    ctx.strokeRect(x, y, w, h)
+    ctx.setLineDash([])
+    const lw = ctx.measureText('OPP').width
+    const labelY = Math.max(0, y - 20)
+    ctx.fillStyle = '#ef4444'
+    ctx.beginPath()
+    ctx.roundRect(x, labelY, lw + 10, 20, [3, 3, 0, 0])
+    ctx.fill()
+    ctx.fillStyle = '#fff'
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('OPP', x + 5, labelY + 10)
+  }
+}
+
 export function MatchContent({
   videoUrl,
   matchInsights,
-  segmentsById,
+  segments,
   spatialData,
 }: {
   videoUrl: string | null
   matchInsights: InsightRow[]
-  segmentsById: Record<string, SegmentRef>
+  segments: SegmentRef[]
   spatialData: SpatialData | null
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -118,7 +176,14 @@ export function MatchContent({
   const [overlayVisible, setOverlayVisible] = useState(false)
   const [canvasDims, setCanvasDims] = useState({ w: 0, h: 0 })
 
-  // Keep canvas size in sync with rendered video dimensions
+  // Refs read by event handlers (avoid stale closures)
+  const segmentsRef = useRef(segments)
+  useEffect(() => { segmentsRef.current = segments }, [segments])
+
+  const currentBboxRef = useRef<{ user: Bbox | null; opp: Bbox | null } | null>(null)
+  const redrawRef = useRef<() => void>(() => {})
+
+  // Keep canvas pixel dimensions in sync with rendered video size
   useEffect(() => {
     const vid = videoRef.current
     if (!vid) return
@@ -130,7 +195,6 @@ export function MatchContent({
     return () => obs.disconnect()
   }, [])
 
-  // Update canvas pixel dimensions when container resizes
   useEffect(() => {
     const c = canvasRef.current
     if (!c || canvasDims.w === 0) return
@@ -138,18 +202,65 @@ export function MatchContent({
     c.height = canvasDims.h
   }, [canvasDims])
 
-  // Draw / clear overlay
-  const redraw = useCallback(() => {
-    const c = canvasRef.current
-    if (!c) return
-    if (overlayVisible && spatialData && canvasDims.w > 0) {
-      drawOverlay(c, spatialData)
-    } else {
-      c.getContext('2d')?.clearRect(0, 0, c.width, c.height)
+  // Re-build the redraw closure whenever state/props change, then call it immediately
+  useEffect(() => {
+    redrawRef.current = () => {
+      const c = canvasRef.current
+      if (!c || canvasDims.w === 0) return
+      const ctx = c.getContext('2d')
+      if (!ctx) return
+      ctx.clearRect(0, 0, c.width, c.height)
+
+      if (overlayVisible && spatialData) {
+        drawSpatialOverlay(c, spatialData)
+        c.style.transition = 'none'
+        c.style.opacity = '1'
+      } else {
+        const bbox = currentBboxRef.current
+        if (bbox && (bbox.user || bbox.opp)) {
+          drawBboxes(ctx, c.width, c.height, bbox.user, bbox.opp)
+          c.style.transition = 'none'
+          c.style.opacity = '1'
+        } else {
+          c.style.transition = 'opacity 0.4s'
+          c.style.opacity = '0'
+        }
+      }
     }
+    redrawRef.current()
   }, [overlayVisible, spatialData, canvasDims])
 
-  useEffect(() => { redraw() }, [redraw])
+  // Drive bbox overlay from video playback time
+  useEffect(() => {
+    const vid = videoRef.current
+    if (!vid) return
+    function onTime() {
+      const t = vid!.currentTime
+      const seg = segmentsRef.current.find(s => t >= s.startSeconds && t <= s.endSeconds) ?? null
+      currentBboxRef.current = seg ? { user: seg.userBbox, opp: seg.opponentBbox } : null
+      redrawRef.current()
+    }
+    vid.addEventListener('timeupdate', onTime)
+    vid.addEventListener('seeked', onTime)
+    vid.addEventListener('pause', onTime)
+    vid.addEventListener('play', onTime)
+    return () => {
+      vid.removeEventListener('timeupdate', onTime)
+      vid.removeEventListener('seeked', onTime)
+      vid.removeEventListener('pause', onTime)
+      vid.removeEventListener('play', onTime)
+    }
+  }, [])
+
+  const segmentsById = useMemo(
+    () => Object.fromEntries(segments.map(s => [s.id, s])),
+    [segments],
+  )
+
+  const hasBboxData = useMemo(
+    () => segments.some(s => s.userBbox || s.opponentBbox),
+    [segments],
+  )
 
   function seekTo(seconds: number) {
     const vid = videoRef.current
@@ -167,7 +278,7 @@ export function MatchContent({
 
   return (
     <div className="space-y-6">
-      {/* Video player with spatial overlay */}
+      {/* Video player with overlay canvas */}
       {videoUrl && (
         <div className="space-y-2">
           <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Match Video</h2>
@@ -180,21 +291,31 @@ export function MatchContent({
               className="w-full max-h-[45vh] object-contain block"
               preload="metadata"
             />
-            {/* Overlay canvas — sits on top of the video, pointer-events:none so controls still work */}
             <canvas
               ref={canvasRef}
               className="absolute inset-0 pointer-events-none"
-              style={{
-                opacity: overlayVisible ? 1 : 0,
-                transition: 'opacity 0.4s',
-              }}
+              style={{ opacity: 0 }}
             />
           </div>
-          <p className="text-xs text-muted-foreground">
-            {spatialData
-              ? 'Click a timestamp below — the video will jump there and show your mat region and position.'
-              : 'Click a timestamp below to jump to that moment in the video.'}
-          </p>
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-xs text-muted-foreground">
+              {spatialData
+                ? 'Click a timestamp below — the video will jump there and highlight your mat region.'
+                : 'Click a timestamp below to jump to that moment in the video.'}
+            </p>
+            {hasBboxData && (
+              <div className="flex items-center gap-3 text-xs text-muted-foreground flex-shrink-0">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-sm bg-green-400 inline-block" />
+                  You
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-sm bg-red-400 inline-block" />
+                  Opponent
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -220,14 +341,13 @@ export function MatchContent({
                   <p className="text-sm font-medium">{insight.description}</p>
                   <p className="text-sm opacity-80">{insight.suggestion}</p>
 
-                  {/* Clickable timestamp chips */}
                   {evidenceSegs.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 pt-0.5">
                       {evidenceSegs.map((seg) => (
                         <button
                           key={seg.id}
                           onClick={() => seekTo(seg.startSeconds)}
-                          title="Jump to this moment and highlight your mat area"
+                          title="Jump to this moment"
                           className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-black/10 hover:bg-black/20 active:bg-black/30 transition-colors font-mono cursor-pointer"
                         >
                           ▶ {formatTime(seg.startSeconds)}–{formatTime(seg.endSeconds)}

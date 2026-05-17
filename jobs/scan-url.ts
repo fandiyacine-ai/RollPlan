@@ -227,6 +227,8 @@ export const scanUrl = inngest.createFunction(
               userRole: p.user_role,
               dominance: p.dominance,
               confidence: p.confidence,
+              userBbox: p.user_bbox ?? null,
+              opponentBbox: p.opponent_bbox ?? null,
             }))
           )
           if (extractObject.events.length > 0) {

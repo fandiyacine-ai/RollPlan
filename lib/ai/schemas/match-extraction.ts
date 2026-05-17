@@ -2,6 +2,13 @@ import { z } from 'zod'
 import { POSITION_IDS } from '../../taxonomy/positions'
 import { EVENT_TYPE_IDS } from '../../taxonomy/events'
 
+const BboxSchema = z.object({
+  x1: z.number().min(0).max(1),
+  y1: z.number().min(0).max(1),
+  x2: z.number().min(0).max(1),
+  y2: z.number().min(0).max(1),
+})
+
 export const PositionSegmentSchema = z.object({
   start_seconds: z.number().min(0),
   end_seconds: z.number().min(0),
@@ -9,6 +16,8 @@ export const PositionSegmentSchema = z.object({
   user_role: z.enum(['top', 'bottom', 'neutral', 'standing']),
   dominance: z.enum(['dominant', 'neutral', 'inferior']),
   confidence: z.number().min(0).max(1),
+  user_bbox: BboxSchema.optional(),
+  opponent_bbox: BboxSchema.optional(),
 })
 
 export const MatchEventSchema = z.object({

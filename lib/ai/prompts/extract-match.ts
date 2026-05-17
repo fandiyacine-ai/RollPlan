@@ -64,7 +64,16 @@ ${BJJ_POSITION_VISUAL_GUIDE}
 - confidence reflects your certainty about the classification, not about whether the action happened.
 - Express uncertainty via confidence (0.0–1.0), NEVER by hedging in the description field.
 - If you cannot confidently classify a position, use transition.
-- CRITICAL: Once you identify which athlete is the user, track THAT SAME PERSON consistently for the entire match. Do not swap who is "user" and who is "opponent" mid-match even during scrambles or position reversals. The identity of the two athletes does not change — only their positions do.`
+- CRITICAL: Once you identify which athlete is the user, track THAT SAME PERSON consistently for the entire match. Do not swap who is "user" and who is "opponent" mid-match even during scrambles or position reversals. The identity of the two athletes does not change — only their positions do.
+
+## Bounding boxes
+
+For each position_segment, estimate bounding boxes for the user and opponent as normalized coordinates (0.0–1.0) relative to the full frame:
+- user_bbox: { x1, y1, x2, y2 } wrapping the user athlete’s full body at a representative frame near segment midpoint
+- opponent_bbox: { x1, y1, x2, y2 } wrapping the opponent athlete’s full body
+- (x1,y1) is the top-left corner, (x2,y2) is the bottom-right corner — x1<x2 and y1<y2 must hold
+- Accuracy within ±0.08 is sufficient; prefer slightly wider boxes over clipping limbs
+- Omit the field entirely if the athlete is fully off-screen, heavily occluded, or the segment is too brief (<2 s) to judge`
 }
 
 function formatTimestamp(seconds: number): string {

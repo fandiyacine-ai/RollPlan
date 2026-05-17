@@ -73,7 +73,7 @@ export const analyzeVideo = inngest.createFunction(
         const extractContent: any[] = []
         if (athleteImageBase64) {
           extractContent.push({ type: 'image', image: `data:image/jpeg;base64,${athleteImageBase64}` })
-          extractContent.push({ type: 'text', text: '↑ This is the competitor to track — study their appearance carefully before analysing the video.' })
+          extractContent.push({ type: 'text', text: '↑ IDENTITY REFERENCE FRAME. The red "⬅ YOU" box marks the ONLY athlete to label as "user" for the ENTIRE match. The other athlete is ALWAYS "opponent". Use this annotated frame as your identity anchor — do not swap these roles at any point.' })
         }
         extractContent.push({ type: 'file', data: new URL(geminiFileUri), mediaType: video.contentType as `${string}/${string}` })
         extractContent.push({
@@ -121,6 +121,8 @@ export const analyzeVideo = inngest.createFunction(
             userRole: p.user_role,
             dominance: p.dominance,
             confidence: p.confidence,
+            userBbox: p.user_bbox ?? null,
+            opponentBbox: p.opponent_bbox ?? null,
           }))
         )
         if (object.events.length > 0) {

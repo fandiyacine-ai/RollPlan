@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, real, boolean, timestamp } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, real, boolean, timestamp, jsonb } from 'drizzle-orm/pg-core'
 import { matches } from './matches'
 
 export const positionSegments = pgTable('position_segments', {
@@ -10,6 +10,8 @@ export const positionSegments = pgTable('position_segments', {
   userRole: text('user_role').notNull(), // top | bottom | neutral | standing
   dominance: text('dominance').notNull(), // dominant | neutral | inferior
   confidence: real('confidence').notNull(),
+  userBbox: jsonb('user_bbox'),     // { x1, y1, x2, y2 } normalized 0-1
+  opponentBbox: jsonb('opponent_bbox'), // { x1, y1, x2, y2 } normalized 0-1
   userCorrected: boolean('user_corrected').notNull().default(false),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })
