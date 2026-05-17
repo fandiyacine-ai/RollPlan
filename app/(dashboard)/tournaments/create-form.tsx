@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createTournament } from './actions'
 
 const RULESET_OPTIONS = [
@@ -14,6 +15,8 @@ const RULESET_OPTIONS = [
 export function CreateTournamentForm() {
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
 
   if (!open) {
     return (
@@ -30,7 +33,14 @@ export function CreateTournamentForm() {
     <form
       action={async (fd) => {
         setPending(true)
-        await createTournament(fd)
+        setError(null)
+        const result = await createTournament(fd)
+        if (result.error) {
+          setError(result.error)
+          setPending(false)
+        } else if (result.tournamentId) {
+          router.push(`/tournaments/${result.tournamentId}/opponents`)
+        }
       }}
       className="rounded-lg border p-5 space-y-4 max-w-lg"
     >
@@ -87,6 +97,10 @@ export function CreateTournamentForm() {
           className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
         />
       </div>
+
+      {error && (
+        <p className="text-sm text-red-600 rounded-md border border-red-200 bg-red-50 px-3 py-2">{error}</p>
+      )}
 
       <div className="flex gap-2 justify-end">
         <button
