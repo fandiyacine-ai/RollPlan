@@ -1,8 +1,10 @@
+import React from 'react'
 import { db } from '../../../lib/db'
 import { matches, insights, videos, positionSegments, matchEvents, users } from '../../../lib/db/schema'
 import { desc, eq, inArray, isNull } from 'drizzle-orm'
 import Link from 'next/link'
 import RefreshPoller from './refresh-poller'
+import { DeleteMatchButton } from './delete-match-button'
 import { POSITIONS } from '../../../lib/taxonomy/positions'
 import { auth, currentUser } from '@clerk/nextjs/server'
 
@@ -53,6 +55,7 @@ export default async function PlayerCardPage() {
   const recentMatches = await db
     .select({
       id: matches.id,
+      videoId: matches.videoId,
       status: matches.status,
       format: matches.format,
       context: matches.context,
@@ -277,6 +280,7 @@ export default async function PlayerCardPage() {
                 segments={matchSegs}
                 events={matchEvts}
                 insights={matchInsightsList}
+                deleteButton={<DeleteMatchButton matchId={match.id} videoId={match.videoId} />}
               />
             )
           })}
@@ -347,15 +351,17 @@ function MatchCard({
   segments,
   events,
   insights: matchInsights,
+  deleteButton,
 }: {
   match: {
-    id: string; status: string; format: string; context: string; ruleset: string
+    id: string; videoId: string; status: string; format: string; context: string; ruleset: string
     eventName: string | null; opponentLabel: string; competitorLabel: string | null
     createdAt: Date; filename: string | null
   }
   segments: { endSeconds: number; startSeconds: number; positionId: string; dominance: string }[]
   events: { eventTypeId: string; actor: string; outcome: string; techniqueLabel: string | null }[]
   insights: { id: string; category: string; severity: string; description: string; suggestion: string; youtubeSearchQuery: string | null }[]
+  deleteButton: React.ReactNode
 }) {
   const totalTime = segments.reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
   const domTime = segments.filter(s => s.dominance === 'dominant').reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
@@ -398,22 +404,25 @@ function MatchCard({
             {' · '}{match.createdAt.toLocaleDateString()}
           </p>
         </div>
-        {isAnalysed && (
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            <Link
-              href={`/matches/${match.id}`}
-              className="text-xs px-2.5 py-1 rounded-full border font-medium hover:bg-muted transition-colors"
-            >
-              Details
-            </Link>
-            <Link
-              href={`/matches/${match.id}/coach`}
-              className="text-xs px-2.5 py-1 rounded-full bg-foreground text-background font-medium hover:opacity-90 transition-opacity"
-            >
-              Coach
-            </Link>
-          </div>
-        )}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {isAnalysed && (
+            <>
+              <Link
+                href={`/matches/${match.id}`}
+                className="text-xs px-2.5 py-1 rounded-full border font-medium hover:bg-muted transition-colors"
+              >
+                Details
+              </Link>
+              <Link
+                href={`/matches/${match.id}/coach`}
+                className="text-xs px-2.5 py-1 rounded-full bg-foreground text-background font-medium hover:opacity-90 transition-opacity"
+              >
+                Coach
+              </Link>
+            </>
+          )}
+          {deleteButton}
+        </div>
       </div>
 
       {/* Match stats strip — only for analysed matches */}
