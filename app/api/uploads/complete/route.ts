@@ -10,7 +10,7 @@ export const maxDuration = 30
 
 export async function POST(req: NextRequest) {
   try {
-    const { videoId, path, sourceType, format, appearanceHint, scanMode, athleteName, eventName } = await req.json()
+    const { videoId, path, sourceType, format, appearanceHint, athleteImageBase64, scanMode, athleteName, eventName } = await req.json()
 
     if (!videoId || !path) return NextResponse.json({ error: 'videoId and path are required' }, { status: 400 })
 
@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
             sourceType: sourceType ?? 'own_competition',
             eventName: eventName?.trim() || undefined,
             appearanceHint: appearanceHint?.trim() || undefined,
+            athleteImageBase64: athleteImageBase64 || undefined,
           },
         })
       } catch {
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
     }).returning()
 
     try {
-      await inngest.send({ name: 'video/uploaded', data: { videoId, matchId: match.id, appearanceHint } })
+      await inngest.send({ name: 'video/uploaded', data: { videoId, matchId: match.id, appearanceHint, athleteImageBase64: athleteImageBase64 || undefined } })
     } catch {
       // Inngest not configured — upload succeeded but analysis won't start
     }

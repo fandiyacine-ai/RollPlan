@@ -29,8 +29,8 @@ export const analyzeVideo = inngest.createFunction(
     name: 'Analyse Match Video',
     triggers: [{ event: 'video/uploaded' }],
   },
-  async ({ event, step }: { event: { data: { videoId: string; matchId: string; appearanceHint?: string } }; step: any }) => {
-    const { videoId, matchId, appearanceHint } = event.data
+  async ({ event, step }: { event: { data: { videoId: string; matchId: string; appearanceHint?: string; athleteImageBase64?: string } }; step: any }) => {
+    const { videoId, matchId, appearanceHint, athleteImageBase64 } = event.data
 
     await step.run('validate-video', async () => {
       const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
@@ -69,30 +69,30 @@ export const analyzeVideo = inngest.createFunction(
 
       const start = Date.now()
       try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const extractContent: any[] = []
+        if (athleteImageBase64) {
+          extractContent.push({ type: 'image', image: `data:image/jpeg;base64,${athleteImageBase64}` })
+          extractContent.push({ type: 'text', text: '↑ This is the competitor to track — study their appearance carefully before analysing the video.' })
+        }
+        extractContent.push({ type: 'file', data: new URL(geminiFileUri), mediaType: video.contentType as `${string}/${string}` })
+        extractContent.push({
+          type: 'text',
+          text: buildExtractMatchUserPrompt({
+            competitorDescription: match.competitorLabel ?? 'the main competitor',
+            appearanceHint: appearanceHint || undefined,
+            format: match.format,
+            ruleset: match.ruleset,
+            durationSeconds: video.durationSeconds ?? undefined,
+          }),
+        })
+
         const result = await generateObject({
           model: google(GEMINI_VIDEO_MODEL),
           schema: MatchExtractionOutputSchema,
           maxRetries: 0,
           system: buildExtractMatchSystemPrompt(),
-          messages: [{
-            role: 'user',
-            content: [
-              {
-                type: 'file',
-                data: new URL(geminiFileUri),
-                mediaType: video.contentType as `${string}/${string}`,
-              },
-              {
-                type: 'text',
-                text: buildExtractMatchUserPrompt({
-                  competitorDescription: [match.competitorLabel ?? 'the main competitor', appearanceHint].filter(Boolean).join(' — '),
-                  format: match.format,
-                  ruleset: match.ruleset,
-                  durationSeconds: video.durationSeconds ?? undefined,
-                }),
-              },
-            ],
-          }],
+          messages: [{ role: 'user', content: extractContent }],
         })
         object = result.object
         usage = result.usage

@@ -12,6 +12,8 @@ type AppearanceColor = 'blue_gi' | 'white_gi' | 'black_gi' | 'dark_rash' | 'ligh
 type StartingSide = 'left' | 'right'
 type Rect = { x1: number; y1: number; x2: number; y2: number }
 type Pt = { x: number; y: number }
+type Frame = { dataUrl: string; naturalW: number; naturalH: number }
+type FrameResult = { spatialHint: string; athleteImageBase64: string }
 
 const SOURCE_LABELS: Record<SourceType, string> = {
   own_competition: 'My competition match',
@@ -65,20 +67,69 @@ function extractYouTubeId(url: string): string | null {
   return null
 }
 
+async function extractFrames(file: File): Promise<Frame[]> {
+  const url = URL.createObjectURL(file)
+  try {
+    const vid = document.createElement('video')
+    vid.muted = true
+    vid.preload = 'metadata'
+    vid.src = url
+    await new Promise<void>((res, rej) => {
+      vid.onloadedmetadata = () => res()
+      vid.onerror = () => rej(new Error('Video load failed'))
+    })
+    const duration = vid.duration
+    const offsets = [0.08, 0.25, 0.5, 0.75].map(p => Math.max(0.5, duration * p))
+    const frames: Frame[] = []
+    for (const t of offsets) {
+      vid.currentTime = t
+      await new Promise<void>((res) => { vid.onseeked = () => res() })
+      const c = document.createElement('canvas')
+      c.width = vid.videoWidth
+      c.height = vid.videoHeight
+      c.getContext('2d')!.drawImage(vid, 0, 0)
+      frames.push({ dataUrl: c.toDataURL('image/jpeg', 0.75), naturalW: vid.videoWidth, naturalH: vid.videoHeight })
+    }
+    return frames
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
+function cropFrame(frame: Frame, pt: Pt): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const CROP = Math.min(240, frame.naturalW, frame.naturalH)
+    const cx = Math.round(pt.x * frame.naturalW)
+    const cy = Math.round(pt.y * frame.naturalH)
+    const sx = Math.max(0, Math.min(cx - CROP / 2, frame.naturalW - CROP))
+    const sy = Math.max(0, Math.min(cy - CROP / 2, frame.naturalH - CROP))
+    const img = new Image()
+    img.onload = () => {
+      const c = document.createElement('canvas')
+      c.width = CROP; c.height = CROP
+      c.getContext('2d')!.drawImage(img, sx, sy, CROP, CROP, 0, 0, CROP, CROP)
+      resolve(c.toDataURL('image/jpeg', 0.8).replace(/^data:image\/jpeg;base64,/, ''))
+    }
+    img.onerror = reject
+    img.src = frame.dataUrl
+  })
+}
+
 // ─── Frame selector ───────────────────────────────────────────────────────────
 
-type SelectorPhase = 'loading' | 'draw-roi' | 'mark-athlete' | 'done'
+type SelectorPhase = 'loading' | 'pick-frame' | 'draw-roi' | 'mark-athlete' | 'done'
 
 function FrameSelector({
   videoFile,
-  onSpatialHint,
+  onComplete,
 }: {
   videoFile: File
-  onSpatialHint: (hint: string | null) => void
+  onComplete: (result: FrameResult | null) => void
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imgRef = useRef<HTMLImageElement>(null)
-  const [frameDataUrl, setFrameDataUrl] = useState<string | null>(null)
+  const [frames, setFrames] = useState<Frame[]>([])
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
   const [phase, setPhase] = useState<SelectorPhase>('loading')
   const [roi, setRoi] = useState<Rect | null>(null)
   const [dragStart, setDragStart] = useState<Pt | null>(null)
@@ -86,34 +137,24 @@ function FrameSelector({
   const [athletePt, setAthletePt] = useState<Pt | null>(null)
   const [canvasDims, setCanvasDims] = useState({ w: 0, h: 0 })
 
-  // Extract a frame from the video at ~10% of its duration
   useEffect(() => {
-    const vid = document.createElement('video')
-    const objectUrl = URL.createObjectURL(videoFile)
-    vid.muted = true
-    vid.preload = 'metadata'
-    vid.src = objectUrl
-    vid.onloadedmetadata = () => {
-      vid.currentTime = Math.max(0.1, Math.min(vid.duration * 0.1, 5))
-    }
-    vid.onseeked = () => {
-      const c = document.createElement('canvas')
-      c.width = vid.videoWidth
-      c.height = vid.videoHeight
-      c.getContext('2d')!.drawImage(vid, 0, 0)
-      setFrameDataUrl(c.toDataURL('image/jpeg', 0.8))
-      URL.revokeObjectURL(objectUrl)
-      setPhase('draw-roi')
-    }
-    vid.onerror = () => {
-      URL.revokeObjectURL(objectUrl)
-      // Fall back silently — selector just won't show
-    }
-    vid.load()
-    return () => URL.revokeObjectURL(objectUrl)
+    extractFrames(videoFile)
+      .then(f => { setFrames(f); setPhase('pick-frame') })
+      .catch(() => setPhase('pick-frame')) // fail silently
   }, [videoFile])
 
-  // Sync canvas pixel dimensions to the rendered img size
+  const selectedFrame = selectedIdx !== null ? frames[selectedIdx] : null
+
+  function selectFrame(idx: number) {
+    setSelectedIdx(idx)
+    setRoi(null)
+    setDragStart(null)
+    setDragCurrent(null)
+    setAthletePt(null)
+    setPhase('draw-roi')
+    setCanvasDims({ w: 0, h: 0 })
+  }
+
   function onImgLoad(e: React.SyntheticEvent<HTMLImageElement>) {
     const canvas = canvasRef.current
     const rect = (e.target as HTMLImageElement).getBoundingClientRect()
@@ -123,13 +164,12 @@ function FrameSelector({
     setCanvasDims({ w: rect.width, h: rect.height })
   }
 
-  // Redraw the canvas overlay whenever state changes
+  // Redraw overlay
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas || canvasDims.w === 0) return
     const ctx = canvas.getContext('2d')!
-    const W = canvas.width
-    const H = canvas.height
+    const W = canvas.width, H = canvas.height
     ctx.clearRect(0, 0, W, H)
 
     const activeRoi: Rect | null = roi
@@ -142,43 +182,53 @@ function FrameSelector({
     const rw = Math.abs(activeRoi.x2 - activeRoi.x1) * W
     const rh = Math.abs(activeRoi.y2 - activeRoi.y1) * H
 
-    // Dim everything outside the ROI
     ctx.fillStyle = 'rgba(0,0,0,0.52)'
     ctx.fillRect(0, 0, W, ry)
     ctx.fillRect(0, ry + rh, W, H - ry - rh)
     ctx.fillRect(0, ry, rx, rh)
     ctx.fillRect(rx + rw, ry, W - rx - rw, rh)
 
-    // ROI border
     ctx.strokeStyle = '#4ade80'
     ctx.lineWidth = 2
     ctx.strokeRect(rx, ry, rw, rh)
 
-    // Athlete marker
     if (athletePt) {
       const px = athletePt.x * W
       const py = athletePt.y * H
-      ctx.fillStyle = '#ef4444'
+      // Outer glow
       ctx.beginPath()
-      ctx.arc(px, py, 9, 0, Math.PI * 2)
-      ctx.fill()
+      ctx.arc(px, py, 22, 0, Math.PI * 2)
+      ctx.strokeStyle = 'rgba(239,68,68,0.45)'
+      ctx.lineWidth = 6
+      ctx.stroke()
+      // White ring
+      ctx.beginPath()
+      ctx.arc(px, py, 14, 0, Math.PI * 2)
       ctx.strokeStyle = 'white'
       ctx.lineWidth = 2
       ctx.stroke()
+      // Red fill
+      ctx.beginPath()
+      ctx.arc(px, py, 10, 0, Math.PI * 2)
+      ctx.fillStyle = '#ef4444'
+      ctx.fill()
+      // Label badge
+      ctx.font = 'bold 11px sans-serif'
+      const lw = ctx.measureText('YOU').width
+      ctx.fillStyle = '#ef4444'
+      ctx.beginPath()
+      ctx.roundRect(px + 18, py - 9, lw + 10, 18, 3)
+      ctx.fill()
       ctx.fillStyle = 'white'
-      ctx.font = 'bold 12px sans-serif'
       ctx.textAlign = 'left'
       ctx.textBaseline = 'middle'
-      ctx.fillText('YOU', px + 13, py)
+      ctx.fillText('YOU', px + 23, py)
     }
   }, [roi, dragStart, dragCurrent, athletePt, canvasDims])
 
   function getPoint(e: React.MouseEvent<HTMLCanvasElement>): Pt {
     const r = canvasRef.current!.getBoundingClientRect()
-    return {
-      x: (e.clientX - r.left) / r.width,
-      y: (e.clientY - r.top) / r.height,
-    }
+    return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }
   }
 
   function handleMouseDown(e: React.MouseEvent<HTMLCanvasElement>) {
@@ -196,97 +246,110 @@ function FrameSelector({
   function handleMouseUp(e: React.MouseEvent<HTMLCanvasElement>) {
     if (phase !== 'draw-roi' || !dragStart) return
     const end = getPoint(e)
-    const w = Math.abs(end.x - dragStart.x)
-    const h = Math.abs(end.y - dragStart.y)
-    if (w < 0.05 || h < 0.05) {
-      setDragStart(null)
-      setDragCurrent(null)
-      return
+    if (Math.abs(end.x - dragStart.x) < 0.05 || Math.abs(end.y - dragStart.y) < 0.05) {
+      setDragStart(null); setDragCurrent(null); return
     }
     setRoi({ x1: dragStart.x, y1: dragStart.y, x2: end.x, y2: end.y })
-    setDragStart(null)
-    setDragCurrent(null)
+    setDragStart(null); setDragCurrent(null)
     setPhase('mark-athlete')
   }
 
-  function handleClick(e: React.MouseEvent<HTMLCanvasElement>) {
-    if (phase !== 'mark-athlete' || !roi) return
+  async function handleClick(e: React.MouseEvent<HTMLCanvasElement>) {
+    if (phase !== 'mark-athlete' || !roi || !selectedFrame) return
     const pt = getPoint(e)
-    // Must click inside the ROI
     if (
       pt.x < Math.min(roi.x1, roi.x2) || pt.x > Math.max(roi.x1, roi.x2) ||
       pt.y < Math.min(roi.y1, roi.y2) || pt.y > Math.max(roi.y1, roi.y2)
     ) return
     setAthletePt(pt)
     setPhase('done')
-    onSpatialHint(buildSpatialHint(roi, pt))
+    const athleteImageBase64 = await cropFrame(selectedFrame, pt)
+    onComplete({ spatialHint: buildSpatialHint(roi, pt), athleteImageBase64 })
   }
 
   function reset() {
-    setRoi(null)
-    setDragStart(null)
-    setDragCurrent(null)
-    setAthletePt(null)
-    setPhase('draw-roi')
-    onSpatialHint(null)
+    setSelectedIdx(null)
+    setRoi(null); setDragStart(null); setDragCurrent(null); setAthletePt(null)
+    setPhase('pick-frame')
+    onComplete(null)
   }
 
-  if (!frameDataUrl) {
+  if (phase === 'loading') {
     return (
-      <div className="rounded-md border bg-muted/30 h-24 flex items-center justify-center">
-        <p className="text-xs text-muted-foreground">Extracting frame…</p>
+      <div className="rounded-md border bg-muted/30 h-20 flex items-center justify-center">
+        <p className="text-xs text-muted-foreground">Extracting frames…</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between min-h-[20px]">
-        <p className="text-xs font-medium">
-          {phase === 'draw-roi' && <span className="text-foreground">Step 1 of 2 — Draw a box around your mat</span>}
-          {phase === 'mark-athlete' && <span className="text-foreground">Step 2 of 2 — Click on yourself</span>}
-          {phase === 'done' && <span className="text-green-700">Mat region and athlete position saved</span>}
-        </p>
-        {phase !== 'draw-roi' && (
-          <button onClick={reset} className="text-xs text-muted-foreground hover:text-foreground underline transition-colors">
-            Reset
-          </button>
-        )}
-      </div>
-      <div className="relative rounded-md overflow-hidden border select-none">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          ref={imgRef}
-          src={frameDataUrl}
-          alt="Video frame"
-          className="w-full block"
-          draggable={false}
-          onLoad={onImgLoad}
-        />
-        <canvas
-          ref={canvasRef}
-          className="absolute inset-0 w-full h-full"
-          style={{
-            cursor:
-              phase === 'draw-roi' ? 'crosshair' :
-              phase === 'mark-athlete' ? 'pointer' :
-              'default',
-          }}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onClick={handleClick}
-        />
-      </div>
-      {phase === 'draw-roi' && (
-        <p className="text-xs text-muted-foreground">
-          Click and drag to outline the mat you want to analyse. This tells the AI to ignore other matches in the background.
-        </p>
+    <div className="space-y-3">
+      {/* Frame strip */}
+      {(phase === 'pick-frame' || phase === 'done') && (
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium">
+            {phase === 'pick-frame' ? 'Pick the clearest frame showing both athletes on your mat' : 'Position captured'}
+          </p>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {frames.map((f, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => selectFrame(i)}
+                className={`flex-shrink-0 rounded overflow-hidden border-2 transition-all ${
+                  selectedIdx === i && phase === 'done'
+                    ? 'border-green-500'
+                    : 'border-transparent hover:border-foreground/40'
+                }`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={f.dataUrl} alt={`Frame ${i + 1}`} className="h-20 w-auto object-cover" draggable={false} />
+              </button>
+            ))}
+          </div>
+          {phase === 'done' && (
+            <p className="text-xs text-green-700 font-medium">Mat region and athlete position saved. Click a frame above to redo.</p>
+          )}
+        </div>
       )}
-      {phase === 'mark-athlete' && (
-        <p className="text-xs text-muted-foreground">
-          Click directly on yourself inside the green box.
-        </p>
+
+      {/* Interactive canvas */}
+      {selectedFrame && phase !== 'pick-frame' && phase !== 'done' && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium">
+              {phase === 'draw-roi' && 'Step 1 of 2 — Draw a box around your mat'}
+              {phase === 'mark-athlete' && 'Step 2 of 2 — Click on yourself inside the box'}
+            </p>
+            <button onClick={reset} className="text-xs text-muted-foreground hover:text-foreground underline">
+              Change frame
+            </button>
+          </div>
+          <div className="relative rounded-md overflow-hidden border select-none">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              ref={imgRef}
+              src={selectedFrame.dataUrl}
+              alt="Selected frame"
+              className="w-full block"
+              draggable={false}
+              onLoad={onImgLoad}
+            />
+            <canvas
+              ref={canvasRef}
+              className="absolute inset-0 w-full h-full"
+              style={{ cursor: phase === 'draw-roi' ? 'crosshair' : 'pointer' }}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onClick={handleClick}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {phase === 'draw-roi' && 'Drag to outline the mat area — the AI will ignore other matches in the background.'}
+            {phase === 'mark-athlete' && 'Click directly on yourself inside the green box.'}
+          </p>
+        </div>
       )}
     </div>
   )
@@ -296,7 +359,7 @@ function FrameSelector({
 
 function FileUploadTab() {
   const [file, setFile] = useState<File | null>(null)
-  const [spatialHint, setSpatialHint] = useState<string | null>(null)
+  const [frameResult, setFrameResult] = useState<FrameResult | null>(null)
   const [scanMode, setScanMode] = useState<ScanMode>('single')
   const [athleteName, setAthleteName] = useState('')
   const [eventName, setEventName] = useState('')
@@ -315,7 +378,7 @@ function FileUploadTab() {
     if (!f.type.startsWith('video/')) { setError('Only video files are accepted'); return }
     if (f.size > 2 * 1024 * 1024 * 1024) { setError('File must be under 2 GB'); return }
     setFile(f)
-    setSpatialHint(null)
+    setFrameResult(null)
     setError(null)
   }
 
@@ -327,7 +390,7 @@ function FileUploadTab() {
     setError(null)
 
     const appearanceStr = buildAppearanceHint(appearanceColor, startingSide)
-    const hint = [appearanceStr, spatialHint].filter(Boolean).join(' ')
+    const hint = [appearanceStr, frameResult?.spatialHint].filter(Boolean).join(' ')
 
     try {
       const presignRes = await fetch('/api/uploads', {
@@ -358,6 +421,7 @@ function FileUploadTab() {
         body: JSON.stringify({
           videoId, path, sourceType, format,
           appearanceHint: hint || undefined,
+          athleteImageBase64: frameResult?.athleteImageBase64 || undefined,
           scanMode,
           ...(scanMode === 'scan' ? { athleteName: athleteName.trim(), eventName: eventName.trim() || undefined } : {}),
         }),
@@ -393,7 +457,7 @@ function FileUploadTab() {
         )}
         <div className="flex gap-3 justify-center pt-2">
           <button
-            onClick={() => { setFile(null); setSpatialHint(null); setState('idle'); setProgress(0); setAthleteName(''); setEventName('') }}
+            onClick={() => { setFile(null); setFrameResult(null); setState('idle'); setProgress(0); setAthleteName(''); setEventName('') }}
             className="px-4 py-2 rounded-md border text-sm hover:bg-muted transition-colors"
           >
             Upload another
@@ -428,27 +492,21 @@ function FileUploadTab() {
       </div>
 
       {file && (
-        <FrameSelector videoFile={file} onSpatialHint={setSpatialHint} />
+        <FrameSelector videoFile={file} onComplete={setFrameResult} />
       )}
 
       <div className="space-y-3">
         <label className="text-sm font-medium">Recording type</label>
         <div className="flex rounded-lg border overflow-hidden">
           {(['single', 'scan'] as ScanMode[]).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setScanMode(mode)}
-              className={`flex-1 py-2 text-sm transition-colors ${scanMode === mode ? 'bg-foreground text-background font-medium' : 'hover:bg-muted'}`}
-            >
+            <button key={mode} type="button" onClick={() => setScanMode(mode)}
+              className={`flex-1 py-2 text-sm transition-colors ${scanMode === mode ? 'bg-foreground text-background font-medium' : 'hover:bg-muted'}`}>
               {mode === 'single' ? 'Single match clip' : 'Full mat / session'}
             </button>
           ))}
         </div>
         <p className="text-xs text-muted-foreground">
-          {scanMode === 'single'
-            ? 'The whole video contains one match.'
-            : 'Gemini scans the full recording and extracts every match for the specified athlete.'}
+          {scanMode === 'single' ? 'The whole video contains one match.' : 'Gemini scans the full recording and extracts every match for the specified athlete.'}
         </p>
       </div>
 
@@ -456,23 +514,15 @@ function FileUploadTab() {
         <div className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Athlete name <span className="text-red-500">*</span></label>
-            <input
-              type="text"
-              value={athleteName}
-              onChange={(e) => setAthleteName(e.target.value)}
+            <input type="text" value={athleteName} onChange={(e) => setAthleteName(e.target.value)}
               placeholder="Name as shown on screen (e.g. David Smith)"
-              className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
-            />
+              className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20" />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Event name <span className="text-muted-foreground font-normal">(optional)</span></label>
-            <input
-              type="text"
-              value={eventName}
-              onChange={(e) => setEventName(e.target.value)}
+            <input type="text" value={eventName} onChange={(e) => setEventName(e.target.value)}
               placeholder="e.g. Pan Ams 2026"
-              className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
-            />
+              className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20" />
           </div>
         </div>
       )}
@@ -492,7 +542,8 @@ function FileUploadTab() {
         </div>
       )}
 
-      <button onClick={upload} disabled={!file || state === 'uploading'} className="w-full py-2.5 rounded-md bg-foreground text-background text-sm font-medium disabled:opacity-40 hover:opacity-90 transition-opacity">
+      <button onClick={upload} disabled={!file || state === 'uploading'}
+        className="w-full py-2.5 rounded-md bg-foreground text-background text-sm font-medium disabled:opacity-40 hover:opacity-90 transition-opacity">
         {state === 'uploading' ? 'Uploading…' : 'Upload Video'}
       </button>
     </div>
@@ -513,35 +564,21 @@ function UrlAnalysisTab() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  function updateUrl(i: number, val: string) {
-    setUrls((prev) => prev.map((u, idx) => (idx === i ? val : u)))
-  }
-
-  function addUrl() {
-    if (urls.length < 10) setUrls((prev) => [...prev, ''])
-  }
-
-  function removeUrl(i: number) {
-    setUrls((prev) => prev.filter((_, idx) => idx !== i))
-  }
+  function updateUrl(i: number, val: string) { setUrls((prev) => prev.map((u, idx) => idx === i ? val : u)) }
+  function addUrl() { if (urls.length < 10) setUrls((prev) => [...prev, '']) }
+  function removeUrl(i: number) { setUrls((prev) => prev.filter((_, idx) => idx !== i)) }
 
   async function submit() {
     const validUrls = urls.map((u) => u.trim()).filter(Boolean)
     if (!athleteName.trim()) { setError('Athlete name is required'); return }
     if (validUrls.length === 0) { setError('At least one URL is required'); return }
-
-    setState('uploading')
-    setError(null)
-
+    setState('uploading'); setError(null)
     try {
       const res = await fetch('/api/analyse-urls', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          athleteName: athleteName.trim(),
-          urls: validUrls,
-          format,
-          sourceType,
+          athleteName: athleteName.trim(), urls: validUrls, format, sourceType,
           eventName: eventName.trim() || undefined,
           appearanceHint: buildAppearanceHint(appearanceColor, startingSide) || undefined,
         }),
@@ -550,8 +587,7 @@ function UrlAnalysisTab() {
       if (!res.ok) { setError(data.error ?? 'Submission failed'); setState('error'); return }
       setState('success')
     } catch {
-      setError('Network error — check your connection')
-      setState('error')
+      setError('Network error — check your connection'); setState('error')
     }
   }
 
@@ -573,25 +609,17 @@ function UrlAnalysisTab() {
     <div className="space-y-6">
       <div className="space-y-2">
         <label className="text-sm font-medium">Athlete name <span className="text-red-500">*</span></label>
-        <input
-          type="text"
-          value={athleteName}
-          onChange={(e) => setAthleteName(e.target.value)}
+        <input type="text" value={athleteName} onChange={(e) => setAthleteName(e.target.value)}
           placeholder="Name as shown on screen (e.g. David Smith)"
-          className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
-        />
+          className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20" />
         <p className="text-xs text-muted-foreground">Must match exactly what appears in the tournament overlay (Smoothcomp, IBJJF scoreboard, etc.)</p>
       </div>
 
       <div className="space-y-2">
         <label className="text-sm font-medium">Event name <span className="text-muted-foreground font-normal">(optional)</span></label>
-        <input
-          type="text"
-          value={eventName}
-          onChange={(e) => setEventName(e.target.value)}
+        <input type="text" value={eventName} onChange={(e) => setEventName(e.target.value)}
           placeholder="e.g. Pan Ams 2026, IBJJF Worlds 2026"
-          className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
-        />
+          className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20" />
       </div>
 
       <div className="space-y-2">
@@ -602,13 +630,9 @@ function UrlAnalysisTab() {
             return (
               <div key={i} className="space-y-2">
                 <div className="flex gap-2">
-                  <input
-                    type="url"
-                    value={url}
-                    onChange={(e) => updateUrl(i, e.target.value)}
+                  <input type="url" value={url} onChange={(e) => updateUrl(i, e.target.value)}
                     placeholder="https://youtube.com/watch?v=... or direct video URL"
-                    className="flex-1 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                  />
+                    className="flex-1 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20" />
                   {urls.length > 1 && (
                     <button onClick={() => removeUrl(i)} className="px-3 py-2 rounded-md border text-sm text-muted-foreground hover:bg-muted transition-colors">✕</button>
                   )}
@@ -616,11 +640,8 @@ function UrlAnalysisTab() {
                 {ytId && (
                   <div className="flex items-center gap-3 rounded-md border bg-muted/30 p-2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`}
-                      alt="YouTube thumbnail"
-                      className="w-24 h-14 object-cover rounded flex-shrink-0 bg-muted"
-                    />
+                    <img src={`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`} alt="YouTube thumbnail"
+                      className="w-24 h-14 object-cover rounded flex-shrink-0 bg-muted" />
                     <p className="text-xs text-muted-foreground">
                       Use the appearance options below to tell the AI which athlete is <strong>you</strong> in this video.
                     </p>
@@ -642,18 +663,15 @@ function UrlAnalysisTab() {
 
       {error && <p className="text-sm text-red-500">{error}</p>}
 
-      <button
-        onClick={submit}
-        disabled={state === 'uploading'}
-        className="w-full py-2.5 rounded-md bg-foreground text-background text-sm font-medium disabled:opacity-40 hover:opacity-90 transition-opacity"
-      >
+      <button onClick={submit} disabled={state === 'uploading'}
+        className="w-full py-2.5 rounded-md bg-foreground text-background text-sm font-medium disabled:opacity-40 hover:opacity-90 transition-opacity">
         {state === 'uploading' ? 'Submitting…' : 'Analyse Stream'}
       </button>
     </div>
   )
 }
 
-// ─── Shared appearance / format / source fields ───────────────────────────────
+// ─── Shared fields ────────────────────────────────────────────────────────────
 
 function SharedFields({
   format, setFormat, sourceType, setSourceType,
@@ -669,20 +687,13 @@ function SharedFields({
       <div className="space-y-3">
         <div>
           <label className="text-sm font-medium">What are you wearing? <span className="text-muted-foreground font-normal text-xs">(optional)</span></label>
-          <p className="text-xs text-muted-foreground mt-0.5">Extra hint for the AI alongside the frame selection above</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Extra hint alongside the frame selection above</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {COLOR_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
+            <button key={opt.value} type="button"
               onClick={() => setAppearanceColor(appearanceColor === opt.value ? null : opt.value)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm transition-all ${
-                appearanceColor === opt.value
-                  ? 'border-foreground bg-foreground text-background font-medium'
-                  : 'border-border hover:border-foreground/40'
-              }`}
-            >
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm transition-all ${appearanceColor === opt.value ? 'border-foreground bg-foreground text-background font-medium' : 'border-border hover:border-foreground/40'}`}>
               <span className={`w-3 h-3 rounded-full flex-shrink-0 ${opt.bg}`} />
               {opt.label}
             </button>
@@ -690,16 +701,9 @@ function SharedFields({
         </div>
         <div className="flex gap-2">
           {(['left', 'right'] as StartingSide[]).map((side) => (
-            <button
-              key={side}
-              type="button"
+            <button key={side} type="button"
               onClick={() => setStartingSide(startingSide === side ? null : side)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition-all ${
-                startingSide === side
-                  ? 'border-foreground bg-foreground text-background font-medium'
-                  : 'border-border hover:border-foreground/40'
-              }`}
-            >
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition-all ${startingSide === side ? 'border-foreground bg-foreground text-background font-medium' : 'border-border hover:border-foreground/40'}`}>
               {side === 'left' ? '← ' : '→ '}Starts {side}
             </button>
           ))}
@@ -738,23 +742,17 @@ function SharedFields({
 
 export default function UploadPage() {
   const [tab, setTab] = useState<Tab>('file')
-
   return (
     <div className="max-w-xl space-y-6">
       <h1 className="text-2xl font-bold">Add Match Footage</h1>
-
       <div className="flex rounded-lg border overflow-hidden">
         {(['file', 'url'] as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`flex-1 py-2 text-sm font-medium transition-colors ${tab === t ? 'bg-foreground text-background' : 'hover:bg-muted'}`}
-          >
+          <button key={t} onClick={() => setTab(t)}
+            className={`flex-1 py-2 text-sm font-medium transition-colors ${tab === t ? 'bg-foreground text-background' : 'hover:bg-muted'}`}>
             {t === 'file' ? 'Upload File' : 'Analyse Stream URL'}
           </button>
         ))}
       </div>
-
       {tab === 'file' ? <FileUploadTab /> : <UrlAnalysisTab />}
     </div>
   )

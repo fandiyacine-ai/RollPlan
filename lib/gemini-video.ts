@@ -37,9 +37,10 @@ export async function geminiVideoObject<T extends z.ZodTypeAny>(
     videoOptions?: VideoOptions
     userPrompt: string
     schema: T
+    referenceImageBase64?: string
   }
 ): Promise<{ object: z.infer<T>; usage: { inputTokens: number; outputTokens: number } }> {
-  const { system, videoUrl, videoOptions, userPrompt, schema } = params
+  const { system, videoUrl, videoOptions, userPrompt, schema, referenceImageBase64 } = params
 
   const filePart: Record<string, unknown> = {
     fileData: { mimeType: 'video/mp4', fileUri: videoUrl },
@@ -53,9 +54,17 @@ export async function geminiVideoObject<T extends z.ZodTypeAny>(
     if (Object.keys(vm).length > 0) filePart.videoMetadata = vm
   }
 
+  const userParts: unknown[] = []
+  if (referenceImageBase64) {
+    userParts.push({ inlineData: { mimeType: 'image/jpeg', data: referenceImageBase64 } })
+    userParts.push({ text: '↑ This is the competitor to track — study their appearance carefully before analysing the video.' })
+  }
+  userParts.push(filePart)
+  userParts.push({ text: userPrompt })
+
   const body = {
     systemInstruction: { parts: [{ text: system }] },
-    contents: [{ role: 'user', parts: [filePart, { text: userPrompt }] }],
+    contents: [{ role: 'user', parts: userParts }],
     generationConfig: {
       responseMimeType: 'application/json',
       responseSchema: buildGeminiSchema(schema),
