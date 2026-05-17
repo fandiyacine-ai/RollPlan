@@ -10,6 +10,8 @@ type Format = 'gi' | 'no_gi'
 type UploadState = 'idle' | 'uploading' | 'success' | 'error'
 type AppearanceColor = 'blue_gi' | 'white_gi' | 'black_gi' | 'dark_rash' | 'light_rash' | 'other'
 type StartingSide = 'left' | 'right'
+type Rect = { x1: number; y1: number; x2: number; y2: number }
+type Pt = { x: number; y: number }
 
 const SOURCE_LABELS: Record<SourceType, string> = {
   own_competition: 'My competition match',
@@ -38,6 +40,18 @@ function buildAppearanceHint(color: AppearanceColor | null, side: StartingSide |
   return parts.join(', ')
 }
 
+function buildSpatialHint(roi: Rect, athlete: Pt): string {
+  const l = Math.round(Math.min(roi.x1, roi.x2) * 100)
+  const r = Math.round(Math.max(roi.x1, roi.x2) * 100)
+  const t = Math.round(Math.min(roi.y1, roi.y2) * 100)
+  const b = Math.round(Math.max(roi.y1, roi.y2) * 100)
+  const ax = Math.round(athlete.x * 100)
+  const ay = Math.round(athlete.y * 100)
+  const hPos = athlete.x < (Math.min(roi.x1, roi.x2) + Math.max(roi.x1, roi.x2)) / 2 ? 'left' : 'right'
+  const vPos = athlete.y < (Math.min(roi.y1, roi.y2) + Math.max(roi.y1, roi.y2)) / 2 ? 'upper' : 'lower'
+  return `Focus ONLY on the match within the region spanning ${l}%–${r}% of frame width and ${t}%–${b}% of frame height — ignore all athletes and matches outside this area. Within that mat, the competitor to track is on the ${hPos} ${vPos} side (full-frame position: ${ax}% from left, ${ay}% from top).`
+}
+
 function extractYouTubeId(url: string): string | null {
   try {
     const u = new URL(url)
@@ -51,9 +65,238 @@ function extractYouTubeId(url: string): string | null {
   return null
 }
 
+// ─── Frame selector ───────────────────────────────────────────────────────────
+
+type SelectorPhase = 'loading' | 'draw-roi' | 'mark-athlete' | 'done'
+
+function FrameSelector({
+  videoFile,
+  onSpatialHint,
+}: {
+  videoFile: File
+  onSpatialHint: (hint: string | null) => void
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const imgRef = useRef<HTMLImageElement>(null)
+  const [frameDataUrl, setFrameDataUrl] = useState<string | null>(null)
+  const [phase, setPhase] = useState<SelectorPhase>('loading')
+  const [roi, setRoi] = useState<Rect | null>(null)
+  const [dragStart, setDragStart] = useState<Pt | null>(null)
+  const [dragCurrent, setDragCurrent] = useState<Pt | null>(null)
+  const [athletePt, setAthletePt] = useState<Pt | null>(null)
+  const [canvasDims, setCanvasDims] = useState({ w: 0, h: 0 })
+
+  // Extract a frame from the video at ~10% of its duration
+  useEffect(() => {
+    const vid = document.createElement('video')
+    const objectUrl = URL.createObjectURL(videoFile)
+    vid.muted = true
+    vid.preload = 'metadata'
+    vid.src = objectUrl
+    vid.onloadedmetadata = () => {
+      vid.currentTime = Math.max(0.1, Math.min(vid.duration * 0.1, 5))
+    }
+    vid.onseeked = () => {
+      const c = document.createElement('canvas')
+      c.width = vid.videoWidth
+      c.height = vid.videoHeight
+      c.getContext('2d')!.drawImage(vid, 0, 0)
+      setFrameDataUrl(c.toDataURL('image/jpeg', 0.8))
+      URL.revokeObjectURL(objectUrl)
+      setPhase('draw-roi')
+    }
+    vid.onerror = () => {
+      URL.revokeObjectURL(objectUrl)
+      // Fall back silently — selector just won't show
+    }
+    vid.load()
+    return () => URL.revokeObjectURL(objectUrl)
+  }, [videoFile])
+
+  // Sync canvas pixel dimensions to the rendered img size
+  function onImgLoad(e: React.SyntheticEvent<HTMLImageElement>) {
+    const canvas = canvasRef.current
+    const rect = (e.target as HTMLImageElement).getBoundingClientRect()
+    if (!canvas || rect.width === 0) return
+    canvas.width = rect.width
+    canvas.height = rect.height
+    setCanvasDims({ w: rect.width, h: rect.height })
+  }
+
+  // Redraw the canvas overlay whenever state changes
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas || canvasDims.w === 0) return
+    const ctx = canvas.getContext('2d')!
+    const W = canvas.width
+    const H = canvas.height
+    ctx.clearRect(0, 0, W, H)
+
+    const activeRoi: Rect | null = roi
+      ?? (dragStart && dragCurrent ? { x1: dragStart.x, y1: dragStart.y, x2: dragCurrent.x, y2: dragCurrent.y } : null)
+
+    if (!activeRoi) return
+
+    const rx = Math.min(activeRoi.x1, activeRoi.x2) * W
+    const ry = Math.min(activeRoi.y1, activeRoi.y2) * H
+    const rw = Math.abs(activeRoi.x2 - activeRoi.x1) * W
+    const rh = Math.abs(activeRoi.y2 - activeRoi.y1) * H
+
+    // Dim everything outside the ROI
+    ctx.fillStyle = 'rgba(0,0,0,0.52)'
+    ctx.fillRect(0, 0, W, ry)
+    ctx.fillRect(0, ry + rh, W, H - ry - rh)
+    ctx.fillRect(0, ry, rx, rh)
+    ctx.fillRect(rx + rw, ry, W - rx - rw, rh)
+
+    // ROI border
+    ctx.strokeStyle = '#4ade80'
+    ctx.lineWidth = 2
+    ctx.strokeRect(rx, ry, rw, rh)
+
+    // Athlete marker
+    if (athletePt) {
+      const px = athletePt.x * W
+      const py = athletePt.y * H
+      ctx.fillStyle = '#ef4444'
+      ctx.beginPath()
+      ctx.arc(px, py, 9, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = 'white'
+      ctx.lineWidth = 2
+      ctx.stroke()
+      ctx.fillStyle = 'white'
+      ctx.font = 'bold 12px sans-serif'
+      ctx.textAlign = 'left'
+      ctx.textBaseline = 'middle'
+      ctx.fillText('YOU', px + 13, py)
+    }
+  }, [roi, dragStart, dragCurrent, athletePt, canvasDims])
+
+  function getPoint(e: React.MouseEvent<HTMLCanvasElement>): Pt {
+    const r = canvasRef.current!.getBoundingClientRect()
+    return {
+      x: (e.clientX - r.left) / r.width,
+      y: (e.clientY - r.top) / r.height,
+    }
+  }
+
+  function handleMouseDown(e: React.MouseEvent<HTMLCanvasElement>) {
+    if (phase !== 'draw-roi') return
+    e.preventDefault()
+    setDragStart(getPoint(e))
+    setDragCurrent(null)
+  }
+
+  function handleMouseMove(e: React.MouseEvent<HTMLCanvasElement>) {
+    if (phase !== 'draw-roi' || !dragStart) return
+    setDragCurrent(getPoint(e))
+  }
+
+  function handleMouseUp(e: React.MouseEvent<HTMLCanvasElement>) {
+    if (phase !== 'draw-roi' || !dragStart) return
+    const end = getPoint(e)
+    const w = Math.abs(end.x - dragStart.x)
+    const h = Math.abs(end.y - dragStart.y)
+    if (w < 0.05 || h < 0.05) {
+      setDragStart(null)
+      setDragCurrent(null)
+      return
+    }
+    setRoi({ x1: dragStart.x, y1: dragStart.y, x2: end.x, y2: end.y })
+    setDragStart(null)
+    setDragCurrent(null)
+    setPhase('mark-athlete')
+  }
+
+  function handleClick(e: React.MouseEvent<HTMLCanvasElement>) {
+    if (phase !== 'mark-athlete' || !roi) return
+    const pt = getPoint(e)
+    // Must click inside the ROI
+    if (
+      pt.x < Math.min(roi.x1, roi.x2) || pt.x > Math.max(roi.x1, roi.x2) ||
+      pt.y < Math.min(roi.y1, roi.y2) || pt.y > Math.max(roi.y1, roi.y2)
+    ) return
+    setAthletePt(pt)
+    setPhase('done')
+    onSpatialHint(buildSpatialHint(roi, pt))
+  }
+
+  function reset() {
+    setRoi(null)
+    setDragStart(null)
+    setDragCurrent(null)
+    setAthletePt(null)
+    setPhase('draw-roi')
+    onSpatialHint(null)
+  }
+
+  if (!frameDataUrl) {
+    return (
+      <div className="rounded-md border bg-muted/30 h-24 flex items-center justify-center">
+        <p className="text-xs text-muted-foreground">Extracting frame…</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between min-h-[20px]">
+        <p className="text-xs font-medium">
+          {phase === 'draw-roi' && <span className="text-foreground">Step 1 of 2 — Draw a box around your mat</span>}
+          {phase === 'mark-athlete' && <span className="text-foreground">Step 2 of 2 — Click on yourself</span>}
+          {phase === 'done' && <span className="text-green-700">Mat region and athlete position saved</span>}
+        </p>
+        {phase !== 'draw-roi' && (
+          <button onClick={reset} className="text-xs text-muted-foreground hover:text-foreground underline transition-colors">
+            Reset
+          </button>
+        )}
+      </div>
+      <div className="relative rounded-md overflow-hidden border select-none">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          ref={imgRef}
+          src={frameDataUrl}
+          alt="Video frame"
+          className="w-full block"
+          draggable={false}
+          onLoad={onImgLoad}
+        />
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 w-full h-full"
+          style={{
+            cursor:
+              phase === 'draw-roi' ? 'crosshair' :
+              phase === 'mark-athlete' ? 'pointer' :
+              'default',
+          }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onClick={handleClick}
+        />
+      </div>
+      {phase === 'draw-roi' && (
+        <p className="text-xs text-muted-foreground">
+          Click and drag to outline the mat you want to analyse. This tells the AI to ignore other matches in the background.
+        </p>
+      )}
+      {phase === 'mark-athlete' && (
+        <p className="text-xs text-muted-foreground">
+          Click directly on yourself inside the green box.
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ─── File upload tab ──────────────────────────────────────────────────────────
+
 function FileUploadTab() {
   const [file, setFile] = useState<File | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [spatialHint, setSpatialHint] = useState<string | null>(null)
   const [scanMode, setScanMode] = useState<ScanMode>('single')
   const [athleteName, setAthleteName] = useState('')
   const [eventName, setEventName] = useState('')
@@ -68,17 +311,11 @@ function FileUploadTab() {
   const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
-  useEffect(() => {
-    if (!file) { setPreviewUrl(null); return }
-    const url = URL.createObjectURL(file)
-    setPreviewUrl(url)
-    return () => URL.revokeObjectURL(url)
-  }, [file])
-
   function pickFile(f: File) {
     if (!f.type.startsWith('video/')) { setError('Only video files are accepted'); return }
     if (f.size > 2 * 1024 * 1024 * 1024) { setError('File must be under 2 GB'); return }
     setFile(f)
+    setSpatialHint(null)
     setError(null)
   }
 
@@ -89,10 +326,10 @@ function FileUploadTab() {
     setProgress(0)
     setError(null)
 
-    const hint = buildAppearanceHint(appearanceColor, startingSide)
+    const appearanceStr = buildAppearanceHint(appearanceColor, startingSide)
+    const hint = [appearanceStr, spatialHint].filter(Boolean).join(' ')
 
     try {
-      // Step 1: get a presigned R2 upload URL
       const presignRes = await fetch('/api/uploads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -103,7 +340,6 @@ function FileUploadTab() {
 
       const { uploadUrl, path, videoId } = presignData
 
-      // Step 2: upload directly to R2 (bypasses Railway — no size limit)
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest()
         xhr.upload.onprogress = (e) => {
@@ -116,7 +352,6 @@ function FileUploadTab() {
         xhr.send(file)
       })
 
-      // Step 3: notify server to set publicUrl and trigger analysis
       const completeRes = await fetch('/api/uploads/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -157,7 +392,12 @@ function FileUploadTab() {
           </>
         )}
         <div className="flex gap-3 justify-center pt-2">
-          <button onClick={() => { setFile(null); setState('idle'); setProgress(0); setAthleteName(''); setEventName('') }} className="px-4 py-2 rounded-md border text-sm hover:bg-muted transition-colors">Upload another</button>
+          <button
+            onClick={() => { setFile(null); setSpatialHint(null); setState('idle'); setProgress(0); setAthleteName(''); setEventName('') }}
+            className="px-4 py-2 rounded-md border text-sm hover:bg-muted transition-colors"
+          >
+            Upload another
+          </button>
           <button onClick={() => router.push('/player-card')} className="px-4 py-2 rounded-md bg-foreground text-background text-sm hover:opacity-90 transition-opacity">View Player Card</button>
         </div>
       </div>
@@ -187,21 +427,8 @@ function FileUploadTab() {
         )}
       </div>
 
-      {previewUrl && (
-        <div className="space-y-1.5">
-          <div className="rounded-md border overflow-hidden bg-black">
-            <video
-              src={previewUrl}
-              className="w-full max-h-48 object-contain"
-              preload="metadata"
-              muted
-              playsInline
-            />
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Use the <strong>appearance options below</strong> to tell the AI which athlete is you in this video.
-          </p>
-        </div>
+      {file && (
+        <FrameSelector videoFile={file} onSpatialHint={setSpatialHint} />
       )}
 
       <div className="space-y-3">
@@ -272,6 +499,8 @@ function FileUploadTab() {
   )
 }
 
+// ─── URL analysis tab ─────────────────────────────────────────────────────────
+
 function UrlAnalysisTab() {
   const [athleteName, setAthleteName] = useState('')
   const [eventName, setEventName] = useState('')
@@ -308,7 +537,14 @@ function UrlAnalysisTab() {
       const res = await fetch('/api/analyse-urls', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ athleteName: athleteName.trim(), urls: validUrls, format, sourceType, eventName: eventName.trim() || undefined, appearanceHint: buildAppearanceHint(appearanceColor, startingSide) || undefined }),
+        body: JSON.stringify({
+          athleteName: athleteName.trim(),
+          urls: validUrls,
+          format,
+          sourceType,
+          eventName: eventName.trim() || undefined,
+          appearanceHint: buildAppearanceHint(appearanceColor, startingSide) || undefined,
+        }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'Submission failed'); setState('error'); return }
@@ -417,6 +653,8 @@ function UrlAnalysisTab() {
   )
 }
 
+// ─── Shared appearance / format / source fields ───────────────────────────────
+
 function SharedFields({
   format, setFormat, sourceType, setSourceType,
   appearanceColor, setAppearanceColor, startingSide, setStartingSide,
@@ -430,8 +668,8 @@ function SharedFields({
     <>
       <div className="space-y-3">
         <div>
-          <label className="text-sm font-medium">What are you wearing?</label>
-          <p className="text-xs text-muted-foreground mt-0.5">Helps the AI pick the right athlete in the video</p>
+          <label className="text-sm font-medium">What are you wearing? <span className="text-muted-foreground font-normal text-xs">(optional)</span></label>
+          <p className="text-xs text-muted-foreground mt-0.5">Extra hint for the AI alongside the frame selection above</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {COLOR_OPTIONS.map((opt) => (
@@ -495,6 +733,8 @@ function SharedFields({
     </>
   )
 }
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function UploadPage() {
   const [tab, setTab] = useState<Tab>('file')
