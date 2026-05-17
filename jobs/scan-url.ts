@@ -5,8 +5,9 @@ import { db } from '../lib/db'
 import { videos, matches, positionSegments, matchEvents, insights, aiCallLogs } from '../lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { google, anthropic, GEMINI_URL_SCAN_MODEL, CLAUDE_SYNTHESIS_MODEL, estimateCostUsd } from '../lib/ai/clients'
+import { geminiVideoObject, isYouTubeUrl } from '../lib/gemini-video'
 import { UrlScanOutputSchema, FoundMatch } from '../lib/ai/schemas/url-scan'
-import { MatchExtractionOutputSchema } from '../lib/ai/schemas/match-extraction'
+import { MatchExtractionOutputSchema, type MatchExtractionOutput } from '../lib/ai/schemas/match-extraction'
 import { PositionVerificationSchema } from '../lib/ai/schemas/position-verification'
 import { InsightsOutputSchema } from '../lib/ai/schemas/insights'
 import { buildScanUrlSystemPrompt, buildScanUrlUserPrompt, SCAN_URL_PROMPT_VERSION } from '../lib/ai/prompts/scan-url'
@@ -45,28 +46,45 @@ export const scanUrl = inngest.createFunction(
       let scanResult: { matches: FoundMatch[]; athlete_found: boolean; scan_notes: string }
 
       try {
-        const { object, usage } = await generateObject({
-          model: google(GEMINI_URL_SCAN_MODEL),
-          schema: UrlScanOutputSchema,
-          maxRetries: 0,
-          system: buildScanUrlSystemPrompt(),
-          messages: [{
-            role: 'user',
-            content: [
-              videoFilePart(video.publicUrl, video.contentType),
-              { type: 'text', text: buildScanUrlUserPrompt(athleteName) },
-            ],
-          }],
-        })
-        scanResult = object
+        let scanUsage: { inputTokens: number; outputTokens: number }
+
+        if (isYouTubeUrl(video.publicUrl)) {
+          // Full competition streams can be 2–4+ hours. Scan at 0.1fps (1 frame/10s) to stay
+          // well under Gemini's 1M token limit while still catching scoreboard transitions.
+          const result = await geminiVideoObject(GEMINI_URL_SCAN_MODEL, {
+            system: buildScanUrlSystemPrompt(),
+            videoUrl: video.publicUrl,
+            videoOptions: { fps: 0.1 },
+            userPrompt: buildScanUrlUserPrompt(athleteName),
+            schema: UrlScanOutputSchema,
+          })
+          scanResult = result.object
+          scanUsage = result.usage
+        } else {
+          const result = await generateObject({
+            model: google(GEMINI_URL_SCAN_MODEL),
+            schema: UrlScanOutputSchema,
+            maxRetries: 0,
+            system: buildScanUrlSystemPrompt(),
+            messages: [{
+              role: 'user',
+              content: [
+                videoFilePart(video.publicUrl, video.contentType),
+                { type: 'text', text: buildScanUrlUserPrompt(athleteName) },
+              ],
+            }],
+          })
+          scanResult = result.object
+          scanUsage = { inputTokens: result.usage.inputTokens ?? 0, outputTokens: result.usage.outputTokens ?? 0 }
+        }
 
         await db.insert(aiCallLogs).values({
           jobId: videoId,
           model: GEMINI_URL_SCAN_MODEL,
           promptVersion: SCAN_URL_PROMPT_VERSION,
-          tokensIn: usage.inputTokens ?? 0,
-          tokensOut: usage.outputTokens ?? 0,
-          costUsdEstimate: estimateCostUsd(GEMINI_URL_SCAN_MODEL, usage.inputTokens ?? 0, usage.outputTokens ?? 0),
+          tokensIn: scanUsage.inputTokens,
+          tokensOut: scanUsage.outputTokens,
+          costUsdEstimate: estimateCostUsd(GEMINI_URL_SCAN_MODEL, scanUsage.inputTokens, scanUsage.outputTokens),
           latencyMs: Date.now() - start,
           status: 'success',
         })
@@ -118,33 +136,65 @@ export const scanUrl = inngest.createFunction(
 
         // Extract positions + events
         const extractStart = Date.now()
-        let extractObject: Awaited<ReturnType<typeof generateObject<typeof MatchExtractionOutputSchema>>>['object']
-        let extractUsage: Awaited<ReturnType<typeof generateObject<typeof MatchExtractionOutputSchema>>>['usage']
+        const isYT = isYouTubeUrl(video.publicUrl)
+        let extractObject: MatchExtractionOutput
+        let extractUsage: { inputTokens: number; outputTokens: number }
 
         try {
-          const result = await generateObject({
-            model: google(GEMINI_URL_SCAN_MODEL),
-            schema: MatchExtractionOutputSchema,
-            maxRetries: 0,
-            system: buildExtractMatchSystemPrompt(),
-            messages: [{
-              role: 'user',
-              content: [
-                videoFilePart(video.publicUrl, video.contentType),
-                {
-                  type: 'text',
-                  text: buildExtractMatchUserPrompt({
-                    competitorDescription: [athleteName, appearanceHint].filter(Boolean).join(' — '),
-                    format: format as 'gi' | 'no_gi',
-                    ruleset: 'ibjjf',
-                    timestampRange: { startSeconds: found.start_seconds, endSeconds: found.end_seconds },
-                  }),
-                },
-              ],
-            }],
-          })
-          extractObject = result.object
-          extractUsage = result.usage
+          if (isYT) {
+            // Trim the YouTube video to just this match window. Gemini reports timestamps
+            // relative to the clip start, so we shift them back to absolute after.
+            const clipStart = found.start_seconds
+            const result = await geminiVideoObject(GEMINI_URL_SCAN_MODEL, {
+              system: buildExtractMatchSystemPrompt(),
+              videoUrl: video.publicUrl,
+              videoOptions: { fps: 1.0, startSeconds: clipStart, endSeconds: found.end_seconds },
+              userPrompt: buildExtractMatchUserPrompt({
+                competitorDescription: [athleteName, appearanceHint].filter(Boolean).join(' — '),
+                format: format as 'gi' | 'no_gi',
+                ruleset: 'ibjjf',
+                timestampRange: { startSeconds: 0, endSeconds: found.end_seconds - clipStart },
+              }),
+              schema: MatchExtractionOutputSchema,
+            })
+            extractObject = {
+              ...result.object,
+              positions: result.object.positions.map(p => ({
+                ...p,
+                start_seconds: p.start_seconds + clipStart,
+                end_seconds: p.end_seconds + clipStart,
+              })),
+              events: result.object.events.map(e => ({
+                ...e,
+                timestamp_seconds: e.timestamp_seconds + clipStart,
+              })),
+            }
+            extractUsage = result.usage
+          } else {
+            const result = await generateObject({
+              model: google(GEMINI_URL_SCAN_MODEL),
+              schema: MatchExtractionOutputSchema,
+              maxRetries: 0,
+              system: buildExtractMatchSystemPrompt(),
+              messages: [{
+                role: 'user',
+                content: [
+                  videoFilePart(video.publicUrl, video.contentType),
+                  {
+                    type: 'text',
+                    text: buildExtractMatchUserPrompt({
+                      competitorDescription: [athleteName, appearanceHint].filter(Boolean).join(' — '),
+                      format: format as 'gi' | 'no_gi',
+                      ruleset: 'ibjjf',
+                      timestampRange: { startSeconds: found.start_seconds, endSeconds: found.end_seconds },
+                    }),
+                  },
+                ],
+              }],
+            })
+            extractObject = result.object
+            extractUsage = { inputTokens: result.usage.inputTokens ?? 0, outputTokens: result.usage.outputTokens ?? 0 }
+          }
         } catch (err) {
           await db.update(matches).set({ status: 'failed' }).where(eq(matches.id, match.id))
           throw err
@@ -193,8 +243,9 @@ export const scanUrl = inngest.createFunction(
           status: 'success',
         })
 
-        // Verify positions — targeted second pass on confusion-prone / low-confidence segments
-        try {
+        // Verify positions — targeted second pass on confusion-prone / low-confidence segments.
+        // Skip for YouTube: extraction already runs at 1fps on the trimmed match window.
+        if (!isYT) try {
           const allSegments = await db.query.positionSegments.findMany({ where: eq(positionSegments.matchId, match.id) })
           const toVerify = allSegments.filter(s => s.confidence < 0.75 || CONFUSION_PRONE.has(s.positionId))
 
