@@ -5,6 +5,7 @@ import { db } from '../lib/db'
 import { videos, matches, positionSegments, matchEvents, insights, aiCallLogs } from '../lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { google, anthropic, GEMINI_VIDEO_MODEL, CLAUDE_SYNTHESIS_MODEL, estimateCostUsd } from '../lib/ai/clients'
+import { uploadVideoToGemini, deleteGeminiFile } from '../lib/ai/gemini-files'
 import { MatchExtractionOutputSchema } from '../lib/ai/schemas/match-extraction'
 import { PositionVerificationSchema } from '../lib/ai/schemas/position-verification'
 import { InsightsOutputSchema } from '../lib/ai/schemas/insights'
@@ -44,6 +45,15 @@ export const analyzeVideo = inngest.createFunction(
       return { thumbnailKey: null }
     })
 
+    // Upload video to Gemini Files API — streams from R2 to disk to Google,
+    // never loading the full file into Node.js heap
+    const { geminiFileUri } = await step.run('upload-to-gemini', async () => {
+      const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
+      if (!video?.publicUrl) throw new Error('Video has no public URL')
+      const geminiFileUri = await uploadVideoToGemini(video.publicUrl, video.contentType)
+      return { geminiFileUri }
+    })
+
     await step.run('extract-positions-events', async () => {
       const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
       if (!video?.publicUrl) throw new Error('Video has no public URL')
@@ -69,7 +79,7 @@ export const analyzeVideo = inngest.createFunction(
             content: [
               {
                 type: 'file',
-                data: new URL(video.publicUrl),
+                data: new URL(geminiFileUri),
                 mediaType: video.contentType as `${string}/${string}`,
               },
               {
@@ -143,9 +153,6 @@ export const analyzeVideo = inngest.createFunction(
     })
 
     await step.run('verify-positions', async () => {
-      const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
-      if (!video?.publicUrl) return { corrections: 0, skipped: true }
-
       const allSegments = await db.query.positionSegments.findMany({ where: eq(positionSegments.matchId, matchId) })
       const toVerify = allSegments.filter(s => s.confidence < 0.75 || CONFUSION_PRONE.has(s.positionId))
       if (toVerify.length === 0) return { corrections: 0 }
@@ -163,7 +170,7 @@ export const analyzeVideo = inngest.createFunction(
           messages: [{
             role: 'user',
             content: [
-              { type: 'file', data: new URL(video.publicUrl), mediaType: video.contentType as `${string}/${string}` },
+              { type: 'file', data: new URL(geminiFileUri), mediaType: 'video/mp4' },
               { type: 'text', text: buildVerifyPositionsUserPrompt(
                 toVerify.map((s, i) => ({
                   index: i,
@@ -289,6 +296,10 @@ export const analyzeVideo = inngest.createFunction(
     await step.run('mark-analysed', async () => {
       await db.update(matches).set({ status: 'analysed' }).where(eq(matches.id, matchId))
       await db.update(videos).set({ status: 'analysed' }).where(eq(videos.id, videoId))
+    })
+
+    await step.run('cleanup-gemini-file', async () => {
+      await deleteGeminiFile(geminiFileUri)
     })
   }
 )
