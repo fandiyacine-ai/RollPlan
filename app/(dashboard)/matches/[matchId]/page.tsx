@@ -96,9 +96,10 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
             {match.status === 'analysed' && (
               <Link
                 href={`/matches/${matchId}/coach`}
-                className={buttonVariants({ size: 'sm' })}
+                className={`${buttonVariants({ size: 'sm' })} gap-1.5`}
               >
                 Frame by Frame
+                <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-white/20 leading-none tracking-wide">AI</span>
               </Link>
             )}
           </div>

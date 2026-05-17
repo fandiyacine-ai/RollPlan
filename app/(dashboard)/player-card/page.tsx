@@ -553,8 +553,9 @@ function TimelineMatchItem({
             <Link href={`/matches/${match.id}`} className={buttonVariants({ variant: 'outline', size: 'xs' })}>
               Full Review
             </Link>
-            <Link href={`/matches/${match.id}/coach`} className={buttonVariants({ size: 'xs' })}>
+            <Link href={`/matches/${match.id}/coach`} className={`${buttonVariants({ size: 'xs' })} gap-1.5`}>
               Frame by Frame
+              <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-white/20 leading-none tracking-wide">AI</span>
             </Link>
           </div>
         )}
