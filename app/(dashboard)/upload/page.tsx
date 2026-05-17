@@ -440,7 +440,7 @@ function FrameSelector({
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={f.dataUrl} alt={`Frame ${i + 1}`} className="h-20 w-auto object-cover block" draggable={false} />
                     {f.label === 'entry' && (
-                      <span className="absolute bottom-1 left-1 text-[9px] font-bold uppercase bg-green-500 text-white px-1 py-0.5 rounded leading-none tracking-wide">
+                      <span className="absolute bottom-1 left-1 text-[9px] font-bold uppercase bg-emerald-500 text-white px-1 py-0.5 rounded leading-none tracking-wide">
                         Entry
                       </span>
                     )}
@@ -451,11 +451,11 @@ function FrameSelector({
           </div>
           {frames.some(f => f.label === 'entry') && phase === 'pick-frame' && (
             <p className="text-xs text-muted-foreground">
-              <span className="text-green-700 font-medium">Entry frames</span> show athletes walking onto the mat — easiest to identify yourself before the match starts.
+              <span className="text-emerald-400 font-medium">Entry frames</span> show athletes walking onto the mat — easiest to identify yourself before the match starts.
             </p>
           )}
           {phase === 'done' && (
-            <p className="text-xs text-green-700 font-medium">Mat region and athlete position saved.</p>
+            <p className="text-xs text-emerald-400 font-medium">Position captured — identity reference saved.</p>
           )}
         </div>
       )}
@@ -599,23 +599,23 @@ function FileUploadTab() {
 
   if (state === 'success') {
     return (
-      <div className="rounded-lg border border-green-200 bg-green-50 p-8 text-center space-y-4">
+      <div className="rounded-lg border border-emerald-800/50 bg-emerald-950/40 p-8 text-center space-y-4">
         <div className="text-4xl">✓</div>
         {scanMode === 'scan' ? (
           <>
-            <p className="font-medium text-green-800">Scanning for {athleteName}&apos;s matches…</p>
+            <p className="font-medium text-emerald-400">Scanning for {athleteName}&apos;s matches…</p>
             <p className="text-sm text-muted-foreground">Gemini will find all matches in the recording. This may take several minutes.</p>
           </>
         ) : (
           <>
-            <p className="font-medium text-green-800">Video uploaded successfully!</p>
-            <p className="text-sm text-muted-foreground">Analysis will begin shortly.</p>
+            <p className="font-medium text-emerald-400">Video uploaded — analysis starting shortly.</p>
+            <p className="text-sm text-muted-foreground">You&apos;ll see it appear in your Match Feed.</p>
           </>
         )}
         <div className="flex gap-3 justify-center pt-2">
           <button onClick={() => { setFile(null); setFrameResult(null); setState('idle'); setProgress(0); setAthleteName(''); setEventName('') }}
             className="px-4 py-2 rounded-md border text-sm hover:bg-muted transition-colors">Upload another</button>
-          <button onClick={() => router.push('/player-card')} className="px-4 py-2 rounded-md bg-foreground text-background text-sm hover:opacity-90 transition-opacity">View Player Card</button>
+          <button onClick={() => router.push('/player-card')} className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity">View My Stats</button>
         </div>
       </div>
     )
@@ -651,7 +651,7 @@ function FileUploadTab() {
         <div className="flex rounded-lg border overflow-hidden">
           {(['single', 'scan'] as ScanMode[]).map((mode) => (
             <button key={mode} type="button" onClick={() => setScanMode(mode)}
-              className={`flex-1 py-2 text-sm transition-colors ${scanMode === mode ? 'bg-foreground text-background font-medium' : 'hover:bg-muted'}`}>
+              className={`flex-1 py-2 text-sm transition-colors ${scanMode === mode ? 'bg-primary text-primary-foreground font-medium' : 'hover:bg-muted'}`}>
               {mode === 'single' ? 'Single match clip' : 'Full mat / session'}
             </button>
           ))}
@@ -685,19 +685,19 @@ function FileUploadTab() {
         startingSideAuto={startingSideAuto}
         selfDescription={selfDescription} setSelfDescription={setSelfDescription} />
 
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="text-sm text-rose-400">{error}</p>}
 
       {state === 'uploading' && (
         <div className="space-y-1">
           <div className="h-2 rounded-full bg-muted overflow-hidden">
-            <div className="h-full bg-foreground transition-all duration-200" style={{ width: `${progress}%` }} />
+            <div className="h-full bg-primary transition-all duration-200" style={{ width: `${progress}%` }} />
           </div>
           <p className="text-xs text-muted-foreground text-right">{progress}%</p>
         </div>
       )}
 
       <button onClick={upload} disabled={!file || state === 'uploading'}
-        className="w-full py-2.5 rounded-md bg-foreground text-background text-sm font-medium disabled:opacity-40 hover:opacity-90 transition-opacity">
+        className="w-full py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-40 hover:opacity-90 transition-opacity">
         {state === 'uploading' ? 'Uploading…' : 'Upload Video'}
       </button>
     </div>
@@ -748,13 +748,13 @@ function UrlAnalysisTab() {
 
   if (state === 'success') {
     return (
-      <div className="rounded-lg border border-green-200 bg-green-50 p-8 text-center space-y-4">
+      <div className="rounded-lg border border-emerald-800/50 bg-emerald-950/40 p-8 text-center space-y-4">
         <div className="text-4xl">✓</div>
-        <p className="font-medium text-green-800">{urls.filter(Boolean).length} stream{urls.filter(Boolean).length > 1 ? 's' : ''} submitted for analysis!</p>
+        <p className="font-medium text-emerald-400">{urls.filter(Boolean).length} stream{urls.filter(Boolean).length > 1 ? 's' : ''} submitted for analysis!</p>
         <p className="text-sm text-muted-foreground">Gemini will scan for {athleteName}&apos;s matches. This may take several minutes.</p>
         <div className="flex gap-3 justify-center pt-2">
           <button onClick={() => { setUrls(['']); setAthleteName(''); setEventName(''); setState('idle') }} className="px-4 py-2 rounded-md border text-sm hover:bg-muted transition-colors">Submit more</button>
-          <button onClick={() => router.push('/player-card')} className="px-4 py-2 rounded-md bg-foreground text-background text-sm hover:opacity-90 transition-opacity">View Player Card</button>
+          <button onClick={() => router.push('/player-card')} className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity">View My Stats</button>
         </div>
       </div>
     )
@@ -817,10 +817,10 @@ function UrlAnalysisTab() {
         startingSide={startingSide} setStartingSide={setStartingSide}
         selfDescription={selfDescription} setSelfDescription={setSelfDescription} />
 
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="text-sm text-rose-400">{error}</p>}
 
       <button onClick={submit} disabled={state === 'uploading'}
-        className="w-full py-2.5 rounded-md bg-foreground text-background text-sm font-medium disabled:opacity-40 hover:opacity-90 transition-opacity">
+        className="w-full py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-40 hover:opacity-90 transition-opacity">
         {state === 'uploading' ? 'Submitting…' : 'Analyse Stream'}
       </button>
     </div>
@@ -865,7 +865,7 @@ function SharedFields({
           {COLOR_OPTIONS.map((opt) => (
             <button key={opt.value} type="button"
               onClick={() => setAppearanceColor(appearanceColor === opt.value ? null : opt.value)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm transition-all ${appearanceColor === opt.value ? 'border-foreground bg-foreground text-background font-medium' : 'border-border hover:border-foreground/40'}`}>
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm transition-all ${appearanceColor === opt.value ? 'border-primary bg-primary text-primary-foreground font-medium' : 'border-border hover:border-foreground/40'}`}>
               <span className={`w-3 h-3 rounded-full flex-shrink-0 ${opt.bg}`} />
               {opt.label}
             </button>
@@ -875,7 +875,7 @@ function SharedFields({
           {(['left', 'right'] as StartingSide[]).map((side) => (
             <button key={side} type="button"
               onClick={() => setStartingSide(startingSide === side ? null : side)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition-all ${startingSide === side ? 'border-foreground bg-foreground text-background font-medium' : 'border-border hover:border-foreground/40'}`}>
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition-all ${startingSide === side ? 'border-primary bg-primary text-primary-foreground font-medium' : 'border-border hover:border-foreground/40'}`}>
               {side === 'left' ? '← ' : '→ '}Starts {side}
               {startingSide === side && startingSideAuto && (
                 <span className="text-[10px] opacity-70 font-normal">(auto)</span>
@@ -885,7 +885,7 @@ function SharedFields({
           <span className="self-center text-xs text-muted-foreground">side of the mat</span>
         </div>
         {startingSideAuto && startingSide && (
-          <p className="text-xs text-green-700">
+          <p className="text-xs text-emerald-400">
             Auto-detected from your frame selection — tap to override.
           </p>
         )}
@@ -928,7 +928,7 @@ export default function UploadPage() {
       <div className="flex rounded-lg border overflow-hidden">
         {(['file', 'url'] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)}
-            className={`flex-1 py-2 text-sm font-medium transition-colors ${tab === t ? 'bg-foreground text-background' : 'hover:bg-muted'}`}>
+            className={`flex-1 py-2 text-sm font-medium transition-colors ${tab === t ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}>
             {t === 'file' ? 'Upload File' : 'Analyse Stream URL'}
           </button>
         ))}

@@ -11,9 +11,15 @@ const RULESET_LABEL: Record<string, string> = {
 }
 
 const STATUS_BADGE: Record<string, string> = {
-  upcoming: 'bg-blue-100 text-blue-700',
-  completed: 'bg-green-100 text-green-700',
-  cancelled: 'bg-gray-100 text-gray-500',
+  upcoming: 'bg-blue-950 text-blue-400 border border-blue-800/50',
+  completed: 'bg-emerald-950 text-emerald-400 border border-emerald-800/50',
+  cancelled: 'bg-zinc-800 text-zinc-400 border border-zinc-700',
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  upcoming: 'Upcoming',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
 }
 
 export default async function TournamentsPage() {
@@ -52,8 +58,8 @@ export default async function TournamentsPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_BADGE[t.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                    {t.status}
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_BADGE[t.status] ?? 'bg-zinc-800 text-zinc-400 border border-zinc-700'}`}>
+                    {STATUS_LABEL[t.status] ?? t.status}
                   </span>
                   <DeleteTournamentButton id={t.id} />
                 </div>

@@ -36,16 +36,16 @@ function formatTime(seconds: number): string {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  strength: 'bg-green-50 border-green-200 text-green-800',
-  mistake: 'bg-red-50 border-red-200 text-red-800',
-  opportunity: 'bg-blue-50 border-blue-200 text-blue-800',
-  pattern: 'bg-yellow-50 border-yellow-200 text-yellow-800',
+  strength: 'bg-emerald-950/60 border-emerald-800/50 text-emerald-300',
+  mistake: 'bg-rose-950/60 border-rose-800/50 text-rose-300',
+  opportunity: 'bg-blue-950/60 border-blue-800/50 text-blue-300',
+  pattern: 'bg-amber-950/60 border-amber-800/50 text-amber-300',
 }
 
 const SEVERITY_DOT: Record<string, string> = {
-  critical: 'bg-red-500',
-  moderate: 'bg-yellow-500',
-  minor: 'bg-gray-400',
+  critical: 'bg-rose-500',
+  moderate: 'bg-amber-500',
+  minor: 'bg-zinc-500',
 }
 
 function drawSpatialOverlay(canvas: HTMLCanvasElement, spatial: SpatialData) {
@@ -281,7 +281,7 @@ export function MatchContent({
       {/* Video player with overlay canvas */}
       {videoUrl && (
         <div className="space-y-2">
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Match Video</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Footage</h2>
           <div className="relative rounded-lg overflow-hidden border bg-black select-none">
             <video
               ref={videoRef}
@@ -319,10 +319,10 @@ export function MatchContent({
         </div>
       )}
 
-      {/* AI Insights */}
+      {/* Coaching Notes */}
       {matchInsights.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">AI Insights</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Coaching Notes</h2>
           <div className="space-y-2">
             {matchInsights.map((insight) => {
               const ids = Array.isArray(insight.evidenceSegmentIds) ? (insight.evidenceSegmentIds as string[]) : []
@@ -348,7 +348,7 @@ export function MatchContent({
                           key={seg.id}
                           onClick={() => seekTo(seg.startSeconds)}
                           title="Jump to this moment"
-                          className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-black/10 hover:bg-black/20 active:bg-black/30 transition-colors font-mono cursor-pointer"
+                          className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 active:bg-white/30 transition-colors font-mono cursor-pointer"
                         >
                           ▶ {formatTime(seg.startSeconds)}–{formatTime(seg.endSeconds)}
                         </button>
@@ -377,7 +377,7 @@ export function MatchContent({
       )}
 
       {matchInsights.length === 0 && (
-        <p className="text-sm text-muted-foreground">No insights generated for this match.</p>
+        <p className="text-sm text-muted-foreground">No coaching notes generated for this match yet.</p>
       )}
     </div>
   )

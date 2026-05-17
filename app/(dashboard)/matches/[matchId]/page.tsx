@@ -13,10 +13,17 @@ const POSITION_MAP = Object.fromEntries(POSITIONS.map((p) => [p.id, p.name]))
 const EVENT_MAP = Object.fromEntries(EVENT_TYPES.map((e) => [e.id, e.name]))
 
 const STATUS_BADGE: Record<string, string> = {
-  pending: 'bg-gray-100 text-gray-600',
-  processing: 'bg-blue-100 text-blue-700',
-  analysed: 'bg-green-100 text-green-700',
-  failed: 'bg-red-100 text-red-700',
+  pending: 'bg-zinc-800 text-zinc-400 border border-zinc-700',
+  processing: 'bg-blue-950 text-blue-400 border border-blue-800/50',
+  analysed: 'bg-emerald-950 text-emerald-400 border border-emerald-800/50',
+  failed: 'bg-rose-950 text-rose-400 border border-rose-800/50',
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  pending: 'Queued',
+  processing: 'Analysing',
+  analysed: 'Ready',
+  failed: 'Failed',
 }
 
 function formatTime(seconds: number): string {
@@ -83,14 +90,14 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_BADGE[match.status]}`}>
-              {match.status}
+              {STATUS_LABEL[match.status] ?? match.status}
             </span>
             {match.status === 'analysed' && (
               <Link
                 href={`/matches/${matchId}/coach`}
-                className="text-xs px-3 py-1.5 rounded-full bg-foreground text-background font-medium hover:opacity-90 transition-opacity"
+                className="text-xs px-3 py-1.5 rounded-full bg-primary text-primary-foreground font-medium hover:opacity-90 transition-opacity"
               >
-                AI Coach
+                Ask Coach
               </Link>
             )}
           </div>
@@ -105,7 +112,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
       )}
 
       {match.status === 'failed' && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="rounded-lg border border-rose-800/50 bg-rose-950/40 p-4 text-sm text-rose-400">
           Analysis failed. Try uploading the match again.
         </div>
       )}
@@ -119,11 +126,11 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
               <p className="text-2xl font-bold mt-1">{formatTime(totalMatchTime)}</p>
             </div>
             <div className="rounded-lg border p-4">
-              <p className="text-xs text-muted-foreground">Positions Tracked</p>
+              <p className="text-xs text-muted-foreground">Segments</p>
               <p className="text-2xl font-bold mt-1">{segments.length}</p>
             </div>
             <div className="rounded-lg border p-4">
-              <p className="text-xs text-muted-foreground">Events Detected</p>
+              <p className="text-xs text-muted-foreground">Key Moments</p>
               <p className="text-2xl font-bold mt-1">{events.length}</p>
             </div>
           </div>
@@ -131,7 +138,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
           {/* Position breakdown */}
           {sortedPositions.length > 0 && (
             <div className="space-y-3">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Position Breakdown</h2>
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Time on Mat</h2>
               <div className="space-y-2.5">
                 {sortedPositions.map(([posId, stats]) => {
                   const barPct = (stats.total / maxPositionTime) * 100
@@ -146,9 +153,9 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
                       </div>
                       <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                         <div className="h-full flex rounded-full overflow-hidden" style={{ width: `${barPct}%` }}>
-                          <div className="bg-green-500" style={{ width: `${domPct}%` }} />
-                          <div className="bg-gray-300" style={{ width: `${neuPct}%` }} />
-                          <div className="bg-red-400" style={{ width: `${infPct}%` }} />
+                          <div className="bg-emerald-500" style={{ width: `${domPct}%` }} />
+                          <div className="bg-zinc-600" style={{ width: `${neuPct}%` }} />
+                          <div className="bg-rose-400" style={{ width: `${infPct}%` }} />
                         </div>
                       </div>
                     </div>
@@ -157,13 +164,13 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
               </div>
               <div className="flex items-center gap-4 pt-1 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-green-500 inline-block" /> Dominant
+                  <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" /> In Control
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-gray-300 inline-block" /> Neutral
+                  <span className="w-2.5 h-2.5 rounded-sm bg-zinc-600 inline-block" /> Neutral
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-red-400 inline-block" /> Inferior
+                  <span className="w-2.5 h-2.5 rounded-sm bg-rose-400 inline-block" /> Under Pressure
                 </span>
               </div>
             </div>
@@ -172,7 +179,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
           {/* Events timeline */}
           {events.length > 0 && (
             <div className="space-y-3">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Events</h2>
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Key Moments</h2>
               <div className="divide-y">
                 {events.map((event) => {
                   const isUser = event.actor === 'user'
@@ -183,7 +190,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
                       </span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${isUser ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${isUser ? 'bg-blue-950 text-blue-400' : 'bg-orange-950 text-orange-400'}`}>
                             {isUser ? 'You' : 'Opp'}
                           </span>
                           <span className="text-sm font-medium">{EVENT_MAP[event.eventTypeId] ?? event.eventTypeId}</span>
@@ -200,7 +207,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
             </div>
           )}
 
-          {/* Video player + AI Insights (client component — video is seekable from insight timestamps) */}
+          {/* Video + Coaching Notes (client component — video is seekable from coaching note timestamps) */}
           <MatchContent
             videoUrl={video?.publicUrl ?? null}
             matchInsights={matchInsights}
