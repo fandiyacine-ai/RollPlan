@@ -695,9 +695,15 @@ function FileUploadTab() {
         </div>
       )}
 
-      <Button onClick={upload} disabled={!file || state === 'uploading'} className="w-full shadow-[0_0_20px_rgba(180,130,20,0.25)]" size="lg">
+      <Button onClick={upload} disabled={!file || state === 'uploading'} className="w-full" size="lg">
         {state === 'uploading' ? 'Uploading…' : 'Upload Video'}
       </Button>
+
+      <p className="text-xs text-muted-foreground text-center leading-relaxed">
+        Your video is uploaded to secure cloud storage and processed by{' '}
+        <span className="font-medium text-foreground/70">Google Gemini AI</span>.
+        You can delete your video and all analysis data at any time from the match page.
+      </p>
     </div>
   )
 }

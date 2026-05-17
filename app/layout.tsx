@@ -8,8 +8,8 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'RollPlan — BJJ Gameplan Generator',
-  description: 'Evidence-backed competition gameplans for serious BJJ competitors.',
+  title: 'FrameMatters — AI BJJ Match Analysis',
+  description: 'Upload your BJJ footage. AI maps every position, event, and turning point — all traced to timestamps.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

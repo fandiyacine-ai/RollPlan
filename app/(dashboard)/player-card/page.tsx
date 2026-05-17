@@ -558,7 +558,7 @@ function TimelineMatchItem({
               Full Review
             </Link>
             <Link href={`/matches/${match.id}/coach`} className={buttonVariants({ size: 'xs' })}>
-              Ask Coach
+              Frame by Frame
             </Link>
           </div>
         )}

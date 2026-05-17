@@ -19,7 +19,7 @@ export function Nav() {
       <div className="flex items-center gap-8">
         {/* Brand */}
         <Link href="/player-card" className="flex items-center gap-2 group">
-          <span className="text-primary font-black text-lg tracking-tight">RollPlan</span>
+          <span className="font-black text-lg tracking-tight">Frame<span className="text-muted-foreground">Matters</span></span>
         </Link>
 
         {/* Links */}

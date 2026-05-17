@@ -98,7 +98,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
                 href={`/matches/${matchId}/coach`}
                 className={buttonVariants({ size: 'sm' })}
               >
-                Ask Coach
+                Frame by Frame
               </Link>
             )}
           </div>

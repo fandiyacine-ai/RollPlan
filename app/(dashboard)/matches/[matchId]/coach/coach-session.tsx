@@ -257,7 +257,7 @@ export default function CoachSession({
       {/* Header */}
       <div className="flex items-center justify-between py-2 border-b flex-shrink-0">
         <div>
-          <Link href="/player-card" className="text-xs text-muted-foreground hover:text-foreground transition-colors">← Player Card</Link>
+          <Link href="/player-card" className="text-xs text-muted-foreground hover:text-foreground transition-colors">← My Game</Link>
           <h1 className="font-semibold text-sm mt-0.5">
             {match.competitorLabel ?? 'You'} vs {match.opponentLabel}
             {match.eventName && <span className="text-muted-foreground font-normal"> · {match.eventName}</span>}
@@ -416,13 +416,13 @@ export default function CoachSession({
           <div className="flex-1 overflow-y-auto space-y-3 pr-1">
             {messages.length === 0 && (
               <p className="text-sm text-muted-foreground pt-4">
-                {videoUrl ? 'Pause the video at any moment and ask your coach what happened.' : 'Ask your coach about this match.'}
+                {videoUrl ? 'Pause at any frame — ask the AI exactly what happened.' : 'Ask the AI about this match.'}
               </p>
             )}
             {messages.map((msg, i) => (
               <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {msg.role === 'coach' && (
-                  <div className="w-6 h-6 rounded-full bg-foreground text-background flex items-center justify-center text-xs flex-shrink-0 mt-0.5">C</div>
+                  <div className="w-6 h-6 rounded-full bg-foreground text-background flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5">AI</div>
                 )}
                 <div className={`rounded-2xl px-3.5 py-2 text-sm max-w-[85%] leading-relaxed ${msg.role === 'user' ? 'bg-foreground text-background rounded-tr-sm' : 'bg-muted rounded-tl-sm'}`}>
                   {msg.role === 'user' && msg.frameDataUrl && (
@@ -454,6 +454,10 @@ export default function CoachSession({
                 }
               </div>
             )}
+
+            <p className="text-[10px] text-muted-foreground/50 leading-relaxed">
+              Questions and video frames are sent to Google Gemini AI. Your video is stored securely and you can delete it at any time.
+            </p>
 
             {speechSupported && (
               <div className="flex items-center gap-3">
