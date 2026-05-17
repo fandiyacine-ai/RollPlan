@@ -132,6 +132,7 @@ function FrameSelector({
   onComplete: (result: FrameResult | null) => void
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const justFinishedRoi = useRef(false)
   const [frames, setFrames] = useState<Frame[]>([])
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
   const [phase, setPhase] = useState<SelectorPhase>('loading')
@@ -275,10 +276,12 @@ function FrameSelector({
     }
     setRoi({ x1: dragStart.x, y1: dragStart.y, x2: end.x, y2: end.y })
     setDragStart(null); setDragCurrent(null)
+    justFinishedRoi.current = true
     setPhase('mark-athlete')
   }
 
   async function handleClick(e: React.MouseEvent<HTMLCanvasElement>) {
+    if (justFinishedRoi.current) { justFinishedRoi.current = false; return }
     if (phase !== 'mark-athlete' || !roi || !selectedFrame) return
     const pt = getPoint(e)
     if (
@@ -399,6 +402,7 @@ function FileUploadTab() {
   const [format, setFormat] = useState<Format>('gi')
   const [appearanceColor, setAppearanceColor] = useState<AppearanceColor | null>(null)
   const [startingSide, setStartingSide] = useState<StartingSide | null>(null)
+  const [selfDescription, setSelfDescription] = useState('')
   const [state, setState] = useState<UploadState>('idle')
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -420,7 +424,7 @@ function FileUploadTab() {
     setState('uploading'); setProgress(0); setError(null)
 
     const appearanceStr = buildAppearanceHint(appearanceColor, startingSide)
-    const hint = [appearanceStr, frameResult?.spatialHint].filter(Boolean).join(' ')
+    const hint = [selfDescription.trim(), appearanceStr, frameResult?.spatialHint].filter(Boolean).join(' ')
 
     try {
       const presignRes = await fetch('/api/uploads', {
@@ -549,7 +553,8 @@ function FileUploadTab() {
 
       <SharedFields format={format} setFormat={setFormat} sourceType={sourceType} setSourceType={setSourceType}
         appearanceColor={appearanceColor} setAppearanceColor={setAppearanceColor}
-        startingSide={startingSide} setStartingSide={setStartingSide} />
+        startingSide={startingSide} setStartingSide={setStartingSide}
+        selfDescription={selfDescription} setSelfDescription={setSelfDescription} />
 
       {error && <p className="text-sm text-red-500">{error}</p>}
 
@@ -580,6 +585,7 @@ function UrlAnalysisTab() {
   const [format, setFormat] = useState<Format>('gi')
   const [appearanceColor, setAppearanceColor] = useState<AppearanceColor | null>(null)
   const [startingSide, setStartingSide] = useState<StartingSide | null>(null)
+  const [selfDescription, setSelfDescription] = useState('')
   const [state, setState] = useState<UploadState>('idle')
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
@@ -600,7 +606,7 @@ function UrlAnalysisTab() {
         body: JSON.stringify({
           athleteName: athleteName.trim(), urls: validUrls, format, sourceType,
           eventName: eventName.trim() || undefined,
-          appearanceHint: buildAppearanceHint(appearanceColor, startingSide) || undefined,
+          appearanceHint: [selfDescription.trim(), buildAppearanceHint(appearanceColor, startingSide)].filter(Boolean).join(' ') || undefined,
         }),
       })
       const data = await res.json()
@@ -679,7 +685,8 @@ function UrlAnalysisTab() {
 
       <SharedFields format={format} setFormat={setFormat} sourceType={sourceType} setSourceType={setSourceType}
         appearanceColor={appearanceColor} setAppearanceColor={setAppearanceColor}
-        startingSide={startingSide} setStartingSide={setStartingSide} />
+        startingSide={startingSide} setStartingSide={setStartingSide}
+        selfDescription={selfDescription} setSelfDescription={setSelfDescription} />
 
       {error && <p className="text-sm text-red-500">{error}</p>}
 
@@ -696,14 +703,28 @@ function UrlAnalysisTab() {
 function SharedFields({
   format, setFormat, sourceType, setSourceType,
   appearanceColor, setAppearanceColor, startingSide, setStartingSide,
+  selfDescription, setSelfDescription,
 }: {
   format: Format; setFormat: (f: Format) => void
   sourceType: SourceType; setSourceType: (s: SourceType) => void
   appearanceColor: AppearanceColor | null; setAppearanceColor: (c: AppearanceColor | null) => void
   startingSide: StartingSide | null; setStartingSide: (s: StartingSide | null) => void
+  selfDescription: string; setSelfDescription: (v: string) => void
 }) {
   return (
     <>
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Describe yourself in the video <span className="text-muted-foreground font-normal text-xs">(optional)</span></label>
+        <textarea
+          value={selfDescription}
+          onChange={(e) => setSelfDescription(e.target.value)}
+          rows={2}
+          placeholder="e.g. I am wearing a black gi, standing on the left side. The referee is in white."
+          className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+        />
+        <p className="text-xs text-muted-foreground">Free text hint to help the AI distinguish you from opponents and referees.</p>
+      </div>
+
       <div className="space-y-3">
         <div>
           <label className="text-sm font-medium">What are you wearing? <span className="text-muted-foreground font-normal text-xs">(optional)</span></label>
