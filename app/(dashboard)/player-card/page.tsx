@@ -7,6 +7,7 @@ import RefreshPoller from './refresh-poller'
 import { DeleteMatchButton } from './delete-match-button'
 import { DeleteVideoButton } from './delete-video-button'
 import { ClearAllButton } from './clear-all-button'
+import { VideoThumbnail } from './video-thumbnail'
 import { POSITIONS } from '../../../lib/taxonomy/positions'
 import { auth, currentUser } from '@clerk/nextjs/server'
 
@@ -71,6 +72,7 @@ export default async function PlayerCardPage() {
       competitorLabel: matches.competitorLabel,
       createdAt: matches.createdAt,
       filename: videos.originalFilename,
+      videoPublicUrl: videos.publicUrl,
     })
     .from(matches)
     .leftJoin(videos, eq(matches.videoId, videos.id))
@@ -314,6 +316,7 @@ export default async function PlayerCardPage() {
                 segments={matchSegs}
                 events={matchEvts}
                 insights={matchInsightsList}
+                thumbnailUrl={match.videoPublicUrl ?? null}
                 deleteButton={<DeleteMatchButton matchId={match.id} videoId={match.videoId} />}
               />
             )
@@ -385,6 +388,7 @@ function MatchCard({
   segments,
   events,
   insights: matchInsights,
+  thumbnailUrl,
   deleteButton,
 }: {
   match: {
@@ -395,6 +399,7 @@ function MatchCard({
   segments: { endSeconds: number; startSeconds: number; positionId: string; dominance: string }[]
   events: { eventTypeId: string; actor: string; outcome: string; techniqueLabel: string | null }[]
   insights: { id: string; category: string; severity: string; description: string; suggestion: string; youtubeSearchQuery: string | null }[]
+  thumbnailUrl: string | null
   deleteButton: React.ReactNode
 }) {
   const totalTime = segments.reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
@@ -417,7 +422,15 @@ function MatchCard({
   return (
     <div className="rounded-lg border overflow-hidden">
       {/* Match header */}
-      <div className="px-4 py-3 flex items-start justify-between gap-3">
+      <div className="flex items-stretch">
+        {/* Thumbnail */}
+        {thumbnailUrl && (
+          <VideoThumbnail
+            src={thumbnailUrl}
+            className="w-[88px] h-[66px] rounded-l-lg"
+          />
+        )}
+        <div className="px-4 py-3 flex items-start justify-between gap-3 flex-1 min-w-0">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             {isAnalysed ? (
@@ -433,7 +446,6 @@ function MatchCard({
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
             {match.format === 'no_gi' ? 'No-Gi' : 'Gi'}
-            {' · '}{match.ruleset.toUpperCase()}
             {match.eventName ? ` · ${match.eventName}` : ''}
             {' · '}{match.createdAt.toLocaleDateString()}
           </p>
@@ -456,6 +468,7 @@ function MatchCard({
             </>
           )}
           {deleteButton}
+        </div>
         </div>
       </div>
 
