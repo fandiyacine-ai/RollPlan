@@ -9,7 +9,7 @@ export interface VideoOptions {
 }
 
 export function isYouTubeUrl(url: string): boolean {
-  return /(?:youtube\.com\/watch|youtu\.be\/)/i.test(url)
+  return /(?:youtube\.com|youtu\.be)/i.test(url)
 }
 
 // Gemini's responseSchema is a strict subset of JSON Schema.

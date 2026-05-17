@@ -91,14 +91,23 @@ export const scanUrl = inngest.createFunction(
       } catch (err: unknown) {
         await db.update(videos).set({ status: 'failed' }).where(eq(videos.id, videoId))
         const msg = err instanceof Error ? err.message : String(err)
+        const isYT = isYouTubeUrl(video.publicUrl)
         if (msg.includes('10800') || msg.includes('fewer than') || msg.includes('images in your request')) {
-          throw new NonRetriableError('Stream is too long — Gemini supports up to 3 hours of video. Try splitting the recording into individual mat sessions.')
+          throw new NonRetriableError('Stream is too long — try a shorter clip or a direct mat recording instead of the full event stream.')
         }
         if (msg.includes('Resource has been exhausted') || msg.includes('RESOURCE_EXHAUSTED')) {
-          throw new NonRetriableError('Video is too long to process in one call — keep each URL under ~1 hour. For full tournament streams, submit individual mat recordings split by time block.')
+          throw new NonRetriableError(
+            isYT
+              ? 'Gemini quota exhausted processing this YouTube video — the stream may be extremely long (6h+) or the API quota is temporarily exceeded. Try again in a few minutes, or submit a shorter clip.'
+              : 'Video is too large to process — keep direct video files under ~1 hour. For full tournament streams use the YouTube URL instead.'
+          )
         }
         if (msg.includes('input token count exceeds') || msg.includes('maximum number of tokens allowed')) {
-          throw new NonRetriableError('Video is too long for a single analysis pass (exceeded 1M token limit). Submit the recording split into ~1-hour segments — most Smoothcomp streams have separate mat recordings you can link directly.')
+          throw new NonRetriableError(
+            isYT
+              ? 'YouTube video exceeded token limit even at low fps — this stream may be over 6 hours. Try submitting the individual mat recording URL instead of the full event stream.'
+              : 'Video is too long for a single analysis pass — submit as a YouTube URL or split into ~1-hour segments.'
+          )
         }
         throw err
       }
