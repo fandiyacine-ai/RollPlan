@@ -71,7 +71,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
       {/* Header */}
       <div>
         <Link href="/player-card" className="text-xs text-muted-foreground hover:text-foreground inline-block mb-3">
-          ← Player Card
+          ← My Game
         </Link>
         <div className="flex items-start justify-between gap-4">
           <div>

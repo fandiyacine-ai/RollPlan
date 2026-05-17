@@ -5,8 +5,8 @@ import { usePathname } from 'next/navigation'
 import { UserButton } from '@clerk/nextjs'
 
 const NAV = [
-  { href: '/player-card', label: 'My Stats' },
-  { href: '/tournaments', label: 'Tournaments' },
+  { href: '/player-card', label: 'My Game' },
+  { href: '/tournaments', label: 'Scout Opponent' },
 ]
 
 export function Nav() {
@@ -46,7 +46,7 @@ export function Nav() {
           href="/upload"
           className="text-sm px-3 py-1.5 rounded-md bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
         >
-          + Add Match
+          Analyse Match
         </Link>
         <UserButton />
       </div>
