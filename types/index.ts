@@ -5,6 +5,6 @@ export type VideoSource = 'own_competition' | 'own_sparring' | 'opponent' | 'pub
 export type VideoStatus = 'uploaded' | 'processing' | 'analysed' | 'failed'
 export type MatchFormat = 'gi' | 'no_gi'
 export type MatchContext = 'competition' | 'sparring' | 'drilling'
-export type MatchRuleset = 'ibjjf' | 'adcc' | 'ebi' | 'other'
+export type MatchRuleset = 'ibjjf' | 'adcc' | 'ebi' | 'ajp' | 'other'
 export type InsightCategory = 'strength' | 'mistake' | 'opportunity' | 'pattern'
 export type InsightSeverity = 'critical' | 'moderate' | 'minor'

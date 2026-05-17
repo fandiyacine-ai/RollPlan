@@ -30,10 +30,10 @@ export const scanUrl = inngest.createFunction(
     triggers: [{ event: 'url/submitted' }],
   },
   async ({ event, step }: {
-    event: { data: { videoId: string; athleteName: string; format: string; sourceType: string; eventName?: string; appearanceHint?: string } }
+    event: { data: { videoId: string; athleteName: string; format: string; sourceType: string; eventName?: string; appearanceHint?: string; tournamentOpponentId?: string } }
     step: any
   }) => {
-    const { videoId, athleteName, format, sourceType, eventName, appearanceHint } = event.data
+    const { videoId, athleteName, format, sourceType, eventName, appearanceHint, tournamentOpponentId } = event.data
 
     const foundMatches: FoundMatch[] = await step.run('scan-for-matches', async () => {
       const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
@@ -109,6 +109,7 @@ export const scanUrl = inngest.createFunction(
           ruleset: 'ibjjf',
           eventName: eventName ?? null,
           userNotes: found.round_or_bracket ?? null,
+          tournamentOpponentId: tournamentOpponentId ?? null,
           status: 'processing',
         }).returning()
 
