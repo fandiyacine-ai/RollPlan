@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { UserButton } from '@clerk/nextjs'
+import { ThemeToggle } from './theme-toggle'
 
 const NAV = [
   { href: '/player-card', label: 'My Game' },
@@ -48,7 +49,8 @@ export function Nav() {
         </Link>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
+        <ThemeToggle />
         <UserButton />
       </div>
     </nav>
