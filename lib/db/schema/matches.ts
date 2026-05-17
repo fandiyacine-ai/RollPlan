@@ -27,5 +27,6 @@ export const matches = pgTable('matches', {
   userNotes: text('user_notes'),
   tournamentOpponentId: uuid('tournament_opponent_id').references(() => tournamentOpponents.id, { onDelete: 'set null' }),
   spatialData: jsonb('spatial_data'), // { roi: {x1,y1,x2,y2}, athlete: {x,y} } — from frame selector
+  narration: text('narration'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })

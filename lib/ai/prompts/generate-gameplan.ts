@@ -24,15 +24,18 @@ You receive:
 2. YOUR PROFILE — raw match data from the athlete's own competition/sparring footage (positionSegments, matchEvents, insights). The "competitor" in this data is the ATHLETE YOU ARE COACHING.
 3. OPPONENT PROFILE — raw match data from scouted opponent footage. The "competitor" in this data is the OPPONENT. Their "dominant" segments = dangerous for your athlete. Their "inferior" segments = openings for your athlete.
 
-Produce a structured gameplan that is SPECIFIC to this matchup. Every claim in your_advantages, their_threats, and recommended_strategy must reference evidence IDs from the input data.
+Produce a structured gameplan that is SPECIFIC to this matchup. Base every claim on the patterns you observe in the data.
 
 ## Rules
 - Do NOT give generic BJJ advice. Every recommendation must follow from the data.
-- your_advantages: positions/attacks where athlete excels AND opponent is vulnerable.
-- their_threats: positions/submissions where opponent excels AND athlete has shown weakness.
-- recommended_strategy: the specific sequence/approach for THIS match.
-- drill_priorities: max 3 per week over 3 weeks (9 total). Address specific matchup dynamics.
-- confidence: 0.0–1.0. If opponent has < 3 analysed matches, lower confidence and say so.
+- Do NOT include raw IDs (UUIDs, hex strings, database references) anywhere in your output — write natural language only.
+- opening: what to do in the first 30 seconds based on how the opponent typically starts.
+- primary_chain: the most evidence-backed attack sequence for this matchup.
+- secondary_options: fallback attacks when the primary chain is stuffed.
+- defensive_priorities: the opponent's most dangerous weapons and how to neutralise them.
+- opponent_intel: concrete threat, weakness, and 2–4 observed patterns.
+- mental_cues: 2–5 short mat-side reminders (≤ 6 words each).
+- If opponent has < 3 analysed matches, lower confidence and note it in the summary.
 - Apply the active ruleset — e.g. for AJP/No-Gi, leg lock entries should feature prominently if both athletes use leg positions.`
 }
 
@@ -58,6 +61,24 @@ export function buildGameplanUserPrompt(data: {
   }>
 }): string {
   const rulesetNote = RULESET_NOTES[data.tournament.ruleset] ?? RULESET_NOTES.other
+
+  const stripIds = <T extends { id: string }>(arr: T[]): Omit<T, 'id'>[] =>
+    arr.map(({ id: _id, ...rest }) => rest)
+
+  const cleanYourMatches = data.yourMatches.map(({ id: _id, ...m }) => ({
+    ...m,
+    segments: stripIds(m.segments),
+    events: stripIds(m.events),
+    insights: stripIds(m.insights),
+  }))
+
+  const cleanOpponentMatches = data.opponentMatches.map(({ id: _id, ...m }) => ({
+    ...m,
+    segments: stripIds(m.segments),
+    events: stripIds(m.events),
+    insights: stripIds(m.insights),
+  }))
+
   return JSON.stringify({
     tournament: {
       name: data.tournament.name,
@@ -69,14 +90,14 @@ export function buildGameplanUserPrompt(data: {
     },
     opponent: { name: data.opponent.name, notes: data.opponent.notes ?? null },
     your_profile: {
-      match_count: data.yourMatches.length,
+      match_count: cleanYourMatches.length,
       note: 'The "competitor" in each match is YOUR ATHLETE. dominant = athlete in control.',
-      matches: data.yourMatches,
+      matches: cleanYourMatches,
     },
     opponent_profile: {
-      match_count: data.opponentMatches.length,
+      match_count: cleanOpponentMatches.length,
       note: 'The "competitor" in each match is the OPPONENT. dominant = opponent in control (THREAT). inferior = opponent weak (OPPORTUNITY).',
-      matches: data.opponentMatches,
+      matches: cleanOpponentMatches,
     },
   }, null, 0)
 }

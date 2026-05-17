@@ -23,6 +23,24 @@ type InsightRow = {
   evidenceSegmentIds: unknown
 }
 
+export type TimelineItem =
+  | {
+      type: 'position'
+      time: number
+      positionName: string
+      dominance: string
+      durationSeconds: number
+      segmentId: string
+    }
+  | {
+      type: 'event'
+      time: number
+      actor: string
+      eventName: string
+      techniqueLabel: string | null
+      outcome: string | null
+    }
+
 type SpatialData = {
   roi: Bbox
   athlete: Bbox
@@ -46,6 +64,83 @@ const SEVERITY_DOT: Record<string, string> = {
   critical: 'bg-rose-500',
   moderate: 'bg-amber-500',
   minor: 'bg-zinc-500',
+}
+
+const DOMINANCE_DOT: Record<string, string> = {
+  dominant: 'bg-emerald-500',
+  inferior: 'bg-rose-500',
+  neutral: 'bg-zinc-500',
+}
+
+const DOMINANCE_LABEL: Record<string, string> = {
+  dominant: 'In control',
+  inferior: 'Under pressure',
+  neutral: 'Neutral',
+}
+
+function TimelineRow({
+  item,
+  onSeek,
+}: {
+  item: TimelineItem
+  onSeek?: () => void
+}) {
+  const isPosition = item.type === 'position'
+
+  return (
+    <div
+      className={`relative flex items-start gap-4 pl-10 py-2.5 group ${onSeek ? 'cursor-pointer hover:bg-muted/40 rounded-lg' : ''}`}
+      onClick={onSeek}
+    >
+      {/* Node */}
+      <div className="absolute left-3.5 top-4 -translate-y-1/2 z-10">
+        {isPosition ? (
+          <div className={`w-2.5 h-2.5 rounded-full border-2 border-background ${DOMINANCE_DOT[item.dominance] ?? 'bg-zinc-500'}`} />
+        ) : (
+          <div className={`w-2.5 h-2.5 rounded-full ${item.actor === 'user' ? 'bg-blue-400' : 'bg-orange-400'}`} />
+        )}
+      </div>
+
+      {/* Timestamp */}
+      <span className="text-xs font-mono text-muted-foreground w-10 flex-shrink-0 pt-0.5 tabular-nums">
+        {formatTime(item.time)}
+      </span>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        {isPosition ? (
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="text-sm font-medium">{item.positionName}</span>
+            <span className={`text-[10px] font-semibold uppercase tracking-wide ${
+              item.dominance === 'dominant' ? 'text-emerald-500' :
+              item.dominance === 'inferior' ? 'text-rose-500' : 'text-muted-foreground'
+            }`}>{DOMINANCE_LABEL[item.dominance]}</span>
+            <span className="text-xs text-muted-foreground ml-auto tabular-nums">{formatTime(item.durationSeconds)}</span>
+          </div>
+        ) : (
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+              item.actor === 'user' ? 'bg-blue-950 text-blue-400' : 'bg-orange-950 text-orange-400'
+            }`}>
+              {item.actor === 'user' ? 'You' : 'Opp'}
+            </span>
+            <span className="text-sm font-medium">{item.eventName}</span>
+            {item.techniqueLabel && (
+              <span className="text-xs text-muted-foreground italic">{item.techniqueLabel}</span>
+            )}
+            {item.outcome && (
+              <span className="text-xs text-muted-foreground ml-auto capitalize">{item.outcome}</span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Seek arrow, shown on hover */}
+      {onSeek && (
+        <span className="text-muted-foreground/30 group-hover:text-muted-foreground text-xs flex-shrink-0 transition-colors self-center">▶</span>
+      )}
+    </div>
+  )
 }
 
 function drawSpatialOverlay(canvas: HTMLCanvasElement, spatial: SpatialData) {
@@ -164,17 +259,20 @@ export function MatchContent({
   matchInsights,
   segments,
   spatialData,
+  timelineItems,
 }: {
   videoUrl: string | null
   matchInsights: InsightRow[]
   segments: SegmentRef[]
   spatialData: SpatialData | null
+  timelineItems: TimelineItem[]
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const overlayTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const [overlayVisible, setOverlayVisible] = useState(false)
   const [canvasDims, setCanvasDims] = useState({ w: 0, h: 0 })
+  const [activeTab, setActiveTab] = useState<'timeline' | 'notes'>('timeline')
 
   // Refs read by event handlers (avoid stale closures)
   const segmentsRef = useRef(segments)
@@ -277,12 +375,11 @@ export function MatchContent({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Video player with overlay canvas */}
       {videoUrl && (
         <div className="space-y-2">
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Footage</h2>
-          <div className="relative rounded-lg overflow-hidden border bg-black select-none">
+          <div className="relative rounded-xl overflow-hidden border bg-black select-none">
             <video
               ref={videoRef}
               src={videoUrl}
@@ -297,90 +394,120 @@ export function MatchContent({
               style={{ opacity: 0 }}
             />
           </div>
-          <div className="flex items-center justify-between gap-4">
-            <p className="text-xs text-muted-foreground">
-              {spatialData
-                ? 'Click a timestamp below — the video will jump there and highlight your mat region.'
-                : 'Click a timestamp below to jump to that moment in the video.'}
-            </p>
-            {hasBboxData && (
-              <div className="flex items-center gap-3 text-xs text-muted-foreground flex-shrink-0">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-green-400 inline-block" />
-                  You
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-red-400 inline-block" />
-                  Opponent
-                </span>
-              </div>
+          {hasBboxData && (
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-green-400 inline-block" />You</span>
+              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-red-400 inline-block" />Opponent</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab bar */}
+      <div className="flex gap-1 border-b border-border/60 pb-0">
+        {([
+          { id: 'timeline', label: `Timeline${timelineItems.length > 0 ? ` (${timelineItems.length})` : ''}` },
+          { id: 'notes', label: `Coaching Notes${matchInsights.length > 0 ? ` (${matchInsights.length})` : ''}` },
+        ] as const).map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-2 text-sm font-medium transition-colors relative ${
+              activeTab === tab.id
+                ? 'text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {tab.label}
+            {activeTab === tab.id && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground rounded-t-full" />
             )}
-          </div>
+          </button>
+        ))}
+      </div>
+
+      {/* Timeline tab */}
+      {activeTab === 'timeline' && (
+        <div>
+          {timelineItems.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">No timeline data for this match.</p>
+          ) : (
+            <div className="relative">
+              <div className="absolute left-[19px] top-3 bottom-3 w-px bg-border/60" />
+              <div className="space-y-0">
+                {timelineItems.map((item, i) => (
+                  <TimelineRow
+                    key={i}
+                    item={item}
+                    onSeek={videoUrl ? () => seekTo(item.time) : undefined}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Coaching Notes */}
-      {matchInsights.length > 0 && (
+      {/* Coaching Notes tab */}
+      {activeTab === 'notes' && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Coaching Notes</h2>
-            <span className="text-[10px] text-muted-foreground/60 font-medium">Generated by AI · <a href="/player-card" className="underline hover:text-muted-foreground">delete data</a></span>
+          <div className="flex items-center justify-end">
+            <span className="text-[10px] text-muted-foreground/60 font-medium">
+              Generated by AI · <a href="/player-card" className="underline hover:text-muted-foreground">delete data</a>
+            </span>
           </div>
-          <div className="space-y-2">
-            {matchInsights.map((insight) => {
-              const ids = Array.isArray(insight.evidenceSegmentIds) ? (insight.evidenceSegmentIds as string[]) : []
-              const evidenceSegs = ids.map((id) => segmentsById[id]).filter(Boolean) as SegmentRef[]
 
-              return (
-                <div
-                  key={insight.id}
-                  className={`rounded-lg border p-4 space-y-1.5 ${CATEGORY_COLORS[insight.category] ?? 'bg-muted border-muted'}`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${SEVERITY_DOT[insight.severity] ?? 'bg-gray-400'}`} />
-                    <span className="text-xs font-semibold uppercase tracking-wide capitalize">{insight.category}</span>
-                    <span className="text-xs opacity-60 ml-auto">{Math.round(insight.confidence * 100)}% conf.</span>
-                  </div>
-                  <p className="text-sm font-medium">{insight.description}</p>
-                  <p className="text-sm opacity-80">{insight.suggestion}</p>
-
-                  {evidenceSegs.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 pt-0.5">
-                      {evidenceSegs.map((seg) => (
-                        <button
-                          key={seg.id}
-                          onClick={() => seekTo(seg.startSeconds)}
-                          title="Jump to this moment"
-                          className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 active:bg-white/30 transition-colors font-mono cursor-pointer"
-                        >
-                          ▶ {formatTime(seg.startSeconds)}–{formatTime(seg.endSeconds)}
-                        </button>
-                      ))}
+          {matchInsights.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No coaching notes generated for this match yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {matchInsights.map((insight) => {
+                const ids = Array.isArray(insight.evidenceSegmentIds) ? (insight.evidenceSegmentIds as string[]) : []
+                const evidenceSegs = ids.map((id) => segmentsById[id]).filter(Boolean) as SegmentRef[]
+                return (
+                  <div
+                    key={insight.id}
+                    className={`rounded-xl border p-4 space-y-1.5 ${CATEGORY_COLORS[insight.category] ?? 'bg-muted border-muted'}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${SEVERITY_DOT[insight.severity] ?? 'bg-gray-400'}`} />
+                      <span className="text-xs font-semibold uppercase tracking-wide capitalize">{insight.category}</span>
+                      <span className="text-xs opacity-60 ml-auto">{Math.round(insight.confidence * 100)}% conf.</span>
                     </div>
-                  )}
-
-                  {insight.youtubeSearchQuery && (
-                    <a
-                      href={`https://www.youtube.com/results?search_query=${encodeURIComponent(insight.youtubeSearchQuery)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs font-medium mt-0.5 opacity-70 hover:opacity-100 transition-opacity"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-                      </svg>
-                      Watch technique
-                    </a>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+                    <p className="text-sm font-medium">{insight.description}</p>
+                    <p className="text-sm opacity-80">{insight.suggestion}</p>
+                    {evidenceSegs.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-0.5">
+                        {evidenceSegs.map((seg) => (
+                          <button
+                            key={seg.id}
+                            onClick={() => seekTo(seg.startSeconds)}
+                            className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 transition-colors font-mono cursor-pointer"
+                          >
+                            ▶ {formatTime(seg.startSeconds)}–{formatTime(seg.endSeconds)}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {insight.youtubeSearchQuery && (
+                      <a
+                        href={`https://www.youtube.com/results?search_query=${encodeURIComponent(insight.youtubeSearchQuery)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-medium mt-0.5 opacity-70 hover:opacity-100 transition-opacity"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+                        </svg>
+                        Watch technique
+                      </a>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
-      )}
-
-      {matchInsights.length === 0 && (
-        <p className="text-sm text-muted-foreground">No coaching notes generated for this match yet.</p>
       )}
     </div>
   )

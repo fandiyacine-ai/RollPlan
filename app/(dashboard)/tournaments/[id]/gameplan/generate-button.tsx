@@ -25,8 +25,8 @@ export function GenerateGameplanButton({
 
   if (done) {
     return (
-      <p className="text-sm text-green-700 font-medium">
-        Gameplan generation queued — refresh in ~30 seconds.
+      <p className="text-sm text-muted-foreground font-medium">
+        Generating… refresh in ~30 seconds.
       </p>
     )
   }

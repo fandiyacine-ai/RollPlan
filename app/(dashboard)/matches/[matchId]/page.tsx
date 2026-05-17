@@ -4,7 +4,8 @@ import { eq, asc } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
-import { MatchContent } from './match-content'
+import { MatchContent, type TimelineItem } from './match-content'
+import { NarrateButton } from './narrate-button'
 import { POSITIONS } from '../../../../lib/taxonomy/positions'
 import { EVENT_TYPES } from '../../../../lib/taxonomy/events'
 
@@ -65,13 +66,33 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
   const maxPositionTime = sortedPositions[0]?.[1].total ?? 1
   const totalMatchTime = segments.reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
 
+  // Build merged timeline
+  const timelineItems: TimelineItem[] = [
+    ...segments.map(s => ({
+      type: 'position' as const,
+      time: s.startSeconds,
+      positionName: POSITION_MAP[s.positionId] ?? s.positionId,
+      dominance: s.dominance,
+      durationSeconds: s.endSeconds - s.startSeconds,
+      segmentId: s.id,
+    })),
+    ...events.map(e => ({
+      type: 'event' as const,
+      time: e.timestampSeconds,
+      actor: e.actor,
+      eventName: EVENT_MAP[e.eventTypeId] ?? e.eventTypeId,
+      techniqueLabel: e.techniqueLabel,
+      outcome: e.outcome,
+    })),
+  ].sort((a, b) => a.time - b.time)
+
   const displayDate = match.recordedAt ?? match.createdAt
 
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Header */}
       <div>
-        <Link href="/player-card" className="text-xs text-muted-foreground hover:text-foreground inline-block mb-3">
+        <Link href="/matches" className="text-xs text-muted-foreground hover:text-foreground inline-block mb-3">
           ← My Matches
         </Link>
         <div className="flex items-start justify-between gap-4">
@@ -132,7 +153,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
               <p className="text-2xl font-bold mt-1">{segments.length}</p>
             </div>
             <div className="rounded-lg border p-4">
-              <p className="text-xs text-muted-foreground">Key Moments</p>
+              <p className="text-xs text-muted-foreground">Events</p>
               <p className="text-2xl font-bold mt-1">{events.length}</p>
             </div>
           </div>
@@ -178,41 +199,33 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
             </div>
           )}
 
-          {/* Events timeline */}
-          {events.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Key Moments</h2>
-              <div className="divide-y">
-                {events.map((event) => {
-                  const isUser = event.actor === 'user'
-                  return (
-                    <div key={event.id} className="flex items-start gap-3 py-2.5">
-                      <span className="text-xs text-muted-foreground font-mono w-10 flex-shrink-0 pt-0.5 tabular-nums">
-                        {formatTime(event.timestampSeconds)}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${isUser ? 'bg-blue-950 text-blue-400' : 'bg-orange-950 text-orange-400'}`}>
-                            {isUser ? 'You' : 'Opp'}
-                          </span>
-                          <span className="text-sm font-medium">{EVENT_MAP[event.eventTypeId] ?? event.eventTypeId}</span>
-                          {event.techniqueLabel && (
-                            <span className="text-xs text-muted-foreground">({event.techniqueLabel})</span>
-                          )}
-                          <span className="text-xs text-muted-foreground capitalize ml-auto">{event.outcome}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+          {/* Match Report */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Match Report</h2>
+              <NarrateButton matchId={matchId} hasNarration={!!match.narration} />
             </div>
-          )}
 
-          {/* Video + Coaching Notes (client component — video is seekable from coaching note timestamps) */}
+            {match.narration ? (
+              <div className="rounded-xl border bg-card p-5 space-y-3">
+                {match.narration.split('\n\n').filter(Boolean).map((para, i) => (
+                  <p key={i} className="text-sm leading-relaxed text-foreground/90">{para}</p>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-border/60 p-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  No match report yet — click &ldquo;Generate Match Report&rdquo; to get a coach&rsquo;s breakdown of this match.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Video + Timeline + Coaching Notes */}
           <MatchContent
             videoUrl={video?.publicUrl ?? null}
             matchInsights={matchInsights}
+            timelineItems={timelineItems}
             segments={segments.map((s) => ({
               id: s.id,
               startSeconds: s.startSeconds,

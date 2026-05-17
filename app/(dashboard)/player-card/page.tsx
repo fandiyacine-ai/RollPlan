@@ -5,10 +5,8 @@ import { desc, eq, inArray, isNull, and, ne, or } from 'drizzle-orm'
 import Link from 'next/link'
 import { buttonVariants } from '../../../components/ui/button'
 import RefreshPoller from './refresh-poller'
-import { DeleteMatchButton } from './delete-match-button'
 import { DeleteVideoButton } from './delete-video-button'
 import { ClearAllButton } from './clear-all-button'
-import { VideoThumbnail } from './video-thumbnail'
 import { POSITIONS } from '../../../lib/taxonomy/positions'
 import { auth, currentUser } from '@clerk/nextjs/server'
 
@@ -24,17 +22,6 @@ const BELT_STYLE: Record<string, { bg: string; text: string }> = {
   black:  { bg: 'bg-zinc-950 ring-1 ring-zinc-600', text: 'text-white' },
 }
 
-const STATUS_CHIP: Record<string, string> = {
-  pending:    'bg-zinc-800 text-zinc-400',
-  processing: 'bg-blue-950 text-blue-400 border border-blue-800/50',
-  analysed:   'bg-muted text-muted-foreground border border-border',
-  failed:     'bg-rose-950 text-rose-400 border border-rose-800/50',
-}
-
-const STATUS_LABEL: Record<string, string> = {
-  pending: 'Queued', processing: 'Analysing', analysed: 'Ready', failed: 'Failed',
-}
-
 function fmt(s: number): string {
   if (s < 60) return `${Math.round(s)}s`
   const m = Math.floor(s / 60)
@@ -44,15 +31,6 @@ function fmt(s: number): string {
 
 function initials(name: string): string {
   return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
-}
-
-function matchTitle(m: { eventName: string | null; format: string; context: string }): string {
-  if (m.eventName) return m.eventName
-  const fmtLabel = m.format === 'no_gi' ? 'No-Gi' : 'Gi'
-  const ctxLabel = m.context === 'own_sparring' ? 'Sparring'
-    : m.context === 'opponent' ? 'Opponent Footage'
-    : 'Competition'
-  return `${fmtLabel} ${ctxLabel}`
 }
 
 export default async function PlayerCardPage() {
@@ -75,56 +53,49 @@ export default async function PlayerCardPage() {
   const recentMatches = await db
     .select({
       id: matches.id,
-      videoId: matches.videoId,
       status: matches.status,
       format: matches.format,
       context: matches.context,
-      ruleset: matches.ruleset,
-      eventName: matches.eventName,
-      opponentLabel: matches.opponentLabel,
-      competitorLabel: matches.competitorLabel,
       createdAt: matches.createdAt,
-      filename: videos.originalFilename,
-      videoPublicUrl: videos.publicUrl,
+      sourceType: videos.sourceType,
     })
     .from(matches)
     .leftJoin(videos, eq(matches.videoId, videos.id))
     .where(matchFilter)
     .orderBy(desc(matches.createdAt))
-    .limit(20)
+    .limit(50)
 
   const videoFilter = dbUser
     ? or(eq(videos.userId, dbUser.id), isNull(videos.userId))
     : isNull(videos.userId)
 
   const videosWithNoMatches = await db
-    .select({
-      id: videos.id,
-      originalFilename: videos.originalFilename,
-      sourceType: videos.sourceType,
-      status: videos.status,
-      uploadedAt: videos.uploadedAt,
-    })
+    .select({ id: videos.id, originalFilename: videos.originalFilename, sourceType: videos.sourceType, status: videos.status })
     .from(videos)
     .leftJoin(matches, eq(matches.videoId, videos.id))
     .where(and(isNull(matches.id), ne(videos.status, 'analysed'), videoFilter))
-    .orderBy(desc(videos.uploadedAt))
-    .limit(20)
+    .limit(10)
 
   const scanningVideos = videosWithNoMatches.filter(v => v.status !== 'failed')
   const failedVideos = videosWithNoMatches.filter(v => v.status === 'failed')
 
-  const analysedIds = recentMatches.filter((m) => m.status === 'analysed').map((m) => m.id)
+  // Own matches only for stats (sourceType !== 'opponent')
+  const ownAnalysedIds = recentMatches
+    .filter(m => m.status === 'analysed' && m.sourceType !== 'opponent')
+    .map(m => m.id)
+
+  const scoutedAnalysed = recentMatches.filter(m => m.status === 'analysed' && m.sourceType === 'opponent').length
+  const pendingCount = recentMatches.filter(m => m.status === 'pending' || m.status === 'processing').length + scanningVideos.length
 
   const [allInsights, allSegments, allEvents] = await Promise.all([
-    analysedIds.length > 0
-      ? db.select().from(insights).where(inArray(insights.matchId, analysedIds))
+    ownAnalysedIds.length > 0
+      ? db.select().from(insights).where(inArray(insights.matchId, ownAnalysedIds))
       : Promise.resolve([]),
-    analysedIds.length > 0
-      ? db.select().from(positionSegments).where(inArray(positionSegments.matchId, analysedIds))
+    ownAnalysedIds.length > 0
+      ? db.select().from(positionSegments).where(inArray(positionSegments.matchId, ownAnalysedIds))
       : Promise.resolve([]),
-    analysedIds.length > 0
-      ? db.select().from(matchEvents).where(inArray(matchEvents.matchId, analysedIds))
+    ownAnalysedIds.length > 0
+      ? db.select().from(matchEvents).where(inArray(matchEvents.matchId, ownAnalysedIds))
       : Promise.resolve([]),
   ])
 
@@ -134,15 +105,17 @@ export default async function PlayerCardPage() {
   const totalInferiorTime = allSegments.filter(s => s.dominance === 'inferior').reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
   const controlPct = totalAnalyzedTime > 0 ? Math.round((totalDominantTime / totalAnalyzedTime) * 100) : 0
   const underPressurePct = totalAnalyzedTime > 0 ? Math.round((totalInferiorTime / totalAnalyzedTime) * 100) : 0
+  const avgMatchDuration = ownAnalysedIds.length > 0 ? Math.round(totalAnalyzedTime / ownAnalysedIds.length) : 0
   const subAttempts = allEvents.filter(e => e.actor === 'user' && e.eventTypeId.includes('submission')).length
+  const avgAiScore = allInsights.length > 0
+    ? Math.round(allInsights.reduce((acc, i) => acc + i.confidence, 0) / allInsights.length * 100)
+    : null
 
   // ── Position breakdown ──
   const positionStats: Record<string, { total: number; dominant: number; neutral: number; inferior: number }> = {}
   for (const seg of allSegments) {
     const dur = seg.endSeconds - seg.startSeconds
-    if (!positionStats[seg.positionId]) {
-      positionStats[seg.positionId] = { total: 0, dominant: 0, neutral: 0, inferior: 0 }
-    }
+    if (!positionStats[seg.positionId]) positionStats[seg.positionId] = { total: 0, dominant: 0, neutral: 0, inferior: 0 }
     positionStats[seg.positionId].total += dur
     positionStats[seg.positionId][seg.dominance as 'dominant' | 'neutral' | 'inferior'] += dur
   }
@@ -153,17 +126,27 @@ export default async function PlayerCardPage() {
   const sharpPositions = sortedPositions
     .filter(([, s]) => s.total > 30 && (s.dominant / s.total) >= 0.5)
     .sort(([, a], [, b]) => (b.dominant / b.total) - (a.dominant / a.total))
-    .slice(0, 3)
+    .slice(0, 5)
 
   const exposedPositions = sortedPositions
     .filter(([, s]) => s.total > 30 && (s.inferior / s.total) >= 0.3)
     .sort(([, a], [, b]) => (b.inferior / b.total) - (a.inferior / a.total))
-    .slice(0, 3)
+    .slice(0, 5)
 
-  const isProcessing =
-    scanningVideos.length > 0 ||
-    recentMatches.some((m) => m.status === 'pending' || m.status === 'processing')
+  // ── Signature techniques ──
+  const myTechniques: Record<string, number> = {}
+  const theirTechniques: Record<string, number> = {}
+  for (const e of allEvents) {
+    if (!e.techniqueLabel) continue
+    if (e.actor === 'user') myTechniques[e.techniqueLabel] = (myTechniques[e.techniqueLabel] ?? 0) + 1
+    else if (e.actor === 'opponent') theirTechniques[e.techniqueLabel] = (theirTechniques[e.techniqueLabel] ?? 0) + 1
+  }
+  const topMyTech = Object.entries(myTechniques).sort((a, b) => b[1] - a[1]).slice(0, 5)
+  const topTheirTech = Object.entries(theirTechniques).sort((a, b) => b[1] - a[1]).slice(0, 5)
+  const maxMyTech = topMyTech[0]?.[1] ?? 1
+  const maxTheirTech = topTheirTech[0]?.[1] ?? 1
 
+  const isProcessing = scanningVideos.length > 0 || recentMatches.some(m => m.status === 'pending' || m.status === 'processing')
   const isEmpty = recentMatches.length === 0 && scanningVideos.length === 0 && failedVideos.length === 0
 
   if (isEmpty) {
@@ -172,10 +155,7 @@ export default async function PlayerCardPage() {
         <ProfileHeader name={displayName} dbUser={dbUser} />
         <div className="rounded-xl border border-dashed border-border p-16 text-center space-y-4">
           <p className="text-muted-foreground text-sm">No match footage analysed yet.</p>
-          <Link
-            href="/upload"
-            className={buttonVariants({ size: 'sm', className: 'rounded-full' })}
-          >
+          <Link href="/upload" className={buttonVariants({ size: 'sm', className: 'rounded-full' })}>
             Analyse your first match
           </Link>
         </div>
@@ -183,208 +163,213 @@ export default async function PlayerCardPage() {
     )
   }
 
+  const matchesSub = [
+    scoutedAnalysed > 0 ? `+${scoutedAnalysed} scouted` : null,
+    pendingCount > 0 ? `${pendingCount} analysing…` : null,
+  ].filter(Boolean).join(' · ') || undefined
+
   return (
-    <div className="max-w-7xl">
+    <div className="max-w-5xl space-y-8">
       {isProcessing && <RefreshPoller />}
 
-      <div className="flex flex-col lg:flex-row gap-8 items-start">
-        {/* ── LEFT: Analytics ── */}
-        <div className="flex-1 min-w-0 space-y-8">
-          <ProfileHeader name={displayName} dbUser={dbUser} />
+      <ProfileHeader name={displayName} dbUser={dbUser} />
 
-          {/* Stats band */}
-          {analysedIds.length > 0 && (
-            <div className="grid grid-cols-4 gap-px rounded-xl overflow-hidden border border-border/60 bg-border/20">
-              <StatCell
-                label="Matches"
-                value={String(analysedIds.length)}
-                sub={recentMatches.length > analysedIds.length ? `${recentMatches.length} total` : undefined}
-              />
-              <StatCell label="Time on Mat" value={fmt(totalAnalyzedTime)} />
-              <StatCell
-                label="Control Rate"
-                value={`${controlPct}%`}
-                sub={`${underPressurePct}% under pressure`}
-                accent={controlPct >= 55 ? 'green' : controlPct < 40 ? 'red' : undefined}
-              />
-              <StatCell label="Attacks" value={String(subAttempts)} sub="submission attempts" />
-            </div>
-          )}
-
-          {/* Game DNA */}
-          {(sharpPositions.length > 0 || exposedPositions.length > 0) && (
-            <div className="rounded-xl border border-border/60 overflow-hidden bg-card">
-              <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between">
-                <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Your Game DNA</h2>
-                <span className="text-xs text-muted-foreground">{analysedIds.length} match{analysedIds.length !== 1 ? 'es' : ''} analysed</span>
-              </div>
-              <div className="grid grid-cols-2 divide-x divide-border/60">
-                <div className="p-5 space-y-3">
-                  <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wide flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-                    Sharp Positions
-                  </p>
-                  {sharpPositions.length > 0 ? sharpPositions.map(([id, s]) => {
-                    const pct = Math.round((s.dominant / s.total) * 100)
-                    return (
-                      <div key={id} className="flex items-center justify-between gap-2">
-                        <span className="text-sm truncate">{POSITION_MAP[id] ?? id}</span>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <div className="w-16 h-1 rounded-full bg-muted overflow-hidden">
-                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
-                          </div>
-                          <span className="text-xs font-bold text-emerald-400 w-8 text-right tabular-nums">{pct}%</span>
-                        </div>
-                      </div>
-                    )
-                  }) : <p className="text-xs text-muted-foreground">Not enough data yet</p>}
-                </div>
-                <div className="p-5 space-y-3">
-                  <p className="text-xs font-semibold text-rose-400 uppercase tracking-wide flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400 inline-block" />
-                    Exposed Positions
-                  </p>
-                  {exposedPositions.length > 0 ? exposedPositions.map(([id, s]) => {
-                    const pct = Math.round((s.inferior / s.total) * 100)
-                    return (
-                      <div key={id} className="flex items-center justify-between gap-2">
-                        <span className="text-sm truncate">{POSITION_MAP[id] ?? id}</span>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <div className="w-16 h-1 rounded-full bg-muted overflow-hidden">
-                            <div className="h-full bg-rose-500 rounded-full" style={{ width: `${pct}%` }} />
-                          </div>
-                          <span className="text-xs font-bold text-rose-400 w-8 text-right tabular-nums">{pct}%</span>
-                        </div>
-                      </div>
-                    )
-                  }) : <p className="text-xs text-muted-foreground">Not enough data yet</p>}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Time & Control */}
-          {sortedPositions.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Time & Control</h2>
-              <div className="space-y-2.5">
-                {sortedPositions.slice(0, 8).map(([posId, stats]) => {
-                  const barPct = (stats.total / maxPositionTime) * 100
-                  const domPct = (stats.dominant / stats.total) * 100
-                  const infPct = (stats.inferior / stats.total) * 100
-                  const neuPct = Math.max(0, 100 - domPct - infPct)
-                  return (
-                    <div key={posId}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-foreground/80">{POSITION_MAP[posId] ?? posId}</span>
-                        <span className="text-xs text-muted-foreground tabular-nums">{fmt(stats.total)}</span>
-                      </div>
-                      <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                        <div className="h-full flex rounded-full overflow-hidden" style={{ width: `${barPct}%` }}>
-                          <div className="bg-emerald-500" style={{ width: `${domPct}%` }} />
-                          <div className="bg-zinc-500" style={{ width: `${neuPct}%` }} />
-                          <div className="bg-rose-500" style={{ width: `${infPct}%` }} />
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-              <div className="flex items-center gap-5 pt-1 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" /> In Control</span>
-                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-zinc-500 inline-block" /> Neutral</span>
-                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-rose-500 inline-block" /> Under Pressure</span>
-              </div>
-            </div>
-          )}
-
-          {/* Scanning */}
-          {scanningVideos.length > 0 && (
-            <div className="space-y-2">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">In Progress</h2>
-              {scanningVideos.map((v) => (
-                <div key={v.id} className="rounded-xl border border-border/60 p-4 flex items-center justify-between gap-4 bg-card">
-                  <div>
-                    <p className="font-medium text-sm truncate max-w-xs">{v.originalFilename}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {v.sourceType === 'public_url' ? 'Scanning footage for matches…' : 'Analysing your footage…'}
-                    </p>
-                  </div>
-                  <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-950 text-blue-400 border border-blue-800/50 flex-shrink-0">
-                    Analysing
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Failed */}
-          {failedVideos.length > 0 && (
-            <div className="space-y-2">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Failed</h2>
-              {failedVideos.map((v) => (
-                <div key={v.id} className="rounded-xl border border-rose-900/40 bg-rose-950/20 p-4 flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="font-medium text-sm truncate">{v.originalFilename}</p>
-                    <p className="text-xs text-rose-400 mt-0.5">Analysis failed — remove or resubmit</p>
-                  </div>
-                  <DeleteVideoButton videoId={v.id} />
-                </div>
-              ))}
-            </div>
-          )}
+      {/* Stats grid */}
+      {ownAnalysedIds.length > 0 && (
+        <div className="grid grid-cols-3 gap-3">
+          <StatCard
+            label="Matches Analysed"
+            value={String(ownAnalysedIds.length)}
+            sub={matchesSub}
+          />
+          <StatCard label="Total Mat Time" value={fmt(totalAnalyzedTime)} />
+          <StatCard
+            label="Avg Duration"
+            value={avgMatchDuration > 0 ? fmt(avgMatchDuration) : '—'}
+            sub="per match"
+          />
+          <StatCard
+            label="Control Rate"
+            value={`${controlPct}%`}
+            sub={`${underPressurePct}% under pressure`}
+            accent={controlPct >= 55 ? 'good' : controlPct < 35 ? 'bad' : undefined}
+          />
+          <StatCard
+            label="Attacks Attempted"
+            value={String(subAttempts)}
+            sub="submission attempts"
+          />
+          <StatCard
+            label="AI Confidence"
+            value={avgAiScore !== null ? `${avgAiScore}%` : '—'}
+            sub="avg analysis score"
+          />
         </div>
+      )}
 
-        {/* ── RIGHT: Match Feed Timeline ── */}
-        <div className="w-full lg:w-72 xl:w-80 flex-shrink-0 lg:sticky lg:top-20">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Match Feed {recentMatches.length > 0 && <span className="font-normal opacity-50">({recentMatches.length})</span>}
-            </h2>
-            <ClearAllButton />
+      {/* Processing banner */}
+      {pendingCount > 0 && (
+        <div className="rounded-xl border border-blue-900/30 bg-blue-950/10 px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+            <p className="text-sm text-muted-foreground">
+              {pendingCount} match{pendingCount !== 1 ? 'es' : ''} being analysed
+            </p>
           </div>
-
-          {recentMatches.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No matches yet.</p>
-          ) : (
-            <div className="relative">
-              {recentMatches.length > 1 && (
-                <div className="absolute left-[6px] top-5 bottom-8 w-px bg-border/60" />
-              )}
-              <div>
-                {(() => {
-                  let lastYear: number | null = null
-                  return recentMatches.map((match) => {
-                    const matchYear = match.createdAt.getFullYear()
-                    const showYear = matchYear !== lastYear
-                    lastYear = matchYear
-                    const matchSegs = allSegments.filter(s => s.matchId === match.id)
-                    const matchInsightsList = allInsights.filter(i => i.matchId === match.id)
-                    return (
-                      <div key={match.id}>
-                        {showYear && (
-                          <div className="relative pl-7 pb-2 pt-1">
-                            <div className="absolute left-0 top-[14px] w-3 h-3 rounded-full bg-background border border-border/60 z-10" />
-                            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
-                              {matchYear}
-                            </span>
-                          </div>
-                        )}
-                        <TimelineMatchItem
-                          match={match}
-                          segments={matchSegs}
-                          insightsList={matchInsightsList}
-                          thumbnailUrl={match.videoPublicUrl ?? null}
-                          deleteButton={<DeleteMatchButton matchId={match.id} videoId={match.videoId ?? ''} />}
-                        />
-                      </div>
-                    )
-                  })
-                })()}
-              </div>
-            </div>
-          )}
+          <Link href="/matches" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+            View in My Matches →
+          </Link>
         </div>
+      )}
+
+      {/* Game DNA */}
+      {(sharpPositions.length > 0 || exposedPositions.length > 0) && (
+        <div className="rounded-xl border border-border/60 overflow-hidden bg-card">
+          <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between">
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Game DNA</h2>
+            <span className="text-xs text-muted-foreground">{ownAnalysedIds.length} match{ownAnalysedIds.length !== 1 ? 'es' : ''}</span>
+          </div>
+          <div className="grid grid-cols-2 divide-x divide-border/60">
+            <div className="p-5 space-y-4">
+              <p className="text-[10px] font-semibold text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+                Strongest Positions
+              </p>
+              {sharpPositions.length > 0 ? sharpPositions.map(([id, s]) => {
+                const pct = Math.round((s.dominant / s.total) * 100)
+                return (
+                  <div key={id}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-sm">{POSITION_MAP[id] ?? id}</span>
+                      <span className="text-xs font-bold text-emerald-400 tabular-nums">{pct}%</span>
+                    </div>
+                    <div className="h-1 rounded-full bg-muted overflow-hidden">
+                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                )
+              }) : <p className="text-xs text-muted-foreground">Not enough data yet</p>}
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-[10px] font-semibold text-rose-400 uppercase tracking-widest flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-400 inline-block" />
+                Exposed Positions
+              </p>
+              {exposedPositions.length > 0 ? exposedPositions.map(([id, s]) => {
+                const pct = Math.round((s.inferior / s.total) * 100)
+                return (
+                  <div key={id}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-sm">{POSITION_MAP[id] ?? id}</span>
+                      <span className="text-xs font-bold text-rose-400 tabular-nums">{pct}%</span>
+                    </div>
+                    <div className="h-1 rounded-full bg-muted overflow-hidden">
+                      <div className="h-full bg-rose-500 rounded-full" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                )
+              }) : <p className="text-xs text-muted-foreground">Not enough data yet</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Signature techniques */}
+      {(topMyTech.length >= 2 || topTheirTech.length >= 2) && (
+        <div className="rounded-xl border border-border/60 overflow-hidden bg-card">
+          <div className="px-5 py-3 border-b border-border/60">
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Signature Game</h2>
+          </div>
+          <div className="grid grid-cols-2 divide-x divide-border/60">
+            <div className="p-5 space-y-4">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Your Weapons</p>
+              {topMyTech.length > 0 ? topMyTech.map(([tech, count]) => (
+                <div key={tech}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm capitalize">{tech}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">{count}×</span>
+                  </div>
+                  <div className="h-1 rounded-full bg-muted overflow-hidden">
+                    <div className="h-full bg-foreground/40 rounded-full" style={{ width: `${(count / maxMyTech) * 100}%` }} />
+                  </div>
+                </div>
+              )) : <p className="text-xs text-muted-foreground">Not enough data yet</p>}
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Opponent Threats</p>
+              {topTheirTech.length > 0 ? topTheirTech.map(([tech, count]) => (
+                <div key={tech}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm capitalize">{tech}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">{count}×</span>
+                  </div>
+                  <div className="h-1 rounded-full bg-muted overflow-hidden">
+                    <div className="h-full bg-rose-500/50 rounded-full" style={{ width: `${(count / maxTheirTech) * 100}%` }} />
+                  </div>
+                </div>
+              )) : <p className="text-xs text-muted-foreground">Not enough data yet</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Time & Control */}
+      {sortedPositions.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Time & Control</h2>
+          <div className="rounded-xl border bg-card p-5 space-y-4">
+            {sortedPositions.slice(0, 10).map(([posId, stats]) => {
+              const barPct = (stats.total / maxPositionTime) * 100
+              const domPct = (stats.dominant / stats.total) * 100
+              const infPct = (stats.inferior / stats.total) * 100
+              const neuPct = Math.max(0, 100 - domPct - infPct)
+              return (
+                <div key={posId}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm">{POSITION_MAP[posId] ?? posId}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">{fmt(stats.total)}</span>
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                    <div className="h-full flex rounded-full overflow-hidden" style={{ width: `${barPct}%` }}>
+                      <div className="bg-emerald-500" style={{ width: `${domPct}%` }} />
+                      <div className="bg-zinc-500/60" style={{ width: `${neuPct}%` }} />
+                      <div className="bg-rose-500" style={{ width: `${infPct}%` }} />
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <div className="flex items-center gap-5 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" /> In Control</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-zinc-500/60 inline-block" /> Neutral</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-rose-500 inline-block" /> Under Pressure</span>
+          </div>
+        </div>
+      )}
+
+      {/* Failed videos */}
+      {failedVideos.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Failed</h2>
+          {failedVideos.map((v) => (
+            <div key={v.id} className="rounded-xl border border-rose-900/40 bg-rose-950/20 p-4 flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="font-medium text-sm truncate">{v.originalFilename}</p>
+                <p className="text-xs text-rose-400 mt-0.5">Analysis failed — remove or resubmit</p>
+              </div>
+              <DeleteVideoButton videoId={v.id} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="flex items-center justify-between pt-2 border-t border-border/40">
+        <p className="text-xs text-muted-foreground">
+          Stats based on {ownAnalysedIds.length} analysed match{ownAnalysedIds.length !== 1 ? 'es' : ''}
+        </p>
+        <ClearAllButton />
       </div>
     </div>
   )
@@ -398,200 +383,42 @@ function ProfileHeader({ name, dbUser }: { name: string; dbUser: typeof users.$i
   const style = dbUser?.primaryStyle
 
   return (
-    <div className="flex items-center justify-between gap-4">
-      <div className="flex items-center gap-4">
-        <div className="w-12 h-12 rounded-full bg-primary/15 border border-primary/30 text-primary flex items-center justify-center text-base font-bold flex-shrink-0">
-          {initials(name)}
+    <div className="flex items-center gap-4">
+      <div className="w-14 h-14 rounded-full bg-primary/10 border border-primary/20 text-primary flex items-center justify-center text-lg font-bold flex-shrink-0">
+        {initials(name)}
+      </div>
+      <div>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <h1 className="text-2xl font-black tracking-tight">{name}</h1>
+          {belt && (
+            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${BELT_STYLE[belt]?.bg ?? 'bg-muted'} ${BELT_STYLE[belt]?.text ?? 'text-foreground'}`}>
+              {belt.charAt(0).toUpperCase() + belt.slice(1)} Belt
+            </span>
+          )}
         </div>
-        <div>
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-2xl font-black tracking-tight">{name}</h1>
-            {belt && (
-              <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${BELT_STYLE[belt]?.bg ?? 'bg-muted'} ${BELT_STYLE[belt]?.text ?? 'text-foreground'}`}>
-                {belt.charAt(0).toUpperCase() + belt.slice(1)} Belt
-              </span>
-            )}
-          </div>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {gym ?? (
-              <Link href="#" className="hover:text-foreground transition-colors">Add gym →</Link>
-            )}
-            {style && ` · ${style === 'no_gi' ? 'No-Gi' : style === 'both' ? 'Gi & No-Gi' : 'Gi'}`}
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          {gym ?? (
+            <Link href="#" className="hover:text-foreground transition-colors">Add gym →</Link>
+          )}
+          {style && ` · ${style === 'no_gi' ? 'No-Gi' : style === 'both' ? 'Gi & No-Gi' : 'Gi'}`}
+        </p>
       </div>
     </div>
   )
 }
 
-function StatCell({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: 'green' | 'red' }) {
+function StatCard({ label, value, sub, accent }: {
+  label: string; value: string; sub?: string; accent?: 'good' | 'bad'
+}) {
   return (
-    <div className="bg-card px-5 py-4">
+    <div className="rounded-xl border bg-card px-5 py-4 space-y-1">
       <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</p>
-      <p className={`text-2xl font-black mt-1 tabular-nums tracking-tight ${
-        accent === 'green' ? 'text-emerald-400' : accent === 'red' ? 'text-rose-400' : 'text-foreground'
+      <p className={`text-3xl font-black tabular-nums tracking-tight leading-none mt-2 ${
+        accent === 'good' ? 'text-emerald-400' : accent === 'bad' ? 'text-rose-400' : 'text-foreground'
       }`}>
         {value}
       </p>
-      {sub && <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>}
-    </div>
-  )
-}
-
-function TimelineMatchItem({
-  match,
-  segments,
-  insightsList,
-  thumbnailUrl,
-  deleteButton,
-}: {
-  match: {
-    id: string; videoId: string | null; status: string; format: string; context: string
-    eventName: string | null; createdAt: Date
-  }
-  segments: { endSeconds: number; startSeconds: number; positionId: string; dominance: string }[]
-  insightsList: { id: string; category: string; description: string; confidence: number }[]
-  thumbnailUrl: string | null
-  deleteButton: React.ReactNode
-}) {
-  const isAnalysed = match.status === 'analysed'
-  const totalTime = segments.reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
-  const domTime = segments.filter(s => s.dominance === 'dominant').reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
-  const domPct = totalTime > 0 ? Math.round((domTime / totalTime) * 100) : null
-
-  const posByTime: Record<string, number> = {}
-  for (const s of segments) posByTime[s.positionId] = (posByTime[s.positionId] ?? 0) + (s.endSeconds - s.startSeconds)
-  const topPos = Object.entries(posByTime).sort((a, b) => b[1] - a[1])[0]?.[0]
-
-  const topInsight = insightsList.find(i => i.category === 'strength')
-    ?? insightsList.find(i => i.category === 'opportunity')
-    ?? insightsList[0]
-  const extraCount = insightsList.length - 1
-
-  const avgConfidence = insightsList.length > 0
-    ? Math.round(insightsList.reduce((acc, i) => acc + i.confidence, 0) / insightsList.length * 100)
-    : null
-
-  const title = matchTitle(match)
-
-  const dotColor = match.status === 'analysed'
-    ? 'border-border bg-card'
-    : match.status === 'failed'
-    ? 'border-rose-500/60 bg-rose-950/50'
-    : 'border-blue-500/60 bg-blue-950/50'
-
-  return (
-    <div className="relative pl-7 pb-4">
-      {/* Timeline dot */}
-      <div className={`absolute left-0 top-[18px] w-3 h-3 rounded-full border-2 ${dotColor}`} />
-
-      <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
-        {/* Header */}
-        <div className="flex items-stretch">
-          {thumbnailUrl && (
-            <VideoThumbnail src={thumbnailUrl} className="w-20 h-[56px] object-cover flex-shrink-0" />
-          )}
-          <div className="px-3 py-2.5 flex-1 min-w-0 flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              {isAnalysed ? (
-                <Link href={`/matches/${match.id}`} className="font-semibold text-sm hover:text-primary transition-colors truncate block">
-                  {title}
-                </Link>
-              ) : (
-                <span className="font-semibold text-sm truncate block">{title}</span>
-              )}
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                {match.createdAt.toLocaleDateString()}
-              </p>
-            </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${STATUS_CHIP[match.status] ?? 'bg-muted text-muted-foreground'}`}>
-                {STATUS_LABEL[match.status] ?? match.status}
-              </span>
-              {deleteButton}
-            </div>
-          </div>
-        </div>
-
-        {/* Stats strip */}
-        {isAnalysed && segments.length > 0 && (
-          <div className="px-3 py-2 border-t border-border/40 space-y-1.5">
-            <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
-              <div
-                className="h-full rounded-full bg-foreground/50"
-                style={{ width: `${domPct ?? 50}%` }}
-              />
-            </div>
-            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground flex-wrap">
-              <span className="font-medium text-foreground/80">{domPct !== null ? `${domPct}% ctrl` : '—'}</span>
-              <span className="opacity-40">·</span>
-              <span>{fmt(totalTime)}</span>
-              {topPos && (
-                <>
-                  <span className="opacity-40">·</span>
-                  <span className="truncate">{POSITION_MAP[topPos] ?? topPos}</span>
-                </>
-              )}
-              {avgConfidence !== null && (
-                <>
-                  <span className="opacity-40">·</span>
-                  <span className="inline-flex items-center gap-0.5">
-                    <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" className="opacity-60">
-                      <path d="M12 2L9.19 8.63L2 9.24l5.46 4.73L5.82 21 12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2z"/>
-                    </svg>
-                    <span>AI Score {avgConfidence}%</span>
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Insight preview */}
-        {topInsight && (
-          <div className="px-3 py-2.5 border-t border-border/40">
-            <div className="flex items-start gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full mt-1 flex-shrink-0 bg-muted-foreground/50" />
-              <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
-                {topInsight.description}
-              </p>
-            </div>
-            {extraCount > 0 && (
-              <Link
-                href={`/matches/${match.id}`}
-                className="text-[11px] text-primary/70 hover:text-primary mt-1.5 inline-block font-medium transition-colors"
-              >
-                +{extraCount} more insight{extraCount > 1 ? 's' : ''} →
-              </Link>
-            )}
-          </div>
-        )}
-
-        {/* Pending/failed states */}
-        {(match.status === 'pending' || match.status === 'processing') && (
-          <div className="px-3 py-2.5 border-t border-border/40">
-            <p className="text-[11px] text-muted-foreground">Analysing your footage…</p>
-          </div>
-        )}
-        {match.status === 'failed' && (
-          <div className="px-3 py-2.5 border-t border-rose-900/30">
-            <p className="text-[11px] text-rose-400">Analysis failed. Try uploading again.</p>
-          </div>
-        )}
-
-        {/* Actions */}
-        {isAnalysed && (
-          <div className="px-3 py-2 border-t border-border/40 flex items-center gap-1.5">
-            <Link href={`/matches/${match.id}`} className={buttonVariants({ variant: 'outline', size: 'xs' })}>
-              Full Review
-            </Link>
-            <Link href={`/matches/${match.id}/coach`} className={`${buttonVariants({ size: 'xs' })} gap-1.5`}>
-              Frame by Frame
-              <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-white/20 leading-none tracking-wide">AI</span>
-            </Link>
-          </div>
-        )}
-      </div>
+      {sub && <p className="text-[11px] text-muted-foreground">{sub}</p>}
     </div>
   )
 }
