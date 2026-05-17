@@ -18,8 +18,8 @@ export function Nav() {
     <nav className="border-b border-border/60 px-6 h-14 flex items-center justify-between sticky top-0 z-40 bg-background/90 backdrop-blur-sm">
       <div className="flex items-center gap-8">
         {/* Brand */}
-        <Link href="/player-card" className="flex items-center gap-2 group">
-          <span className="font-black text-lg tracking-tight">Frame<span className="text-muted-foreground">Matters</span></span>
+        <Link href="/" className="flex items-center gap-2 group">
+          <span className="text-xl font-extrabold tracking-tight [font-family:var(--font-brand)]">Frame<span className="text-muted-foreground font-bold">Matters</span></span>
         </Link>
 
         {/* Links */}

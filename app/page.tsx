@@ -8,8 +8,8 @@ export default function HomePage() {
 
       {/* Nav */}
       <nav className="px-6 h-14 flex items-center justify-between border-b border-border/60 sticky top-0 z-40 bg-background/90 backdrop-blur-sm">
-        <span className="font-black text-lg tracking-tight">
-          Frame<span className="text-muted-foreground">Matters</span>
+        <span className="text-xl font-extrabold tracking-tight [font-family:var(--font-brand)]">
+          Frame<span className="text-muted-foreground font-bold">Matters</span>
         </span>
         <div className="flex items-center gap-2">
           <Link href="/sign-in" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}>
@@ -168,8 +168,8 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="border-t px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
-        <span className="font-bold tracking-tight text-foreground">
-          Frame<span className="text-muted-foreground font-normal">Matters</span>
+        <span className="font-extrabold tracking-tight text-foreground [font-family:var(--font-brand)]">
+          Frame<span className="text-muted-foreground font-bold">Matters</span>
         </span>
         <p className="text-center sm:text-right max-w-sm">
           Your video is processed by Google Gemini AI and stored securely.
