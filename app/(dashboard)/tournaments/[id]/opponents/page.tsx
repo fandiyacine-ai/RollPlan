@@ -98,30 +98,50 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
           {opponents.map((opp) => {
             const analysed = scoutedMap[opp.id] ?? 0
             const pending = pendingMap[opp.id] ?? 0
-            const total = analysed + pending
+
+            const statusDot = pending > 0
+              ? <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse flex-shrink-0" />
+              : analysed > 0
+              ? <span className="w-2 h-2 rounded-full bg-muted-foreground/40 flex-shrink-0" />
+              : <span className="w-2 h-2 rounded-full border border-muted-foreground/30 flex-shrink-0" />
 
             return (
-              <div key={opp.id} className="rounded-lg border p-4 space-y-2">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="font-medium">{opp.opponentLabel}</p>
-                    {opp.seedingNotes && (
-                      <p className="text-xs text-muted-foreground mt-0.5">{opp.seedingNotes}</p>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {analysed > 0
-                        ? `${analysed} match${analysed !== 1 ? 'es' : ''} analysed`
-                        : 'Not scouted yet'}
-                      {pending > 0 && ` · ${pending} scanning…`}
-                    </p>
+              <div key={opp.id} className="rounded-xl border bg-card overflow-hidden">
+                {/* Scanning progress bar */}
+                {pending > 0 && (
+                  <div className="h-0.5 w-full bg-muted overflow-hidden">
+                    <div className="h-full bg-blue-400/60 animate-[shimmer_2s_ease-in-out_infinite]" style={{ width: '60%' }} />
                   </div>
+                )}
+
+                <div className="p-4 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {statusDot}
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm">{opp.opponentLabel}</p>
+                      {opp.seedingNotes && (
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{opp.seedingNotes}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {pending > 0 && analysed === 0
+                          ? <span className="text-blue-400">Analysing {pending} match{pending !== 1 ? 'es' : ''}…</span>
+                          : pending > 0
+                          ? <><span className="text-blue-400">{pending} scanning</span> · {analysed} ready</>
+                          : analysed > 0
+                          ? `${analysed} match${analysed !== 1 ? 'es' : ''} ready`
+                          : <span className="text-muted-foreground/60">No footage added yet</span>
+                        }
+                      </p>
+                    </div>
+                  </div>
+
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {analysed > 0 && (
                       <Link
                         href={`/tournaments/${tournamentId}/gameplan?opponent=${opp.id}`}
-                        className="text-xs px-3 py-1 rounded-full bg-foreground text-background font-medium hover:opacity-90 transition-opacity"
+                        className="text-xs px-3 py-1.5 rounded-lg bg-foreground text-background font-medium hover:opacity-90 transition-opacity"
                       >
-                        Gameplan
+                        Gameplan →
                       </Link>
                     )}
                     <ScoutForm
