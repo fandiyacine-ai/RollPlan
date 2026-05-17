@@ -67,7 +67,12 @@ function extractYouTubeId(url: string): string | null {
   return null
 }
 
-async function extractFrames(file: File): Promise<Frame[]> {
+function randomFractions(count = 4): number[] {
+  return Array.from({ length: count }, () => 0.05 + Math.random() * 0.88)
+    .sort((a, b) => a - b)
+}
+
+async function extractFramesAt(file: File, fractions: number[]): Promise<Frame[]> {
   const url = URL.createObjectURL(file)
   try {
     const vid = document.createElement('video')
@@ -76,13 +81,13 @@ async function extractFrames(file: File): Promise<Frame[]> {
     vid.src = url
     await new Promise<void>((res, rej) => {
       vid.onloadedmetadata = () => res()
-      vid.onerror = () => rej(new Error('Video load failed'))
+      vid.onerror = () => rej(new Error('load failed'))
+      setTimeout(() => rej(new Error('timeout')), 10000)
     })
     const duration = vid.duration
-    const offsets = [0.08, 0.25, 0.5, 0.75].map(p => Math.max(0.5, duration * p))
     const frames: Frame[] = []
-    for (const t of offsets) {
-      vid.currentTime = t
+    for (const frac of fractions) {
+      vid.currentTime = Math.max(0.5, duration * frac)
       await new Promise<void>((res) => { vid.onseeked = () => res() })
       const c = document.createElement('canvas')
       c.width = vid.videoWidth
@@ -127,10 +132,10 @@ function FrameSelector({
   onComplete: (result: FrameResult | null) => void
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const imgRef = useRef<HTMLImageElement>(null)
   const [frames, setFrames] = useState<Frame[]>([])
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
   const [phase, setPhase] = useState<SelectorPhase>('loading')
+  const [loadingFrames, setLoadingFrames] = useState(false)
   const [roi, setRoi] = useState<Rect | null>(null)
   const [dragStart, setDragStart] = useState<Pt | null>(null)
   const [dragCurrent, setDragCurrent] = useState<Pt | null>(null)
@@ -138,33 +143,56 @@ function FrameSelector({
   const [canvasDims, setCanvasDims] = useState({ w: 0, h: 0 })
 
   useEffect(() => {
-    extractFrames(videoFile)
+    extractFramesAt(videoFile, [0.08, 0.25, 0.5, 0.75])
       .then(f => { setFrames(f); setPhase('pick-frame') })
-      .catch(() => setPhase('pick-frame')) // fail silently
+      .catch(() => setPhase('pick-frame'))
   }, [videoFile])
 
+  // Sync canvas pixel dimensions to the rendered container using the frame's
+  // known aspect ratio, so we don't depend on img layout timing.
   const selectedFrame = selectedIdx !== null ? frames[selectedIdx] : null
+  useEffect(() => {
+    if (!selectedFrame) return
+    const id = requestAnimationFrame(() => {
+      const canvas = canvasRef.current
+      if (!canvas) return
+      const container = canvas.parentElement
+      if (!container) return
+      const containerW = container.getBoundingClientRect().width
+      if (containerW === 0) return
+      const ratio = selectedFrame.naturalH / selectedFrame.naturalW
+      const w = Math.round(containerW)
+      const h = Math.round(containerW * ratio)
+      canvas.width = w
+      canvas.height = h
+      setCanvasDims({ w, h })
+    })
+    return () => cancelAnimationFrame(id)
+  }, [selectedFrame])
+
+  async function refreshFrames() {
+    setLoadingFrames(true)
+    setSelectedIdx(null)
+    setRoi(null); setDragStart(null); setDragCurrent(null); setAthletePt(null)
+    setPhase('pick-frame')
+    onComplete(null)
+    try {
+      const newFrames = await extractFramesAt(videoFile, randomFractions())
+      setFrames(newFrames)
+    } finally {
+      setLoadingFrames(false)
+    }
+  }
 
   function selectFrame(idx: number) {
     setSelectedIdx(idx)
-    setRoi(null)
-    setDragStart(null)
-    setDragCurrent(null)
-    setAthletePt(null)
-    setPhase('draw-roi')
+    setRoi(null); setDragStart(null); setDragCurrent(null); setAthletePt(null)
     setCanvasDims({ w: 0, h: 0 })
+    setPhase('draw-roi')
+    onComplete(null)
   }
 
-  function onImgLoad(e: React.SyntheticEvent<HTMLImageElement>) {
-    const canvas = canvasRef.current
-    const rect = (e.target as HTMLImageElement).getBoundingClientRect()
-    if (!canvas || rect.width === 0) return
-    canvas.width = rect.width
-    canvas.height = rect.height
-    setCanvasDims({ w: rect.width, h: rect.height })
-  }
-
-  // Redraw overlay
+  // Redraw canvas overlay
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas || canvasDims.w === 0) return
@@ -195,24 +223,20 @@ function FrameSelector({
     if (athletePt) {
       const px = athletePt.x * W
       const py = athletePt.y * H
-      // Outer glow
       ctx.beginPath()
       ctx.arc(px, py, 22, 0, Math.PI * 2)
       ctx.strokeStyle = 'rgba(239,68,68,0.45)'
       ctx.lineWidth = 6
       ctx.stroke()
-      // White ring
       ctx.beginPath()
       ctx.arc(px, py, 14, 0, Math.PI * 2)
       ctx.strokeStyle = 'white'
       ctx.lineWidth = 2
       ctx.stroke()
-      // Red fill
       ctx.beginPath()
       ctx.arc(px, py, 10, 0, Math.PI * 2)
       ctx.fillStyle = '#ef4444'
       ctx.fill()
-      // Label badge
       ctx.font = 'bold 11px sans-serif'
       const lw = ctx.measureText('YOU').width
       ctx.fillStyle = '#ef4444'
@@ -246,7 +270,7 @@ function FrameSelector({
   function handleMouseUp(e: React.MouseEvent<HTMLCanvasElement>) {
     if (phase !== 'draw-roi' || !dragStart) return
     const end = getPoint(e)
-    if (Math.abs(end.x - dragStart.x) < 0.05 || Math.abs(end.y - dragStart.y) < 0.05) {
+    if (Math.abs(end.x - dragStart.x) < 0.04 || Math.abs(end.y - dragStart.y) < 0.04) {
       setDragStart(null); setDragCurrent(null); return
     }
     setRoi({ x1: dragStart.x, y1: dragStart.y, x2: end.x, y2: end.y })
@@ -284,12 +308,24 @@ function FrameSelector({
 
   return (
     <div className="space-y-3">
-      {/* Frame strip */}
+      {/* Frame strip — always shown in pick-frame and done phases */}
       {(phase === 'pick-frame' || phase === 'done') && (
-        <div className="space-y-1.5">
-          <p className="text-xs font-medium">
-            {phase === 'pick-frame' ? 'Pick the clearest frame showing both athletes on your mat' : 'Position captured'}
-          </p>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium">
+              {phase === 'done'
+                ? 'Position captured — click a frame to redo'
+                : 'Pick the clearest frame where you can see yourself on the mat'}
+            </p>
+            <button
+              type="button"
+              onClick={refreshFrames}
+              disabled={loadingFrames}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40 flex items-center gap-1"
+            >
+              {loadingFrames ? 'Loading…' : '↻ New frames'}
+            </button>
+          </div>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {frames.map((f, i) => (
               <button
@@ -297,43 +333,39 @@ function FrameSelector({
                 type="button"
                 onClick={() => selectFrame(i)}
                 className={`flex-shrink-0 rounded overflow-hidden border-2 transition-all ${
-                  selectedIdx === i && phase === 'done'
-                    ? 'border-green-500'
-                    : 'border-transparent hover:border-foreground/40'
+                  selectedIdx === i && phase === 'done' ? 'border-green-500' : 'border-transparent hover:border-foreground/40'
                 }`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={f.dataUrl} alt={`Frame ${i + 1}`} className="h-20 w-auto object-cover" draggable={false} />
+                <img src={f.dataUrl} alt={`Frame ${i + 1}`} className="h-20 w-auto object-cover block" draggable={false} />
               </button>
             ))}
           </div>
           {phase === 'done' && (
-            <p className="text-xs text-green-700 font-medium">Mat region and athlete position saved. Click a frame above to redo.</p>
+            <p className="text-xs text-green-700 font-medium">Mat region and athlete position saved.</p>
           )}
         </div>
       )}
 
-      {/* Interactive canvas */}
+      {/* Interactive canvas — shown only while drawing */}
       {selectedFrame && phase !== 'pick-frame' && phase !== 'done' && (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium">
-              {phase === 'draw-roi' && 'Step 1 of 2 — Draw a box around your mat'}
-              {phase === 'mark-athlete' && 'Step 2 of 2 — Click on yourself inside the box'}
+              {phase === 'draw-roi' && 'Step 1 of 2 — Drag to draw a box around your mat'}
+              {phase === 'mark-athlete' && 'Step 2 of 2 — Click on yourself inside the green box'}
             </p>
-            <button onClick={reset} className="text-xs text-muted-foreground hover:text-foreground underline">
+            <button type="button" onClick={reset} className="text-xs text-muted-foreground hover:text-foreground underline transition-colors">
               Change frame
             </button>
           </div>
-          <div className="relative rounded-md overflow-hidden border select-none">
+          <div className="relative rounded-md overflow-hidden border select-none bg-black">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              ref={imgRef}
               src={selectedFrame.dataUrl}
               alt="Selected frame"
               className="w-full block"
               draggable={false}
-              onLoad={onImgLoad}
             />
             <canvas
               ref={canvasRef}
@@ -346,7 +378,7 @@ function FrameSelector({
             />
           </div>
           <p className="text-xs text-muted-foreground">
-            {phase === 'draw-roi' && 'Drag to outline the mat area — the AI will ignore other matches in the background.'}
+            {phase === 'draw-roi' && 'Outline the mat — the AI will ignore other matches in the background.'}
             {phase === 'mark-athlete' && 'Click directly on yourself inside the green box.'}
           </p>
         </div>
@@ -385,9 +417,7 @@ function FileUploadTab() {
   async function upload() {
     if (!file) return
     if (scanMode === 'scan' && !athleteName.trim()) { setError('Athlete name is required for full mat scan'); return }
-    setState('uploading')
-    setProgress(0)
-    setError(null)
+    setState('uploading'); setProgress(0); setError(null)
 
     const appearanceStr = buildAppearanceHint(appearanceColor, startingSide)
     const hint = [appearanceStr, frameResult?.spatialHint].filter(Boolean).join(' ')
@@ -405,9 +435,7 @@ function FileUploadTab() {
 
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest()
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100))
-        }
+        xhr.upload.onprogress = (e) => { if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100)) }
         xhr.onload = () => xhr.status < 300 ? resolve() : reject(new Error(`Storage upload failed: ${xhr.status}`))
         xhr.onerror = () => reject(new Error('Network error during upload'))
         xhr.open('PUT', uploadUrl)
@@ -429,10 +457,8 @@ function FileUploadTab() {
       if (!completeRes.ok) {
         const d = await completeRes.json().catch(() => ({}))
         setError(d.error ?? 'Upload complete but analysis could not start')
-        setState('error')
-        return
+        setState('error'); return
       }
-
       setState('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed')
@@ -456,12 +482,8 @@ function FileUploadTab() {
           </>
         )}
         <div className="flex gap-3 justify-center pt-2">
-          <button
-            onClick={() => { setFile(null); setFrameResult(null); setState('idle'); setProgress(0); setAthleteName(''); setEventName('') }}
-            className="px-4 py-2 rounded-md border text-sm hover:bg-muted transition-colors"
-          >
-            Upload another
-          </button>
+          <button onClick={() => { setFile(null); setFrameResult(null); setState('idle'); setProgress(0); setAthleteName(''); setEventName('') }}
+            className="px-4 py-2 rounded-md border text-sm hover:bg-muted transition-colors">Upload another</button>
           <button onClick={() => router.push('/player-card')} className="px-4 py-2 rounded-md bg-foreground text-background text-sm hover:opacity-90 transition-opacity">View Player Card</button>
         </div>
       </div>
@@ -491,9 +513,7 @@ function FileUploadTab() {
         )}
       </div>
 
-      {file && (
-        <FrameSelector videoFile={file} onComplete={setFrameResult} />
-      )}
+      {file && <FrameSelector videoFile={file} onComplete={setFrameResult} />}
 
       <div className="space-y-3">
         <label className="text-sm font-medium">Recording type</label>
@@ -612,7 +632,7 @@ function UrlAnalysisTab() {
         <input type="text" value={athleteName} onChange={(e) => setAthleteName(e.target.value)}
           placeholder="Name as shown on screen (e.g. David Smith)"
           className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20" />
-        <p className="text-xs text-muted-foreground">Must match exactly what appears in the tournament overlay (Smoothcomp, IBJJF scoreboard, etc.)</p>
+        <p className="text-xs text-muted-foreground">Must match exactly what appears in the tournament overlay</p>
       </div>
 
       <div className="space-y-2">
@@ -654,7 +674,7 @@ function UrlAnalysisTab() {
         {urls.length < 10 && (
           <button onClick={addUrl} className="text-sm text-muted-foreground hover:text-foreground transition-colors">+ Add another URL</button>
         )}
-        <p className="text-xs text-muted-foreground">YouTube or direct video links. Maximum ~1 hour per URL — for full tournament streams, split by mat or time block.</p>
+        <p className="text-xs text-muted-foreground">YouTube or direct video links. Maximum ~1 hour per URL.</p>
       </div>
 
       <SharedFields format={format} setFormat={setFormat} sourceType={sourceType} setSourceType={setSourceType}
