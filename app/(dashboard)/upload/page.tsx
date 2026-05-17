@@ -13,7 +13,8 @@ type StartingSide = 'left' | 'right'
 type Rect = { x1: number; y1: number; x2: number; y2: number }
 type Pt = { x: number; y: number }
 type Frame = { dataUrl: string; naturalW: number; naturalH: number }
-type FrameResult = { spatialHint: string; athleteImageBase64: string }
+type SpatialData = { roi: Rect; athlete: Pt }
+type FrameResult = { spatialHint: string; athleteImageBase64: string; spatialData: SpatialData }
 
 const SOURCE_LABELS: Record<SourceType, string> = {
   own_competition: 'My competition match',
@@ -103,7 +104,7 @@ async function extractFramesAt(file: File, fractions: number[]): Promise<Frame[]
 
 function cropFrame(frame: Frame, pt: Pt): Promise<string> {
   return new Promise((resolve, reject) => {
-    const CROP = Math.min(240, frame.naturalW, frame.naturalH)
+    const CROP = Math.min(380, frame.naturalW, frame.naturalH)
     const cx = Math.round(pt.x * frame.naturalW)
     const cy = Math.round(pt.y * frame.naturalH)
     const sx = Math.max(0, Math.min(cx - CROP / 2, frame.naturalW - CROP))
@@ -291,7 +292,11 @@ function FrameSelector({
     setAthletePt(pt)
     setPhase('done')
     const athleteImageBase64 = await cropFrame(selectedFrame, pt)
-    onComplete({ spatialHint: buildSpatialHint(roi, pt), athleteImageBase64 })
+    const normalizedRoi: Rect = {
+      x1: Math.min(roi.x1, roi.x2), y1: Math.min(roi.y1, roi.y2),
+      x2: Math.max(roi.x1, roi.x2), y2: Math.max(roi.y1, roi.y2),
+    }
+    onComplete({ spatialHint: buildSpatialHint(roi, pt), athleteImageBase64, spatialData: { roi: normalizedRoi, athlete: pt } })
   }
 
   function reset() {
@@ -454,6 +459,7 @@ function FileUploadTab() {
           videoId, path, sourceType, format,
           appearanceHint: hint || undefined,
           athleteImageBase64: frameResult?.athleteImageBase64 || undefined,
+          spatialData: frameResult?.spatialData || undefined,
           scanMode,
           ...(scanMode === 'scan' ? { athleteName: athleteName.trim(), eventName: eventName.trim() || undefined } : {}),
         }),

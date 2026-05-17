@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 
 type SegmentRef = { id: string; startSeconds: number; endSeconds: number }
 
@@ -12,7 +12,12 @@ type InsightRow = {
   suggestion: string
   confidence: number
   youtubeSearchQuery: string | null
-  evidenceSegmentIds: unknown // jsonb — cast to string[]
+  evidenceSegmentIds: unknown
+}
+
+type SpatialData = {
+  roi: { x1: number; y1: number; x2: number; y2: number }
+  athlete: { x: number; y: number }
 }
 
 function formatTime(seconds: number): string {
@@ -35,16 +40,125 @@ const SEVERITY_DOT: Record<string, string> = {
   minor: 'bg-gray-400',
 }
 
+function drawOverlay(canvas: HTMLCanvasElement, spatial: SpatialData) {
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  const W = canvas.width, H = canvas.height
+  ctx.clearRect(0, 0, W, H)
+
+  const { roi, athlete } = spatial
+  const rx = roi.x1 * W
+  const ry = roi.y1 * H
+  const rw = (roi.x2 - roi.x1) * W
+  const rh = (roi.y2 - roi.y1) * H
+
+  // Dim outside ROI
+  ctx.fillStyle = 'rgba(0,0,0,0.45)'
+  ctx.fillRect(0, 0, W, ry)
+  ctx.fillRect(0, ry + rh, W, H - ry - rh)
+  ctx.fillRect(0, ry, rx, rh)
+  ctx.fillRect(rx + rw, ry, W - rx - rw, rh)
+
+  // Green ROI box
+  ctx.strokeStyle = '#4ade80'
+  ctx.lineWidth = 3
+  ctx.setLineDash([8, 4])
+  ctx.strokeRect(rx + 1.5, ry + 1.5, rw - 3, rh - 3)
+  ctx.setLineDash([])
+
+  // "YOUR MAT" label top-left of box
+  ctx.font = 'bold 11px sans-serif'
+  const label = 'YOUR MAT'
+  const lw = ctx.measureText(label).width
+  ctx.fillStyle = '#4ade80'
+  ctx.beginPath()
+  ctx.roundRect(rx, ry - 20, lw + 12, 20, [3, 3, 0, 0])
+  ctx.fill()
+  ctx.fillStyle = '#000'
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(label, rx + 6, ry - 10)
+
+  // Athlete position marker
+  const ax = athlete.x * W
+  const ay = athlete.y * H
+  ctx.beginPath()
+  ctx.arc(ax, ay, 20, 0, Math.PI * 2)
+  ctx.strokeStyle = 'rgba(239,68,68,0.4)'
+  ctx.lineWidth = 7
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.arc(ax, ay, 10, 0, Math.PI * 2)
+  ctx.fillStyle = '#ef4444'
+  ctx.fill()
+  ctx.beginPath()
+  ctx.arc(ax, ay, 10, 0, Math.PI * 2)
+  ctx.strokeStyle = 'white'
+  ctx.lineWidth = 2
+  ctx.stroke()
+
+  // "YOU" badge
+  ctx.font = 'bold 11px sans-serif'
+  const yw = ctx.measureText('YOU').width
+  ctx.fillStyle = '#ef4444'
+  ctx.beginPath()
+  ctx.roundRect(ax + 16, ay - 9, yw + 10, 18, 3)
+  ctx.fill()
+  ctx.fillStyle = 'white'
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('YOU', ax + 21, ay)
+}
+
 export function MatchContent({
   videoUrl,
   matchInsights,
   segmentsById,
+  spatialData,
 }: {
   videoUrl: string | null
   matchInsights: InsightRow[]
   segmentsById: Record<string, SegmentRef>
+  spatialData: SpatialData | null
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const overlayTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const [overlayVisible, setOverlayVisible] = useState(false)
+  const [canvasDims, setCanvasDims] = useState({ w: 0, h: 0 })
+
+  // Keep canvas size in sync with rendered video dimensions
+  useEffect(() => {
+    const vid = videoRef.current
+    if (!vid) return
+    const obs = new ResizeObserver(() => {
+      const r = vid.getBoundingClientRect()
+      if (r.width > 0) setCanvasDims({ w: Math.round(r.width), h: Math.round(r.height) })
+    })
+    obs.observe(vid)
+    return () => obs.disconnect()
+  }, [])
+
+  // Update canvas pixel dimensions when container resizes
+  useEffect(() => {
+    const c = canvasRef.current
+    if (!c || canvasDims.w === 0) return
+    c.width = canvasDims.w
+    c.height = canvasDims.h
+  }, [canvasDims])
+
+  // Draw / clear overlay
+  const redraw = useCallback(() => {
+    const c = canvasRef.current
+    if (!c) return
+    if (overlayVisible && spatialData && canvasDims.w > 0) {
+      drawOverlay(c, spatialData)
+    } else {
+      c.getContext('2d')?.clearRect(0, 0, c.width, c.height)
+    }
+  }, [overlayVisible, spatialData, canvasDims])
+
+  useEffect(() => { redraw() }, [redraw])
 
   function seekTo(seconds: number) {
     const vid = videoRef.current
@@ -52,15 +166,21 @@ export function MatchContent({
     vid.currentTime = Math.max(0, seconds - 1.5)
     vid.play().catch(() => {})
     vid.scrollIntoView({ behavior: 'smooth', block: 'center' })
+
+    if (spatialData) {
+      setOverlayVisible(true)
+      clearTimeout(overlayTimer.current)
+      overlayTimer.current = setTimeout(() => setOverlayVisible(false), 4500)
+    }
   }
 
   return (
     <div className="space-y-6">
-      {/* Video player */}
+      {/* Video player with spatial overlay */}
       {videoUrl && (
         <div className="space-y-2">
           <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Match Video</h2>
-          <div className="rounded-lg overflow-hidden border bg-black">
+          <div className="relative rounded-lg overflow-hidden border bg-black select-none">
             <video
               ref={videoRef}
               src={videoUrl}
@@ -69,9 +189,20 @@ export function MatchContent({
               className="w-full max-h-[45vh] object-contain block"
               preload="metadata"
             />
+            {/* Overlay canvas — sits on top of the video, pointer-events:none so controls still work */}
+            <canvas
+              ref={canvasRef}
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                opacity: overlayVisible ? 1 : 0,
+                transition: 'opacity 0.4s',
+              }}
+            />
           </div>
           <p className="text-xs text-muted-foreground">
-            Click a timestamp on any insight below to jump to that moment in the video.
+            {spatialData
+              ? 'Click a timestamp below — the video will jump there and show your mat region and position.'
+              : 'Click a timestamp below to jump to that moment in the video.'}
           </p>
         </div>
       )}
@@ -98,14 +229,14 @@ export function MatchContent({
                   <p className="text-sm font-medium">{insight.description}</p>
                   <p className="text-sm opacity-80">{insight.suggestion}</p>
 
-                  {/* Evidence timestamps — click to seek */}
+                  {/* Clickable timestamp chips */}
                   {evidenceSegs.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 pt-0.5">
                       {evidenceSegs.map((seg) => (
                         <button
                           key={seg.id}
                           onClick={() => seekTo(seg.startSeconds)}
-                          title={`Jump to ${formatTime(seg.startSeconds)} in video`}
+                          title="Jump to this moment and highlight your mat area"
                           className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-black/10 hover:bg-black/20 active:bg-black/30 transition-colors font-mono cursor-pointer"
                         >
                           ▶ {formatTime(seg.startSeconds)}–{formatTime(seg.endSeconds)}
