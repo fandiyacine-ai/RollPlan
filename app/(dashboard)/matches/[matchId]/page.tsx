@@ -3,6 +3,7 @@ import { matches, videos, positionSegments, matchEvents, insights } from '../../
 import { eq, asc } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { MatchContent } from './match-content'
 import { POSITIONS } from '../../../../lib/taxonomy/positions'
 import { EVENT_TYPES } from '../../../../lib/taxonomy/events'
 
@@ -16,19 +17,6 @@ const STATUS_BADGE: Record<string, string> = {
   processing: 'bg-blue-100 text-blue-700',
   analysed: 'bg-green-100 text-green-700',
   failed: 'bg-red-100 text-red-700',
-}
-
-const CATEGORY_COLORS: Record<string, string> = {
-  strength: 'bg-green-50 border-green-200 text-green-800',
-  mistake: 'bg-red-50 border-red-200 text-red-800',
-  opportunity: 'bg-blue-50 border-blue-200 text-blue-800',
-  pattern: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-}
-
-const SEVERITY_DOT: Record<string, string> = {
-  critical: 'bg-red-500',
-  moderate: 'bg-yellow-500',
-  minor: 'bg-gray-400',
 }
 
 function formatTime(seconds: number): string {
@@ -212,43 +200,12 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
             </div>
           )}
 
-          {/* AI Insights */}
-          {matchInsights.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">AI Insights</h2>
-              <div className="space-y-2">
-                {matchInsights.map((insight) => (
-                  <div
-                    key={insight.id}
-                    className={`rounded-lg border p-4 space-y-1 ${CATEGORY_COLORS[insight.category] ?? 'bg-muted border-muted'}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${SEVERITY_DOT[insight.severity] ?? 'bg-gray-400'}`} />
-                      <span className="text-xs font-semibold uppercase tracking-wide capitalize">{insight.category}</span>
-                      <span className="text-xs opacity-60 ml-auto">{Math.round(insight.confidence * 100)}% conf.</span>
-                    </div>
-                    <p className="text-sm font-medium">{insight.description}</p>
-                    <p className="text-sm opacity-80">{insight.suggestion}</p>
-                    {insight.youtubeSearchQuery && (
-                      <a
-                        href={`https://www.youtube.com/results?search_query=${encodeURIComponent(insight.youtubeSearchQuery)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 text-xs font-medium mt-1 opacity-70 hover:opacity-100 transition-opacity"
-                      >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-                        Watch technique
-                      </a>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {matchInsights.length === 0 && (
-            <p className="text-sm text-muted-foreground">No insights generated for this match.</p>
-          )}
+          {/* Video player + AI Insights (client component — video is seekable from insight timestamps) */}
+          <MatchContent
+            videoUrl={video?.publicUrl ?? null}
+            matchInsights={matchInsights}
+            segmentsById={Object.fromEntries(segments.map((s) => [s.id, { id: s.id, startSeconds: s.startSeconds, endSeconds: s.endSeconds }]))}
+          />
         </>
       )}
     </div>
