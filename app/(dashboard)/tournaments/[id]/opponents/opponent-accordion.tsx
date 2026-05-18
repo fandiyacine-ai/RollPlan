@@ -1,0 +1,160 @@
+'use client'
+
+import { useState } from 'react'
+import Link from 'next/link'
+import { ScoutForm } from './opponent-forms'
+import { DeleteOpponentButton } from './opponent-forms'
+
+type MatchRow = {
+  id: string
+  status: string
+  format: string
+  context: string
+  eventName: string | null
+  createdAt: Date
+}
+
+type Opponent = {
+  id: string
+  opponentLabel: string
+  seedingNotes: string | null
+}
+
+const STATUS_CHIP: Record<string, string> = {
+  pending:    'bg-zinc-800 text-zinc-400',
+  processing: 'bg-blue-950 text-blue-400 border border-blue-800/50',
+  analysed:   'bg-emerald-950/60 text-emerald-400 border border-emerald-800/30',
+  failed:     'bg-rose-950 text-rose-400 border border-rose-800/50',
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  pending: 'Queued', processing: 'Scanning', analysed: 'Ready', failed: 'Failed',
+}
+
+function matchTitle(m: MatchRow): string {
+  if (m.eventName) return m.eventName
+  const fmt = m.format === 'no_gi' ? 'No-Gi' : 'Gi'
+  const ctx = m.context === 'sparring' ? 'Sparring' : 'Competition'
+  return `${fmt} ${ctx}`
+}
+
+function fmtDate(d: Date): string {
+  return new Date(d).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+export function OpponentAccordion({
+  opponent,
+  matches,
+  tournamentId,
+}: {
+  opponent: Opponent
+  matches: MatchRow[]
+  tournamentId: string
+}) {
+  const [open, setOpen] = useState(false)
+
+  const analysed = matches.filter(m => m.status === 'analysed').length
+  const pending  = matches.filter(m => m.status === 'pending' || m.status === 'processing').length
+  const failed   = matches.filter(m => m.status === 'failed').length
+
+  const statusDot = pending > 0
+    ? <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse flex-shrink-0" />
+    : analysed > 0
+    ? <span className="w-2 h-2 rounded-full bg-emerald-400/60 flex-shrink-0" />
+    : <span className="w-2 h-2 rounded-full border border-muted-foreground/30 flex-shrink-0" />
+
+  const subtitle = pending > 0 && analysed === 0
+    ? <span className="text-blue-400">Scanning {pending} clip{pending !== 1 ? 's' : ''}…</span>
+    : pending > 0
+    ? <><span className="text-blue-400">{pending} scanning</span> · {analysed} ready</>
+    : analysed > 0
+    ? `${analysed} match${analysed !== 1 ? 'es' : ''} ready${failed > 0 ? ` · ${failed} failed` : ''}`
+    : failed > 0
+    ? <span className="text-rose-400">{failed} failed</span>
+    : <span className="text-muted-foreground/50">No footage added yet</span>
+
+  const canExpand = matches.length > 0
+
+  return (
+    <div className="rounded-xl border bg-card overflow-hidden">
+      {pending > 0 && (
+        <div className="h-0.5 w-full bg-muted overflow-hidden">
+          <div className="h-full bg-blue-400/60 animate-[shimmer_2s_ease-in-out_infinite]" style={{ width: '60%' }} />
+        </div>
+      )}
+
+      <div className="p-4 flex items-center justify-between gap-4">
+        {/* Left — clickable to expand */}
+        <button
+          type="button"
+          onClick={() => canExpand && setOpen(o => !o)}
+          className={`flex items-center gap-3 min-w-0 flex-1 text-left ${canExpand ? 'cursor-pointer' : 'cursor-default'}`}
+        >
+          {statusDot}
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-sm">{opponent.opponentLabel}</p>
+            {opponent.seedingNotes && (
+              <p className="text-xs text-muted-foreground truncate">{opponent.seedingNotes}</p>
+            )}
+            <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
+          </div>
+          {canExpand && (
+            <svg
+              width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              className={`text-muted-foreground/50 flex-shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          )}
+        </button>
+
+        {/* Right — actions, never trigger accordion */}
+        <div className="flex items-center gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
+          {analysed > 0 && (
+            <Link
+              href={`/tournaments/${tournamentId}/gameplan?opponent=${opponent.id}`}
+              className="text-xs px-3 py-1.5 rounded-lg bg-foreground text-background font-medium hover:opacity-90 transition-opacity"
+            >
+              Gameplan →
+            </Link>
+          )}
+          <ScoutForm
+            tournamentId={tournamentId}
+            opponentId={opponent.id}
+            opponentName={opponent.opponentLabel}
+          />
+          <DeleteOpponentButton opponentId={opponent.id} tournamentId={tournamentId} />
+        </div>
+      </div>
+
+      {/* Footage list */}
+      {open && matches.length > 0 && (
+        <div className="border-t border-border/40 divide-y divide-border/30">
+          {matches.map((m) => (
+            <div key={m.id} className="px-4 py-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_CHIP[m.status] ?? STATUS_CHIP.pending}`}>
+                  {STATUS_LABEL[m.status] ?? m.status}
+                </span>
+                <span className="text-sm truncate">{matchTitle(m)}</span>
+                <span className="text-xs text-muted-foreground flex-shrink-0">{fmtDate(m.createdAt)}</span>
+              </div>
+              {m.status === 'analysed' && (
+                <Link
+                  href={`/matches/${m.id}`}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                >
+                  View →
+                </Link>
+              )}
+              {m.status === 'failed' && (
+                <span className="text-xs text-rose-400 flex-shrink-0">Analysis failed</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}

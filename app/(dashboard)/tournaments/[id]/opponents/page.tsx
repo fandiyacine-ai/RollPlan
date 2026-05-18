@@ -1,8 +1,8 @@
 import { db } from '../../../../../lib/db'
 import { tournamentOpponents, matches } from '../../../../../lib/db/schema'
-import { eq, count } from 'drizzle-orm'
-import { AddOpponentForm, ScoutForm, DeleteOpponentButton } from './opponent-forms'
-import Link from 'next/link'
+import { eq, inArray } from 'drizzle-orm'
+import { AddOpponentForm } from './opponent-forms'
+import { OpponentAccordion } from './opponent-accordion'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,31 +15,30 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
     .where(eq(tournamentOpponents.tournamentId, tournamentId))
     .orderBy(tournamentOpponents.createdAt)
 
-  // Count scouted matches per opponent
-  const scoutedCounts = await db
-    .select({ opponentId: matches.tournamentOpponentId, count: count() })
-    .from(matches)
-    .where(eq(matches.status, 'analysed'))
-    .groupBy(matches.tournamentOpponentId)
+  const opponentIds = opponents.map(o => o.id)
 
-  const scoutedMap = Object.fromEntries(
-    scoutedCounts
-      .filter(r => r.opponentId !== null)
-      .map(r => [r.opponentId!, r.count])
-  )
+  const allMatches = opponentIds.length > 0
+    ? await db
+        .select({
+          id: matches.id,
+          status: matches.status,
+          format: matches.format,
+          context: matches.context,
+          eventName: matches.eventName,
+          createdAt: matches.createdAt,
+          tournamentOpponentId: matches.tournamentOpponentId,
+        })
+        .from(matches)
+        .where(inArray(matches.tournamentOpponentId, opponentIds))
+        .orderBy(matches.createdAt)
+    : []
 
-  // Count in-progress scans
-  const pendingCounts = await db
-    .select({ opponentId: matches.tournamentOpponentId, count: count() })
-    .from(matches)
-    .where(eq(matches.status, 'processing'))
-    .groupBy(matches.tournamentOpponentId)
-
-  const pendingMap = Object.fromEntries(
-    pendingCounts
-      .filter(r => r.opponentId !== null)
-      .map(r => [r.opponentId!, r.count])
-  )
+  const matchesByOpponent = allMatches.reduce<Record<string, typeof allMatches>>((acc, m) => {
+    if (!m.tournamentOpponentId) return acc
+    acc[m.tournamentOpponentId] ??= []
+    acc[m.tournamentOpponentId].push(m)
+    return acc
+  }, {})
 
   return (
     <div className="space-y-5">
@@ -48,34 +47,6 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
           Opponents ({opponents.length})
         </h2>
         <AddOpponentForm tournamentId={tournamentId} />
-      </div>
-
-      {/* Smoothcomp stream — disabled form */}
-      <div className="rounded-xl border border-border/50 bg-card p-4 space-y-3 opacity-60">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold">Add Smoothcomp stream</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Paste a recorded stream URL — the AI will find every match your opponent competed in and build a gameplan.
-            </p>
-          </div>
-          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border flex-shrink-0 ml-3">
-            Coming soon
-          </span>
-        </div>
-        <div className="flex gap-2">
-          <input
-            disabled
-            placeholder="https://smoothcomp.com/en/event/..."
-            className="flex-1 h-9 rounded-lg border border-input bg-muted px-3 text-sm text-muted-foreground placeholder:text-muted-foreground/50 cursor-not-allowed"
-          />
-          <button
-            disabled
-            className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium cursor-not-allowed opacity-50"
-          >
-            Analyse
-          </button>
-        </div>
       </div>
 
       {opponents.length === 0 ? (
@@ -95,66 +66,14 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
         </div>
       ) : (
         <div className="space-y-3">
-          {opponents.map((opp) => {
-            const analysed = scoutedMap[opp.id] ?? 0
-            const pending = pendingMap[opp.id] ?? 0
-
-            const statusDot = pending > 0
-              ? <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse flex-shrink-0" />
-              : analysed > 0
-              ? <span className="w-2 h-2 rounded-full bg-muted-foreground/40 flex-shrink-0" />
-              : <span className="w-2 h-2 rounded-full border border-muted-foreground/30 flex-shrink-0" />
-
-            return (
-              <div key={opp.id} className="rounded-xl border bg-card overflow-hidden">
-                {/* Scanning progress bar */}
-                {pending > 0 && (
-                  <div className="h-0.5 w-full bg-muted overflow-hidden">
-                    <div className="h-full bg-blue-400/60 animate-[shimmer_2s_ease-in-out_infinite]" style={{ width: '60%' }} />
-                  </div>
-                )}
-
-                <div className="p-4 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    {statusDot}
-                    <div className="min-w-0">
-                      <p className="font-semibold text-sm">{opp.opponentLabel}</p>
-                      {opp.seedingNotes && (
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{opp.seedingNotes}</p>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {pending > 0 && analysed === 0
-                          ? <span className="text-blue-400">Analysing {pending} match{pending !== 1 ? 'es' : ''}…</span>
-                          : pending > 0
-                          ? <><span className="text-blue-400">{pending} scanning</span> · {analysed} ready</>
-                          : analysed > 0
-                          ? `${analysed} match${analysed !== 1 ? 'es' : ''} ready`
-                          : <span className="text-muted-foreground/60">No footage added yet</span>
-                        }
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {analysed > 0 && (
-                      <Link
-                        href={`/tournaments/${tournamentId}/gameplan?opponent=${opp.id}`}
-                        className="text-xs px-3 py-1.5 rounded-lg bg-foreground text-background font-medium hover:opacity-90 transition-opacity"
-                      >
-                        Gameplan →
-                      </Link>
-                    )}
-                    <ScoutForm
-                      tournamentId={tournamentId}
-                      opponentId={opp.id}
-                      opponentName={opp.opponentLabel}
-                    />
-                    <DeleteOpponentButton opponentId={opp.id} tournamentId={tournamentId} />
-                  </div>
-                </div>
-              </div>
-            )
-          })}
+          {opponents.map((opp) => (
+            <OpponentAccordion
+              key={opp.id}
+              opponent={opp}
+              matches={matchesByOpponent[opp.id] ?? []}
+              tournamentId={tournamentId}
+            />
+          ))}
         </div>
       )}
     </div>
