@@ -1,5 +1,5 @@
 import { generateObject } from 'ai'
-import { NonRetriableError } from 'inngest'
+import { NonRetriableError, RetryAfterError } from 'inngest'
 import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
 import { videos, matches, positionSegments, matchEvents, insights, aiCallLogs } from '../lib/db/schema'
@@ -31,13 +31,13 @@ export const scanUrl = inngest.createFunction(
     triggers: [{ event: 'url/submitted' }],
   },
   async ({ event, step }: {
-    event: { data: { videoId: string; userId?: string; athleteName: string; format: string; sourceType: string; eventName?: string; appearanceHint?: string; athleteImageBase64?: string; tournamentOpponentId?: string; skipScan?: boolean; startSeconds?: number; endSeconds?: number; chunkIndex?: number; chunkTotal?: number } }
+    event: { data: { videoId: string; userId?: string; athleteName: string; format: string; sourceType: string; eventName?: string; appearanceHint?: string; athleteImageBase64?: string; tournamentOpponentId?: string; skipScan?: boolean; startSeconds?: number; endSeconds?: number; chunkIndex?: number; chunkTotal?: number; chunkVideoIds?: string[] } }
     step: any
   }) => {
-    const { videoId, userId, athleteName, format, sourceType, eventName, appearanceHint, athleteImageBase64, tournamentOpponentId, skipScan, startSeconds, endSeconds, chunkIndex, chunkTotal } = event.data
+    const { videoId, userId, athleteName, format, sourceType, eventName, appearanceHint, athleteImageBase64, tournamentOpponentId, skipScan, startSeconds, endSeconds, chunkIndex, chunkTotal, chunkVideoIds } = event.data
 
-    const CHUNK_SECS = 30 * 60  // 30-minute windows — ~180 frames at 0.1fps, well within quota
-    const NUM_CHUNKS = 6        // covers up to 3 hours
+    const CHUNK_SECS = 20 * 60  // 20-minute windows — ~60 frames at 0.05fps
+    const NUM_CHUNKS = 9        // covers up to 3 hours
 
     // null return value signals "needs chunking" — handled after the step
     const scanStepResult: FoundMatch[] | null = skipScan
@@ -61,7 +61,7 @@ export const scanUrl = inngest.createFunction(
             system: buildScanUrlSystemPrompt(),
             videoUrl: video.publicUrl,
             videoOptions: {
-              fps: 0.1,
+              fps: 0.05,  // 1 frame/20s — sufficient to spot scoreboard changes, halves token cost
               ...(startSeconds !== undefined ? { startSeconds } : {}),
               ...(endSeconds !== undefined ? { endSeconds } : {}),
             },
@@ -109,8 +109,8 @@ export const scanUrl = inngest.createFunction(
         if (msg.includes('Resource has been exhausted') || msg.includes('RESOURCE_EXHAUSTED')) {
           if (isYT) {
             if (chunkIndex !== undefined) {
-              // Already a chunk — transient rate-limit, leave status as-is so UI doesn't show failed during retry
-              throw new Error('Gemini quota temporarily exhausted in chunk — retrying.')
+              // Transient rate-limit on a chunk — wait 90s before retrying so quota resets
+              throw new RetryAfterError('Gemini quota temporarily exhausted in chunk — retrying.', '90s')
             }
             // Full video too long for Gemini — signal chunking to the outer function
             await db.update(videos).set({ status: 'processing' }).where(eq(videos.id, videoId))
@@ -133,7 +133,7 @@ export const scanUrl = inngest.createFunction(
 
       if (!scanResult.athlete_found || scanResult.matches.length === 0) {
         if (chunkIndex !== undefined) {
-          // Empty chunk (no matches in this time window) — complete silently
+          // Empty chunk — mark done; outer function will trigger the next chunk
           await db.update(videos).set({ status: 'analysed' }).where(eq(videos.id, videoId))
           return []
         }
@@ -173,10 +173,11 @@ export const scanUrl = inngest.createFunction(
         return ids
       })
 
-      await step.sendEvent('send-chunk-events', chunkVideoIds.map((chunkVid, i) => ({
+      // Fire only chunk 0 — each chunk triggers the next on completion (sequential, not parallel)
+      await step.sendEvent('send-first-chunk', {
         name: 'url/submitted' as const,
         data: {
-          videoId: chunkVid,
+          videoId: chunkVideoIds[0],
           userId,
           athleteName,
           format,
@@ -185,12 +186,13 @@ export const scanUrl = inngest.createFunction(
           appearanceHint,
           athleteImageBase64,
           tournamentOpponentId,
-          startSeconds: i * CHUNK_SECS,
-          endSeconds: (i + 1) * CHUNK_SECS,
-          chunkIndex: i,
+          startSeconds: 0,
+          endSeconds: CHUNK_SECS,
+          chunkIndex: 0,
           chunkTotal: NUM_CHUNKS,
+          chunkVideoIds,
         },
-      })))
+      })
 
       return
     }
@@ -465,5 +467,29 @@ export const scanUrl = inngest.createFunction(
     await step.run('mark-video-analysed', async () => {
       await db.update(videos).set({ status: 'analysed' }).where(eq(videos.id, videoId))
     })
+
+    // Sequential chunk chain: trigger the next chunk only after this one is fully done
+    if (chunkIndex !== undefined && chunkTotal !== undefined && chunkVideoIds && chunkIndex < chunkTotal - 1) {
+      const nextIndex = chunkIndex + 1
+      await step.sendEvent('send-next-chunk', {
+        name: 'url/submitted' as const,
+        data: {
+          videoId: chunkVideoIds[nextIndex],
+          userId,
+          athleteName,
+          format,
+          sourceType,
+          eventName,
+          appearanceHint,
+          athleteImageBase64,
+          tournamentOpponentId,
+          startSeconds: nextIndex * CHUNK_SECS,
+          endSeconds: (nextIndex + 1) * CHUNK_SECS,
+          chunkIndex: nextIndex,
+          chunkTotal,
+          chunkVideoIds,
+        },
+      })
+    }
   }
 )
