@@ -34,11 +34,30 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 function rowTitle(m: FootageRow): string {
-  if (m.label) return m.label
+  if (m.label) {
+    // Strip the "· Part N/M" suffix for display — it's noise in the list
+    const clean = m.label.replace(/\s*·\s*Part\s+\d+\/\d+$/, '').trim()
+    return clean || m.label
+  }
   if (m.eventName) return m.eventName
   const fmt = m.format === 'no_gi' ? 'No-Gi' : 'Gi'
   const ctx = m.context === 'sparring' ? 'Sparring' : 'Competition'
   return `${fmt} ${ctx}`
+}
+
+const CHUNK_LABEL_RE = /·\s*Part\s+(\d+)\/(\d+)$/
+
+function detectChunks(pendingVideos: FootageRow[]): { done: number; total: number } | null {
+  let total = 0
+  let remaining = 0
+  for (const v of pendingVideos) {
+    const m = v.label?.match(CHUNK_LABEL_RE)
+    if (m) {
+      total = Math.max(total, parseInt(m[2]))
+      remaining++
+    }
+  }
+  return total > 0 ? { done: total - remaining, total } : null
 }
 
 function fmtDate(d: Date): string {
@@ -63,6 +82,7 @@ export function OpponentAccordion({
   const [open, setOpen] = useState(false)
 
   const allRows = [...pendingVideos, ...matches]
+  const chunkProgress = detectChunks(pendingVideos)
 
   const analysed = matches.filter(m => m.status === 'analysed').length
   const pending  = allRows.filter(m => m.status === 'pending' || m.status === 'processing' || m.status === 'uploaded').length
@@ -74,7 +94,11 @@ export function OpponentAccordion({
     ? <span className="w-2 h-2 rounded-full bg-emerald-400/60 flex-shrink-0" />
     : <span className="w-2 h-2 rounded-full border border-muted-foreground/30 flex-shrink-0" />
 
-  const subtitle = pending > 0 && analysed === 0
+  const subtitle = chunkProgress
+    ? chunkProgress.done === 0
+      ? <span className="text-blue-400">Scanning video in {chunkProgress.total} parts…</span>
+      : <><span className="text-blue-400">{chunkProgress.done}/{chunkProgress.total} parts scanned</span>{analysed > 0 ? ` · ${analysed} match${analysed !== 1 ? 'es' : ''} found` : ''}</>
+    : pending > 0 && analysed === 0
     ? <span className="text-blue-400">Scanning {pending} clip{pending !== 1 ? 's' : ''}…</span>
     : pending > 0
     ? <><span className="text-blue-400">{pending} scanning</span> · {analysed} ready</>
@@ -90,7 +114,14 @@ export function OpponentAccordion({
     <div className="rounded-xl border bg-card overflow-hidden">
       {pending > 0 && (
         <div className="h-0.5 w-full bg-muted overflow-hidden">
-          <div className="h-full bg-blue-400/60 animate-[shimmer_2s_ease-in-out_infinite]" style={{ width: '60%' }} />
+          {chunkProgress ? (
+            <div
+              className="h-full bg-blue-400/70 transition-all duration-700"
+              style={{ width: `${chunkProgress.total > 0 ? Math.max(4, (chunkProgress.done / chunkProgress.total) * 100) : 4}%` }}
+            />
+          ) : (
+            <div className="h-full bg-blue-400/60 animate-[shimmer_2s_ease-in-out_infinite]" style={{ width: '60%' }} />
+          )}
         </div>
       )}
 
