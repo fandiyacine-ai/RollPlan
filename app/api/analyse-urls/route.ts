@@ -3,6 +3,7 @@ import { db } from '../../../lib/db'
 import { videos } from '../../../lib/db/schema'
 import { inngest } from '../../../lib/inngest'
 import { getOrCreateDbUserId } from '../../../lib/db/get-user'
+import { checkMonthlyLimit } from '../../../lib/db/usage'
 
 export const maxDuration = 30
 
@@ -21,6 +22,14 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = await getOrCreateDbUserId()
+
+    const usage = await checkMonthlyLimit(userId)
+    if (!usage.allowed) {
+      return NextResponse.json({
+        error: `You've used all ${usage.limit} free analyses for this month. Upgrade to continue.`,
+      }, { status: 402 })
+    }
+
     const videoIds: string[] = []
 
     for (const url of urls) {

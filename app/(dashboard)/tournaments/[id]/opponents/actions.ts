@@ -6,6 +6,7 @@ import { tournamentOpponents, videos } from '../../../../../lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { inngest } from '../../../../../lib/inngest'
 import { getOrCreateDbUserId } from '../../../../../lib/db/get-user'
+import { checkMonthlyLimit } from '../../../../../lib/db/usage'
 
 export async function addOpponent(tournamentId: string, formData: FormData) {
   const name = (formData.get('name') as string)?.trim()
@@ -40,6 +41,11 @@ export async function submitScoutUrls(tournamentId: string, opponentId: string, 
   const appearanceHint = (formData.get('appearanceHint') as string)?.trim() || undefined
 
   const userId = await getOrCreateDbUserId()
+
+  const usage = await checkMonthlyLimit(userId)
+  if (!usage.allowed) {
+    throw new Error(`You've used all ${usage.limit} free analyses for this month. Upgrade to continue.`)
+  }
 
   for (const url of urls) {
     try { new URL(url) } catch { throw new Error(`Invalid URL: ${url}`) }

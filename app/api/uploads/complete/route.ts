@@ -4,6 +4,7 @@ import { videos, matches } from '../../../../lib/db/schema'
 import { getPublicVideoUrl } from '../../../../lib/storage/r2'
 import { inngest } from '../../../../lib/inngest'
 import { getOrCreateDbUserId } from '../../../../lib/db/get-user'
+import { checkMonthlyLimit } from '../../../../lib/db/usage'
 import { eq } from 'drizzle-orm'
 
 export const maxDuration = 30
@@ -25,6 +26,13 @@ export async function POST(req: NextRequest) {
 
     if (scanMode === 'scan') {
       if (!athleteName) return NextResponse.json({ error: 'athleteName required for scan mode' }, { status: 400 })
+
+      const usage = await checkMonthlyLimit(userId)
+      if (!usage.allowed) {
+        return NextResponse.json({
+          error: `You've used all ${usage.limit} free analyses for this month. Upgrade to continue.`,
+        }, { status: 402 })
+      }
       try {
         await inngest.send({
           name: 'url/submitted',
