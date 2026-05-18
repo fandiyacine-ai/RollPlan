@@ -7,6 +7,7 @@ async function UsagePill() {
   try {
     const userId = await getOrCreateDbUserId()
     const { used, limit } = await checkMonthlyLimit(userId)
+    if (!isFinite(limit)) return null  // paid plan — no usage pill
     const pct = Math.min(100, (used / limit) * 100)
     const barColor = used >= limit ? 'bg-rose-500' : used >= Math.floor(limit * 0.8) ? 'bg-amber-500' : 'bg-foreground/40'
     return (
