@@ -12,7 +12,7 @@ const NAV = [
   { href: '/tournaments', label: 'Scout Opponent' },
 ]
 
-export function Nav() {
+export function Nav({ usageSlot }: { usageSlot?: React.ReactNode }) {
   const path = usePathname()
 
   return (
@@ -51,7 +51,8 @@ export function Nav() {
         </Link>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
+        {usageSlot}
         <ThemeToggle />
         <Link
           href="/settings"

@@ -97,9 +97,13 @@ const DOMINANCE_LABEL: Record<string, string> = {
 function TimelineRow({
   item,
   onSeek,
+  competitorLabel,
+  opponentLabel,
 }: {
   item: TimelineItem
   onSeek?: () => void
+  competitorLabel?: string | null
+  opponentLabel?: string | null
 }) {
   const isPosition = item.type === 'position'
 
@@ -138,7 +142,7 @@ function TimelineRow({
             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
               item.actor === 'user' ? 'bg-blue-950 text-blue-400' : 'bg-orange-950 text-orange-400'
             }`}>
-              {item.actor === 'user' ? 'You' : 'Opp'}
+              {item.actor === 'user' ? (competitorLabel ?? 'You') : (opponentLabel ?? 'Opp')}
             </span>
             <span className="text-sm font-medium">{item.eventName}</span>
             {item.techniqueLabel && (
@@ -276,12 +280,16 @@ export function MatchContent({
   segments,
   spatialData,
   timelineItems,
+  competitorLabel,
+  opponentLabel,
 }: {
   videoUrl: string | null
   matchInsights: InsightRow[]
   segments: SegmentRef[]
   spatialData: SpatialData | null
   timelineItems: TimelineItem[]
+  competitorLabel?: string | null
+  opponentLabel?: string | null
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -487,6 +495,8 @@ export function MatchContent({
                     key={i}
                     item={item}
                     onSeek={videoUrl ? () => seekTo(item.time) : undefined}
+                    competitorLabel={competitorLabel}
+                    opponentLabel={opponentLabel}
                   />
                 ))}
               </div>

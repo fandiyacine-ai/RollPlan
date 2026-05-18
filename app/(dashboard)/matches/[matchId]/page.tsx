@@ -240,6 +240,8 @@ export default async function MatchDetailPage({
             videoUrl={video?.publicUrl ?? null}
             matchInsights={matchInsights}
             timelineItems={timelineItems}
+            competitorLabel={match.tournamentOpponentId ? match.competitorLabel : null}
+            opponentLabel={match.tournamentOpponentId ? match.opponentLabel : null}
             segments={segments.map((s) => ({
               id: s.id,
               startSeconds: s.startSeconds,

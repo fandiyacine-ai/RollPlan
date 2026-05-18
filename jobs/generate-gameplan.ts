@@ -2,7 +2,7 @@ import { generateObject } from 'ai'
 import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
 import { tournaments, tournamentOpponents, gameplans, matches, positionSegments, matchEvents, insights, aiCallLogs } from '../lib/db/schema'
-import { eq, desc } from 'drizzle-orm'
+import { eq, desc, and, isNull } from 'drizzle-orm'
 import { anthropic, CLAUDE_SYNTHESIS_MODEL, estimateCostUsd } from '../lib/ai/clients'
 import { GameplanOutputSchema, GameplanOutput } from '../lib/ai/schemas/gameplan'
 import { buildGameplanSystemPrompt, buildGameplanUserPrompt, GENERATE_GAMEPLAN_PROMPT_VERSION } from '../lib/ai/prompts/generate-gameplan'
@@ -22,8 +22,8 @@ export const generateGameplan = inngest.createFunction(
     name: 'Generate Tournament Gameplan',
     triggers: [{ event: 'gameplan/requested' }],
   },
-  async ({ event, step }: { event: { data: { tournamentId: string; opponentId: string } }; step: any }) => {
-    const { tournamentId, opponentId } = event.data
+  async ({ event, step }: { event: { data: { tournamentId: string; opponentId: string; userId?: string } }; step: any }) => {
+    const { tournamentId, opponentId, userId } = event.data
 
     const gameplanData = await step.run('fetch-data', async () => {
       const tournament = await db.query.tournaments.findFirst({ where: eq(tournaments.id, tournamentId) })
@@ -32,15 +32,16 @@ export const generateGameplan = inngest.createFunction(
       const opponent = await db.query.tournamentOpponents.findFirst({ where: eq(tournamentOpponents.id, opponentId) })
       if (!opponent) throw new Error(`Opponent ${opponentId} not found`)
 
-      // User's own analysed matches — not tagged as opponent scouting
-      const userMatchRows = await db
+      // User's own analysed matches — scoped to this user, not opponent scouting
+      const ownMatchFilter = userId
+        ? and(eq(matches.status, 'analysed'), eq(matches.userId, userId), isNull(matches.tournamentOpponentId))
+        : and(eq(matches.status, 'analysed'), isNull(matches.tournamentOpponentId))
+      const ownMatches = await db
         .select()
         .from(matches)
-        .where(eq(matches.status, 'analysed'))
+        .where(ownMatchFilter)
         .orderBy(desc(matches.createdAt))
         .limit(10)
-      // Filter out opponent-scouted matches (tournamentOpponentId IS NULL)
-      const ownMatches = userMatchRows.filter(m => m.tournamentOpponentId === null)
 
       // Opponent's scouted matches
       const opponentMatchRows = await db

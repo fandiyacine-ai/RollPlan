@@ -1,9 +1,31 @@
+import { Suspense } from 'react'
 import { Nav } from './nav'
+import { getOrCreateDbUserId } from '../../lib/db/get-user'
+import { checkMonthlyLimit } from '../../lib/db/usage'
+
+async function UsagePill() {
+  try {
+    const userId = await getOrCreateDbUserId()
+    const { used, limit } = await checkMonthlyLimit(userId)
+    const pct = Math.min(100, (used / limit) * 100)
+    const barColor = used >= limit ? 'bg-rose-500' : used >= Math.floor(limit * 0.8) ? 'bg-amber-500' : 'bg-foreground/40'
+    return (
+      <div className="flex flex-col items-end gap-1">
+        <span className="text-[10px] text-muted-foreground/70 leading-none tabular-nums">{used}/{limit} analyses</span>
+        <div className="w-14 h-1 rounded-full bg-muted overflow-hidden">
+          <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+    )
+  } catch {
+    return null
+  }
+}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
-      <Nav />
+      <Nav usageSlot={<Suspense fallback={null}><UsagePill /></Suspense>} />
       <main className="p-6">{children}</main>
     </div>
   )
