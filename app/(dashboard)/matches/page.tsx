@@ -79,7 +79,7 @@ export default async function MatchesPage() {
     })
     .from(matches)
     .leftJoin(videos, eq(matches.videoId, videos.id))
-    .where(matchFilter)
+    .where(and(matchFilter, or(isNull(videos.sourceType), ne(videos.sourceType, 'opponent'))))
     .orderBy(desc(matches.createdAt))
     .limit(50)
 
@@ -96,7 +96,7 @@ export default async function MatchesPage() {
     })
     .from(videos)
     .leftJoin(matches, eq(matches.videoId, videos.id))
-    .where(and(isNull(matches.id), ne(videos.status, 'analysed'), videoFilter))
+    .where(and(isNull(matches.id), ne(videos.status, 'analysed'), ne(videos.sourceType, 'opponent'), videoFilter))
     .orderBy(desc(videos.uploadedAt))
     .limit(20)
 

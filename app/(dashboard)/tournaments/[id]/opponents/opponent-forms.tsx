@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { addOpponent, submitScoutUrls, deleteOpponent } from './actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,6 +23,8 @@ import {
 
 type AppearanceColor = 'blue_gi' | 'white_gi' | 'black_gi' | 'dark_rash' | 'light_rash' | 'other'
 type StartingSide = 'left' | 'right'
+type ScoutMethod = 'single' | 'session' | null
+type SingleMode = 'url' | 'upload'
 
 const COLOR_OPTIONS: { value: AppearanceColor; label: string; bg: string }[] = [
   { value: 'blue_gi',    label: 'Blue Gi',    bg: 'bg-blue-600' },
@@ -44,6 +46,86 @@ function buildAppearanceHint(color: AppearanceColor | null, side: StartingSide |
   if (side) parts.push(`starts on the ${side} side of the mat`)
   return parts.join(', ')
 }
+
+function extractYouTubeId(url: string): string | null {
+  try {
+    const u = new URL(url)
+    if (u.hostname.includes('youtu.be')) return u.pathname.slice(1).split('/')[0] ?? null
+    if (u.hostname.includes('youtube.com')) {
+      if (u.pathname.startsWith('/watch')) return u.searchParams.get('v')
+      const m = u.pathname.match(/\/(?:live|embed|v)\/([^/?]+)/)
+      return m?.[1] ?? null
+    }
+  } catch {}
+  return null
+}
+
+// ── Appearance fields (shared between all modes) ──────────────────────────────
+
+function AppearanceFields({
+  format, setFormat,
+  appearanceColor, setAppearanceColor,
+  startingSide, setStartingSide,
+}: {
+  format: string; setFormat: (v: string) => void
+  appearanceColor: AppearanceColor | null; setAppearanceColor: (v: AppearanceColor | null) => void
+  startingSide: StartingSide | null; setStartingSide: (v: StartingSide | null) => void
+}) {
+  return (
+    <div className="space-y-3 pt-1">
+      <div className="space-y-1">
+        <label className="text-xs text-muted-foreground">Format</label>
+        <Select value={format} onValueChange={(v) => { if (v) setFormat(v) }}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="gi">Gi</SelectItem>
+            <SelectItem value="no_gi">No-Gi</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1.5">
+        <p className="text-xs text-muted-foreground font-medium">Opponent&apos;s appearance <span className="font-normal">(optional — helps the AI)</span></p>
+        <div className="flex flex-wrap gap-1.5">
+          {COLOR_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setAppearanceColor(appearanceColor === opt.value ? null : opt.value)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs transition-all ${
+                appearanceColor === opt.value
+                  ? 'border-primary bg-primary text-primary-foreground font-medium'
+                  : 'border-border hover:border-foreground/40'
+              }`}
+            >
+              <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${opt.bg}`} />
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-1.5">
+          {(['left', 'right'] as StartingSide[]).map((side) => (
+            <button
+              key={side}
+              type="button"
+              onClick={() => setStartingSide(startingSide === side ? null : side)}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs transition-all ${
+                startingSide === side
+                  ? 'border-primary bg-primary text-primary-foreground font-medium'
+                  : 'border-border hover:border-foreground/40'
+              }`}
+            >
+              {side === 'left' ? '← ' : '→ '}Starts {side}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Add opponent ──────────────────────────────────────────────────────────────
 
 export function DeleteOpponentButton({ opponentId, tournamentId }: { opponentId: string; tournamentId: string }) {
   const [pending, setPending] = useState(false)
@@ -93,24 +175,15 @@ export function AddOpponentForm({ tournamentId }: { tournamentId: string }) {
         >
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Name *</label>
-            <Input
-              name="name"
-              required
-              placeholder="e.g. João Silva"
-            />
+            <Input name="name" required placeholder="e.g. João Silva" />
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Seeding notes</label>
-            <Input
-              name="notes"
-              placeholder="e.g. #3 seed, black belt 5 years"
-            />
+            <Input name="notes" placeholder="e.g. #3 seed, black belt 5 years" />
           </div>
         </form>
         <DialogFooter>
-          <DialogClose>
-            <Button variant="outline" type="button">Cancel</Button>
-          </DialogClose>
+          <DialogClose><Button variant="outline" type="button">Cancel</Button></DialogClose>
           <Button type="submit" form="add-opponent-form" disabled={pending}>
             {pending ? 'Adding…' : 'Add'}
           </Button>
@@ -120,7 +193,7 @@ export function AddOpponentForm({ tournamentId }: { tournamentId: string }) {
   )
 }
 
-type ScoutMethod = 'video' | 'smoothcomp' | null
+// ── Scout form ────────────────────────────────────────────────────────────────
 
 export function ScoutForm({
   tournamentId,
@@ -133,20 +206,124 @@ export function ScoutForm({
 }) {
   const [open, setOpen] = useState(false)
   const [method, setMethod] = useState<ScoutMethod>(null)
+  const [singleMode, setSingleMode] = useState<SingleMode>('url')
   const [pending, setPending] = useState(false)
   const [done, setDone] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // shared appearance state
+  const [format, setFormat] = useState('gi')
   const [appearanceColor, setAppearanceColor] = useState<AppearanceColor | null>(null)
   const [startingSide, setStartingSide] = useState<StartingSide | null>(null)
-  const [format, setFormat] = useState('gi')
+
+  // single match — URL
+  const [singleUrl, setSingleUrl] = useState('')
+
+  // single match — file upload
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // session — multi-URL
+  const [sessionUrls, setSessionUrls] = useState('')
 
   function handleClose(o: boolean) {
     setOpen(o)
-    if (!o) { setPending(false); setMethod(null) }
+    if (!o) {
+      setPending(false); setMethod(null); setError(null)
+      setSingleUrl(''); setUploadFile(null); setUploadProgress(0)
+      setSessionUrls(''); setAppearanceColor(null); setStartingSide(null)
+    }
+  }
+
+  function pickFile(f: File) {
+    if (!f.type.startsWith('video/')) { setError('Only video files are accepted'); return }
+    if (f.size > 2 * 1024 * 1024 * 1024) { setError('File must be under 2 GB'); return }
+    setUploadFile(f); setError(null)
+  }
+
+  async function submitSingleUrl() {
+    const url = singleUrl.trim()
+    if (!url) { setError('A video URL is required'); return }
+    try { new URL(url) } catch { setError('Invalid URL'); return }
+
+    setPending(true); setError(null)
+    const fd = new FormData()
+    fd.set('urls', url)
+    fd.set('format', format)
+    fd.set('appearanceHint', buildAppearanceHint(appearanceColor, startingSide))
+    await submitScoutUrls(tournamentId, opponentId, fd)
+    setOpen(false); setDone(true)
+  }
+
+  async function submitSingleUpload() {
+    if (!uploadFile) { setError('Please select a file'); return }
+    setPending(true); setError(null); setUploadProgress(0)
+
+    try {
+      const presignRes = await fetch('/api/uploads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: uploadFile.name, contentType: uploadFile.type, size: uploadFile.size, sourceType: 'opponent', format }),
+      })
+      const presignData = await presignRes.json()
+      if (!presignRes.ok) throw new Error(presignData.error ?? 'Failed to prepare upload')
+
+      const { uploadUrl, path, videoId } = presignData
+
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.upload.onprogress = (e) => { if (e.lengthComputable) setUploadProgress(Math.round((e.loaded / e.total) * 100)) }
+        xhr.onload = () => xhr.status < 300 ? resolve() : reject(new Error(`Upload failed: ${xhr.status}`))
+        xhr.onerror = () => reject(new Error('Network error'))
+        xhr.open('PUT', uploadUrl)
+        xhr.setRequestHeader('Content-Type', uploadFile.type)
+        xhr.send(uploadFile)
+      })
+
+      const completeRes = await fetch('/api/uploads/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          videoId, path,
+          sourceType: 'opponent',
+          format,
+          scanMode: 'scan',
+          athleteName: opponentName,
+          tournamentOpponentId: opponentId,
+          appearanceHint: buildAppearanceHint(appearanceColor, startingSide) || undefined,
+        }),
+      })
+      if (!completeRes.ok) {
+        const d = await completeRes.json().catch(() => ({}))
+        throw new Error(d.error ?? 'Upload complete failed')
+      }
+
+      setOpen(false); setDone(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed')
+      setPending(false)
+    }
+  }
+
+  async function submitSession() {
+    const urls = sessionUrls.split('\n').map(u => u.trim()).filter(Boolean)
+    if (urls.length === 0) { setError('At least one URL is required'); return }
+    setPending(true); setError(null)
+    const fd = new FormData()
+    fd.set('urls', urls.join('\n'))
+    fd.set('format', format)
+    fd.set('appearanceHint', buildAppearanceHint(appearanceColor, startingSide))
+    await submitScoutUrls(tournamentId, opponentId, fd)
+    setOpen(false); setDone(true)
   }
 
   if (done) {
     return <span className="text-xs text-emerald-400 font-medium">Scanning queued ✓</span>
   }
+
+  const singleUrlYtId = singleUrl.trim() ? extractYouTubeId(singleUrl.trim()) : null
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -162,120 +339,157 @@ export function ScoutForm({
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
-            onClick={() => setMethod('video')}
+            onClick={() => setMethod('single')}
             className={`rounded-xl border p-4 text-left transition-all space-y-1.5 ${
-              method === 'video'
-                ? 'border-primary bg-primary/5'
-                : 'border-border hover:border-foreground/30'
+              method === 'single' ? 'border-primary bg-primary/5' : 'border-border hover:border-foreground/30'
             }`}
           >
             <div className="flex items-center gap-2">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                 <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
               </svg>
-              <span className="text-sm font-medium">Match video</span>
+              <span className="text-sm font-medium">Single Match</span>
             </div>
-            <p className="text-xs text-muted-foreground">Upload a video file or paste a YouTube link</p>
+            <p className="text-xs text-muted-foreground">Upload a file or paste a video link</p>
           </button>
 
-          <div className="rounded-xl border border-border/50 p-4 text-left opacity-50 cursor-not-allowed space-y-1.5">
+          <button
+            type="button"
+            onClick={() => setMethod('session')}
+            className={`rounded-xl border p-4 text-left transition-all space-y-1.5 ${
+              method === 'session' ? 'border-primary bg-primary/5' : 'border-border hover:border-foreground/30'
+            }`}
+          >
             <div className="flex items-center gap-2">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
-                <circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>
+                <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
               </svg>
-              <span className="text-sm font-medium">Smoothcomp stream</span>
+              <span className="text-sm font-medium">Mat Session</span>
             </div>
-            <p className="text-xs text-muted-foreground">Recorded stream import</p>
-            <span className="inline-block text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-950/60 text-amber-400 border border-amber-800/40">
-              Not available yet
-            </span>
-          </div>
+            <p className="text-xs text-muted-foreground">YouTube link — AI scans for all their matches</p>
+          </button>
         </div>
 
-        {/* Video form */}
-        {method === 'video' && (
-          <form
-            id="scout-form"
-            action={async (fd) => {
-              fd.set('appearanceHint', buildAppearanceHint(appearanceColor, startingSide))
-              fd.set('format', format)
-              setPending(true)
-              await submitScoutUrls(tournamentId, opponentId, fd)
-              setOpen(false)
-              setDone(true)
-            }}
-            className="space-y-3 pt-1"
-          >
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Format</label>
-              <Select value={format} onValueChange={(v) => { if (v !== null) setFormat(v) }}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="gi">Gi</SelectItem>
-                  <SelectItem value="no_gi">No-Gi</SelectItem>
-                </SelectContent>
-              </Select>
+        {/* Single match */}
+        {method === 'single' && (
+          <div className="space-y-4">
+            {/* URL / Upload sub-tabs */}
+            <div className="flex rounded-lg border overflow-hidden">
+              {(['url', 'upload'] as SingleMode[]).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => { setSingleMode(m); setError(null) }}
+                  className={`flex-1 py-1.5 text-xs font-medium transition-colors ${
+                    singleMode === m ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/50'
+                  }`}
+                >
+                  {m === 'url' ? 'Video Link' : 'Upload File'}
+                </button>
+              ))}
             </div>
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Video URLs (one per line, max 10)</label>
-              <textarea
-                name="urls"
-                required
-                rows={4}
-                placeholder="https://youtube.com/watch?v=..."
-                className="w-full rounded-lg border border-input bg-muted text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring/50 resize-none"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Opponent&apos;s appearance in video</p>
-                <p className="text-xs text-muted-foreground">Helps the AI identify which athlete is {opponentName}</p>
+
+            {singleMode === 'url' && (
+              <div className="space-y-2">
+                <Input
+                  type="url"
+                  value={singleUrl}
+                  onChange={(e) => setSingleUrl(e.target.value)}
+                  placeholder="https://youtube.com/watch?v=…"
+                />
+                {singleUrlYtId && (
+                  <div className="flex items-center gap-3 rounded-md border bg-muted/30 p-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`https://img.youtube.com/vi/${singleUrlYtId}/hqdefault.jpg`}
+                      alt=""
+                      className="w-20 h-12 object-cover rounded flex-shrink-0 bg-muted"
+                    />
+                    <p className="text-xs text-muted-foreground">YouTube video detected</p>
+                  </div>
+                )}
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                {COLOR_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setAppearanceColor(appearanceColor === opt.value ? null : opt.value)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs transition-all ${
-                      appearanceColor === opt.value
-                        ? 'border-primary bg-primary text-primary-foreground font-medium'
-                        : 'border-border hover:border-foreground/40'
-                    }`}
-                  >
-                    <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${opt.bg}`} />
-                    {opt.label}
-                  </button>
-                ))}
+            )}
+
+            {singleMode === 'upload' && (
+              <div className="space-y-2">
+                <div
+                  className={`rounded-lg border-2 border-dashed p-6 text-center cursor-pointer transition-colors ${
+                    isDragging ? 'border-foreground bg-muted' : 'border-muted-foreground/30 hover:border-muted-foreground/60'
+                  }`}
+                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) pickFile(f) }}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input ref={fileInputRef} type="file" accept="video/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) pickFile(f) }} />
+                  {uploadFile ? (
+                    <div className="space-y-0.5">
+                      <p className="text-sm font-medium truncate">{uploadFile.name}</p>
+                      <p className="text-xs text-muted-foreground">{(uploadFile.size / 1024 / 1024).toFixed(1)} MB</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">Drop video here or click to browse</p>
+                      <p className="text-xs text-muted-foreground/60">MP4, MOV, AVI · up to 2 GB</p>
+                    </div>
+                  )}
+                </div>
+                {pending && uploadProgress > 0 && (
+                  <div className="space-y-1">
+                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div className="h-full bg-primary transition-all" style={{ width: `${uploadProgress}%` }} />
+                    </div>
+                    <p className="text-xs text-muted-foreground text-right">{uploadProgress}%</p>
+                  </div>
+                )}
               </div>
-              <div className="flex gap-1.5">
-                {(['left', 'right'] as StartingSide[]).map((side) => (
-                  <button
-                    key={side}
-                    type="button"
-                    onClick={() => setStartingSide(startingSide === side ? null : side)}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs transition-all ${
-                      startingSide === side
-                        ? 'border-primary bg-primary text-primary-foreground font-medium'
-                        : 'border-border hover:border-foreground/40'
-                    }`}
-                  >
-                    {side === 'left' ? '← ' : '→ '}Starts {side}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </form>
+            )}
+
+            <AppearanceFields
+              format={format} setFormat={setFormat}
+              appearanceColor={appearanceColor} setAppearanceColor={setAppearanceColor}
+              startingSide={startingSide} setStartingSide={setStartingSide}
+            />
+          </div>
         )}
 
+        {/* Mat session */}
+        {method === 'session' && (
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">YouTube URLs <span className="text-muted-foreground/60">· one per line · max 10</span></label>
+              <textarea
+                value={sessionUrls}
+                onChange={(e) => setSessionUrls(e.target.value)}
+                rows={4}
+                placeholder={"https://youtube.com/watch?v=…\nhttps://youtube.com/watch?v=…"}
+                className="w-full rounded-lg border border-input bg-muted text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring/50 resize-none"
+              />
+              <p className="text-xs text-muted-foreground">The AI scans the full recording and extracts every match for {opponentName}.</p>
+            </div>
+            <AppearanceFields
+              format={format} setFormat={setFormat}
+              appearanceColor={appearanceColor} setAppearanceColor={setAppearanceColor}
+              startingSide={startingSide} setStartingSide={setStartingSide}
+            />
+          </div>
+        )}
+
+        {error && <p className="text-xs text-destructive">{error}</p>}
+
         <DialogFooter>
-          <DialogClose>
-            <Button variant="outline" type="button">Cancel</Button>
-          </DialogClose>
-          {method === 'video' && (
-            <Button type="submit" form="scout-form" disabled={pending}>
+          <DialogClose><Button variant="outline" type="button">Cancel</Button></DialogClose>
+          {method === 'single' && (
+            <Button
+              onClick={singleMode === 'url' ? submitSingleUrl : submitSingleUpload}
+              disabled={pending}
+            >
+              {pending ? (singleMode === 'upload' ? 'Uploading…' : 'Submitting…') : 'Submit'}
+            </Button>
+          )}
+          {method === 'session' && (
+            <Button onClick={submitSession} disabled={pending}>
               {pending ? 'Submitting…' : 'Submit'}
             </Button>
           )}

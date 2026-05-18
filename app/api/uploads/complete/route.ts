@@ -10,7 +10,7 @@ export const maxDuration = 30
 
 export async function POST(req: NextRequest) {
   try {
-    const { videoId, path, sourceType, format, appearanceHint, athleteImageBase64, spatialData, scanMode, athleteName, eventName, durationSeconds } = await req.json()
+    const { videoId, path, sourceType, format, appearanceHint, athleteImageBase64, spatialData, scanMode, athleteName, eventName, durationSeconds, tournamentOpponentId } = await req.json()
 
     if (!videoId || !path) return NextResponse.json({ error: 'videoId and path are required' }, { status: 400 })
 
@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
             eventName: eventName?.trim() || undefined,
             appearanceHint: appearanceHint?.trim() || undefined,
             athleteImageBase64: athleteImageBase64 || undefined,
+            tournamentOpponentId: tournamentOpponentId || undefined,
           },
         })
       } catch {
