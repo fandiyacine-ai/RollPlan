@@ -24,6 +24,15 @@ function videoFilePart(url: string, contentType = 'video/mp4') {
   return { type: 'file' as const, data: new URL(url), mediaType: contentType as `${string}/${string}` }
 }
 
+function parseYouTubeTimestamp(url: string): number {
+  try {
+    const t = new URL(url).searchParams.get('t')
+    if (!t) return 0
+    const s = parseInt(t)
+    return isNaN(s) ? 0 : s
+  } catch { return 0 }
+}
+
 export const scanUrl = inngest.createFunction(
   {
     id: 'scan-url',
@@ -110,7 +119,7 @@ export const scanUrl = inngest.createFunction(
           if (isYT) {
             if (chunkIndex !== undefined) {
               // Transient rate-limit on a chunk — wait 90s before retrying so quota resets
-              throw new RetryAfterError('Gemini quota temporarily exhausted in chunk — retrying.', '90s')
+              throw new RetryAfterError('Gemini quota temporarily exhausted in chunk — retrying.', '5m')
             }
             // Full video too long for Gemini — signal chunking to the outer function
             await db.update(videos).set({ status: 'processing' }).where(eq(videos.id, videoId))
@@ -148,9 +157,12 @@ export const scanUrl = inngest.createFunction(
 
     // ── Chunking: video was too long for a single Gemini pass ─────────────────
     if (scanStepResult === null) {
-      const chunkVideoIds: string[] = await step.run('create-chunk-videos', async () => {
+      const { chunkVideoIds: newChunkIds, urlOffset } = await step.run('create-chunk-videos', async () => {
         const original = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
         if (!original) throw new Error('Original video not found')
+
+        // Respect YouTube &t= timestamp so chunks start from where the user pointed, not second 0
+        const ytOffset = parseYouTubeTimestamp(original.publicUrl ?? '')
 
         const ids: string[] = []
         for (let i = 0; i < NUM_CHUNKS; i++) {
@@ -168,16 +180,15 @@ export const scanUrl = inngest.createFunction(
           ids.push(v.id)
         }
 
-        // Mark original as done — chunks carry the work forward
         await db.update(videos).set({ status: 'analysed' }).where(eq(videos.id, videoId))
-        return ids
+        return { chunkVideoIds: ids, urlOffset: ytOffset }
       })
 
       // Fire only chunk 0 — each chunk triggers the next on completion (sequential, not parallel)
       await step.sendEvent('send-first-chunk', {
         name: 'url/submitted' as const,
         data: {
-          videoId: chunkVideoIds[0],
+          videoId: newChunkIds[0],
           userId,
           athleteName,
           format,
@@ -186,11 +197,11 @@ export const scanUrl = inngest.createFunction(
           appearanceHint,
           athleteImageBase64,
           tournamentOpponentId,
-          startSeconds: 0,
-          endSeconds: CHUNK_SECS,
+          startSeconds: urlOffset,
+          endSeconds: urlOffset + CHUNK_SECS,
           chunkIndex: 0,
           chunkTotal: NUM_CHUNKS,
-          chunkVideoIds,
+          chunkVideoIds: newChunkIds,
         },
       })
 
@@ -471,6 +482,8 @@ export const scanUrl = inngest.createFunction(
     // Sequential chunk chain: trigger the next chunk only after this one is fully done
     if (chunkIndex !== undefined && chunkTotal !== undefined && chunkVideoIds && chunkIndex < chunkTotal - 1) {
       const nextIndex = chunkIndex + 1
+      // Brief cooldown so Gemini's per-minute quota has time to reset between chunks
+      await step.sleep('chunk-cooldown', '30s')
       await step.sendEvent('send-next-chunk', {
         name: 'url/submitted' as const,
         data: {
@@ -483,8 +496,8 @@ export const scanUrl = inngest.createFunction(
           appearanceHint,
           athleteImageBase64,
           tournamentOpponentId,
-          startSeconds: nextIndex * CHUNK_SECS,
-          endSeconds: (nextIndex + 1) * CHUNK_SECS,
+          startSeconds: endSeconds,           // current chunk end = next chunk start
+          endSeconds: endSeconds! + CHUNK_SECS,
           chunkIndex: nextIndex,
           chunkTotal,
           chunkVideoIds,
