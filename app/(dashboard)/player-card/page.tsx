@@ -9,6 +9,7 @@ import { DeleteVideoButton } from './delete-video-button'
 import { ClearAllButton } from './clear-all-button'
 import { POSITIONS } from '../../../lib/taxonomy/positions'
 import { auth, currentUser } from '@clerk/nextjs/server'
+import { ControlTrendChart, type TrendPoint } from './progress-chart'
 
 export const dynamic = 'force-dynamic'
 
@@ -111,6 +112,34 @@ export default async function PlayerCardPage() {
     ? Math.round(allInsights.reduce((acc, i) => acc + i.confidence, 0) / allInsights.length * 100)
     : null
 
+  // ── Per-match trend (chronological) ──
+  const perMatchTrend: TrendPoint[] = ownAnalysedIds
+    .map(id => {
+      const segs = allSegments.filter(s => s.matchId === id)
+      const total = segs.reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
+      const dominant = segs.filter(s => s.dominance === 'dominant').reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
+      const inferior = segs.filter(s => s.dominance === 'inferior').reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
+      const match = recentMatches.find(m => m.id === id)
+      return {
+        controlRate: total > 0 ? Math.round((dominant / total) * 100) : 0,
+        pressureRate: total > 0 ? Math.round((inferior / total) * 100) : 0,
+        createdAt: (match?.createdAt ?? new Date()).toISOString(),
+      }
+    })
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    .slice(-20)
+
+  // trend delta: last 3 vs previous 3
+  const trendDelta = (() => {
+    if (perMatchTrend.length < 4) return null
+    const recent = perMatchTrend.slice(-3)
+    const older = perMatchTrend.slice(-6, -3)
+    if (older.length === 0) return null
+    const recentAvg = recent.reduce((a, b) => a + b.controlRate, 0) / recent.length
+    const olderAvg = older.reduce((a, b) => a + b.controlRate, 0) / older.length
+    return Math.round(recentAvg - olderAvg)
+  })()
+
   // ── Position breakdown ──
   const positionStats: Record<string, { total: number; dominant: number; neutral: number; inferior: number }> = {}
   for (const seg of allSegments) {
@@ -193,6 +222,7 @@ export default async function PlayerCardPage() {
             value={`${controlPct}%`}
             sub={`${underPressurePct}% under pressure`}
             accent={controlPct >= 55 ? 'good' : controlPct < 35 ? 'bad' : undefined}
+            trend={trendDelta}
           />
           <StatCard
             label="Attacks Attempted"
@@ -204,6 +234,33 @@ export default async function PlayerCardPage() {
             value={avgAiScore !== null ? `${avgAiScore}%` : '—'}
             sub="avg analysis score"
           />
+        </div>
+      )}
+
+      {/* Progress over time */}
+      {ownAnalysedIds.length >= 2 && (
+        <div className="rounded-xl border border-border/60 overflow-hidden bg-card">
+          <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between">
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Progress Over Time</h2>
+            {trendDelta !== null && trendDelta !== 0 && (
+              <span className={`text-xs font-semibold ${trendDelta > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {trendDelta > 0 ? '↑' : '↓'} {Math.abs(trendDelta)}% vs prev 3 matches
+              </span>
+            )}
+          </div>
+          <div className="px-5 pt-3 pb-1">
+            <div className="flex items-center gap-5 text-xs text-muted-foreground mb-3">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-4 h-0.5 bg-emerald-400 rounded-full" />
+                Control Rate
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-4 h-0.5 bg-rose-500/50 rounded-full" />
+                Under Pressure
+              </span>
+            </div>
+            <ControlTrendChart data={perMatchTrend} />
+          </div>
         </div>
       )}
 
@@ -407,17 +464,24 @@ function ProfileHeader({ name, dbUser }: { name: string; dbUser: typeof users.$i
   )
 }
 
-function StatCard({ label, value, sub, accent }: {
-  label: string; value: string; sub?: string; accent?: 'good' | 'bad'
+function StatCard({ label, value, sub, accent, trend }: {
+  label: string; value: string; sub?: string; accent?: 'good' | 'bad'; trend?: number | null
 }) {
   return (
     <div className="rounded-xl border bg-card px-5 py-4 space-y-1">
       <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</p>
-      <p className={`text-3xl font-black tabular-nums tracking-tight leading-none mt-2 ${
-        accent === 'good' ? 'text-emerald-400' : accent === 'bad' ? 'text-rose-400' : 'text-foreground'
-      }`}>
-        {value}
-      </p>
+      <div className="flex items-end justify-between mt-2">
+        <p className={`text-3xl font-black tabular-nums tracking-tight leading-none ${
+          accent === 'good' ? 'text-emerald-400' : accent === 'bad' ? 'text-rose-400' : 'text-foreground'
+        }`}>
+          {value}
+        </p>
+        {trend != null && trend !== 0 && (
+          <span className={`text-xs font-bold mb-0.5 ${trend > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+            {trend > 0 ? '↑' : '↓'}{Math.abs(trend)}%
+          </span>
+        )}
+      </div>
       {sub && <p className="text-[11px] text-muted-foreground">{sub}</p>}
     </div>
   )
