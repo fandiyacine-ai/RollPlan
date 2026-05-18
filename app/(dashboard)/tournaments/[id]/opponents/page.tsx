@@ -6,60 +6,92 @@ import { OpponentAccordion } from './opponent-accordion'
 
 export const dynamic = 'force-dynamic'
 
+type MatchRow = {
+  id: string; status: string; format: string | null; context: string | null
+  eventName: string | null; createdAt: Date; label: string | null; tournamentOpponentId: string | null
+}
+
+type VideoRow = {
+  id: string; status: string; label: string; createdAt: Date; tournamentOpponentId: string | null
+}
+
+function DbError({ label, err }: { label: string; err: unknown }) {
+  const msg = err instanceof Error ? err.message : String(err)
+  return (
+    <div className="rounded-lg border border-rose-800/50 bg-rose-950/20 p-4 text-sm text-rose-400">
+      <p className="font-semibold mb-1">DB error ({label})</p>
+      <pre className="text-xs whitespace-pre-wrap break-all">{msg}</pre>
+    </div>
+  )
+}
+
 export default async function OpponentsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: tournamentId } = await params
 
-  const opponents = await db
-    .select()
-    .from(tournamentOpponents)
-    .where(eq(tournamentOpponents.tournamentId, tournamentId))
-    .orderBy(tournamentOpponents.createdAt)
+  let opponents: { id: string; tournamentId: string; opponentLabel: string; playerCardId: string | null; seedingNotes: string | null; createdAt: Date }[]
+  try {
+    opponents = await db
+      .select()
+      .from(tournamentOpponents)
+      .where(eq(tournamentOpponents.tournamentId, tournamentId))
+      .orderBy(tournamentOpponents.createdAt)
+  } catch (err) {
+    return <DbError label="opponents query" err={err} />
+  }
 
   const opponentIds = opponents.map(o => o.id)
 
-  const [allMatches, allPendingVideos] = opponentIds.length > 0
-    ? await Promise.all([
-        db.select({
-          id: matches.id,
-          status: matches.status,
-          format: matches.format,
-          context: matches.context,
-          eventName: matches.eventName,
-          createdAt: matches.createdAt,
-          label: matches.eventName,
-          tournamentOpponentId: matches.tournamentOpponentId,
-        })
-        .from(matches)
-        .where(inArray(matches.tournamentOpponentId, opponentIds))
-        .orderBy(matches.createdAt),
+  let allMatches: MatchRow[] = []
+  let allPendingVideos: VideoRow[] = []
 
-        // Videos queued/scanning/failed that don't have a match record yet
-        db.select({
-          id: videos.id,
-          status: videos.status,
-          label: videos.originalFilename,
-          createdAt: videos.uploadedAt,
-          tournamentOpponentId: videos.tournamentOpponentId,
-        })
-        .from(videos)
-        .leftJoin(matches, eq(matches.videoId, videos.id))
-        .where(and(
-          inArray(videos.tournamentOpponentId, opponentIds),
-          isNull(matches.id),
-          ne(videos.status, 'analysed'),
-        ))
-        .orderBy(videos.uploadedAt),
-      ])
-    : [[], []]
+  if (opponentIds.length > 0) {
+    try {
+      allMatches = await db.select({
+        id: matches.id,
+        status: matches.status,
+        format: matches.format,
+        context: matches.context,
+        eventName: matches.eventName,
+        createdAt: matches.createdAt,
+        label: matches.eventName,
+        tournamentOpponentId: matches.tournamentOpponentId,
+      })
+      .from(matches)
+      .where(inArray(matches.tournamentOpponentId, opponentIds))
+      .orderBy(matches.createdAt) as MatchRow[]
+    } catch (err) {
+      return <DbError label="matches query" err={err} />
+    }
 
-  const matchesByOpponent = allMatches.reduce<Record<string, typeof allMatches>>((acc, m) => {
+    try {
+      allPendingVideos = await db.select({
+        id: videos.id,
+        status: videos.status,
+        label: videos.originalFilename,
+        createdAt: videos.uploadedAt,
+        tournamentOpponentId: videos.tournamentOpponentId,
+      })
+      .from(videos)
+      .leftJoin(matches, eq(matches.videoId, videos.id))
+      .where(and(
+        inArray(videos.tournamentOpponentId, opponentIds),
+        isNull(matches.id),
+        ne(videos.status, 'analysed'),
+      ))
+      .orderBy(videos.uploadedAt) as VideoRow[]
+    } catch (err) {
+      return <DbError label="videos query" err={err} />
+    }
+  }
+
+  const matchesByOpponent = allMatches.reduce<Record<string, MatchRow[]>>((acc, m) => {
     if (!m.tournamentOpponentId) return acc
     acc[m.tournamentOpponentId] ??= []
     acc[m.tournamentOpponentId].push(m)
     return acc
   }, {})
 
-  const pendingVideosByOpponent = allPendingVideos.reduce<Record<string, typeof allPendingVideos>>((acc, v) => {
+  const pendingVideosByOpponent = allPendingVideos.reduce<Record<string, VideoRow[]>>((acc, v) => {
     if (!v.tournamentOpponentId) return acc
     acc[v.tournamentOpponentId] ??= []
     acc[v.tournamentOpponentId].push(v)
