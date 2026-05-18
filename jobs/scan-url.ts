@@ -36,8 +36,8 @@ export const scanUrl = inngest.createFunction(
   }) => {
     const { videoId, userId, athleteName, format, sourceType, eventName, appearanceHint, athleteImageBase64, tournamentOpponentId, skipScan, startSeconds, endSeconds, chunkIndex, chunkTotal } = event.data
 
-    const CHUNK_SECS = 85 * 60  // 85-minute windows — safely under Gemini's ~90-min video limit
-    const NUM_CHUNKS = 3         // covers up to 4h15m
+    const CHUNK_SECS = 30 * 60  // 30-minute windows — ~180 frames at 0.1fps, well within quota
+    const NUM_CHUNKS = 6        // covers up to 3 hours
 
     // null return value signals "needs chunking" — handled after the step
     const scanStepResult: FoundMatch[] | null = skipScan
@@ -99,31 +99,35 @@ export const scanUrl = inngest.createFunction(
           status: 'success',
         })
       } catch (err: unknown) {
-        await db.update(videos).set({ status: 'failed' }).where(eq(videos.id, videoId))
         const msg = err instanceof Error ? err.message : String(err)
         const isYT = isYouTubeUrl(video.publicUrl)
+
         if (msg.includes('10800') || msg.includes('fewer than') || msg.includes('images in your request')) {
+          await db.update(videos).set({ status: 'failed' }).where(eq(videos.id, videoId))
           throw new NonRetriableError('Stream is too long — try a shorter clip or a direct mat recording instead of the full event stream.')
         }
         if (msg.includes('Resource has been exhausted') || msg.includes('RESOURCE_EXHAUSTED')) {
           if (isYT) {
             if (chunkIndex !== undefined) {
-              // Already a chunk — this is a real transient rate-limit, retry normally
+              // Already a chunk — transient rate-limit, leave status as-is so UI doesn't show failed during retry
               throw new Error('Gemini quota temporarily exhausted in chunk — retrying.')
             }
             // Full video too long for Gemini — signal chunking to the outer function
             await db.update(videos).set({ status: 'processing' }).where(eq(videos.id, videoId))
             return null
           }
+          await db.update(videos).set({ status: 'failed' }).where(eq(videos.id, videoId))
           throw new NonRetriableError('Video is too large to process — keep direct video files under ~1 hour. For full tournament streams use the YouTube URL instead.')
         }
         if (msg.includes('input token count exceeds') || msg.includes('maximum number of tokens allowed')) {
+          await db.update(videos).set({ status: 'failed' }).where(eq(videos.id, videoId))
           throw new NonRetriableError(
             isYT
               ? 'YouTube video exceeded token limit even at low fps — this stream may be over 6 hours. Try submitting the individual mat recording URL instead of the full event stream.'
               : 'Video is too long for a single analysis pass — submit as a YouTube URL or split into ~1-hour segments.'
           )
         }
+        await db.update(videos).set({ status: 'failed' }).where(eq(videos.id, videoId))
         throw err
       }
 
