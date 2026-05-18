@@ -1,7 +1,6 @@
 'use client'
 
 import { useRef, useState, useEffect } from 'react'
-import { toPng } from 'html-to-image'
 import { ShareCard, type ShareCardData } from './share-card'
 
 export function ShareCardButton({ data }: { data: ShareCardData }) {
@@ -20,6 +19,7 @@ export function ShareCardButton({ data }: { data: ShareCardData }) {
     if (!cardRef.current) return
     setDownloading(true)
     try {
+      const { toPng } = await import('html-to-image')
       const dataUrl = await toPng(cardRef.current, {
         pixelRatio: 2,
         cacheBust: true,
