@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp, pgEnum, jsonb } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, integer, timestamp, pgEnum, jsonb, boolean } from 'drizzle-orm/pg-core'
 import { users } from './users'
 import { videos } from './videos'
 import { tournamentOpponents } from './tournaments'
@@ -28,5 +28,7 @@ export const matches = pgTable('matches', {
   tournamentOpponentId: uuid('tournament_opponent_id').references(() => tournamentOpponents.id, { onDelete: 'set null' }),
   spatialData: jsonb('spatial_data'), // { roi: {x1,y1,x2,y2}, athlete: {x,y} } — from frame selector
   narration: text('narration'),
+  shareToken: text('share_token').unique(),
+  shareIncludesVideo: boolean('share_includes_video').default(false),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })

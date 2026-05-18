@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
 import { MatchContent, type TimelineItem } from './match-content'
 import { NarrateButton } from './narrate-button'
+import { ShareButton } from './share-button'
 import { POSITIONS } from '../../../../lib/taxonomy/positions'
 import { EVENT_TYPES } from '../../../../lib/taxonomy/events'
 
@@ -129,13 +130,16 @@ export default async function MatchDetailPage({
               {STATUS_LABEL[match.status] ?? match.status}
             </span>
             {match.status === 'analysed' && (
-              <Link
-                href={`/matches/${matchId}/coach`}
-                className={`${buttonVariants({ size: 'sm' })} gap-1.5`}
-              >
-                Frame by Frame
-                <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-white/20 leading-none tracking-wide">AI</span>
-              </Link>
+              <>
+                <ShareButton matchId={matchId} />
+                <Link
+                  href={`/matches/${matchId}/coach`}
+                  className={`${buttonVariants({ size: 'sm' })} gap-1.5`}
+                >
+                  Frame by Frame
+                  <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-white/20 leading-none tracking-wide">AI</span>
+                </Link>
+              </>
             )}
           </div>
         </div>

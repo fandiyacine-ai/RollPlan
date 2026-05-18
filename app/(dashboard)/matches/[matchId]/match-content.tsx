@@ -276,6 +276,7 @@ function drawBboxes(
 
 export function MatchContent({
   videoUrl,
+  videoHidden,
   matchInsights,
   segments,
   spatialData,
@@ -284,6 +285,7 @@ export function MatchContent({
   opponentLabel,
 }: {
   videoUrl: string | null
+  videoHidden?: boolean
   matchInsights: InsightRow[]
   segments: SegmentRef[]
   spatialData: SpatialData | null
@@ -412,8 +414,18 @@ export function MatchContent({
 
   return (
     <div className="space-y-5">
+      {/* Video hidden placeholder */}
+      {videoHidden && (
+        <div className="relative rounded-xl overflow-hidden border bg-muted aspect-video flex items-center justify-center select-none">
+          <div className="absolute inset-0 backdrop-blur-sm bg-background/60" />
+          <div className="relative text-center space-y-1">
+            <p className="text-sm font-medium text-muted-foreground">Video hidden by owner</p>
+          </div>
+        </div>
+      )}
+
       {/* Video player with overlay canvas */}
-      {(extractYouTubeId(videoUrl ?? '') || videoUrl) && (
+      {!videoHidden && (extractYouTubeId(videoUrl ?? '') || videoUrl) && (
         <div className="space-y-2">
           {extractYouTubeId(videoUrl ?? '') ? (
             <div className="relative rounded-xl overflow-hidden border bg-black select-none aspect-video">
