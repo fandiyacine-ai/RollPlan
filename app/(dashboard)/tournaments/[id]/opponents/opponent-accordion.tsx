@@ -186,7 +186,7 @@ export function OpponentAccordion({
                 </div>
                 {m.status === 'analysed' && (
                   <Link
-                    href={`/matches/${m.id}`}
+                    href={`/matches/${m.id}?back=/tournaments/${tournamentId}/opponents`}
                     className="text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
                   >
                     View →

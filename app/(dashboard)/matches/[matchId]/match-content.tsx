@@ -2,6 +2,19 @@
 
 import { useRef, useState, useEffect, useMemo } from 'react'
 
+function extractYouTubeId(url: string): string | null {
+  try {
+    const u = new URL(url)
+    if (u.hostname.includes('youtu.be')) return u.pathname.slice(1).split('/')[0] ?? null
+    if (u.hostname.includes('youtube.com')) {
+      if (u.pathname.startsWith('/watch')) return u.searchParams.get('v')
+      const m = u.pathname.match(/\/(?:live|embed|v)\/([^/?]+)/)
+      return m?.[1] ?? null
+    }
+  } catch {}
+  return null
+}
+
 type Bbox = { x1: number; y1: number; x2: number; y2: number }
 
 type SegmentRef = {
@@ -47,10 +60,13 @@ type SpatialData = {
 }
 
 function formatTime(seconds: number): string {
-  if (seconds < 60) return `${Math.round(seconds)}s`
-  const m = Math.floor(seconds / 60)
-  const s = Math.round(seconds % 60)
-  return s > 0 ? `${m}m ${s}s` : `${m}m`
+  const total = Math.round(seconds)
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  if (h > 0) return s > 0 ? `${h}h ${m}m ${s}s` : m > 0 ? `${h}h ${m}m` : `${h}h`
+  if (m > 0) return s > 0 ? `${m}m ${s}s` : `${m}m`
+  return `${s}s`
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -268,6 +284,7 @@ export function MatchContent({
   timelineItems: TimelineItem[]
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const overlayTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const [overlayVisible, setOverlayVisible] = useState(false)
@@ -361,6 +378,17 @@ export function MatchContent({
   )
 
   function seekTo(seconds: number) {
+    const ytId = videoUrl ? extractYouTubeId(videoUrl) : null
+    if (ytId) {
+      iframeRef.current?.contentWindow?.postMessage(
+        JSON.stringify({ event: 'command', func: 'seekTo', args: [Math.max(0, seconds - 1.5), true] }), '*'
+      )
+      iframeRef.current?.contentWindow?.postMessage(
+        JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*'
+      )
+      return
+    }
+
     const vid = videoRef.current
     if (!vid) return
     vid.currentTime = Math.max(0, seconds - 1.5)
@@ -377,24 +405,36 @@ export function MatchContent({
   return (
     <div className="space-y-5">
       {/* Video player with overlay canvas */}
-      {videoUrl && (
+      {(extractYouTubeId(videoUrl ?? '') || videoUrl) && (
         <div className="space-y-2">
-          <div className="relative rounded-xl overflow-hidden border bg-black select-none">
-            <video
-              ref={videoRef}
-              src={videoUrl}
-              controls
-              playsInline
-              className="w-full max-h-[45vh] object-contain block"
-              preload="metadata"
-            />
-            <canvas
-              ref={canvasRef}
-              className="absolute inset-0 pointer-events-none"
-              style={{ opacity: 0 }}
-            />
-          </div>
-          {hasBboxData && (
+          {extractYouTubeId(videoUrl ?? '') ? (
+            <div className="relative rounded-xl overflow-hidden border bg-black select-none aspect-video">
+              <iframe
+                ref={iframeRef}
+                src={`https://www.youtube.com/embed/${extractYouTubeId(videoUrl ?? '')}?enablejsapi=1`}
+                className="w-full h-full"
+                allow="autoplay; encrypted-media"
+                allowFullScreen
+              />
+            </div>
+          ) : (
+            <div className="relative rounded-xl overflow-hidden border bg-black select-none">
+              <video
+                ref={videoRef}
+                src={videoUrl!}
+                controls
+                playsInline
+                className="w-full max-h-[45vh] object-contain block"
+                preload="metadata"
+              />
+              <canvas
+                ref={canvasRef}
+                className="absolute inset-0 pointer-events-none"
+                style={{ opacity: 0 }}
+              />
+            </div>
+          )}
+          {!extractYouTubeId(videoUrl ?? '') && hasBboxData && (
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-green-400 inline-block" />You</span>
               <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-red-400 inline-block" />Opponent</span>
@@ -433,6 +473,13 @@ export function MatchContent({
             <p className="text-sm text-muted-foreground py-4">No timeline data for this match.</p>
           ) : (
             <div className="relative">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground pb-3">
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0" />In Control</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-zinc-500 flex-shrink-0" />Neutral</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-rose-500 flex-shrink-0" />Under Pressure</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-400 flex-shrink-0" />Your action</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-orange-400 flex-shrink-0" />Opponent action</span>
+              </div>
               <div className="absolute left-[19px] top-3 bottom-3 w-px bg-border/60" />
               <div className="space-y-0">
                 {timelineItems.map((item, i) => (
@@ -461,6 +508,12 @@ export function MatchContent({
             <p className="text-sm text-muted-foreground">No coaching notes generated for this match yet.</p>
           ) : (
             <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-emerald-500/60 flex-shrink-0" />Strength</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-rose-500/60 flex-shrink-0" />Mistake</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-blue-500/60 flex-shrink-0" />Opportunity</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-amber-500/60 flex-shrink-0" />Pattern</span>
+              </div>
               {matchInsights.map((insight) => {
                 const ids = Array.isArray(insight.evidenceSegmentIds) ? (insight.evidenceSegmentIds as string[]) : []
                 const evidenceSegs = ids.map((id) => segmentsById[id]).filter(Boolean) as SegmentRef[]

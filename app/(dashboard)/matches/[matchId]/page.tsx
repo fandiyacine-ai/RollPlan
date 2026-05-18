@@ -35,8 +35,18 @@ function formatTime(seconds: number): string {
   return s > 0 ? `${m}m ${s}s` : `${m}m`
 }
 
-export default async function MatchDetailPage({ params }: { params: Promise<{ matchId: string }> }) {
+export default async function MatchDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ matchId: string }>
+  searchParams: Promise<{ back?: string }>
+}) {
   const { matchId } = await params
+  const { back } = await searchParams
+
+  const backHref = back ?? '/matches'
+  const backLabel = back?.includes('/tournaments') ? '← Scout Opponent' : '← My Matches'
 
   const match = await db.query.matches.findFirst({ where: eq(matches.id, matchId) })
   if (!match) notFound()
@@ -92,12 +102,16 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ ma
     <div className="space-y-6 max-w-3xl">
       {/* Header */}
       <div>
-        <Link href="/matches" className="text-xs text-muted-foreground hover:text-foreground inline-block mb-3">
-          ← My Matches
+        <Link href={backHref} className="text-xs text-muted-foreground hover:text-foreground inline-block mb-3">
+          {backLabel}
         </Link>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">vs. {match.opponentLabel}</h1>
+            <h1 className="text-2xl font-bold">
+              {match.tournamentOpponentId
+                ? `${match.competitorLabel || 'Unknown'} vs. ${match.opponentLabel}`
+                : `vs. ${match.opponentLabel}`}
+            </h1>
             <p className="text-sm text-muted-foreground mt-1">
               {match.format === 'no_gi' ? 'No-Gi' : 'Gi'} · {match.context}
               {match.eventName ? ` · ${match.eventName}` : ''}
