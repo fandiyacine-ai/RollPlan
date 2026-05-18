@@ -16,7 +16,19 @@ export default async function TournamentLayout({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const tournament = await db.query.tournaments.findFirst({ where: eq(tournaments.id, id) })
+
+  let tournament: Awaited<ReturnType<typeof db.query.tournaments.findFirst>>
+  try {
+    tournament = await db.query.tournaments.findFirst({ where: eq(tournaments.id, id) })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    return (
+      <div className="p-4 rounded-lg border border-rose-800/50 bg-rose-950/20 text-sm text-rose-400">
+        <p className="font-semibold mb-1">DB error (layout: tournaments query)</p>
+        <pre className="text-xs whitespace-pre-wrap break-all">{msg}</pre>
+      </div>
+    )
+  }
   if (!tournament) notFound()
 
   return (
