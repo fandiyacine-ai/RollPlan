@@ -306,6 +306,19 @@ export const scanUrl = inngest.createFunction(
             extractUsage = { inputTokens: result.usage.inputTokens ?? 0, outputTokens: result.usage.outputTokens ?? 0 }
           }
         } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err)
+          // Transient Gemini errors — leave status as 'processing' so UI doesn't flash 'failed'
+          // during a retry, and use RetryAfterError so we don't hammer the API immediately.
+          if (
+            msg.includes('high demand') ||
+            msg.includes('Internal error encountered') ||
+            msg.includes('503') ||
+            msg.includes('500') ||
+            msg.includes('overloaded') ||
+            msg.includes('UNAVAILABLE')
+          ) {
+            throw new RetryAfterError('Gemini temporarily unavailable during extraction — retrying.', '3m')
+          }
           await db.update(matches).set({ status: 'failed' }).where(eq(matches.id, match.id))
           throw err
         }
@@ -466,6 +479,10 @@ export const scanUrl = inngest.createFunction(
             status: 'success',
           })
         } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err)
+          if (msg.includes('overloaded') || msg.includes('529') || msg.includes('high demand')) {
+            throw new RetryAfterError('Claude temporarily unavailable during insights — retrying.', '3m')
+          }
           await db.update(matches).set({ status: 'failed' }).where(eq(matches.id, match.id))
           throw err
         }
