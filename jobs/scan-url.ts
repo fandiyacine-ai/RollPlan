@@ -37,6 +37,7 @@ export const scanUrl = inngest.createFunction(
   {
     id: 'scan-url',
     name: 'Scan URL for Matches',
+    retries: 10,
     triggers: [{ event: 'url/submitted' }],
   },
   async ({ event, step }: {
@@ -213,10 +214,9 @@ export const scanUrl = inngest.createFunction(
     for (let i = 0; i < foundMatches.length; i++) {
       const found = foundMatches[i]
 
-      await step.run(`analyse-match-${i}`, async () => {
-        const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
-        if (!video?.publicUrl) throw new Error('Video has no public URL')
-
+      // Step A: create match record in its own memoised step — if extraction is retried,
+      // Inngest replays this step's result without re-inserting, preventing ghost match records.
+      const matchId = await step.run(`create-match-${i}`, async () => {
         const [match] = await db.insert(matches).values({
           videoId,
           userId: userId ?? null,
@@ -230,265 +230,281 @@ export const scanUrl = inngest.createFunction(
           tournamentOpponentId: tournamentOpponentId ?? null,
           status: 'processing',
         }).returning()
+        return match.id
+      })
 
-        // Extract positions + events
-        const extractStart = Date.now()
-        const isYT = isYouTubeUrl(video.publicUrl)
-        let extractObject: MatchExtractionOutput
-        let extractUsage: { inputTokens: number; outputTokens: number }
+      // Step B: extract + analyse — idempotency guards mean retries safely skip already-done work
+      await step.run(`extract-match-${i}`, async () => {
+        const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
+        if (!video?.publicUrl) throw new Error('Video has no public URL')
 
-        try {
-          if (isYT) {
-            // Trim the YouTube video to just this match window. Gemini reports timestamps
-            // relative to the clip start, so we shift back to absolute after.
-            // For chunk jobs, startSeconds is the chunk's offset into the video —
-            // found.start/end_seconds are relative to the chunk start, so we add the offset
-            // to get the absolute position in the full video.
-            const chunkOffset = startSeconds ?? 0
-            const clipStart = skipScan ? 0 : (chunkOffset + found.start_seconds)
-            const clipEnd = skipScan ? undefined : (chunkOffset + found.end_seconds)
-            const matchDuration = found.end_seconds - found.start_seconds
-            const videoOptions = skipScan
-              ? { fps: 1.0 }
-              : { fps: 1.0, startSeconds: clipStart, endSeconds: clipEnd }
-            const result = await geminiVideoObject(GEMINI_URL_SCAN_MODEL, {
-              system: buildExtractMatchSystemPrompt(),
-              videoUrl: video.publicUrl,
-              videoOptions,
-              userPrompt: buildExtractMatchUserPrompt({
-                competitorDescription: athleteName,
-                appearanceHint: appearanceHint || undefined,
-                format: format as 'gi' | 'no_gi',
-                ruleset: 'ibjjf',
-                timestampRange: skipScan ? undefined : { startSeconds: 0, endSeconds: matchDuration },
-              }),
-              schema: MatchExtractionOutputSchema,
-              referenceImageBase64: athleteImageBase64 || undefined,
-            })
-            // Only shift timestamps if we trimmed the clip (not when skipScan)
-            extractObject = skipScan ? result.object : {
-              ...result.object,
-              positions: result.object.positions.map(p => ({
-                ...p,
-                start_seconds: p.start_seconds + clipStart,
-                end_seconds: p.end_seconds + clipStart,
-              })),
-              events: result.object.events.map(e => ({
-                ...e,
-                timestamp_seconds: e.timestamp_seconds + clipStart,
-              })),
+        // Idempotency: skip extraction if positions were already saved on a prior attempt
+        const existingSegments = await db.query.positionSegments.findMany({ where: eq(positionSegments.matchId, matchId) })
+
+        if (existingSegments.length === 0) {
+          // Extract positions + events
+          const extractStart = Date.now()
+          const isYT = isYouTubeUrl(video.publicUrl)
+          let extractObject: MatchExtractionOutput
+          let extractUsage: { inputTokens: number; outputTokens: number }
+
+          try {
+            if (isYT) {
+              // Trim the YouTube video to just this match window. Gemini reports timestamps
+              // relative to the clip start, so we shift back to absolute after.
+              // For chunk jobs, startSeconds is the chunk's offset into the video —
+              // found.start/end_seconds are relative to the chunk start, so we add the offset
+              // to get the absolute position in the full video.
+              const chunkOffset = startSeconds ?? 0
+              const clipStart = skipScan ? 0 : (chunkOffset + found.start_seconds)
+              const clipEnd = skipScan ? undefined : (chunkOffset + found.end_seconds)
+              const matchDuration = found.end_seconds - found.start_seconds
+              const videoOptions = skipScan
+                ? { fps: 1.0 }
+                : { fps: 1.0, startSeconds: clipStart, endSeconds: clipEnd }
+              const result = await geminiVideoObject(GEMINI_URL_SCAN_MODEL, {
+                system: buildExtractMatchSystemPrompt(),
+                videoUrl: video.publicUrl,
+                videoOptions,
+                userPrompt: buildExtractMatchUserPrompt({
+                  competitorDescription: athleteName,
+                  appearanceHint: appearanceHint || undefined,
+                  format: format as 'gi' | 'no_gi',
+                  ruleset: 'ibjjf',
+                  timestampRange: skipScan ? undefined : { startSeconds: 0, endSeconds: matchDuration },
+                }),
+                schema: MatchExtractionOutputSchema,
+                referenceImageBase64: athleteImageBase64 || undefined,
+              })
+              // Only shift timestamps if we trimmed the clip (not when skipScan)
+              extractObject = skipScan ? result.object : {
+                ...result.object,
+                positions: result.object.positions.map(p => ({
+                  ...p,
+                  start_seconds: p.start_seconds + clipStart,
+                  end_seconds: p.end_seconds + clipStart,
+                })),
+                events: result.object.events.map(e => ({
+                  ...e,
+                  timestamp_seconds: e.timestamp_seconds + clipStart,
+                })),
+              }
+              extractUsage = result.usage
+            } else {
+              const result = await generateObject({
+                model: google(GEMINI_URL_SCAN_MODEL),
+                schema: MatchExtractionOutputSchema,
+                maxRetries: 0,
+                system: buildExtractMatchSystemPrompt(),
+                messages: [{
+                  role: 'user',
+                  content: [
+                    videoFilePart(video.publicUrl, video.contentType),
+                    {
+                      type: 'text',
+                      text: buildExtractMatchUserPrompt({
+                        competitorDescription: athleteName,
+                        appearanceHint: appearanceHint || undefined,
+                        format: format as 'gi' | 'no_gi',
+                        ruleset: 'ibjjf',
+                        timestampRange: { startSeconds: found.start_seconds, endSeconds: found.end_seconds },
+                      }),
+                    },
+                  ],
+                }],
+              })
+              extractObject = result.object
+              extractUsage = { inputTokens: result.usage.inputTokens ?? 0, outputTokens: result.usage.outputTokens ?? 0 }
             }
-            extractUsage = result.usage
-          } else {
-            const result = await generateObject({
-              model: google(GEMINI_URL_SCAN_MODEL),
-              schema: MatchExtractionOutputSchema,
-              maxRetries: 0,
-              system: buildExtractMatchSystemPrompt(),
-              messages: [{
-                role: 'user',
-                content: [
-                  videoFilePart(video.publicUrl, video.contentType),
-                  {
-                    type: 'text',
-                    text: buildExtractMatchUserPrompt({
-                      competitorDescription: athleteName,
-                      appearanceHint: appearanceHint || undefined,
-                      format: format as 'gi' | 'no_gi',
-                      ruleset: 'ibjjf',
-                      timestampRange: { startSeconds: found.start_seconds, endSeconds: found.end_seconds },
-                    }),
-                  },
-                ],
-              }],
-            })
-            extractObject = result.object
-            extractUsage = { inputTokens: result.usage.inputTokens ?? 0, outputTokens: result.usage.outputTokens ?? 0 }
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err)
+            // Transient Gemini errors — leave status as 'processing' so UI doesn't flash 'failed'
+            // during a retry, and use RetryAfterError so we don't hammer the API immediately.
+            if (
+              msg.includes('high demand') ||
+              msg.includes('Internal error encountered') ||
+              msg.includes('503') ||
+              msg.includes('500') ||
+              msg.includes('overloaded') ||
+              msg.includes('UNAVAILABLE')
+            ) {
+              throw new RetryAfterError('Gemini temporarily unavailable during extraction — retrying.', '3m')
+            }
+            await db.update(matches).set({ status: 'failed' }).where(eq(matches.id, matchId))
+            throw err
           }
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err)
-          // Transient Gemini errors — leave status as 'processing' so UI doesn't flash 'failed'
-          // during a retry, and use RetryAfterError so we don't hammer the API immediately.
-          if (
-            msg.includes('high demand') ||
-            msg.includes('Internal error encountered') ||
-            msg.includes('503') ||
-            msg.includes('500') ||
-            msg.includes('overloaded') ||
-            msg.includes('UNAVAILABLE')
-          ) {
-            throw new RetryAfterError('Gemini temporarily unavailable during extraction — retrying.', '3m')
+
+          if (extractObject.positions.length === 0) {
+            await db.update(matches).set({ status: 'failed' }).where(eq(matches.id, matchId))
+            return { matchId, status: 'failed' }
           }
-          await db.update(matches).set({ status: 'failed' }).where(eq(matches.id, match.id))
-          throw err
-        }
 
-        if (extractObject.positions.length === 0) {
-          await db.update(matches).set({ status: 'failed' }).where(eq(matches.id, match.id))
-          return { matchId: match.id, status: 'failed' }
-        }
-
-        await db.transaction(async (tx) => {
-          await tx.insert(positionSegments).values(
-            extractObject.positions.map((p) => ({
-              matchId: match.id,
-              startSeconds: p.start_seconds,
-              endSeconds: p.end_seconds,
-              positionId: p.position_id,
-              userRole: p.user_role,
-              dominance: p.dominance,
-              confidence: p.confidence,
-              userBbox: p.user_bbox ?? null,
-              opponentBbox: p.opponent_bbox ?? null,
-            }))
-          )
-          if (extractObject.events.length > 0) {
-            await tx.insert(matchEvents).values(
-              extractObject.events.map((e) => ({
-                matchId: match.id,
-                timestampSeconds: e.timestamp_seconds,
-                eventTypeId: e.event_type_id,
-                actor: e.actor,
-                outcome: e.outcome,
-                techniqueLabel: e.technique_label ?? null,
-                confidence: e.confidence,
+          await db.transaction(async (tx) => {
+            await tx.insert(positionSegments).values(
+              extractObject.positions.map((p) => ({
+                matchId,
+                startSeconds: p.start_seconds,
+                endSeconds: p.end_seconds,
+                positionId: p.position_id,
+                userRole: p.user_role,
+                dominance: p.dominance,
+                confidence: p.confidence,
+                userBbox: p.user_bbox ?? null,
+                opponentBbox: p.opponent_bbox ?? null,
               }))
             )
-          }
-        })
-
-        await db.insert(aiCallLogs).values({
-          jobId: match.id,
-          model: GEMINI_URL_SCAN_MODEL,
-          promptVersion: EXTRACT_MATCH_PROMPT_VERSION,
-          tokensIn: extractUsage.inputTokens ?? 0,
-          tokensOut: extractUsage.outputTokens ?? 0,
-          costUsdEstimate: estimateCostUsd(GEMINI_URL_SCAN_MODEL, extractUsage.inputTokens ?? 0, extractUsage.outputTokens ?? 0),
-          latencyMs: Date.now() - extractStart,
-          status: 'success',
-        })
-
-        // Verify positions — targeted second pass on confusion-prone / low-confidence segments.
-        // Skip for YouTube: extraction already runs at 1fps on the trimmed match window.
-        if (!isYT) try {
-          const allSegments = await db.query.positionSegments.findMany({ where: eq(positionSegments.matchId, match.id) })
-          const toVerify = allSegments.filter(s => s.confidence < 0.75 || CONFUSION_PRONE.has(s.positionId))
-
-          if (toVerify.length > 0) {
-            const verifyStart = Date.now()
-            const { object: verifyObject, usage: verifyUsage } = await generateObject({
-              model: google(GEMINI_URL_SCAN_MODEL),
-              schema: PositionVerificationSchema,
-              maxRetries: 0,
-              system: buildVerifyPositionsSystemPrompt(),
-              messages: [{
-                role: 'user',
-                content: [
-                  videoFilePart(video.publicUrl, video.contentType),
-                  { type: 'text', text: buildVerifyPositionsUserPrompt(
-                    toVerify.map((s, i) => ({
-                      index: i,
-                      positionId: s.positionId,
-                      userRole: s.userRole,
-                      dominance: s.dominance,
-                      startSeconds: s.startSeconds,
-                      endSeconds: s.endSeconds,
-                      confidence: s.confidence,
-                    }))
-                  )},
-                ],
-              }],
-            })
-
-            for (const review of verifyObject.reviews) {
-              if (!review.confirmed && review.corrected_position_id && review.confidence >= 0.8) {
-                const seg = toVerify[review.segment_index]
-                if (!seg) continue
-                await db.update(positionSegments).set({
-                  positionId: review.corrected_position_id,
-                  ...(review.corrected_dominance ? { dominance: review.corrected_dominance } : {}),
-                  confidence: review.confidence,
-                }).where(eq(positionSegments.id, seg.id))
-              }
+            if (extractObject.events.length > 0) {
+              await tx.insert(matchEvents).values(
+                extractObject.events.map((e) => ({
+                  matchId,
+                  timestampSeconds: e.timestamp_seconds,
+                  eventTypeId: e.event_type_id,
+                  actor: e.actor,
+                  outcome: e.outcome,
+                  techniqueLabel: e.technique_label ?? null,
+                  confidence: e.confidence,
+                }))
+              )
             }
-
-            await db.insert(aiCallLogs).values({
-              jobId: match.id,
-              model: GEMINI_URL_SCAN_MODEL,
-              promptVersion: VERIFY_POSITIONS_PROMPT_VERSION,
-              tokensIn: verifyUsage.inputTokens ?? 0,
-              tokensOut: verifyUsage.outputTokens ?? 0,
-              costUsdEstimate: estimateCostUsd(GEMINI_URL_SCAN_MODEL, verifyUsage.inputTokens ?? 0, verifyUsage.outputTokens ?? 0),
-              latencyMs: Date.now() - verifyStart,
-              status: 'success',
-            })
-          }
-        } catch {
-          // Verification is best-effort — don't fail the match
-        }
-
-        // Generate insights
-        const segments = await db.query.positionSegments.findMany({ where: eq(positionSegments.matchId, match.id) })
-        const events = await db.query.matchEvents.findMany({ where: eq(matchEvents.matchId, match.id) })
-
-        const matchData = {
-          segments: segments.map((s) => ({
-            id: s.id, start_seconds: s.startSeconds, end_seconds: s.endSeconds,
-            position_id: s.positionId, user_role: s.userRole, dominance: s.dominance, confidence: s.confidence,
-          })),
-          events: events.map((e) => ({
-            id: e.id, timestamp_seconds: e.timestampSeconds, event_type_id: e.eventTypeId,
-            actor: e.actor, outcome: e.outcome, technique_label: e.techniqueLabel, confidence: e.confidence,
-          })),
-        }
-
-        const insightStart = Date.now()
-        try {
-          const { object: insightObj, usage: insightUsage } = await generateObject({
-            model: anthropic(CLAUDE_SYNTHESIS_MODEL),
-            schema: InsightsOutputSchema,
-            maxRetries: 0,
-            system: buildGenerateInsightsSystemPrompt(),
-            prompt: JSON.stringify(matchData),
           })
-
-          await db.insert(insights).values(
-            insightObj.insights.map((insight) => ({
-              matchId: match.id,
-              category: insight.category,
-              severity: insight.severity,
-              description: insight.description,
-              suggestion: insight.suggestion,
-              conceptTags: insight.concept_tags,
-              evidenceSegmentIds: insight.evidence_segment_ids,
-              evidenceEventIds: insight.evidence_event_ids,
-              confidence: insight.confidence,
-              youtubeSearchQuery: insight.youtube_search_query ?? null,
-              promptVersion: GENERATE_INSIGHTS_PROMPT_VERSION,
-            }))
-          )
 
           await db.insert(aiCallLogs).values({
-            jobId: match.id,
-            model: CLAUDE_SYNTHESIS_MODEL,
-            promptVersion: GENERATE_INSIGHTS_PROMPT_VERSION,
-            tokensIn: insightUsage.inputTokens ?? 0,
-            tokensOut: insightUsage.outputTokens ?? 0,
-            costUsdEstimate: estimateCostUsd(CLAUDE_SYNTHESIS_MODEL, insightUsage.inputTokens ?? 0, insightUsage.outputTokens ?? 0),
-            latencyMs: Date.now() - insightStart,
+            jobId: matchId,
+            model: GEMINI_URL_SCAN_MODEL,
+            promptVersion: EXTRACT_MATCH_PROMPT_VERSION,
+            tokensIn: extractUsage.inputTokens ?? 0,
+            tokensOut: extractUsage.outputTokens ?? 0,
+            costUsdEstimate: estimateCostUsd(GEMINI_URL_SCAN_MODEL, extractUsage.inputTokens ?? 0, extractUsage.outputTokens ?? 0),
+            latencyMs: Date.now() - extractStart,
             status: 'success',
           })
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err)
-          if (msg.includes('overloaded') || msg.includes('529') || msg.includes('high demand')) {
-            throw new RetryAfterError('Claude temporarily unavailable during insights — retrying.', '3m')
+
+          // Verify positions — targeted second pass on confusion-prone / low-confidence segments.
+          // Skip for YouTube: extraction already runs at 1fps on the trimmed match window.
+          if (!isYT) try {
+            const allSegments = await db.query.positionSegments.findMany({ where: eq(positionSegments.matchId, matchId) })
+            const toVerify = allSegments.filter(s => s.confidence < 0.75 || CONFUSION_PRONE.has(s.positionId))
+
+            if (toVerify.length > 0) {
+              const verifyStart = Date.now()
+              const { object: verifyObject, usage: verifyUsage } = await generateObject({
+                model: google(GEMINI_URL_SCAN_MODEL),
+                schema: PositionVerificationSchema,
+                maxRetries: 0,
+                system: buildVerifyPositionsSystemPrompt(),
+                messages: [{
+                  role: 'user',
+                  content: [
+                    videoFilePart(video.publicUrl, video.contentType),
+                    { type: 'text', text: buildVerifyPositionsUserPrompt(
+                      toVerify.map((s, i) => ({
+                        index: i,
+                        positionId: s.positionId,
+                        userRole: s.userRole,
+                        dominance: s.dominance,
+                        startSeconds: s.startSeconds,
+                        endSeconds: s.endSeconds,
+                        confidence: s.confidence,
+                      }))
+                    )},
+                  ],
+                }],
+              })
+
+              for (const review of verifyObject.reviews) {
+                if (!review.confirmed && review.corrected_position_id && review.confidence >= 0.8) {
+                  const seg = toVerify[review.segment_index]
+                  if (!seg) continue
+                  await db.update(positionSegments).set({
+                    positionId: review.corrected_position_id,
+                    ...(review.corrected_dominance ? { dominance: review.corrected_dominance } : {}),
+                    confidence: review.confidence,
+                  }).where(eq(positionSegments.id, seg.id))
+                }
+              }
+
+              await db.insert(aiCallLogs).values({
+                jobId: matchId,
+                model: GEMINI_URL_SCAN_MODEL,
+                promptVersion: VERIFY_POSITIONS_PROMPT_VERSION,
+                tokensIn: verifyUsage.inputTokens ?? 0,
+                tokensOut: verifyUsage.outputTokens ?? 0,
+                costUsdEstimate: estimateCostUsd(GEMINI_URL_SCAN_MODEL, verifyUsage.inputTokens ?? 0, verifyUsage.outputTokens ?? 0),
+                latencyMs: Date.now() - verifyStart,
+                status: 'success',
+              })
+            }
+          } catch {
+            // Verification is best-effort — don't fail the match
           }
-          await db.update(matches).set({ status: 'failed' }).where(eq(matches.id, match.id))
-          throw err
         }
 
-        await db.update(matches).set({ status: 'analysed' }).where(eq(matches.id, match.id))
-        return { matchId: match.id, status: 'analysed' }
+        // Generate insights — idempotency: skip if already generated on a prior attempt
+        const existingInsights = await db.query.insights.findMany({ where: eq(insights.matchId, matchId) })
+
+        if (existingInsights.length === 0) {
+          const segments = await db.query.positionSegments.findMany({ where: eq(positionSegments.matchId, matchId) })
+          const events = await db.query.matchEvents.findMany({ where: eq(matchEvents.matchId, matchId) })
+
+          const matchData = {
+            segments: segments.map((s) => ({
+              id: s.id, start_seconds: s.startSeconds, end_seconds: s.endSeconds,
+              position_id: s.positionId, user_role: s.userRole, dominance: s.dominance, confidence: s.confidence,
+            })),
+            events: events.map((e) => ({
+              id: e.id, timestamp_seconds: e.timestampSeconds, event_type_id: e.eventTypeId,
+              actor: e.actor, outcome: e.outcome, technique_label: e.techniqueLabel, confidence: e.confidence,
+            })),
+          }
+
+          const insightStart = Date.now()
+          try {
+            const { object: insightObj, usage: insightUsage } = await generateObject({
+              model: anthropic(CLAUDE_SYNTHESIS_MODEL),
+              schema: InsightsOutputSchema,
+              maxRetries: 0,
+              system: buildGenerateInsightsSystemPrompt(),
+              prompt: JSON.stringify(matchData),
+            })
+
+            await db.insert(insights).values(
+              insightObj.insights.map((insight) => ({
+                matchId,
+                category: insight.category,
+                severity: insight.severity,
+                description: insight.description,
+                suggestion: insight.suggestion,
+                conceptTags: insight.concept_tags,
+                evidenceSegmentIds: insight.evidence_segment_ids,
+                evidenceEventIds: insight.evidence_event_ids,
+                confidence: insight.confidence,
+                youtubeSearchQuery: insight.youtube_search_query ?? null,
+                promptVersion: GENERATE_INSIGHTS_PROMPT_VERSION,
+              }))
+            )
+
+            await db.insert(aiCallLogs).values({
+              jobId: matchId,
+              model: CLAUDE_SYNTHESIS_MODEL,
+              promptVersion: GENERATE_INSIGHTS_PROMPT_VERSION,
+              tokensIn: insightUsage.inputTokens ?? 0,
+              tokensOut: insightUsage.outputTokens ?? 0,
+              costUsdEstimate: estimateCostUsd(CLAUDE_SYNTHESIS_MODEL, insightUsage.inputTokens ?? 0, insightUsage.outputTokens ?? 0),
+              latencyMs: Date.now() - insightStart,
+              status: 'success',
+            })
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err)
+            if (msg.includes('overloaded') || msg.includes('529') || msg.includes('high demand')) {
+              throw new RetryAfterError('Claude temporarily unavailable during insights — retrying.', '3m')
+            }
+            await db.update(matches).set({ status: 'failed' }).where(eq(matches.id, matchId))
+            throw err
+          }
+        }
+
+        await db.update(matches).set({ status: 'analysed' }).where(eq(matches.id, matchId))
+        return { matchId, status: 'analysed' }
       })
     }
 
