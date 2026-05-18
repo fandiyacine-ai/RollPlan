@@ -31,14 +31,18 @@ export const scanUrl = inngest.createFunction(
     triggers: [{ event: 'url/submitted' }],
   },
   async ({ event, step }: {
-    event: { data: { videoId: string; userId?: string; athleteName: string; format: string; sourceType: string; eventName?: string; appearanceHint?: string; athleteImageBase64?: string; tournamentOpponentId?: string; skipScan?: boolean } }
+    event: { data: { videoId: string; userId?: string; athleteName: string; format: string; sourceType: string; eventName?: string; appearanceHint?: string; athleteImageBase64?: string; tournamentOpponentId?: string; skipScan?: boolean; startSeconds?: number; endSeconds?: number; chunkIndex?: number; chunkTotal?: number } }
     step: any
   }) => {
-    const { videoId, userId, athleteName, format, sourceType, eventName, appearanceHint, athleteImageBase64, tournamentOpponentId, skipScan } = event.data
+    const { videoId, userId, athleteName, format, sourceType, eventName, appearanceHint, athleteImageBase64, tournamentOpponentId, skipScan, startSeconds, endSeconds, chunkIndex, chunkTotal } = event.data
 
-    const foundMatches: FoundMatch[] = skipScan
+    const CHUNK_SECS = 85 * 60  // 85-minute windows — safely under Gemini's ~90-min video limit
+    const NUM_CHUNKS = 3         // covers up to 4h15m
+
+    // null return value signals "needs chunking" — handled after the step
+    const scanStepResult: FoundMatch[] | null = skipScan
       ? [{ start_seconds: 0, end_seconds: 999999, opponent_name: 'unknown', round_or_bracket: null }]
-      : await step.run('scan-for-matches', async () => {
+      : await step.run('scan-for-matches', async (): Promise<FoundMatch[] | null> => {
       const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
       if (!video?.publicUrl) throw new Error('Video has no public URL')
 
@@ -56,7 +60,11 @@ export const scanUrl = inngest.createFunction(
           const result = await geminiVideoObject(GEMINI_URL_SCAN_MODEL, {
             system: buildScanUrlSystemPrompt(),
             videoUrl: video.publicUrl,
-            videoOptions: { fps: 0.1 },
+            videoOptions: {
+              fps: 0.1,
+              ...(startSeconds !== undefined ? { startSeconds } : {}),
+              ...(endSeconds !== undefined ? { endSeconds } : {}),
+            },
             userPrompt: buildScanUrlUserPrompt(athleteName),
             schema: UrlScanOutputSchema,
           })
@@ -99,8 +107,13 @@ export const scanUrl = inngest.createFunction(
         }
         if (msg.includes('Resource has been exhausted') || msg.includes('RESOURCE_EXHAUSTED')) {
           if (isYT) {
-            // Temporary Gemini quota/rate-limit — Inngest will retry with backoff
-            throw new Error('Gemini quota temporarily exhausted — retrying.')
+            if (chunkIndex !== undefined) {
+              // Already a chunk — this is a real transient rate-limit, retry normally
+              throw new Error('Gemini quota temporarily exhausted in chunk — retrying.')
+            }
+            // Full video too long for Gemini — signal chunking to the outer function
+            await db.update(videos).set({ status: 'processing' }).where(eq(videos.id, videoId))
+            return null
           }
           throw new NonRetriableError('Video is too large to process — keep direct video files under ~1 hour. For full tournament streams use the YouTube URL instead.')
         }
@@ -115,6 +128,11 @@ export const scanUrl = inngest.createFunction(
       }
 
       if (!scanResult.athlete_found || scanResult.matches.length === 0) {
+        if (chunkIndex !== undefined) {
+          // Empty chunk (no matches in this time window) — complete silently
+          await db.update(videos).set({ status: 'analysed' }).where(eq(videos.id, videoId))
+          return []
+        }
         await db.update(videos).set({ status: 'failed' }).where(eq(videos.id, videoId))
         throw new NonRetriableError(
           `Athlete "${athleteName}" was not found in this video. Check the name matches what's shown on screen.`
@@ -123,6 +141,56 @@ export const scanUrl = inngest.createFunction(
 
       return scanResult.matches
     })
+
+    // ── Chunking: video was too long for a single Gemini pass ─────────────────
+    if (scanStepResult === null) {
+      const chunkVideoIds: string[] = await step.run('create-chunk-videos', async () => {
+        const original = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
+        if (!original) throw new Error('Original video not found')
+
+        const ids: string[] = []
+        for (let i = 0; i < NUM_CHUNKS; i++) {
+          const [v] = await db.insert(videos).values({
+            userId: original.userId,
+            r2Key: `chunk/${videoId}/${i}`,
+            originalFilename: `${original.originalFilename} · Part ${i + 1}/${NUM_CHUNKS}`,
+            contentType: original.contentType,
+            sizeBytes: 0,
+            sourceType: original.sourceType,
+            publicUrl: original.publicUrl,
+            status: 'uploaded',
+          }).returning()
+          ids.push(v.id)
+        }
+
+        // Mark original as done — chunks carry the work forward
+        await db.update(videos).set({ status: 'analysed' }).where(eq(videos.id, videoId))
+        return ids
+      })
+
+      await step.sendEvent('send-chunk-events', chunkVideoIds.map((chunkVid, i) => ({
+        name: 'url/submitted' as const,
+        data: {
+          videoId: chunkVid,
+          userId,
+          athleteName,
+          format,
+          sourceType,
+          eventName,
+          appearanceHint,
+          athleteImageBase64,
+          tournamentOpponentId,
+          startSeconds: i * CHUNK_SECS,
+          endSeconds: (i + 1) * CHUNK_SECS,
+          chunkIndex: i,
+          chunkTotal: NUM_CHUNKS,
+        },
+      })))
+
+      return
+    }
+
+    const foundMatches: FoundMatch[] = scanStepResult
 
     for (let i = 0; i < foundMatches.length; i++) {
       const found = foundMatches[i]
@@ -154,11 +222,17 @@ export const scanUrl = inngest.createFunction(
         try {
           if (isYT) {
             // Trim the YouTube video to just this match window. Gemini reports timestamps
-            // relative to the clip start, so we shift them back to absolute after.
-            const clipStart = skipScan ? 0 : found.start_seconds
+            // relative to the clip start, so we shift back to absolute after.
+            // For chunk jobs, startSeconds is the chunk's offset into the video —
+            // found.start/end_seconds are relative to the chunk start, so we add the offset
+            // to get the absolute position in the full video.
+            const chunkOffset = startSeconds ?? 0
+            const clipStart = skipScan ? 0 : (chunkOffset + found.start_seconds)
+            const clipEnd = skipScan ? undefined : (chunkOffset + found.end_seconds)
+            const matchDuration = found.end_seconds - found.start_seconds
             const videoOptions = skipScan
               ? { fps: 1.0 }
-              : { fps: 1.0, startSeconds: clipStart, endSeconds: found.end_seconds }
+              : { fps: 1.0, startSeconds: clipStart, endSeconds: clipEnd }
             const result = await geminiVideoObject(GEMINI_URL_SCAN_MODEL, {
               system: buildExtractMatchSystemPrompt(),
               videoUrl: video.publicUrl,
@@ -168,7 +242,7 @@ export const scanUrl = inngest.createFunction(
                 appearanceHint: appearanceHint || undefined,
                 format: format as 'gi' | 'no_gi',
                 ruleset: 'ibjjf',
-                timestampRange: skipScan ? undefined : { startSeconds: 0, endSeconds: found.end_seconds - clipStart },
+                timestampRange: skipScan ? undefined : { startSeconds: 0, endSeconds: matchDuration },
               }),
               schema: MatchExtractionOutputSchema,
               referenceImageBase64: athleteImageBase64 || undefined,
