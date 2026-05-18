@@ -6,10 +6,10 @@ import { users } from '../../../lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { getOrCreateDbUserId } from '../../../lib/db/get-user'
 
-type Belt = 'white' | 'blue' | 'purple' | 'brown' | 'black'
+type Belt = 'white' | 'blue' | 'purple' | 'brown' | 'black' | 'grey' | 'yellow' | 'orange' | 'green'
 type Style = 'gi' | 'no_gi' | 'both'
 
-const VALID_BELTS: Belt[] = ['white', 'blue', 'purple', 'brown', 'black']
+const VALID_BELTS: Belt[] = ['white', 'blue', 'purple', 'brown', 'black', 'grey', 'yellow', 'orange', 'green']
 const VALID_STYLES: Style[] = ['gi', 'no_gi', 'both']
 
 export async function updateProfile(_prev: { error?: string }, formData: FormData): Promise<{ error?: string; success?: boolean }> {

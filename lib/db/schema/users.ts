@@ -1,6 +1,6 @@
 import { pgTable, uuid, text, integer, timestamp, pgEnum } from 'drizzle-orm/pg-core'
 
-export const beltEnum = pgEnum('belt', ['white', 'blue', 'purple', 'brown', 'black'])
+export const beltEnum = pgEnum('belt', ['white', 'blue', 'purple', 'brown', 'black', 'grey', 'yellow', 'orange', 'green'])
 export const styleEnum = pgEnum('primary_style', ['gi', 'no_gi', 'both'])
 export const planTierEnum = pgEnum('plan_tier', ['free', 'athlete', 'athlete_plus', 'coach'])
 

@@ -24,6 +24,10 @@ const BELT_STYLE: Record<string, { bg: string; text: string }> = {
   purple: { bg: 'bg-purple-600',  text: 'text-white' },
   brown:  { bg: 'bg-amber-800',   text: 'text-white' },
   black:  { bg: 'bg-zinc-950 ring-1 ring-zinc-600', text: 'text-white' },
+  grey:   { bg: 'bg-gray-400',    text: 'text-white' },
+  yellow: { bg: 'bg-yellow-400',  text: 'text-black' },
+  orange: { bg: 'bg-orange-500',  text: 'text-white' },
+  green:  { bg: 'bg-green-600',   text: 'text-white' },
 }
 
 function fmt(s: number): string {
