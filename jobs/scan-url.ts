@@ -98,11 +98,11 @@ export const scanUrl = inngest.createFunction(
           throw new NonRetriableError('Stream is too long — try a shorter clip or a direct mat recording instead of the full event stream.')
         }
         if (msg.includes('Resource has been exhausted') || msg.includes('RESOURCE_EXHAUSTED')) {
-          throw new NonRetriableError(
-            isYT
-              ? 'Gemini quota exhausted processing this YouTube video — the stream may be extremely long (6h+) or the API quota is temporarily exceeded. Try again in a few minutes, or submit a shorter clip.'
-              : 'Video is too large to process — keep direct video files under ~1 hour. For full tournament streams use the YouTube URL instead.'
-          )
+          if (isYT) {
+            // Temporary Gemini quota/rate-limit — Inngest will retry with backoff
+            throw new Error('Gemini quota temporarily exhausted — retrying.')
+          }
+          throw new NonRetriableError('Video is too large to process — keep direct video files under ~1 hour. For full tournament streams use the YouTube URL instead.')
         }
         if (msg.includes('input token count exceeds') || msg.includes('maximum number of tokens allowed')) {
           throw new NonRetriableError(
