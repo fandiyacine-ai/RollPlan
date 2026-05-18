@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
       publicUrl,
       status: 'uploaded',
       ...(durationSeconds ? { durationSeconds } : {}),
+      ...(tournamentOpponentId ? { tournamentOpponentId } : {}),
     }).where(eq(videos.id, videoId))
 
     if (scanMode === 'scan') {

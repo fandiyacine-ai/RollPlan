@@ -163,6 +163,7 @@ export const scanUrl = inngest.createFunction(
             sourceType: original.sourceType,
             publicUrl: original.publicUrl,
             status: 'uploaded',
+            tournamentOpponentId: original.tournamentOpponentId ?? null,
           }).returning()
           ids.push(v.id)
         }

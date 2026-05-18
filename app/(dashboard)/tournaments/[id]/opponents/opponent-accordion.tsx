@@ -5,12 +5,13 @@ import Link from 'next/link'
 import { ScoutForm } from './opponent-forms'
 import { DeleteOpponentButton } from './opponent-forms'
 
-type MatchRow = {
+type FootageRow = {
   id: string
   status: string
-  format: string
-  context: string
+  format: string | null
+  context: string | null
   eventName: string | null
+  label?: string   // set for video-only rows (no match yet); overrides format/context
   createdAt: Date
 }
 
@@ -25,13 +26,15 @@ const STATUS_CHIP: Record<string, string> = {
   processing: 'bg-blue-950 text-blue-400 border border-blue-800/50',
   analysed:   'bg-emerald-950/60 text-emerald-400 border border-emerald-800/30',
   failed:     'bg-rose-950 text-rose-400 border border-rose-800/50',
+  uploaded:   'bg-zinc-800 text-zinc-400',
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  pending: 'Queued', processing: 'Scanning', analysed: 'Ready', failed: 'Failed',
+  pending: 'Queued', processing: 'Scanning', analysed: 'Ready', failed: 'Failed', uploaded: 'Queued',
 }
 
-function matchTitle(m: MatchRow): string {
+function rowTitle(m: FootageRow): string {
+  if (m.label) return m.label
   if (m.eventName) return m.eventName
   const fmt = m.format === 'no_gi' ? 'No-Gi' : 'Gi'
   const ctx = m.context === 'sparring' ? 'Sparring' : 'Competition'
@@ -42,20 +45,28 @@ function fmtDate(d: Date): string {
   return new Date(d).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+function normaliseStatus(s: string): string {
+  return s === 'uploaded' ? 'pending' : s
+}
+
 export function OpponentAccordion({
   opponent,
   matches,
+  pendingVideos,
   tournamentId,
 }: {
   opponent: Opponent
-  matches: MatchRow[]
+  matches: FootageRow[]
+  pendingVideos: FootageRow[]
   tournamentId: string
 }) {
   const [open, setOpen] = useState(false)
 
+  const allRows = [...pendingVideos, ...matches]
+
   const analysed = matches.filter(m => m.status === 'analysed').length
-  const pending  = matches.filter(m => m.status === 'pending' || m.status === 'processing').length
-  const failed   = matches.filter(m => m.status === 'failed').length
+  const pending  = allRows.filter(m => m.status === 'pending' || m.status === 'processing' || m.status === 'uploaded').length
+  const failed   = allRows.filter(m => m.status === 'failed').length
 
   const statusDot = pending > 0
     ? <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse flex-shrink-0" />
@@ -73,7 +84,7 @@ export function OpponentAccordion({
     ? <span className="text-rose-400">{failed} failed</span>
     : <span className="text-muted-foreground/50">No footage added yet</span>
 
-  const canExpand = matches.length > 0
+  const canExpand = allRows.length > 0
 
   return (
     <div className="rounded-xl border bg-card overflow-hidden">
@@ -129,30 +140,33 @@ export function OpponentAccordion({
       </div>
 
       {/* Footage list */}
-      {open && matches.length > 0 && (
+      {open && allRows.length > 0 && (
         <div className="border-t border-border/40 divide-y divide-border/30">
-          {matches.map((m) => (
-            <div key={m.id} className="px-4 py-3 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_CHIP[m.status] ?? STATUS_CHIP.pending}`}>
-                  {STATUS_LABEL[m.status] ?? m.status}
-                </span>
-                <span className="text-sm truncate">{matchTitle(m)}</span>
-                <span className="text-xs text-muted-foreground flex-shrink-0">{fmtDate(m.createdAt)}</span>
+          {allRows.map((m) => {
+            const ns = normaliseStatus(m.status)
+            return (
+              <div key={m.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${STATUS_CHIP[ns] ?? STATUS_CHIP.pending}`}>
+                    {STATUS_LABEL[ns] ?? m.status}
+                  </span>
+                  <span className="text-sm truncate">{rowTitle(m)}</span>
+                  <span className="text-xs text-muted-foreground flex-shrink-0">{fmtDate(m.createdAt)}</span>
+                </div>
+                {m.status === 'analysed' && (
+                  <Link
+                    href={`/matches/${m.id}`}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                  >
+                    View →
+                  </Link>
+                )}
+                {m.status === 'failed' && (
+                  <span className="text-xs text-rose-400 flex-shrink-0">Analysis failed</span>
+                )}
               </div>
-              {m.status === 'analysed' && (
-                <Link
-                  href={`/matches/${m.id}`}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                >
-                  View →
-                </Link>
-              )}
-              {m.status === 'failed' && (
-                <span className="text-xs text-rose-400 flex-shrink-0">Analysis failed</span>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

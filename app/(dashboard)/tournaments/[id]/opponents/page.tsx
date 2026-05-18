@@ -1,6 +1,6 @@
 import { db } from '../../../../../lib/db'
-import { tournamentOpponents, matches } from '../../../../../lib/db/schema'
-import { eq, inArray } from 'drizzle-orm'
+import { tournamentOpponents, matches, videos } from '../../../../../lib/db/schema'
+import { eq, inArray, isNull, and, ne } from 'drizzle-orm'
 import { AddOpponentForm } from './opponent-forms'
 import { OpponentAccordion } from './opponent-accordion'
 
@@ -17,26 +17,52 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
 
   const opponentIds = opponents.map(o => o.id)
 
-  const allMatches = opponentIds.length > 0
-    ? await db
-        .select({
+  const [allMatches, allPendingVideos] = opponentIds.length > 0
+    ? await Promise.all([
+        db.select({
           id: matches.id,
           status: matches.status,
           format: matches.format,
           context: matches.context,
           eventName: matches.eventName,
           createdAt: matches.createdAt,
+          label: matches.eventName,
           tournamentOpponentId: matches.tournamentOpponentId,
         })
         .from(matches)
         .where(inArray(matches.tournamentOpponentId, opponentIds))
-        .orderBy(matches.createdAt)
-    : []
+        .orderBy(matches.createdAt),
+
+        // Videos queued/scanning/failed that don't have a match record yet
+        db.select({
+          id: videos.id,
+          status: videos.status,
+          label: videos.originalFilename,
+          createdAt: videos.uploadedAt,
+          tournamentOpponentId: videos.tournamentOpponentId,
+        })
+        .from(videos)
+        .leftJoin(matches, eq(matches.videoId, videos.id))
+        .where(and(
+          inArray(videos.tournamentOpponentId, opponentIds),
+          isNull(matches.id),
+          ne(videos.status, 'analysed'),
+        ))
+        .orderBy(videos.uploadedAt),
+      ])
+    : [[], []]
 
   const matchesByOpponent = allMatches.reduce<Record<string, typeof allMatches>>((acc, m) => {
     if (!m.tournamentOpponentId) return acc
     acc[m.tournamentOpponentId] ??= []
     acc[m.tournamentOpponentId].push(m)
+    return acc
+  }, {})
+
+  const pendingVideosByOpponent = allPendingVideos.reduce<Record<string, typeof allPendingVideos>>((acc, v) => {
+    if (!v.tournamentOpponentId) return acc
+    acc[v.tournamentOpponentId] ??= []
+    acc[v.tournamentOpponentId].push(v)
     return acc
   }, {})
 
@@ -70,7 +96,8 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
             <OpponentAccordion
               key={opp.id}
               opponent={opp}
-              matches={matchesByOpponent[opp.id] ?? []}
+              matches={(matchesByOpponent[opp.id] ?? []).map(m => ({ ...m, format: m.format ?? null, context: m.context ?? null, label: undefined }))}
+              pendingVideos={(pendingVideosByOpponent[opp.id] ?? []).map(v => ({ ...v, format: null, context: null, eventName: null }))}
               tournamentId={tournamentId}
             />
           ))}

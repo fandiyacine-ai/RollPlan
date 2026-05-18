@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { addOpponent, submitScoutUrls, deleteOpponent } from './actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -204,6 +205,7 @@ export function ScoutForm({
   opponentId: string
   opponentName: string
 }) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [method, setMethod] = useState<ScoutMethod>(null)
   const [singleMode, setSingleMode] = useState<SingleMode>('url')
@@ -254,7 +256,7 @@ export function ScoutForm({
     fd.set('format', format)
     fd.set('appearanceHint', buildAppearanceHint(appearanceColor, startingSide))
     await submitScoutUrls(tournamentId, opponentId, fd)
-    setOpen(false); setDone(true)
+    setOpen(false); setDone(true); router.refresh()
   }
 
   async function submitSingleUpload() {
@@ -300,7 +302,7 @@ export function ScoutForm({
         throw new Error(d.error ?? 'Upload complete failed')
       }
 
-      setOpen(false); setDone(true)
+      setOpen(false); setDone(true); router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed')
       setPending(false)
@@ -316,7 +318,7 @@ export function ScoutForm({
     fd.set('format', format)
     fd.set('appearanceHint', buildAppearanceHint(appearanceColor, startingSide))
     await submitScoutUrls(tournamentId, opponentId, fd)
-    setOpen(false); setDone(true)
+    setOpen(false); setDone(true); router.refresh()
   }
 
   if (done) {

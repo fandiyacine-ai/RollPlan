@@ -53,6 +53,7 @@ export async function submitScoutUrls(tournamentId: string, opponentId: string, 
       sourceType: 'opponent',
       publicUrl: url,
       status: 'uploaded',
+      tournamentOpponentId: opponentId,
     }).returning()
 
     try {
