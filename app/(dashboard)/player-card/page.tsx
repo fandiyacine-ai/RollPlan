@@ -62,7 +62,7 @@ export default async function PlayerCardPage() {
     })
     .from(matches)
     .leftJoin(videos, eq(matches.videoId, videos.id))
-    .where(matchFilter)
+    .where(and(matchFilter, or(isNull(videos.sourceType), ne(videos.sourceType, 'opponent'))))
     .orderBy(desc(matches.createdAt))
     .limit(50)
 
@@ -74,18 +74,13 @@ export default async function PlayerCardPage() {
     .select({ id: videos.id, originalFilename: videos.originalFilename, sourceType: videos.sourceType, status: videos.status })
     .from(videos)
     .leftJoin(matches, eq(matches.videoId, videos.id))
-    .where(and(isNull(matches.id), ne(videos.status, 'analysed'), videoFilter))
+    .where(and(isNull(matches.id), ne(videos.status, 'analysed'), ne(videos.sourceType, 'opponent'), videoFilter))
     .limit(10)
 
   const scanningVideos = videosWithNoMatches.filter(v => v.status !== 'failed')
   const failedVideos = videosWithNoMatches.filter(v => v.status === 'failed')
 
-  // Own matches only for stats (sourceType !== 'opponent')
-  const ownAnalysedIds = recentMatches
-    .filter(m => m.status === 'analysed' && m.sourceType !== 'opponent')
-    .map(m => m.id)
-
-  const scoutedAnalysed = recentMatches.filter(m => m.status === 'analysed' && m.sourceType === 'opponent').length
+  const ownAnalysedIds = recentMatches.filter(m => m.status === 'analysed').map(m => m.id)
   const pendingCount = recentMatches.filter(m => m.status === 'pending' || m.status === 'processing').length + scanningVideos.length
 
   const [allInsights, allSegments, allEvents] = await Promise.all([
@@ -192,10 +187,7 @@ export default async function PlayerCardPage() {
     )
   }
 
-  const matchesSub = [
-    scoutedAnalysed > 0 ? `+${scoutedAnalysed} scouted` : null,
-    pendingCount > 0 ? `${pendingCount} analysing…` : null,
-  ].filter(Boolean).join(' · ') || undefined
+  const matchesSub = pendingCount > 0 ? `${pendingCount} analysing…` : undefined
 
   return (
     <div className="max-w-5xl space-y-8">
