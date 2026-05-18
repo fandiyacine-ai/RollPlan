@@ -3,6 +3,7 @@ import { gameplans, tournamentOpponents, matches } from '../../../../../lib/db/s
 import { eq, count } from 'drizzle-orm'
 import Link from 'next/link'
 import { GenerateGameplanButton } from './generate-button'
+import { PrintButton } from './print-button'
 import type { GameplanOutput } from '../../../../../lib/ai/schemas/gameplan'
 
 export const dynamic = 'force-dynamic'
@@ -97,7 +98,10 @@ export default async function GameplanPage({
                 {existingGameplan ? ` · Generated ${existingGameplan.createdAt.toLocaleDateString()} (v${existingGameplan.version})` : ''}
               </p>
             </div>
-            <GenerateGameplanButton tournamentId={tournamentId} opponentId={activeOpponent.id} />
+            <div className="flex items-center gap-2">
+              {plan && <PrintButton />}
+              <GenerateGameplanButton tournamentId={tournamentId} opponentId={activeOpponent.id} />
+            </div>
           </div>
 
           {plan ? (

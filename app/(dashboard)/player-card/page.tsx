@@ -10,6 +10,9 @@ import { ClearAllButton } from './clear-all-button'
 import { POSITIONS } from '../../../lib/taxonomy/positions'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { ControlTrendChart, type TrendPoint } from './progress-chart'
+import { TransitionDiagram, type TransitionData } from './transition-diagram'
+import { ShareCardButton } from './share-card-button'
+import type { ShareCardData } from './share-card'
 
 export const dynamic = 'force-dynamic'
 
@@ -157,6 +160,38 @@ export default async function PlayerCardPage() {
     .sort(([, a], [, b]) => (b.inferior / b.total) - (a.inferior / a.total))
     .slice(0, 5)
 
+  // ── Position transitions ──
+  const transitionCounts: Record<string, Record<string, number>> = {}
+  type SegItem = { matchId: string; positionId: string; startSeconds: number; endSeconds: number; dominance: string }
+  const matchGroups: Record<string, SegItem[]> = {}
+  for (const seg of allSegments) {
+    if (!matchGroups[seg.matchId]) matchGroups[seg.matchId] = []
+    matchGroups[seg.matchId].push(seg)
+  }
+  for (const segs of Object.values(matchGroups)) {
+    const sorted = [...segs].sort((a, b) => a.startSeconds - b.startSeconds)
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const from = sorted[i].positionId
+      const to = sorted[i + 1].positionId
+      if (from === to) continue
+      if (!transitionCounts[from]) transitionCounts[from] = {}
+      transitionCounts[from][to] = (transitionCounts[from][to] ?? 0) + 1
+    }
+  }
+  const transitionEdges = Object.entries(transitionCounts).flatMap(([fromId, tos]) =>
+    Object.entries(tos).map(([toId, count]) => ({ fromId, toId, count }))
+  ).sort((a, b) => b.count - a.count)
+
+  const transitionData: TransitionData = {
+    nodes: sortedPositions.slice(0, 8).map(([id, s]) => ({
+      id,
+      name: POSITION_MAP[id] ?? id,
+      totalTime: s.total,
+      dominantTime: s.dominant,
+    })),
+    edges: transitionEdges,
+  }
+
   // ── Signature techniques ──
   const myTechniques: Record<string, number> = {}
   const theirTechniques: Record<string, number> = {}
@@ -188,6 +223,19 @@ export default async function PlayerCardPage() {
   }
 
   const matchesSub = pendingCount > 0 ? `${pendingCount} analysing…` : undefined
+
+  const shareCardData: ShareCardData = {
+    name: displayName,
+    belt: dbUser?.belt ?? null,
+    gym: dbUser?.gym ?? null,
+    controlPct,
+    matchCount: ownAnalysedIds.length,
+    totalMatSeconds: totalAnalyzedTime,
+    topPositions: sortedPositions.slice(0, 3).map(([id, s]) => ({
+      name: POSITION_MAP[id] ?? id,
+      dominantPct: s.total > 0 ? s.dominant / s.total : 0,
+    })),
+  }
 
   return (
     <div className="max-w-5xl space-y-8">
@@ -397,6 +445,23 @@ export default async function PlayerCardPage() {
         </div>
       )}
 
+      {/* Position Transition Flow */}
+      {transitionData.nodes.length >= 3 && transitionEdges.length >= 3 && (
+        <div className="rounded-xl border border-border/60 overflow-hidden bg-card">
+          <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between">
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Position Flow</h2>
+            <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
+              <span className="flex items-center gap-1"><span className="w-2 h-0.5 bg-emerald-400 inline-block rounded" />Dominant</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-0.5 bg-rose-400 inline-block rounded" />Under pressure</span>
+            </div>
+          </div>
+          <div className="p-4">
+            <TransitionDiagram data={transitionData} />
+          </div>
+          <p className="px-5 pb-3 text-[10px] text-muted-foreground/50">Arrow weight = transition frequency across {ownAnalysedIds.length} matches</p>
+        </div>
+      )}
+
       {/* Failed videos */}
       {failedVideos.length > 0 && (
         <div className="space-y-2">
@@ -418,7 +483,10 @@ export default async function PlayerCardPage() {
         <p className="text-xs text-muted-foreground">
           Stats based on {ownAnalysedIds.length} analysed match{ownAnalysedIds.length !== 1 ? 'es' : ''}
         </p>
-        <ClearAllButton />
+        <div className="flex items-center gap-2">
+          {ownAnalysedIds.length > 0 && <ShareCardButton data={shareCardData} />}
+          <ClearAllButton />
+        </div>
       </div>
     </div>
   )

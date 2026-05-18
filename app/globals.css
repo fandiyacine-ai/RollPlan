@@ -141,6 +141,38 @@
   }
 }
 
+@media print {
+  /* Hide all nav, sidebars, and action buttons */
+  header, nav, aside,
+  [data-print-hide],
+  .print\:hidden { display: none !important; }
+
+  body { background: white !important; color: black !important; }
+
+  /* Force light colours so borders/cards are readable */
+  :root {
+    --background: white;
+    --foreground: black;
+    --card: white;
+    --card-foreground: black;
+    --muted: #f3f4f6;
+    --muted-foreground: #6b7280;
+    --border: #d1d5db;
+  }
+
+  /* Remove dark class override so above vars win */
+  .dark { color-scheme: light; }
+
+  /* Ensure the gameplan content fills the page */
+  main { padding: 0 !important; }
+  .space-y-4 > * + * { margin-top: 1rem; }
+
+  /* Page breaks */
+  .rounded-xl { break-inside: avoid; }
+
+  @page { margin: 1.5cm; }
+}
+
 @keyframes shimmer {
   0%   { transform: translateX(-100%); width: 40%; }
   50%  { transform: translateX(150%); width: 60%; }
