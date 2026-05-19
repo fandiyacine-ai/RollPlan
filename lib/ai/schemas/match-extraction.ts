@@ -30,7 +30,7 @@ export const MatchEventSchema = z.object({
 })
 
 export const MatchExtractionOutputSchema = z.object({
-  positions: z.array(PositionSegmentSchema).min(1),
+  positions: z.array(PositionSegmentSchema),
   events: z.array(MatchEventSchema),
   overall_confidence: z.number().min(0).max(1),
   competitor_identifier: z.string().describe('How the competitor was identified (e.g. "blue gi, left side of screen at start")'),

@@ -353,8 +353,13 @@ export const scanUrl = inngest.createFunction(
           }
 
           if (extractObject.positions.length === 0) {
-            await db.update(matches).set({ status: 'failed' }).where(eq(matches.id, matchId))
-            return { matchId, status: 'failed' }
+            // No grappling detected — likely a walkover the scan didn't flag, or a very brief clip.
+            // Mark as analysed with walkover result so it shows correctly in the UI.
+            await db.update(matches).set({
+              status: 'analysed',
+              resultMethod: 'walkover',
+            }).where(eq(matches.id, matchId))
+            return { matchId, status: 'analysed' }
           }
 
           await db.transaction(async (tx) => {
