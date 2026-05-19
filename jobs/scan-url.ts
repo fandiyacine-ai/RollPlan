@@ -227,6 +227,19 @@ export const scanUrl = inngest.createFunction(
       // Step A: create match record in its own memoised step — if extraction is retried,
       // Inngest replays this step's result without re-inserting, preventing ghost match records.
       const matchId = await step.run(`create-match-${i}`, async () => {
+        // Deduplication safety net: if a non-failed match already exists for this
+        // opponent + opponent label, return its ID rather than creating a duplicate.
+        if (tournamentOpponentId) {
+          const existing = await db.query.matches.findFirst({
+            where: (m, { and, eq, ne }) => and(
+              eq(m.tournamentOpponentId, tournamentOpponentId),
+              eq(m.opponentLabel, found.opponent_name || 'unknown'),
+              ne(m.status, 'failed'),
+            ),
+          })
+          if (existing) return existing.id
+        }
+
         const result = found.match_result
         const [match] = await db.insert(matches).values({
           videoId,

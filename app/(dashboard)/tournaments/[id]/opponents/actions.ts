@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '../../../../../lib/db'
 import { tournamentOpponents, videos } from '../../../../../lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 import { inngest } from '../../../../../lib/inngest'
 import { getOrCreateDbUserId } from '../../../../../lib/db/get-user'
 import { checkMonthlyLimit } from '../../../../../lib/db/usage'
@@ -47,8 +47,19 @@ export async function submitScoutUrls(tournamentId: string, opponentId: string, 
     throw new Error(`You've used all ${usage.limit} free analyses for this month. Upgrade to continue.`)
   }
 
+  const skippedUrls: string[] = []
+
   for (const url of urls) {
     try { new URL(url) } catch { throw new Error(`Invalid URL: ${url}`) }
+
+    // Prevent duplicate scans: skip if this URL is already queued or analysed for this opponent
+    const existing = await db.query.videos.findFirst({
+      where: (v) => and(eq(v.publicUrl, url), eq(v.tournamentOpponentId, opponentId)),
+    })
+    if (existing && existing.status !== 'failed') {
+      skippedUrls.push(url)
+      continue
+    }
 
     const [video] = await db.insert(videos).values({
       userId,
@@ -78,6 +89,12 @@ export async function submitScoutUrls(tournamentId: string, opponentId: string, 
     } catch {
       // Inngest not configured — record created but scan won't start
     }
+  }
+
+  if (skippedUrls.length > 0 && skippedUrls.length === urls.length) {
+    throw new Error(
+      `${skippedUrls.length === 1 ? 'This URL has' : 'All URLs have'} already been submitted for ${athleteName}. Delete the existing footage first if you want to re-scan.`
+    )
   }
 
   revalidatePath(`/tournaments/${tournamentId}/opponents`)
