@@ -13,12 +13,31 @@ type FootageRow = {
   eventName: string | null
   label?: string   // set for video-only rows (no match yet); overrides format/context
   createdAt: Date
+  resultWinner: string | null
+  resultMethod: string | null
+  resultTechnique: string | null
 }
 
 type Opponent = {
   id: string
   opponentLabel: string
   seedingNotes: string | null
+}
+
+function ResultBadge({ winner, method, technique }: { winner: string; method: string | null; technique: string | null }) {
+  const isWin = winner === 'user'
+  const label = method === 'submission'
+    ? `W — Sub${technique ? ` (${technique})` : ''}`
+    : method === 'points' ? (isWin ? 'W — Points' : 'L — Points')
+    : method === 'dq' ? (isWin ? 'W — DQ' : 'L — DQ')
+    : isWin ? 'Win' : 'Loss'
+  return (
+    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
+      isWin ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/30' : 'bg-rose-950/60 text-rose-400 border border-rose-800/30'
+    }`}>
+      {isWin ? label : label.replace('W', 'L')}
+    </span>
+  )
 }
 
 const STATUS_CHIP: Record<string, string> = {
@@ -177,11 +196,14 @@ export function OpponentAccordion({
             const ns = normaliseStatus(m.status)
             return (
               <div key={m.id} className="px-4 py-3 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${STATUS_CHIP[ns] ?? STATUS_CHIP.pending}`}>
                     {STATUS_LABEL[ns] ?? m.status}
                   </span>
                   <span className="text-sm truncate">{rowTitle(m)}</span>
+                  {m.resultWinner && (
+                    <ResultBadge winner={m.resultWinner} method={m.resultMethod} technique={m.resultTechnique} />
+                  )}
                   <span className="text-xs text-muted-foreground flex-shrink-0">{fmtDate(m.createdAt)}</span>
                 </div>
                 {m.status === 'analysed' && (

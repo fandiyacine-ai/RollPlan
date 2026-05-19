@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic'
 type MatchRow = {
   id: string; status: string; format: string | null; context: string | null
   eventName: string | null; createdAt: Date; label: string | null; tournamentOpponentId: string | null
+  resultWinner: string | null; resultMethod: string | null; resultTechnique: string | null
 }
 
 type VideoRow = {
@@ -55,6 +56,9 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
         createdAt: matches.createdAt,
         label: matches.eventName,
         tournamentOpponentId: matches.tournamentOpponentId,
+        resultWinner: matches.resultWinner,
+        resultMethod: matches.resultMethod,
+        resultTechnique: matches.resultTechnique,
       })
       .from(matches)
       .where(inArray(matches.tournamentOpponentId, opponentIds))
@@ -128,8 +132,14 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
             <OpponentAccordion
               key={opp.id}
               opponent={opp}
-              matches={(matchesByOpponent[opp.id] ?? []).map(m => ({ ...m, format: m.format ?? null, context: m.context ?? null, label: undefined }))}
-              pendingVideos={(pendingVideosByOpponent[opp.id] ?? []).map(v => ({ ...v, format: null, context: null, eventName: null }))}
+              matches={(matchesByOpponent[opp.id] ?? []).map(m => ({
+                ...m, format: m.format ?? null, context: m.context ?? null, label: undefined,
+                resultWinner: m.resultWinner ?? null, resultMethod: m.resultMethod ?? null, resultTechnique: m.resultTechnique ?? null,
+              }))}
+              pendingVideos={(pendingVideosByOpponent[opp.id] ?? []).map(v => ({
+                ...v, format: null, context: null, eventName: null,
+                resultWinner: null, resultMethod: null, resultTechnique: null,
+              }))}
               tournamentId={tournamentId}
             />
           ))}

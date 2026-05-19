@@ -71,7 +71,7 @@ export const scanUrl = inngest.createFunction(
             system: buildScanUrlSystemPrompt(),
             videoUrl: video.publicUrl,
             videoOptions: {
-              fps: 0.05,  // 1 frame/20s — sufficient to spot scoreboard changes, halves token cost
+              fps: 0.1,  // 1 frame/10s — needed to reliably catch 3-5s name overlays at match starts
               ...(startSeconds !== undefined ? { startSeconds } : {}),
               ...(endSeconds !== undefined ? { endSeconds } : {}),
             },
@@ -217,6 +217,7 @@ export const scanUrl = inngest.createFunction(
       // Step A: create match record in its own memoised step — if extraction is retried,
       // Inngest replays this step's result without re-inserting, preventing ghost match records.
       const matchId = await step.run(`create-match-${i}`, async () => {
+        const result = found.match_result
         const [match] = await db.insert(matches).values({
           videoId,
           userId: userId ?? null,
@@ -229,6 +230,9 @@ export const scanUrl = inngest.createFunction(
           userNotes: found.round_or_bracket ?? null,
           tournamentOpponentId: tournamentOpponentId ?? null,
           status: 'processing',
+          resultWinner: result ? (result.winner_is_tracked_athlete ? 'user' : 'opponent') : null,
+          resultMethod: result?.method ?? null,
+          resultTechnique: result?.technique ?? null,
         }).returning()
         return match.id
       })

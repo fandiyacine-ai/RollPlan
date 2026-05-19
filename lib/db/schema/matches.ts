@@ -30,5 +30,8 @@ export const matches = pgTable('matches', {
   narration: text('narration'),
   shareToken: text('share_token').unique(),
   shareIncludesVideo: boolean('share_includes_video').default(false),
+  resultWinner: text('result_winner'),    // 'user' | 'opponent' — from outcome screen
+  resultMethod: text('result_method'),    // 'submission' | 'points' | 'dq' | 'unknown'
+  resultTechnique: text('result_technique'), // e.g. 'rear naked choke'
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })

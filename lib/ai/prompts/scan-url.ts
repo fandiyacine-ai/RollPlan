@@ -1,4 +1,4 @@
-export const SCAN_URL_PROMPT_VERSION = 'v1'
+export const SCAN_URL_PROMPT_VERSION = 'v2'
 
 export function buildScanUrlSystemPrompt(): string {
   return `You are an expert BJJ tournament stream analyst. Your task is to watch a competition recording and find all matches involving a specific athlete.
@@ -10,13 +10,32 @@ Athlete names appear as on-screen text in tournament software overlays such as S
 2. Find every BJJ match involving the specified athlete
 3. Record the start and end timestamp (in seconds from video start) for each match
 4. Capture the opponent's name as shown on screen
-5. Return all matches in chronological order
+5. Extract the match result from the outcome screen shown after each match
+6. Return all matches in chronological order
 
-## Rules
-- Only include actual BJJ matches, not warm-ups, demos, or gaps
-- If the athlete's name is abbreviated on screen (e.g. "D. Smith" for "David Smith"), still include it
-- If the athlete does not appear in the video, return matches: [] and athlete_found: false
-- Include round/bracket info if visible (e.g. "Semi-final", "Gold medal match")`
+## Match boundary rules — CRITICAL
+
+**start_seconds** = the moment athletes step onto the mat and the referee starts the match (first contact or "combate" call).
+- Do NOT use the timestamp when the athlete name overlay first appears — that graphic is shown BEFORE the match begins.
+- Do NOT use a winner/result announcement screen as a start_seconds.
+
+**end_seconds** = the moment the referee signals the end (raises a hand, separates athletes, signals submission).
+- Stop BEFORE any winner announcement overlay appears.
+
+## Winner / result screens — do NOT treat as a match start
+
+Competition streams display a result graphic after every match: e.g. "Winner: Thiago — by Submission", a highlighted name on the scoreboard, or a medal/podium graphic. When you see these:
+- Use the information to fill in \`match_result\` for the match that just ended.
+- Do NOT create a new match entry based on this screen — it is the END of a match, not the start.
+- winner_is_tracked_athlete: true if the tracked athlete's name is shown as the winner.
+- method: "submission" | "points" | "dq" | "unknown".
+- technique: the finishing technique if visible (e.g. "rear naked choke", "armbar", "advantage").
+
+## Other rules
+- Only include actual BJJ matches, not warm-ups, demos, or gaps between matches.
+- If the athlete's name is abbreviated on screen (e.g. "D. Mikel" for "Dario Mikel"), still include it.
+- If the athlete does not appear in the video at all, return matches: [] and athlete_found: false.
+- Include round/bracket info if visible (e.g. "Semi-final", "Gold medal match").`
 }
 
 export function buildScanUrlUserPrompt(athleteName: string): string {
