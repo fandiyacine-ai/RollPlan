@@ -1,6 +1,6 @@
 import { buildTaxonomyPromptBlock } from '../../taxonomy'
 
-export const EXTRACT_MATCH_PROMPT_VERSION = 'v3'
+export const EXTRACT_MATCH_PROMPT_VERSION = 'v4'
 
 export const BJJ_POSITION_VISUAL_GUIDE = `## Visual Identification Guide — Commonly Confused Positions
 
@@ -48,14 +48,35 @@ ${buildTaxonomyPromptBlock()}
 
 ${BJJ_POSITION_VISUAL_GUIDE}
 
-## Your task
+## Your task — follow these steps in order
 
-1. First, identify the competitor of interest using the provided description and any reference image. There are exactly TWO athletes — one is "user", the other is "opponent". State in competitor_identifier which visual features (gi colour, body position, side of frame) confirm which athlete is the user.
-2. Segment the ENTIRE video from second 0 to the very last second — every second must fall into exactly one segment. No gaps. Pre-match standing/bowing = standing/neutral. Post-match celebration = standing/neutral. Do not stop early.
-3. Identify discrete events (submission attempts, sweeps, passes, takedowns, escapes, etc.).
-4. Read the match result from the outcome screen shown at the end of the clip — the scoreboard highlight, winner announcement, or medal graphic. Set match_result.winner to "user" if the tracked competitor's name is highlighted/announced as the winner, "opponent" otherwise. Set method to "submission", "points", "dq", or "walkover". If no result screen is visible in the clip, omit match_result entirely.
-5. Apply the self-review checklist above before finalising your output.
-6. Output ONLY valid JSON matching the required schema. No prose outside the JSON.
+### Step 1 — Anchor identity from the outcome screen (do this FIRST)
+
+Scan to the end of the clip and find the outcome screen: the scoreboard highlight, winner announcement, or result graphic that shows which athlete won.
+
+- Read the winner's name from that screen exactly as shown.
+- Find which physical athlete on the mat corresponds to that name (they are being raised, celebrated, or highlighted).
+- That physical athlete is **"user"** if their name matches the tracked competitor you were given. Otherwise they are **"opponent"**.
+- Lock in which body/appearance corresponds to "user" and which to "opponent". You will not change this assignment for any reason.
+- Record this in competitor_identifier: e.g. "User anchored from outcome screen — DARIO MIKEL highlighted as winner, wearing blue gi on left side at end."
+
+If no outcome screen is visible, fall back to the provided appearance description and any reference image to identify the user.
+
+### Step 2 — Analyse positions and events
+
+Using the identity anchor from Step 1, segment the ENTIRE video from second 0 to the very last second. Every second must fall into exactly one segment. No gaps. Pre-match standing/bowing = standing/neutral. Post-match celebration = standing/neutral. Do not stop early.
+
+### Step 3 — Record the result
+
+From the outcome screen found in Step 1, populate match_result: winner ("user" or "opponent"), method ("submission", "points", "dq", "walkover"), and technique if visible. Omit match_result if no outcome screen was visible.
+
+### Step 4 — Identify events
+
+Identify discrete events (submission attempts, sweeps, passes, takedowns, escapes, etc.).
+
+### Step 5 — Self-review
+
+Apply the self-review checklist above before finalising your output. Output ONLY valid JSON matching the required schema. No prose outside the JSON.
 
 ## Rules
 - NEVER use position or event type IDs not in the taxonomy above.
@@ -65,7 +86,7 @@ ${BJJ_POSITION_VISUAL_GUIDE}
 - confidence reflects your certainty about the classification, not about whether the action happened.
 - Express uncertainty via confidence (0.0–1.0), NEVER by hedging in the description field.
 - If you cannot confidently classify a position, use transition.
-- CRITICAL: Once you identify which athlete is the user, track THAT SAME PERSON consistently for the entire match. Do not swap who is "user" and who is "opponent" mid-match even during scrambles or position reversals. The identity of the two athletes does not change — only their positions do.
+- CRITICAL: Once you anchor which physical athlete is "user" in Step 1, track THAT SAME PERSON for the entire match. Never swap user/opponent mid-match even during scrambles.
 
 ## Bounding boxes
 
