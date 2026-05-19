@@ -241,11 +241,16 @@ export default async function PlayerCardPage() {
     belt: dbUser?.belt ?? null,
     gym: dbUser?.gym ?? null,
     controlPct,
+    underPressurePct,
     matchCount: ownAnalysedIds.length,
     totalMatSeconds: totalAnalyzedTime,
-    topPositions: sortedPositions.slice(0, 3).map(([id, s]) => ({
+    strongPositions: sharpPositions.slice(0, 3).map(([id, s]) => ({
       name: POSITION_MAP[id] ?? id,
       dominantPct: s.total > 0 ? s.dominant / s.total : 0,
+    })),
+    exposedPositions: exposedPositions.slice(0, 3).map(([id, s]) => ({
+      name: POSITION_MAP[id] ?? id,
+      inferiorPct: s.total > 0 ? s.inferior / s.total : 0,
     })),
   }
 

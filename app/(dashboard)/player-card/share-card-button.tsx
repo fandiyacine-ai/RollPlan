@@ -23,6 +23,8 @@ export function ShareCardButton({ data }: { data: ShareCardData }) {
       const dataUrl = await toPng(cardRef.current, {
         pixelRatio: 2,
         cacheBust: true,
+        width: 540,
+        height: 540,
       })
       const a = document.createElement('a')
       a.href = dataUrl
