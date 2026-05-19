@@ -2,7 +2,7 @@ import { db } from '../../../lib/db'
 import { tournaments } from '../../../lib/db/schema'
 import { desc } from 'drizzle-orm'
 import Link from 'next/link'
-import { CreateTournamentForm, DeleteTournamentButton } from './create-form'
+import { CreateTournamentForm, DeleteTournamentButton, EditTournamentButton } from './create-form'
 
 export const dynamic = 'force-dynamic'
 
@@ -84,6 +84,7 @@ export default async function TournamentsPage() {
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_BADGE[t.status] ?? 'bg-zinc-800 text-zinc-400 border border-zinc-700'}`}>
                     {STATUS_LABEL[t.status] ?? t.status}
                   </span>
+                  <EditTournamentButton tournament={t} />
                   <DeleteTournamentButton id={t.id} />
                 </div>
               </div>

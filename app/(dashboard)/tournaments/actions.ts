@@ -51,6 +51,51 @@ export async function createTournament(
   }
 }
 
+export async function updateTournament(
+  id: string,
+  formData: FormData
+): Promise<{ error?: string }> {
+  try {
+    const userId = await getOrCreateDbUserId()
+
+    const name = (formData.get('name') as string)?.trim()
+    if (!name) return { error: 'Tournament name is required' }
+
+    const rawScUrl = (formData.get('smoothcompUrl') as string)?.trim() || null
+    let smoothcompUrl: string | null = null
+    let smoothcompEventId: string | null = null
+
+    if (rawScUrl) {
+      const bracketParsed = parseSmootcompBracketUrl(rawScUrl)
+      const eventId = bracketParsed?.eventId ?? parseSmootcompEventUrl(rawScUrl)
+      if (!eventId) {
+        return { error: 'Invalid Smoothcomp URL — paste any URL from your event page on smoothcomp.com' }
+      }
+      smoothcompUrl = rawScUrl
+      smoothcompEventId = eventId
+    }
+
+    await db
+      .update(tournaments)
+      .set({
+        name,
+        eventDate: (formData.get('eventDate') as string) || null,
+        division: (formData.get('division') as string)?.trim() || null,
+        ruleset: (formData.get('ruleset') as string) || 'ibjjf',
+        notes: (formData.get('notes') as string)?.trim() || null,
+        status: (formData.get('status') as string) || 'upcoming',
+        smoothcompUrl,
+        smoothcompEventId,
+      })
+      .where(and(eq(tournaments.id, id), eq(tournaments.userId, userId)))
+
+    revalidatePath('/tournaments')
+    return {}
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 export async function deleteTournament(id: string): Promise<{ error?: string }> {
   try {
     const userId = await getOrCreateDbUserId()
