@@ -1,9 +1,9 @@
 // Server component — pure SVG, no client JS needed
 
-const SVG_W = 600
+const SVG_W = 640
 const SVG_H = 340
-const NODE_RX = 54  // half-width of pill
-const NODE_RY = 17  // half-height of pill
+const NODE_RX = 66  // half-width of pill
+const NODE_RY = 18  // half-height of pill
 const MAX_NODES = 9
 const MAX_EDGES = 10
 
@@ -120,9 +120,9 @@ function Node({ node }: { node: NodeDatum }) {
   const isStrong = node.dominantPct >= 0.5
   const isWeak = node.dominantPct < 0.3
   const stroke = isStrong ? '#4ade80' : isWeak ? '#f87171' : '#71717a'
-  const fill = isStrong ? '#4ade8014' : isWeak ? '#f8717114' : 'transparent'
+  const fill = isStrong ? '#4ade8022' : isWeak ? '#f8717122' : 'transparent'
   const textColor = isStrong ? '#4ade80' : isWeak ? '#f87171' : 'currentColor'
-  const name = node.name.length > 15 ? node.name.slice(0, 14) + '…' : node.name
+  const name = node.name.length > 18 ? node.name.slice(0, 17) + '…' : node.name
 
   return (
     <g transform={`translate(${node.x},${node.y})`}>

@@ -601,20 +601,26 @@ function FileUploadTab() {
 
   if (state === 'success') {
     return (
-      <div className="rounded-lg border border-emerald-800/50 bg-emerald-950/40 p-8 text-center space-y-4">
-        <div className="text-4xl">✓</div>
+      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-8 py-10 text-center space-y-5">
+        <div className="flex justify-center">
+          <div className="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+        </div>
         {scanMode === 'scan' ? (
-          <>
-            <p className="font-medium text-emerald-400">Scanning for {athleteName}&apos;s matches…</p>
-            <p className="text-sm text-muted-foreground">Gemini will find all matches in the recording. This may take several minutes.</p>
-          </>
+          <div className="space-y-1.5">
+            <p className="font-semibold text-foreground">Scanning for {athleteName}&apos;s matches</p>
+            <p className="text-sm text-muted-foreground">Gemini will work through the full recording and extract every match. This usually takes a few minutes.</p>
+          </div>
         ) : (
-          <>
-            <p className="font-medium text-emerald-400">Video uploaded — analysis starting shortly.</p>
-            <p className="text-sm text-muted-foreground">You&apos;ll see it appear in your Match Feed.</p>
-          </>
+          <div className="space-y-1.5">
+            <p className="font-semibold text-foreground">Video uploaded</p>
+            <p className="text-sm text-muted-foreground">Analysis is starting shortly — you&apos;ll see it appear in your Match Feed.</p>
+          </div>
         )}
-        <div className="flex gap-3 justify-center pt-2">
+        <div className="flex gap-3 justify-center pt-1">
           <Button variant="outline" onClick={() => { setFile(null); setFrameResult(null); setState('idle'); setProgress(0); setAthleteName(''); setEventName('') }}>Upload another</Button>
           <Button onClick={() => router.push('/player-card')}>View My Stats</Button>
         </div>
@@ -758,19 +764,27 @@ function UrlAnalysisTab() {
   }
 
   if (state === 'success') {
+    const streamCount = urls.filter(Boolean).length
     return (
-      <div className="rounded-lg border border-emerald-800/50 bg-emerald-950/40 p-8 text-center space-y-4">
-        <div className="text-4xl">✓</div>
-        {urlScanMode === 'single'
-          ? <p className="font-medium text-emerald-400">Match submitted — analysis starting shortly.</p>
-          : <p className="font-medium text-emerald-400">{urls.filter(Boolean).length} stream{urls.filter(Boolean).length > 1 ? 's' : ''} submitted for analysis!</p>
-        }
-        <p className="text-sm text-muted-foreground">
-          {urlScanMode === 'single'
-            ? "You'll see it appear in your Match Feed when ready."
-            : `Gemini will scan for ${athleteName}'s matches. This may take several minutes.`}
-        </p>
-        <div className="flex gap-3 justify-center pt-2">
+      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-8 py-10 text-center space-y-5">
+        <div className="flex justify-center">
+          <div className="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <p className="font-semibold text-foreground">
+            {urlScanMode === 'single' ? 'Match submitted' : `${streamCount} stream${streamCount > 1 ? 's' : ''} queued`}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {urlScanMode === 'single'
+              ? "Analysis is starting shortly — you'll see it in your Match Feed when ready."
+              : `Gemini will scan for ${athleteName}'s matches. This usually takes a few minutes per stream.`}
+          </p>
+        </div>
+        <div className="flex gap-3 justify-center pt-1">
           <Button variant="outline" onClick={() => { setUrls(['']); setAthleteName(''); setEventName(''); setState('idle') }}>Submit more</Button>
           <Button onClick={() => router.push('/player-card')}>View My Matches</Button>
         </div>
