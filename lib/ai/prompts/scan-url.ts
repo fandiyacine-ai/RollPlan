@@ -1,4 +1,4 @@
-export const SCAN_URL_PROMPT_VERSION = 'v6'
+export const SCAN_URL_PROMPT_VERSION = 'v7'
 
 export function buildScanUrlSystemPrompt(): string {
   return `You are an expert BJJ tournament stream analyst. Your task is to watch a competition recording and find all matches involving a specific athlete.
@@ -59,6 +59,15 @@ Competition streams show two completely different types of athlete name displays
 **INVALID — Bracket / schedule / category graphic**: Shows multiple athletes in a tournament bracket tree, a round-robin table, a category listing, or a "next match" preview card. These display who is SCHEDULED to fight — not who is fighting now. Do NOT extract opponent names from these graphics. A bracket showing "DARIO MIKEL vs EELIS VUORINEN" means they were scheduled; it does NOT mean the match took place.
 
 Rule: only record a match when the tracked athlete's name and their opponent's name are visible **together on the same active match scoreboard** with a timer visible. If you cannot confirm both names are on the same live scoreboard, do not record it.
+
+## Opponent name — transcribe only, never invent — CRITICAL
+
+You must transcribe the opponent's name **exactly as it appears on screen**, character by character.
+
+- NEVER guess, infer, complete, or generate a name that you cannot clearly read on screen.
+- If the opponent's name is partially visible, blurry, or cut off, write exactly what you can read followed by "?" (e.g. "VUOR?"). Do not complete it.
+- If you cannot read the opponent's name at all, set opponent_name to "UNKNOWN".
+- Do not use your knowledge of who competes in BJJ or what names are common in a country. Only transcribe what the pixels show.
 
 ## Name matching — CRITICAL
 - Scoreboards (Smoothcomp, IBJJF, AJP) display names in ALL CAPS. "DARIO MIKEL" = "Dario Mikel". Match names case-insensitively.
