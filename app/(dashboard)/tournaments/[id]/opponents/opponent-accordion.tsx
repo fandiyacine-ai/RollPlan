@@ -156,7 +156,7 @@ export function OpponentAccordion({
     : footageStatus === 'auto_queued'
     ? <span className="text-blue-400">Scanning past competitions…</span>
     : footageStatus === 'no_footage'
-    ? <span className="text-amber-400">No recordings found — add a link below</span>
+    ? <span className="text-muted-foreground/50">No recordings found — paste a link or upload footage</span>
     : footageStatus === 'reused'
     ? <span className="text-muted-foreground/50">Scouted in another tournament — add footage for this event</span>
     : <span className="text-muted-foreground/50">No footage added yet</span>
@@ -213,16 +213,6 @@ export function OpponentAccordion({
             >
               Gameplan →
             </Link>
-          )}
-          {footageStatus === 'no_footage' && analysed === 0 && (
-            <a
-              href={`https://www.youtube.com/results?search_query=${encodeURIComponent(opponent.opponentLabel + ' BJJ grappling')}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
-            >
-              Search YouTube
-            </a>
           )}
           {/* Hide scout form when auto-discovery is actively queued with no results yet */}
           {footageStatus !== 'pending' && !(footageStatus === 'auto_queued' && allRows.length === 0) && (
