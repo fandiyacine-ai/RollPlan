@@ -1,6 +1,6 @@
 import { db } from '../../../../../lib/db'
 import { tournamentOpponents, matches, videos } from '../../../../../lib/db/schema'
-import { eq, inArray, isNull, and, notLike } from 'drizzle-orm'
+import { eq, inArray, isNull, and, notLike, like, sql } from 'drizzle-orm'
 import { AddOpponentForm } from './opponent-forms'
 import { OpponentAccordion } from './opponent-accordion'
 
@@ -14,7 +14,7 @@ type MatchRow = {
 
 type VideoRow = {
   id: string; status: string; label: string; createdAt: Date; tournamentOpponentId: string | null
-  failureReason: string | null
+  failureReason: string | null; chunksDone: number | null; chunksTotal: number | null
 }
 
 function DbError({ label, err }: { label: string; err: unknown }) {
@@ -70,7 +70,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
     }
 
     try {
-      allPendingVideos = await db.select({
+      const rawVideos = await db.select({
         id: videos.id,
         status: videos.status,
         label: videos.originalFilename,
@@ -83,10 +83,30 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
       .where(and(
         inArray(videos.tournamentOpponentId, opponentIds),
         isNull(matches.id),
-        // Chunk sub-videos are an internal detail — only show the parent URL record
         notLike(videos.r2Key, 'chunk/%'),
       ))
-      .orderBy(videos.uploadedAt) as VideoRow[]
+      .orderBy(videos.uploadedAt)
+
+      // For parent videos in processing state, fetch chunk scan progress
+      const processingIds = rawVideos.filter(v => v.status === 'processing').map(v => v.id)
+      const chunkCountById: Record<string, { done: number; total: number }> = {}
+      if (processingIds.length > 0) {
+        const counts = await db.select({
+          parentId: sql<string>`split_part(r2_key, '/', 2)`,
+          total: sql<number>`count(*)::int`,
+          done: sql<number>`count(*) filter (where status = 'analysed')::int`,
+        })
+        .from(videos)
+        .where(and(like(videos.r2Key, 'chunk/%'), inArray(videos.tournamentOpponentId, opponentIds)))
+        .groupBy(sql`split_part(r2_key, '/', 2)`)
+        for (const r of counts) chunkCountById[r.parentId] = { done: r.done, total: r.total }
+      }
+
+      allPendingVideos = rawVideos.map(v => ({
+        ...v,
+        chunksDone: chunkCountById[v.id]?.done ?? null,
+        chunksTotal: chunkCountById[v.id]?.total ?? null,
+      })) as VideoRow[]
     } catch (err) {
       return <DbError label="videos query" err={err} />
     }
@@ -153,12 +173,12 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
                   ...v,
                   format: null, context: null, eventName: null, opponentLabel: null,
                   resultWinner: null, resultMethod: null, resultTechnique: null,
-                  // A parent video that finished scanning with no matches has status 'analysed'
-                  // but no match records — surface it as a failure with a clear reason.
                   status: v.status === 'analysed' ? 'failed' : v.status,
                   failureReason: v.status === 'analysed'
                     ? (v.failureReason ?? 'Scan complete — no matches found for this athlete in the video.')
                     : (v.failureReason ?? null),
+                  chunksDone: v.chunksDone ?? null,
+                  chunksTotal: v.chunksTotal ?? null,
                 }))}
               tournamentId={tournamentId}
             />

@@ -12,12 +12,14 @@ type FootageRow = {
   context: string | null
   eventName: string | null
   opponentLabel?: string | null
-  label?: string   // set for video-only rows (no match yet); overrides format/context
+  label?: string
   createdAt: Date
   resultWinner: string | null
   resultMethod: string | null
   resultTechnique: string | null
   failureReason: string | null
+  chunksDone?: number | null
+  chunksTotal?: number | null
 }
 
 type Opponent = {
@@ -118,7 +120,12 @@ export function OpponentAccordion({
   const [open, setOpen] = useState(false)
 
   const allRows = [...pendingVideos, ...matches]
-  const chunkProgress = detectChunks(pendingVideos)
+
+  // Chunk progress comes from the parent video row when status is 'processing'
+  const chunkingVideo = pendingVideos.find(v => v.status === 'processing' && v.chunksTotal)
+  const chunkProgress = chunkingVideo?.chunksTotal
+    ? { done: chunkingVideo.chunksDone ?? 0, total: chunkingVideo.chunksTotal }
+    : null
 
   const analysed = matches.filter(m => m.status === 'analysed').length
   const pending  = allRows.filter(m => m.status === 'pending' || m.status === 'processing' || m.status === 'uploaded').length
@@ -132,12 +139,12 @@ export function OpponentAccordion({
 
   const subtitle = chunkProgress
     ? chunkProgress.done === 0
-      ? <span className="text-blue-400">Scanning video in {chunkProgress.total} parts…</span>
-      : <><span className="text-blue-400">{chunkProgress.done}/{chunkProgress.total} parts scanned</span>{analysed > 0 ? ` · ${analysed} match${analysed !== 1 ? 'es' : ''} found` : ''}</>
+      ? <span className="text-blue-400">Scanning — splitting into {chunkProgress.total} parts…</span>
+      : <><span className="text-blue-400">{chunkProgress.done}/{chunkProgress.total} parts scanned</span>{analysed > 0 ? ` · ${analysed} match${analysed !== 1 ? 'es' : ''} found so far` : ''}</>
     : pending > 0 && analysed === 0
-    ? <span className="text-blue-400">Scanning {pending} clip{pending !== 1 ? 's' : ''}…</span>
+    ? <span className="text-blue-400">Scanning…</span>
     : pending > 0
-    ? <><span className="text-blue-400">{pending} scanning</span> · {analysed} ready</>
+    ? <><span className="text-blue-400">Scanning</span> · {analysed} match{analysed !== 1 ? 'es' : ''} found so far</>
     : analysed > 0
     ? `${analysed} match${analysed !== 1 ? 'es' : ''} ready${failed > 0 ? ` · ${failed} failed` : ''}`
     : failed > 0
