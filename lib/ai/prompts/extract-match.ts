@@ -1,6 +1,6 @@
 import { buildTaxonomyPromptBlock } from '../../taxonomy'
 
-export const EXTRACT_MATCH_PROMPT_VERSION = 'v2'
+export const EXTRACT_MATCH_PROMPT_VERSION = 'v3'
 
 export const BJJ_POSITION_VISUAL_GUIDE = `## Visual Identification Guide — Commonly Confused Positions
 
@@ -53,8 +53,9 @@ ${BJJ_POSITION_VISUAL_GUIDE}
 1. First, identify the competitor of interest using the provided description and any reference image. There are exactly TWO athletes — one is "user", the other is "opponent". State in competitor_identifier which visual features (gi colour, body position, side of frame) confirm which athlete is the user.
 2. Segment the ENTIRE video from second 0 to the very last second — every second must fall into exactly one segment. No gaps. Pre-match standing/bowing = standing/neutral. Post-match celebration = standing/neutral. Do not stop early.
 3. Identify discrete events (submission attempts, sweeps, passes, takedowns, escapes, etc.).
-4. Apply the self-review checklist above before finalising your output.
-5. Output ONLY valid JSON matching the required schema. No prose outside the JSON.
+4. Read the match result from the outcome screen shown at the end of the clip — the scoreboard highlight, winner announcement, or medal graphic. Set match_result.winner to "user" if the tracked competitor's name is highlighted/announced as the winner, "opponent" otherwise. Set method to "submission", "points", "dq", or "walkover". If no result screen is visible in the clip, omit match_result entirely.
+5. Apply the self-review checklist above before finalising your output.
+6. Output ONLY valid JSON matching the required schema. No prose outside the JSON.
 
 ## Rules
 - NEVER use position or event type IDs not in the taxonomy above.

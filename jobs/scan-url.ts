@@ -287,6 +287,8 @@ export const scanUrl = inngest.createFunction(
         // Idempotency: skip extraction if positions were already saved on a prior attempt
         const existingSegments = await db.query.positionSegments.findMany({ where: eq(positionSegments.matchId, matchId) })
 
+        let extractedResult: MatchExtractionOutput['match_result'] | undefined
+
         if (existingSegments.length === 0) {
           // Extract positions + events
           const extractStart = Date.now()
@@ -380,12 +382,14 @@ export const scanUrl = inngest.createFunction(
             throw err
           }
 
+          extractedResult = extractObject.match_result
+
           if (extractObject.positions.length === 0) {
-            // No grappling detected — likely a walkover the scan didn't flag, or a very brief clip.
-            // Mark as analysed with walkover result so it shows correctly in the UI.
             await db.update(matches).set({
               status: 'analysed',
-              resultMethod: 'walkover',
+              resultMethod: extractedResult?.method ?? 'walkover',
+              resultWinner: extractedResult?.winner ?? null,
+              resultTechnique: extractedResult?.technique ?? null,
             }).where(eq(matches.id, matchId))
             return { matchId, status: 'analysed' }
           }
@@ -554,7 +558,14 @@ export const scanUrl = inngest.createFunction(
           }
         }
 
-        await db.update(matches).set({ status: 'analysed' }).where(eq(matches.id, matchId))
+        await db.update(matches).set({
+          status: 'analysed',
+          ...(extractedResult ? {
+            resultWinner: extractedResult.winner,
+            resultMethod: extractedResult.method,
+            resultTechnique: extractedResult.technique ?? null,
+          } : {}),
+        }).where(eq(matches.id, matchId))
         return { matchId, status: 'analysed' }
       })
     }

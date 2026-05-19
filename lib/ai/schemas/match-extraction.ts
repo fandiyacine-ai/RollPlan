@@ -29,13 +29,22 @@ export const MatchEventSchema = z.object({
   confidence: z.number().min(0).max(1),
 })
 
+export const MatchResultSchema = z.object({
+  winner: z.enum(['user', 'opponent']).describe('Who won the match'),
+  method: z.enum(['submission', 'points', 'dq', 'walkover', 'unknown']),
+  technique: z.string().optional().describe('Finishing technique if submission, e.g. "rear naked choke"'),
+}).optional().describe('Result from the outcome screen at the end of the match. Omit if no result screen is visible.')
+
 export const MatchExtractionOutputSchema = z.object({
   positions: z.array(PositionSegmentSchema),
   events: z.array(MatchEventSchema),
   overall_confidence: z.number().min(0).max(1),
   competitor_identifier: z.string().describe('How the competitor was identified (e.g. "blue gi, left side of screen at start")'),
+  match_result: MatchResultSchema,
   notes: z.string(),
 })
+
+export type MatchResult = z.infer<typeof MatchResultSchema>
 
 export type MatchExtractionOutput = z.infer<typeof MatchExtractionOutputSchema>
 export type PositionSegmentInput = z.infer<typeof PositionSegmentSchema>
