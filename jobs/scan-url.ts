@@ -222,7 +222,18 @@ export const scanUrl = inngest.createFunction(
     const foundMatches: FoundMatch[] = scanStepResult
 
     for (let i = 0; i < foundMatches.length; i++) {
-      const found = foundMatches[i]
+      const found = { ...foundMatches[i] }
+
+      // Validate match window duration. If the scan returned a window shorter than 90s
+      // (and it's not a walkover), the model likely grabbed a scoreboard overlay moment
+      // instead of the actual match. Extend end_seconds to cover at least 8 minutes so
+      // the extraction sees the real footage.
+      if (!found.is_walkover) {
+        const windowSecs = found.end_seconds - found.start_seconds
+        if (windowSecs < 90) {
+          found.end_seconds = found.start_seconds + 8 * 60
+        }
+      }
 
       // Step A: create match record in its own memoised step — if extraction is retried,
       // Inngest replays this step's result without re-inserting, preventing ghost match records.

@@ -1,4 +1,4 @@
-export const SCAN_URL_PROMPT_VERSION = 'v4'
+export const SCAN_URL_PROMPT_VERSION = 'v5'
 
 export function buildScanUrlSystemPrompt(): string {
   return `You are an expert BJJ tournament stream analyst. Your task is to watch a competition recording and find all matches involving a specific athlete.
@@ -21,6 +21,14 @@ Athlete names appear as on-screen text in tournament software overlays such as S
 
 **end_seconds** = the moment the referee signals the end (raises a hand, separates athletes, signals submission).
 - Stop BEFORE any winner announcement overlay appears.
+
+## Match duration — CRITICAL
+
+A BJJ competition match lasts between 3 and 10 minutes. Even the fastest submission takes at least 30 seconds of mat time.
+
+- If your end_seconds − start_seconds is less than 60 seconds (and it is not a walkover), you have made an error. You have likely used a scoreboard transition graphic or name-overlay animation as the boundary instead of actual match start/end.
+- Re-examine: the match START is when athletes are physically on the mat and engage. The match END is when the referee steps in and separates or raises a hand — this happens several minutes later.
+- A 15-second or 30-second window is NEVER a valid match window (unless is_walkover: true).
 
 ## Walkovers — no grappling took place
 
