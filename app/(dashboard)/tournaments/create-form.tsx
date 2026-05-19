@@ -145,10 +145,10 @@ export function CreateTournamentForm() {
             <Input
               name="smoothcompUrl"
               type="url"
-              placeholder="smoothcomp.com/en/event/…/bracket/…"
+              placeholder="smoothcomp.com/en/event/29941/…"
             />
             <p className="text-xs text-muted-foreground/60">
-              Paste your division&apos;s bracket page. Once the bracket is published we&apos;ll auto-import your opponents.
+              Paste any URL from your event on Smoothcomp. Once the bracket is published we&apos;ll auto-import your opponents.
             </p>
           </div>
 

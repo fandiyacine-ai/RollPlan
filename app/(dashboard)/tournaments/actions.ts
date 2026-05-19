@@ -21,12 +21,15 @@ export async function createTournament(
     let smoothcompEventId: string | null = null
 
     if (rawScUrl) {
-      const parsed = parseSmootcompBracketUrl(rawScUrl)
-      if (!parsed) {
-        return { error: 'Invalid Smoothcomp URL — paste the bracket URL from your division page (e.g. smoothcomp.com/en/event/…/bracket/…)' }
+      // Accept either a specific bracket URL (/event/xxx/bracket/yyy)
+      // or any event URL (/event/xxx/...) — bracket ID is not required at creation time
+      const bracketParsed = parseSmootcompBracketUrl(rawScUrl)
+      const eventId = bracketParsed?.eventId ?? parseSmootcompEventUrl(rawScUrl)
+      if (!eventId) {
+        return { error: 'Invalid Smoothcomp URL — paste any URL from your event page on smoothcomp.com' }
       }
       smoothcompUrl = rawScUrl
-      smoothcompEventId = parsed.eventId
+      smoothcompEventId = eventId
     }
 
     const [tour] = await db.insert(tournaments).values({
