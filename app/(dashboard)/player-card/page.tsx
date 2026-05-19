@@ -247,37 +247,45 @@ export default async function PlayerCardPage() {
 
       <ProfileHeader name={displayName} dbUser={dbUser} />
 
-      {/* Stats grid */}
+      {/* Stats strip */}
       {ownAnalysedIds.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
-          <StatCard
-            label="Matches Analysed"
-            value={String(ownAnalysedIds.length)}
-            sub={matchesSub}
-          />
-          <StatCard label="Total Mat Time" value={fmt(totalAnalyzedTime)} />
-          <StatCard
-            label="Avg Duration"
-            value={avgMatchDuration > 0 ? fmt(avgMatchDuration) : '—'}
-            sub="per match"
-          />
-          <StatCard
-            label="Control Rate"
-            value={`${controlPct}%`}
-            sub={`${underPressurePct}% under pressure`}
-            accent={controlPct >= 55 ? 'good' : controlPct < 35 ? 'bad' : undefined}
-            trend={trendDelta}
-          />
-          <StatCard
-            label="Attacks Attempted"
-            value={String(subAttempts)}
-            sub="submission attempts"
-          />
-          <StatCard
-            label="AI Confidence"
-            value={avgAiScore !== null ? `${avgAiScore}%` : '—'}
-            sub="avg analysis score"
-          />
+        <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+          {/* Control rate — featured */}
+          <div className="px-5 pt-4 pb-3.5 border-b border-border/60">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Control Rate</p>
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className={`text-2xl font-bold tabular-nums leading-none ${
+                controlPct >= 55 ? 'text-emerald-400' : controlPct < 35 ? 'text-rose-400' : 'text-foreground'
+              }`}>{controlPct}%</span>
+              {trendDelta != null && trendDelta !== 0 && (
+                <span className={`text-xs font-semibold ${trendDelta > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {trendDelta > 0 ? '↑' : '↓'}{Math.abs(trendDelta)}%
+                </span>
+              )}
+              <span className="text-xs text-muted-foreground">{underPressurePct}% under pressure</span>
+            </div>
+            <div className="mt-2.5 h-1 rounded-full bg-muted overflow-hidden max-w-sm">
+              <div className="h-full rounded-full" style={{
+                width: `${controlPct}%`,
+                background: controlPct >= 55 ? '#4ade80' : controlPct < 35 ? '#f87171' : '#71717a',
+              }} />
+            </div>
+          </div>
+          {/* Secondary stats */}
+          <div className="grid grid-cols-4 divide-x divide-border/40">
+            {[
+              { label: 'Matches', value: String(ownAnalysedIds.length), sub: matchesSub },
+              { label: 'Mat Time', value: fmt(totalAnalyzedTime) },
+              { label: 'Avg Match', value: avgMatchDuration > 0 ? fmt(avgMatchDuration) : '—' },
+              { label: 'Attacks', value: String(subAttempts), sub: 'submission attempts' },
+            ].map(({ label, value, sub }) => (
+              <div key={label} className="px-4 py-3">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">{label}</p>
+                <p className="text-base font-semibold tabular-nums mt-0.5">{value}</p>
+                {sub && <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -451,18 +459,18 @@ export default async function PlayerCardPage() {
 
       {/* Position Transition Flow */}
       {transitionData.nodes.length >= 3 && transitionEdges.length >= 3 && (
-        <div className="rounded-xl border border-border/60 overflow-hidden bg-card">
-          <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Position Flow</h2>
-            <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
-              <span className="flex items-center gap-1"><span className="w-2 h-0.5 bg-emerald-400 inline-block rounded" />Dominant</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-0.5 bg-rose-400 inline-block rounded" />Under pressure</span>
+        <div className="rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950">
+          <div className="px-5 py-3 border-b border-zinc-800/80 flex items-center justify-between">
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">Position Flow</h2>
+            <div className="flex items-center gap-4 text-[10px] text-zinc-500">
+              <span className="flex items-center gap-1.5"><span className="w-2 h-0.5 bg-emerald-400 inline-block rounded-full" />Dominant</span>
+              <span className="flex items-center gap-1.5"><span className="w-2 h-0.5 bg-rose-400 inline-block rounded-full" />Under pressure</span>
             </div>
           </div>
-          <div className="p-4">
+          <div className="px-2 py-2">
             <TransitionDiagram data={transitionData} />
           </div>
-          <p className="px-5 pb-3 text-[10px] text-muted-foreground/50">Arrow weight = transition frequency across {ownAnalysedIds.length} matches</p>
+          <p className="px-5 pb-3 text-[10px] text-zinc-700">Arrow weight = transition frequency across {ownAnalysedIds.length} matches</p>
         </div>
       )}
 

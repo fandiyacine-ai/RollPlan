@@ -108,7 +108,7 @@ function Arrow({
     <path
       d={d}
       fill="none"
-      stroke="currentColor"
+      stroke="#71717a"
       strokeWidth={sw}
       strokeOpacity={opacity}
       markerEnd="url(#arr)"
@@ -119,9 +119,9 @@ function Arrow({
 function Node({ node }: { node: NodeDatum }) {
   const isStrong = node.dominantPct >= 0.5
   const isWeak = node.dominantPct < 0.3
-  const stroke = isStrong ? '#4ade80' : isWeak ? '#f87171' : '#71717a'
-  const fill = isStrong ? '#4ade8022' : isWeak ? '#f8717122' : 'transparent'
-  const textColor = isStrong ? '#4ade80' : isWeak ? '#f87171' : 'currentColor'
+  const stroke = isStrong ? '#4ade80' : isWeak ? '#f87171' : '#52525b'
+  const fill = isStrong ? '#4ade8018' : isWeak ? '#f8717118' : '#27272a'
+  const textColor = isStrong ? '#4ade80' : isWeak ? '#f87171' : '#a1a1aa'
   const name = node.name.length > 18 ? node.name.slice(0, 17) + '…' : node.name
 
   return (
@@ -156,8 +156,7 @@ function TierLabel({ y, label }: { y: number; label: string }) {
       dominantBaseline="middle"
       fontSize={8}
       fontWeight="700"
-      fill="currentColor"
-      opacity={0.25}
+      fill="#52525b"
       textAnchor="start"
       style={{ fontFamily: 'system-ui, sans-serif', textTransform: 'uppercase', letterSpacing: 1 }}
     >
@@ -196,16 +195,16 @@ export function TransitionDiagram({ data }: { data: TransitionData }) {
     >
       <defs>
         <marker id="arr" markerWidth="7" markerHeight="7" refX="5" refY="2.5" orient="auto">
-          <path d="M0,0 L0,5 L7,2.5 z" fill="currentColor" opacity="0.5" />
+          <path d="M0,0 L0,5 L7,2.5 z" fill="#71717a" opacity="0.9" />
         </marker>
       </defs>
 
       {/* Tier divider lines */}
       {tiersPresent.has(0) && tiersPresent.has(1) && (
-        <line x1={20} y1={112} x2={SVG_W - 20} y2={112} stroke="currentColor" strokeOpacity={0.06} strokeWidth={1} />
+        <line x1={20} y1={112} x2={SVG_W - 20} y2={112} stroke="#3f3f46" strokeWidth={1} />
       )}
       {tiersPresent.has(1) && tiersPresent.has(2) && (
-        <line x1={20} y1={227} x2={SVG_W - 20} y2={227} stroke="currentColor" strokeOpacity={0.06} strokeWidth={1} />
+        <line x1={20} y1={227} x2={SVG_W - 20} y2={227} stroke="#3f3f46" strokeWidth={1} />
       )}
 
       {/* Tier labels */}
