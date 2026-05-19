@@ -239,13 +239,17 @@ export const scanUrl = inngest.createFunction(
           eventName: eventName ?? null,
           userNotes: found.round_or_bracket ?? null,
           tournamentOpponentId: tournamentOpponentId ?? null,
-          status: 'processing',
+          // Walkovers are complete immediately — no extraction needed
+          status: found.is_walkover ? 'analysed' : 'processing',
           resultWinner: result ? (result.winner_is_tracked_athlete ? 'user' : 'opponent') : null,
           resultMethod: result?.method ?? null,
           resultTechnique: result?.technique ?? null,
         }).returning()
         return match.id
       })
+
+      // Walkovers: no grappling occurred, skip extraction entirely
+      if (found.is_walkover) continue
 
       // Step B: extract + analyse — idempotency guards mean retries safely skip already-done work
       await step.run(`extract-match-${i}`, async () => {

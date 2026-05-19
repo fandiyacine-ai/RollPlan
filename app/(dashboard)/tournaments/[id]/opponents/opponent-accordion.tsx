@@ -28,8 +28,10 @@ type Opponent = {
 
 function ResultBadge({ winner, method, technique }: { winner: string; method: string | null; technique: string | null }) {
   const isWin = winner === 'user'
-  const label = method === 'submission'
-    ? `W — Sub${technique ? ` (${technique})` : ''}`
+  const label = method === 'walkover'
+    ? (isWin ? 'W — Walkover' : 'L — Walkover')
+    : method === 'submission'
+    ? (isWin ? `W — Sub${technique ? ` (${technique})` : ''}` : `L — Sub${technique ? ` (${technique})` : ''}`)
     : method === 'points' ? (isWin ? 'W — Points' : 'L — Points')
     : method === 'dq' ? (isWin ? 'W — DQ' : 'L — DQ')
     : isWin ? 'Win' : 'Loss'
@@ -37,7 +39,7 @@ function ResultBadge({ winner, method, technique }: { winner: string; method: st
     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
       isWin ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/30' : 'bg-rose-950/60 text-rose-400 border border-rose-800/30'
     }`}>
-      {isWin ? label : label.replace('W', 'L')}
+      {label}
     </span>
   )
 }

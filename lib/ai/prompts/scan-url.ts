@@ -1,4 +1,4 @@
-export const SCAN_URL_PROMPT_VERSION = 'v3'
+export const SCAN_URL_PROMPT_VERSION = 'v4'
 
 export function buildScanUrlSystemPrompt(): string {
   return `You are an expert BJJ tournament stream analyst. Your task is to watch a competition recording and find all matches involving a specific athlete.
@@ -21,6 +21,17 @@ Athlete names appear as on-screen text in tournament software overlays such as S
 
 **end_seconds** = the moment the referee signals the end (raises a hand, separates athletes, signals submission).
 - Stop BEFORE any winner announcement overlay appears.
+
+## Walkovers — no grappling took place
+
+Some matches are won without any grappling when an opponent does not show up. These appear as a brief screen (often < 60 seconds) showing text like "WON BY WALKOVER", "BYE", or "WINNER BY WALKOVER — [NAME]" without athletes ever stepping on the mat.
+
+When you see a walkover:
+- Still include it as a match entry (it counts as a win/loss in the bracket)
+- Set is_walkover: true
+- Set start_seconds and end_seconds to the timestamp of the announcement (they will be equal or nearly equal — that is expected)
+- Set match_result.method to "walkover" and winner_is_tracked_athlete accordingly
+- Do NOT attempt to extract position data for walkovers
 
 ## Winner / result screens — do NOT treat as a match start
 
