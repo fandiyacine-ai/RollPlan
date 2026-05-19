@@ -29,6 +29,28 @@ const STATUS_LABEL: Record<string, string> = {
   failed: 'Failed',
 }
 
+function MatchResultBadge({ winner, method, technique }: { winner: string; method: string | null; technique: string | null }) {
+  const isWin = winner === 'user'
+  const label = method === 'walkover'
+    ? (isWin ? 'W — Walkover' : 'L — Walkover')
+    : method === 'submission'
+    ? (isWin ? `W — Sub${technique ? ` (${technique})` : ''}` : `L — Sub${technique ? ` (${technique})` : ''}`)
+    : method === 'points'
+    ? (isWin ? 'W — Points' : 'L — Points')
+    : method === 'dq'
+    ? (isWin ? 'W — DQ' : 'L — DQ')
+    : isWin ? 'Win' : 'Loss'
+  return (
+    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+      isWin
+        ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/30'
+        : 'bg-rose-950/60 text-rose-400 border border-rose-800/30'
+    }`}>
+      {label}
+    </span>
+  )
+}
+
 function formatTime(seconds: number): string {
   if (seconds < 60) return `${Math.round(seconds)}s`
   const m = Math.floor(seconds / 60)
@@ -108,11 +130,16 @@ export default async function MatchDetailPage({
         </Link>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">
-              {match.tournamentOpponentId
-                ? `${match.competitorLabel || 'Unknown'} vs. ${match.opponentLabel}`
-                : `vs. ${match.opponentLabel}`}
-            </h1>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-2xl font-bold">
+                {match.tournamentOpponentId
+                  ? `${match.competitorLabel || 'Unknown'} vs. ${match.opponentLabel}`
+                  : `vs. ${match.opponentLabel}`}
+              </h1>
+              {match.resultWinner && (
+                <MatchResultBadge winner={match.resultWinner} method={match.resultMethod} technique={match.resultTechnique} />
+              )}
+            </div>
             <p className="text-sm text-muted-foreground mt-1">
               {match.format === 'no_gi' ? 'No-Gi' : 'Gi'} · {match.context}
               {match.eventName ? ` · ${match.eventName}` : ''}
