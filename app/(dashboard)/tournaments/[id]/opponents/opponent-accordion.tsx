@@ -11,11 +11,13 @@ type FootageRow = {
   format: string | null
   context: string | null
   eventName: string | null
+  opponentLabel?: string | null
   label?: string   // set for video-only rows (no match yet); overrides format/context
   createdAt: Date
   resultWinner: string | null
   resultMethod: string | null
   resultTechnique: string | null
+  failureReason: string | null
 }
 
 type Opponent = {
@@ -53,12 +55,25 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 function rowTitle(m: FootageRow): string {
-  if (m.label) {
-    // Strip the "· Part N/M" suffix for display — it's noise in the list
-    const clean = m.label.replace(/\s*·\s*Part\s+\d+\/\d+$/, '').trim()
-    return clean || m.label
+  // For matches — use opponent name as the primary label
+  if (m.opponentLabel) {
+    const suffix = m.eventName ? ` · ${m.eventName}` : ''
+    return `vs ${m.opponentLabel}${suffix}`
   }
   if (m.eventName) return m.eventName
+  // For video-only rows — strip chunk suffix and URL noise
+  if (m.label) {
+    const clean = m.label.replace(/\s*·\s*Part\s+\d+\/\d+$/, '').trim()
+    // If it looks like a URL, show a clean placeholder
+    if (/^https?:\/\//.test(clean)) {
+      try {
+        const u = new URL(clean)
+        if (u.hostname.includes('youtube') || u.hostname.includes('youtu.be')) return 'YouTube video'
+        return u.hostname
+      } catch { return 'Video link' }
+    }
+    return clean || m.label
+  }
   const fmt = m.format === 'no_gi' ? 'No-Gi' : 'Gi'
   const ctx = m.context === 'sparring' ? 'Sparring' : 'Competition'
   return `${fmt} ${ctx}`
@@ -215,7 +230,9 @@ export function OpponentAccordion({
                   </Link>
                 )}
                 {m.status === 'failed' && (
-                  <span className="text-xs text-rose-400 flex-shrink-0">Analysis failed</span>
+                  <span className="text-xs text-rose-400 flex-shrink-0 max-w-xs truncate" title={m.failureReason ?? undefined}>
+                    {m.failureReason ?? 'Analysis failed'}
+                  </span>
                 )}
               </div>
             )

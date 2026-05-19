@@ -114,50 +114,47 @@ export const scanUrl = inngest.createFunction(
         const msg = err instanceof Error ? err.message : String(err)
         const isYT = isYouTubeUrl(video.publicUrl)
 
+        const failAndThrow = async (reason: string) => {
+          await db.update(videos).set({ status: 'failed', failureReason: reason }).where(eq(videos.id, videoId))
+          throw new NonRetriableError(reason)
+        }
+
         if (msg.includes('10800') || msg.includes('fewer than') || msg.includes('images in your request')) {
-          await db.update(videos).set({ status: 'failed' }).where(eq(videos.id, videoId))
-          throw new NonRetriableError('Stream is too long — try a shorter clip or a direct mat recording instead of the full event stream.')
+          await failAndThrow('Stream is too long — try a shorter clip or a direct mat recording instead of the full event stream.')
         }
         if (msg.includes('Resource has been exhausted') || msg.includes('RESOURCE_EXHAUSTED')) {
           if (isYT) {
             if (chunkIndex !== undefined) {
-              // Transient rate-limit on a chunk — wait 90s before retrying so quota resets
               throw new RetryAfterError('Gemini quota temporarily exhausted in chunk — retrying.', '5m')
             }
-            // Full video too long for Gemini — signal chunking to the outer function
             await db.update(videos).set({ status: 'processing' }).where(eq(videos.id, videoId))
             return null
           }
-          await db.update(videos).set({ status: 'failed' }).where(eq(videos.id, videoId))
-          throw new NonRetriableError('Video is too large to process — keep direct video files under ~1 hour. For full tournament streams use the YouTube URL instead.')
+          await failAndThrow('Video is too large to process — keep direct video files under ~1 hour. For full tournament streams use the YouTube URL instead.')
         }
         if (msg.includes('input token count exceeds') || msg.includes('maximum number of tokens allowed')) {
           if (isYT && chunkIndex === undefined) {
-            // Full scan too long for one Gemini call — fall back to chunked scanning
             await db.update(videos).set({ status: 'processing' }).where(eq(videos.id, videoId))
             return null
           }
-          await db.update(videos).set({ status: 'failed' }).where(eq(videos.id, videoId))
-          throw new NonRetriableError(
+          await failAndThrow(
             isYT
               ? 'Video chunk exceeded token limit — the stream segment may be unusually dense. Try a shorter clip.'
               : 'Video is too long for a single analysis pass — submit as a YouTube URL or split into ~1-hour segments.'
           )
         }
-        await db.update(videos).set({ status: 'failed' }).where(eq(videos.id, videoId))
+        await db.update(videos).set({ status: 'failed', failureReason: msg }).where(eq(videos.id, videoId))
         throw err
       }
 
       if (!scanResult.athlete_found || scanResult.matches.length === 0) {
         if (chunkIndex !== undefined) {
-          // Empty chunk — mark done; outer function will trigger the next chunk
           await db.update(videos).set({ status: 'analysed' }).where(eq(videos.id, videoId))
           return []
         }
-        await db.update(videos).set({ status: 'failed' }).where(eq(videos.id, videoId))
-        throw new NonRetriableError(
-          `Athlete "${athleteName}" was not found in this video. Check the name matches what's shown on screen.`
-        )
+        const reason = `"${athleteName}" was not found in this video. Check the name matches exactly what's shown on screen.`
+        await db.update(videos).set({ status: 'failed', failureReason: reason }).where(eq(videos.id, videoId))
+        throw new NonRetriableError(reason)
       }
 
       return scanResult.matches

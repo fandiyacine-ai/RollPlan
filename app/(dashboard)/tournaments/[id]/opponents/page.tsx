@@ -8,12 +8,13 @@ export const dynamic = 'force-dynamic'
 
 type MatchRow = {
   id: string; status: string; format: string | null; context: string | null
-  eventName: string | null; createdAt: Date; label: string | null; tournamentOpponentId: string | null
+  eventName: string | null; opponentLabel: string | null; createdAt: Date; label: string | null; tournamentOpponentId: string | null
   resultWinner: string | null; resultMethod: string | null; resultTechnique: string | null
 }
 
 type VideoRow = {
   id: string; status: string; label: string; createdAt: Date; tournamentOpponentId: string | null
+  failureReason: string | null
 }
 
 function DbError({ label, err }: { label: string; err: unknown }) {
@@ -53,6 +54,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
         format: matches.format,
         context: matches.context,
         eventName: matches.eventName,
+        opponentLabel: matches.opponentLabel,
         createdAt: matches.createdAt,
         label: matches.eventName,
         tournamentOpponentId: matches.tournamentOpponentId,
@@ -74,6 +76,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
         label: videos.originalFilename,
         createdAt: videos.uploadedAt,
         tournamentOpponentId: videos.tournamentOpponentId,
+        failureReason: videos.failureReason,
       })
       .from(videos)
       .leftJoin(matches, eq(matches.videoId, videos.id))
@@ -135,10 +138,12 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
               matches={(matchesByOpponent[opp.id] ?? []).map(m => ({
                 ...m, format: m.format ?? null, context: m.context ?? null, label: undefined,
                 resultWinner: m.resultWinner ?? null, resultMethod: m.resultMethod ?? null, resultTechnique: m.resultTechnique ?? null,
+                failureReason: null,
               }))}
               pendingVideos={(pendingVideosByOpponent[opp.id] ?? []).map(v => ({
-                ...v, format: null, context: null, eventName: null,
+                ...v, format: null, context: null, eventName: null, opponentLabel: null,
                 resultWinner: null, resultMethod: null, resultTechnique: null,
+                failureReason: v.failureReason ?? null,
               }))}
               tournamentId={tournamentId}
             />

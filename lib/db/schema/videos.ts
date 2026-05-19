@@ -17,6 +17,7 @@ export const videos = pgTable('videos', {
   sourceType: videoSourceEnum('source_type').notNull(),
   publicUrl: text('public_url'),
   status: videoStatusEnum('status').notNull().default('uploaded'),
+  failureReason: text('failure_reason'),
   uploadedAt: timestamp('uploaded_at').notNull().defaultNow(),
   tournamentOpponentId: uuid('tournament_opponent_id').references(() => tournamentOpponents.id, { onDelete: 'set null' }),
 })
