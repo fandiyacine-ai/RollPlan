@@ -41,10 +41,11 @@ const COLOR_HINT: Record<AppearanceColor, string> = {
   dark_rash: 'dark rashguard', light_rash: 'light rashguard', other: 'other-coloured kit',
 }
 
-function buildAppearanceHint(color: AppearanceColor | null, side: StartingSide | null): string {
+function buildAppearanceHint(color: AppearanceColor | null, side: StartingSide | null, notes: string): string {
   const parts: string[] = []
   if (color) parts.push(COLOR_HINT[color])
   if (side) parts.push(`starts on the ${side} side of the mat`)
+  if (notes.trim()) parts.push(notes.trim())
   return parts.join(', ')
 }
 
@@ -67,10 +68,12 @@ function AppearanceFields({
   format, setFormat,
   appearanceColor, setAppearanceColor,
   startingSide, setStartingSide,
+  notes, setNotes,
 }: {
   format: string; setFormat: (v: string) => void
   appearanceColor: AppearanceColor | null; setAppearanceColor: (v: AppearanceColor | null) => void
   startingSide: StartingSide | null; setStartingSide: (v: StartingSide | null) => void
+  notes: string; setNotes: (v: string) => void
 }) {
   return (
     <div className="space-y-3 pt-1">
@@ -121,6 +124,14 @@ function AppearanceFields({
             </button>
           ))}
         </div>
+      </div>
+      <div className="space-y-1">
+        <label className="text-xs text-muted-foreground">Notes for AI <span className="font-normal">(optional — mat number, weight class, etc.)</span></label>
+        <Input
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="e.g. Mat 3, beginners -70kg"
+        />
       </div>
     </div>
   )
@@ -217,6 +228,7 @@ export function ScoutForm({
   const [format, setFormat] = useState('gi')
   const [appearanceColor, setAppearanceColor] = useState<AppearanceColor | null>(null)
   const [startingSide, setStartingSide] = useState<StartingSide | null>(null)
+  const [notes, setNotes] = useState('')
 
   // single match — URL
   const [singleUrl, setSingleUrl] = useState('')
@@ -235,7 +247,7 @@ export function ScoutForm({
     if (!o) {
       setPending(false); setMethod(null); setError(null)
       setSingleUrl(''); setUploadFile(null); setUploadProgress(0)
-      setSessionUrls(''); setAppearanceColor(null); setStartingSide(null)
+      setSessionUrls(''); setAppearanceColor(null); setStartingSide(null); setNotes('')
     }
   }
 
@@ -255,7 +267,7 @@ export function ScoutForm({
       const fd = new FormData()
       fd.set('urls', url)
       fd.set('format', format)
-      fd.set('appearanceHint', buildAppearanceHint(appearanceColor, startingSide))
+      fd.set('appearanceHint', buildAppearanceHint(appearanceColor, startingSide, notes))
       await submitScoutUrls(tournamentId, opponentId, fd)
       setOpen(false); setDone(true); router.refresh()
     } catch (err) {
@@ -299,7 +311,7 @@ export function ScoutForm({
           scanMode: 'scan',
           athleteName: opponentName,
           tournamentOpponentId: opponentId,
-          appearanceHint: buildAppearanceHint(appearanceColor, startingSide) || undefined,
+          appearanceHint: buildAppearanceHint(appearanceColor, startingSide, notes) || undefined,
         }),
       })
       if (!completeRes.ok) {
@@ -322,7 +334,7 @@ export function ScoutForm({
       const fd = new FormData()
       fd.set('urls', urls.join('\n'))
       fd.set('format', format)
-      fd.set('appearanceHint', buildAppearanceHint(appearanceColor, startingSide))
+      fd.set('appearanceHint', buildAppearanceHint(appearanceColor, startingSide, notes))
       await submitScoutUrls(tournamentId, opponentId, fd)
       setOpen(false); setDone(true); router.refresh()
     } catch (err) {
@@ -462,6 +474,7 @@ export function ScoutForm({
               format={format} setFormat={setFormat}
               appearanceColor={appearanceColor} setAppearanceColor={setAppearanceColor}
               startingSide={startingSide} setStartingSide={setStartingSide}
+              notes={notes} setNotes={setNotes}
             />
           </div>
         )}
@@ -484,6 +497,7 @@ export function ScoutForm({
               format={format} setFormat={setFormat}
               appearanceColor={appearanceColor} setAppearanceColor={setAppearanceColor}
               startingSide={startingSide} setStartingSide={setStartingSide}
+              notes={notes} setNotes={setNotes}
             />
           </div>
         )}
