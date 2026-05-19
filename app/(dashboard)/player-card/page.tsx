@@ -194,7 +194,7 @@ export default async function PlayerCardPage() {
   ).sort((a, b) => b.count - a.count)
 
   const transitionData: TransitionData = {
-    nodes: sortedPositions.slice(0, 8).map(([id, s]) => ({
+    nodes: sortedPositions.slice(0, 6).map(([id, s]) => ({
       id,
       name: POSITION_MAP[id] ?? id,
       totalTime: s.total,
@@ -473,17 +473,27 @@ export default async function PlayerCardPage() {
       {/* Position Transition Flow */}
       {transitionData.nodes.length >= 3 && transitionEdges.length >= 3 && (
         <div className="rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950">
-          <div className="px-5 py-3 border-b border-zinc-800/80 flex items-center justify-between">
+          <div className="px-5 py-3 border-b border-zinc-800/80 flex items-center justify-between flex-wrap gap-2">
             <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">Position Flow</h2>
-            <div className="flex items-center gap-4 text-[10px] text-zinc-500">
-              <span className="flex items-center gap-1.5"><span className="w-2 h-0.5 bg-emerald-400 inline-block rounded-full" />Dominant</span>
-              <span className="flex items-center gap-1.5"><span className="w-2 h-0.5 bg-rose-400 inline-block rounded-full" />Under pressure</span>
+            <div className="flex items-center gap-4 text-[10px] text-zinc-600">
+              <span className="flex items-center gap-1.5">
+                <span className="w-5 h-0.5 bg-emerald-500 inline-block rounded-full" />Your move
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-5 h-0.5 bg-rose-500 inline-block rounded-full" />Opponent move
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/20 border border-emerald-500 inline-block" />In control
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500/20 border border-rose-500 inline-block" />Under pressure
+              </span>
             </div>
           </div>
-          <div className="px-2 py-2">
+          <div className="py-1">
             <TransitionDiagram data={transitionData} />
           </div>
-          <p className="px-5 pb-3 text-[10px] text-zinc-700">Arrow weight = transition frequency across {ownAnalysedIds.length} matches</p>
+          <p className="px-5 pb-3 text-[10px] text-zinc-800">Arrow weight = transition frequency · {ownAnalysedIds.length} matches</p>
         </div>
       )}
 
