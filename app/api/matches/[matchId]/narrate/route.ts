@@ -21,9 +21,9 @@ function fmt(s: number): string {
   return sec > 0 ? `${m}:${String(sec).padStart(2, '0')}` : `${m}:00`
 }
 
-function dominanceLabel(d: string): string {
-  if (d === 'dominant') return 'you controlling'
-  if (d === 'inferior') return 'opponent controlling'
+function dominanceLabel(d: string, competitor: string, opponent: string): string {
+  if (d === 'dominant') return `${competitor} controlling`
+  if (d === 'inferior') return `${opponent} controlling`
   return 'neutral'
 }
 
@@ -46,18 +46,21 @@ export async function POST(
       db.select().from(insights).where(eq(insights.matchId, matchId)),
     ])
 
-    // Build merged timeline
+    const competitor = match.competitorLabel?.trim() || 'Athlete'
+    const opponent = match.opponentLabel?.trim() || 'Opponent'
+
+    // Build merged timeline using real names
     type TLItem = { time: number; type: 'position' | 'event'; description: string }
     const posItems: TLItem[] = segments.map(s => ({
       time: s.startSeconds,
       type: 'position',
-      description: `${POSITION_MAP[s.positionId] ?? s.positionId} — ${dominanceLabel(s.dominance)} (${fmt(s.endSeconds - s.startSeconds)})`,
+      description: `${POSITION_MAP[s.positionId] ?? s.positionId} — ${dominanceLabel(s.dominance, competitor, opponent)} (${fmt(s.endSeconds - s.startSeconds)})`,
     }))
     const evtItems: TLItem[] = events.map(e => ({
       time: e.timestampSeconds,
       type: 'event',
       description: [
-        e.actor === 'user' ? 'You' : 'Opponent',
+        e.actor === 'user' ? competitor : opponent,
         EVENT_MAP[e.eventTypeId] ?? e.eventTypeId,
         e.techniqueLabel ? `(${e.techniqueLabel})` : null,
         e.outcome ? `→ ${e.outcome}` : null,

@@ -260,10 +260,22 @@ export default async function MatchDetailPage({
             </div>
 
             {match.narration ? (
-              <div className="rounded-xl border bg-card p-5 space-y-3">
-                {match.narration.split('\n\n').filter(Boolean).map((para, i) => (
-                  <p key={i} className="text-sm leading-relaxed text-foreground/90">{para}</p>
-                ))}
+              <div className="rounded-xl border bg-card p-5 space-y-4">
+                {match.narration.split('\n\n').filter(Boolean).map((chunk, i) => {
+                  const lines = chunk.split('\n')
+                  const firstLine = lines[0].trim()
+                  const isHeader = firstLine === firstLine.toUpperCase() && firstLine.length < 30 && /^[A-Z\s]+$/.test(firstLine)
+                  if (isHeader) {
+                    const body = lines.slice(1).join('\n').trim()
+                    return (
+                      <div key={i} className="space-y-1.5">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{firstLine}</p>
+                        {body && <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{body}</p>}
+                      </div>
+                    )
+                  }
+                  return <p key={i} className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{chunk}</p>
+                })}
               </div>
             ) : (
               <div className="rounded-xl border border-dashed border-border/60 p-6 text-center">
