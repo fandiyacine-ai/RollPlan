@@ -58,6 +58,14 @@ export const scanUrl = inngest.createFunction(
 
       await db.update(videos).set({ status: 'processing' }).where(eq(videos.id, videoId))
 
+      // YouTube full-video passes go straight to chunked scanning — no initial sparse scan.
+      // A 0.05fps sweep of a 3h stream is too thin to reliably find all matches; it often
+      // catches only 1 of N (or a scoreboard animation), then extracts wrong footage and
+      // misses the rest entirely. Chunked 0.1fps 20-min windows are the reliable path.
+      if (isYouTubeUrl(video.publicUrl) && chunkIndex === undefined) {
+        return null
+      }
+
       const start = Date.now()
       let scanResult: { matches: FoundMatch[]; athlete_found: boolean; scan_notes: string }
 
@@ -65,15 +73,11 @@ export const scanUrl = inngest.createFunction(
         let scanUsage: { inputTokens: number; outputTokens: number }
 
         if (isYouTubeUrl(video.publicUrl)) {
-          // Full competition streams can be 2–4+ hours. Scan at 0.1fps (1 frame/10s) to stay
-          // well under Gemini's 1M token limit while still catching scoreboard transitions.
           const result = await geminiVideoObject(GEMINI_URL_SCAN_MODEL, {
             system: buildScanUrlSystemPrompt(),
             videoUrl: video.publicUrl,
             videoOptions: {
-              // Full scan uses 0.05fps to stay under token limits on long streams.
-              // Chunks are 20-min windows so can afford 0.1fps for better overlay detection.
-              fps: chunkIndex !== undefined ? 0.1 : 0.05,
+              fps: 0.1,
               ...(startSeconds !== undefined ? { startSeconds } : {}),
               ...(endSeconds !== undefined ? { endSeconds } : {}),
             },
