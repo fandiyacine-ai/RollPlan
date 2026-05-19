@@ -165,7 +165,7 @@ export default async function PlayerCardPage() {
     .slice(0, 5)
 
   // ── Position transitions ──
-  const transitionCounts: Record<string, Record<string, number>> = {}
+  const transitionCounts: Record<string, Record<string, { count: number; yourActionCount: number }>> = {}
   type SegItem = { matchId: string; positionId: string; startSeconds: number; endSeconds: number; dominance: string }
   const matchGroups: Record<string, SegItem[]> = {}
   for (const seg of allSegments) {
@@ -179,11 +179,18 @@ export default async function PlayerCardPage() {
       const to = sorted[i + 1].positionId
       if (from === to) continue
       if (!transitionCounts[from]) transitionCounts[from] = {}
-      transitionCounts[from][to] = (transitionCounts[from][to] ?? 0) + 1
+      if (!transitionCounts[from][to]) transitionCounts[from][to] = { count: 0, yourActionCount: 0 }
+      transitionCounts[from][to].count += 1
+      if (sorted[i].dominance === 'dominant') transitionCounts[from][to].yourActionCount += 1
     }
   }
   const transitionEdges = Object.entries(transitionCounts).flatMap(([fromId, tos]) =>
-    Object.entries(tos).map(([toId, count]) => ({ fromId, toId, count }))
+    Object.entries(tos).map(([toId, { count, yourActionCount }]) => ({
+      fromId,
+      toId,
+      count,
+      yourAction: yourActionCount >= count / 2,
+    }))
   ).sort((a, b) => b.count - a.count)
 
   const transitionData: TransitionData = {
@@ -192,6 +199,7 @@ export default async function PlayerCardPage() {
       name: POSITION_MAP[id] ?? id,
       totalTime: s.total,
       dominantTime: s.dominant,
+      inferiorTime: s.inferior,
     })),
     edges: transitionEdges,
   }

@@ -1,236 +1,378 @@
 // Server component — pure SVG, no client JS needed
 
-const SVG_W = 640
-const SVG_H = 340
-const NODE_RX = 66  // half-width of pill
-const NODE_RY = 18  // half-height of pill
-const MAX_NODES = 9
-const MAX_EDGES = 10
+const CANVAS_W = 760
+const CANVAS_H = 480
+const NODE_R = 26
 
-// Position tier: 0 = neutral/standing, 1 = guard/bottom, 2 = top control
-const TIER: Record<string, number> = {
-  standing: 0, takedown_scramble: 0, scrambling: 0, transition: 0,
-  closed_guard: 1, open_guard: 1, half_guard: 1, deep_half: 1,
-  butterfly_guard: 1, x_guard: 1, single_leg_x: 1, de_la_riva: 1,
-  reverse_de_la_riva: 1, spider_guard: 1, lasso_guard: 1,
-  fifty_fifty: 1, ashi_garami: 1, leg_entanglement_other: 1, turtle: 1,
-  mount: 2, side_control: 2, knee_on_belly: 2, back_control: 2,
-  north_south: 2, on_top_attempting_pass: 2,
+// Fixed positions for every common BJJ position in the 760×480 canvas
+const FIXED: Record<string, [number, number]> = {
+  standing:               [370,  62],
+  takedown_scramble:      [192,  68],
+  scrambling:             [530,  62],
+  transition:             [370, 135],
+
+  closed_guard:           [76,  200],
+  open_guard:             [256, 218],
+  half_guard:             [196, 322],
+  deep_half:              [116, 392],
+  butterfly_guard:        [76,  358],
+  de_la_riva:             [152, 265],
+  reverse_de_la_riva:     [188, 298],
+  spider_guard:           [155, 342],
+  lasso_guard:            [68,  428],
+  x_guard:                [278, 392],
+  single_leg_x:           [352, 305],
+  ashi_garami:            [325, 362],
+  fifty_fifty:            [455, 378],
+  leg_entanglement_other: [495, 438],
+
+  on_top_attempting_pass: [405, 432],
+
+  side_control:           [506, 295],
+  mount:                  [602, 185],
+  back_control:           [665,  62],
+  north_south:            [548, 390],
+  knee_on_belly:          [622, 302],
+  turtle:                 [662, 372],
 }
 
-const TIER_Y = [55, 170, 285]
-const H_PAD = 70  // horizontal margin
-
-type NodeDatum = {
-  id: string
-  name: string
-  x: number
-  y: number
-  dominantPct: number
-}
-
-type EdgeDatum = {
-  fromId: string
-  toId: string
-  count: number
-}
+// Fallback grid for any position not in FIXED
+const FALLBACK_SLOTS: [number, number][] = [
+  [680, 445], [600, 450], [510, 450], [415, 450], [320, 450], [225, 450],
+]
 
 export type TransitionData = {
-  nodes: { id: string; name: string; totalTime: number; dominantTime: number }[]
-  edges: EdgeDatum[]
+  nodes: {
+    id: string
+    name: string
+    totalTime: number
+    dominantTime: number
+    inferiorTime: number
+  }[]
+  edges: { fromId: string; toId: string; count: number; yourAction: boolean }[]
 }
 
-function computeLayout(nodes: TransitionData['nodes']): NodeDatum[] {
-  const tiers: NodeDatum[][] = [[], [], []]
+// ─── Layout ────────────────────────────────────────────────────────────────────
 
-  for (const node of nodes.slice(0, MAX_NODES)) {
-    const tier = TIER[node.id] ?? 1
-    tiers[tier].push({
-      id: node.id,
-      name: node.name,
-      x: 0,
-      y: TIER_Y[tier],
-      dominantPct: node.totalTime > 0 ? node.dominantTime / node.totalTime : 0,
-    })
+function buildLayout(
+  nodes: TransitionData['nodes'],
+): Map<string, [number, number]> {
+  const map = new Map<string, [number, number]>()
+  let fallbackIdx = 0
+  for (const n of nodes) {
+    map.set(n.id, FIXED[n.id] ?? FALLBACK_SLOTS[fallbackIdx++ % FALLBACK_SLOTS.length])
   }
-
-  const result: NodeDatum[] = []
-  for (const tierNodes of tiers) {
-    const k = tierNodes.length
-    if (k === 0) continue
-    const usableW = SVG_W - 2 * H_PAD - 2 * NODE_RX
-    tierNodes.forEach((n, i) => {
-      n.x = k === 1
-        ? SVG_W / 2
-        : H_PAD + NODE_RX + (usableW * i) / (k - 1)
-      result.push(n)
-    })
-  }
-  return result
+  return map
 }
 
-function Arrow({
-  from, to, count, maxCount, curved,
+// ─── Power chain ───────────────────────────────────────────────────────────────
+
+function findPowerChain(edges: TransitionData['edges']): string[] {
+  const yourEdges = edges.filter(e => e.yourAction)
+  if (yourEdges.length < 2) return []
+
+  const adj: Record<string, string[]> = {}
+  for (const e of yourEdges) {
+    ;(adj[e.fromId] ??= []).push(e.toId)
+  }
+
+  let longest: string[] = []
+
+  function dfs(node: string, path: string[], seen: Set<string>) {
+    if (path.length > longest.length) longest = [...path]
+    for (const next of (adj[node] ?? [])) {
+      if (!seen.has(next)) {
+        seen.add(next)
+        dfs(next, [...path, next], seen)
+        seen.delete(next)
+      }
+    }
+  }
+
+  const targets = new Set(yourEdges.map(e => e.toId))
+  const starts = new Set(yourEdges.map(e => e.fromId).filter(n => !targets.has(n)))
+  const startFrom = starts.size > 0 ? starts : new Set(yourEdges.map(e => e.fromId))
+  for (const s of startFrom) dfs(s, [s], new Set([s]))
+
+  return longest.length >= 2 ? longest : []
+}
+
+// ─── Label splitting ────────────────────────────────────────────────────────────
+
+function splitLabel(name: string): string[] {
+  if (name.length <= 13) return [name]
+  const words = name.split(' ')
+  if (words.length < 2) return [name]
+  const mid = Math.ceil(words.length / 2)
+  return [words.slice(0, mid).join(' '), words.slice(mid).join(' ')]
+}
+
+// ─── SVG sub-components ────────────────────────────────────────────────────────
+
+function NodeCircle({
+  cx, cy, r, name, dominantTime, inferiorTime, totalTime, isTop,
 }: {
-  from: NodeDatum; to: NodeDatum; count: number; maxCount: number; curved: boolean
+  cx: number; cy: number; r: number
+  name: string; dominantTime: number; inferiorTime: number; totalTime: number
+  isTop: boolean
 }) {
-  const dx = to.x - from.x
-  const dy = to.y - from.y
-  const dist = Math.sqrt(dx * dx + dy * dy)
-  if (dist < 1) return null
-  const ux = dx / dist
-  const uy = dy / dist
-
-  // Perpendicular offset for curved/bidirectional edges
-  const px = -uy
-  const py = ux
-  const off = curved ? 18 : 0
-
-  const sx = from.x + ux * NODE_RX + px * off
-  const sy = from.y + uy * NODE_RY + py * off
-  const ex = to.x - ux * (NODE_RX + 8) + px * off
-  const ey = to.y - uy * (NODE_RY + 8) + py * off
-
-  const weight = count / maxCount
-  const sw = 1.2 + weight * 2.8
-  const opacity = 0.3 + weight * 0.5
-
-  let d: string
-  if (curved) {
-    const mx = (sx + ex) / 2 + px * 28
-    const my = (sy + ey) / 2 + py * 28
-    d = `M ${sx} ${sy} Q ${mx} ${my} ${ex} ${ey}`
-  } else {
-    d = `M ${sx} ${sy} L ${ex} ${ey}`
-  }
+  const domPct = totalTime > 0 ? dominantTime / totalTime : 0
+  const infPct = totalTime > 0 ? inferiorTime / totalTime : 0
+  const color = domPct >= 0.5 ? '#10b981' : infPct >= 0.4 ? '#ef4444' : '#71717a'
+  const fill  = domPct >= 0.5 ? '#10b98118' : infPct >= 0.4 ? '#ef444418' : '#3f3f4680'
+  const lines = splitLabel(name)
 
   return (
-    <path
-      d={d}
-      fill="none"
-      stroke="#71717a"
-      strokeWidth={sw}
-      strokeOpacity={opacity}
-      markerEnd="url(#arr)"
-    />
-  )
-}
-
-function Node({ node }: { node: NodeDatum }) {
-  const isStrong = node.dominantPct >= 0.5
-  const isWeak = node.dominantPct < 0.3
-  const stroke = isStrong ? '#4ade80' : isWeak ? '#f87171' : '#52525b'
-  const fill = isStrong ? '#4ade8018' : isWeak ? '#f8717118' : '#27272a'
-  const textColor = isStrong ? '#4ade80' : isWeak ? '#f87171' : '#a1a1aa'
-  const name = node.name.length > 18 ? node.name.slice(0, 17) + '…' : node.name
-
-  return (
-    <g transform={`translate(${node.x},${node.y})`}>
-      <rect
-        x={-NODE_RX} y={-NODE_RY}
-        width={NODE_RX * 2} height={NODE_RY * 2}
-        rx={NODE_RY}
-        fill={fill}
-        stroke={stroke}
-        strokeWidth={1.5}
-        strokeOpacity={0.8}
-      />
-      <text
-        textAnchor="middle"
-        dominantBaseline="middle"
-        fontSize={10}
-        fontWeight="600"
-        fill={textColor}
-        style={{ fontFamily: 'system-ui, sans-serif' }}
-      >
-        {name}
-      </text>
+    <g>
+      {isTop && (
+        <circle cx={cx} cy={cy} r={r + 8} fill={color} opacity={0.12} className="pulse-ring" />
+      )}
+      <circle cx={cx} cy={cy} r={r} fill={fill} stroke={color} strokeWidth={2} />
+      {lines.map((line, i) => (
+        <text
+          key={i}
+          x={cx}
+          y={cy + r + 11 + i * 11}
+          textAnchor="middle"
+          dominantBaseline="auto"
+          fontSize={9}
+          fontWeight="600"
+          fill="#d4d4d8"
+          style={{ fontFamily: 'system-ui, sans-serif' }}
+        >
+          {line}
+        </text>
+      ))}
     </g>
   )
 }
 
-function TierLabel({ y, label }: { y: number; label: string }) {
+function EdgeArrow({
+  from, to, count, maxCount, yourAction, curved, compact,
+}: {
+  from: [number, number]; to: [number, number]
+  count: number; maxCount: number; yourAction: boolean; curved: boolean; compact: boolean
+}) {
+  const [x1, y1] = from
+  const [x2, y2] = to
+  const dx = x2 - x1, dy = y2 - y1
+  const dist = Math.sqrt(dx * dx + dy * dy)
+  if (dist < 2) return null
+
+  const ux = dx / dist, uy = dy / dist
+  const px = -uy, py = ux  // perpendicular
+  const curveDir = curved ? 1 : 0
+  const off = curveDir * 28
+
+  // Start/end on circle perimeters, offset sideways for curved pairs
+  const sideOff = off * 0.25
+  const sx = x1 + ux * NODE_R + px * sideOff
+  const sy = y1 + uy * NODE_R + py * sideOff
+  const ex = x2 - ux * (NODE_R + 7) + px * sideOff
+  const ey = y2 - uy * (NODE_R + 7) + py * sideOff
+
+  // Quadratic control point
+  const cx = (sx + ex) / 2 + px * off
+  const cy = (sy + ey) / 2 + py * off
+
+  // Bezier midpoint at t=0.5
+  const bx = (sx + 2 * cx + ex) / 4
+  const by = (sy + 2 * cy + ey) / 4
+
+  const sw = 1.5 + (count / maxCount) * 3.5
+  const color = yourAction ? '#10b981' : '#ef4444'
+  const markerId = yourAction ? 'arr-g' : 'arr-r'
+
   return (
-    <text
-      x={8} y={y}
-      dominantBaseline="middle"
-      fontSize={8}
-      fontWeight="700"
-      fill="#52525b"
-      textAnchor="start"
-      style={{ fontFamily: 'system-ui, sans-serif', textTransform: 'uppercase', letterSpacing: 1 }}
-    >
-      {label}
-    </text>
+    <g>
+      <path
+        d={`M ${sx} ${sy} Q ${cx} ${cy} ${ex} ${ey}`}
+        fill="none"
+        stroke={color}
+        strokeWidth={sw}
+        strokeOpacity={0.65}
+        markerEnd={`url(#${markerId})`}
+      />
+      {!compact && (
+        <g transform={`translate(${bx},${by})`}>
+          <rect x={-11} y={-8} width={22} height={16} rx={4} fill="#18181b" opacity={0.9} />
+          <text
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontSize={9}
+            fontWeight="700"
+            fill="#d4d4d8"
+            style={{ fontFamily: 'system-ui, sans-serif' }}
+          >
+            ×{count}
+          </text>
+        </g>
+      )}
+    </g>
   )
 }
 
-export function TransitionDiagram({ data }: { data: TransitionData }) {
+function Legend({ x, y }: { x: number; y: number }) {
+  return (
+    <g transform={`translate(${x},${y})`} style={{ fontFamily: 'system-ui, sans-serif' }}>
+      <text fontSize={7.5} fontWeight="700" fill="#52525b" letterSpacing={1}>LEGEND</text>
+      {[
+        { color: '#10b981', label: 'In Control' },
+        { color: '#ef4444', label: 'Under Pressure' },
+        { color: '#71717a', label: 'Neutral' },
+      ].map(({ color, label }, i) => (
+        <g key={label} transform={`translate(0,${15 + i * 15})`}>
+          <circle cx={5} cy={4} r={5} fill={color} opacity={0.75} />
+          <text x={14} y={8} fontSize={8} fill="#a1a1aa">{label}</text>
+        </g>
+      ))}
+      {[
+        { color: '#10b981', label: 'Your move' },
+        { color: '#ef4444', label: 'Opp move' },
+      ].map(({ color, label }, i) => (
+        <g key={label} transform={`translate(0,${65 + i * 15})`}>
+          <line x1={0} y1={5} x2={11} y2={5} stroke={color} strokeWidth={2} />
+          <text x={15} y={9} fontSize={8} fill="#a1a1aa">{label}</text>
+        </g>
+      ))}
+    </g>
+  )
+}
+
+// ─── Main export ────────────────────────────────────────────────────────────────
+
+export function TransitionDiagram({
+  data,
+  compact = false,
+}: {
+  data: TransitionData
+  compact?: boolean
+}) {
   if (data.nodes.length < 3) return null
 
-  const layoutNodes = computeLayout(data.nodes)
-  const nodeMap = new Map(layoutNodes.map(n => [n.id, n]))
-  const visibleIds = new Set(layoutNodes.map(n => n.id))
+  const layout = buildLayout(data.nodes)
+  const nodeMap = new Map(data.nodes.map(n => [n.id, n]))
+  const visibleIds = new Set(data.nodes.map(n => n.id))
 
   const edges = data.edges
     .filter(e => visibleIds.has(e.fromId) && visibleIds.has(e.toId) && e.fromId !== e.toId)
     .sort((a, b) => b.count - a.count)
-    .slice(0, MAX_EDGES)
+    .slice(0, 14)
 
   const maxCount = edges[0]?.count ?? 1
 
-  // Detect bidirectional pairs
+  // Detect bidirectional pairs — curve them apart
   const edgeSet = new Set(edges.map(e => `${e.fromId}→${e.toId}`))
-  const isBidir = (e: EdgeDatum) => edgeSet.has(`${e.toId}→${e.fromId}`)
+  const isBidir = (e: { fromId: string; toId: string }) =>
+    edgeSet.has(`${e.toId}→${e.fromId}`)
 
-  // Detect which tiers have nodes
-  const tiersPresent = new Set(layoutNodes.map(n => TIER[n.id] ?? 1))
+  // Find node with most time (gets glow)
+  const topNodeId = data.nodes[0]?.id
+
+  // Power chain (only in full mode)
+  const powerChain = compact ? [] : findPowerChain(edges)
+
+  const svgHeight = compact ? 300 : CANVAS_H
 
   return (
     <svg
-      viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-      width={SVG_W}
-      height={SVG_H}
-      className="w-full h-auto text-foreground/70"
+      viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
+      width={CANVAS_W}
+      height={svgHeight}
+      className="w-full h-auto"
     >
       <defs>
-        <marker id="arr" markerWidth="7" markerHeight="7" refX="5" refY="2.5" orient="auto">
-          <path d="M0,0 L0,5 L7,2.5 z" fill="#71717a" opacity="0.9" />
-        </marker>
+        <style>{`
+          @keyframes pulseGlow { 0%,100% { opacity:.10 } 50% { opacity:.28 } }
+          .pulse-ring { animation: pulseGlow 2.4s ease-in-out infinite }
+        `}</style>
+
+        {/* Arrow markers — one per colour */}
+        {(['g', 'r'] as const).map(k => (
+          <marker
+            key={k}
+            id={`arr-${k}`}
+            markerWidth="7" markerHeight="7"
+            refX="5" refY="3.5"
+            orient="auto"
+          >
+            <path
+              d="M0,0.5 L0,6.5 L6.5,3.5 z"
+              fill={k === 'g' ? '#10b981' : '#ef4444'}
+              opacity="0.8"
+            />
+          </marker>
+        ))}
       </defs>
 
-      {/* Tier divider lines */}
-      {tiersPresent.has(0) && tiersPresent.has(1) && (
-        <line x1={20} y1={112} x2={SVG_W - 20} y2={112} stroke="#3f3f46" strokeWidth={1} />
-      )}
-      {tiersPresent.has(1) && tiersPresent.has(2) && (
-        <line x1={20} y1={227} x2={SVG_W - 20} y2={227} stroke="#3f3f46" strokeWidth={1} />
-      )}
+      {/* Power chain annotation */}
+      {powerChain.length >= 2 && (() => {
+        const pts = powerChain.map(id => layout.get(id)).filter((p): p is [number, number] => !!p)
+        const midPt = pts[Math.floor(pts.length / 2)]
+        const nodeNames = powerChain.map(id => nodeMap.get(id)?.name ?? id)
+        return (
+          <g>
+            <polyline
+              points={pts.map(([x, y]) => `${x},${y}`).join(' ')}
+              fill="none"
+              stroke="#10b981"
+              strokeWidth={1.5}
+              strokeOpacity={0.22}
+              strokeDasharray="5,3"
+            />
+            {midPt && (
+              <g transform={`translate(${midPt[0] + NODE_R + 6},${midPt[1] - 18})`}
+                style={{ fontFamily: 'system-ui, sans-serif' }}>
+                <text fontSize={10} fontWeight="800" fill="#10b981">Top Game Chain</text>
+                <text y={13} fontSize={8.5} fill="#6b7280">
+                  {nodeNames.join(' → ')}
+                </text>
+              </g>
+            )}
+          </g>
+        )
+      })()}
 
-      {/* Tier labels */}
-      {tiersPresent.has(0) && <TierLabel y={TIER_Y[0]} label="Neutral" />}
-      {tiersPresent.has(1) && <TierLabel y={TIER_Y[1]} label="Guard" />}
-      {tiersPresent.has(2) && <TierLabel y={TIER_Y[2]} label="Top" />}
-
-      {/* Edges (drawn first, under nodes) */}
+      {/* Edges — drawn under nodes */}
       {edges.map((e, i) => {
-        const from = nodeMap.get(e.fromId)
-        const to = nodeMap.get(e.toId)
+        const from = layout.get(e.fromId)
+        const to = layout.get(e.toId)
         if (!from || !to) return null
         return (
-          <Arrow
+          <EdgeArrow
             key={i}
             from={from}
             to={to}
             count={e.count}
             maxCount={maxCount}
+            yourAction={e.yourAction}
             curved={isBidir(e)}
+            compact={compact}
           />
         )
       })}
 
-      {/* Nodes (drawn on top) */}
-      {layoutNodes.map(n => <Node key={n.id} node={n} />)}
+      {/* Nodes — drawn on top */}
+      {data.nodes.map(n => {
+        const pos = layout.get(n.id)
+        if (!pos) return null
+        return (
+          <NodeCircle
+            key={n.id}
+            cx={pos[0]}
+            cy={pos[1]}
+            r={NODE_R}
+            name={n.name}
+            dominantTime={n.dominantTime}
+            inferiorTime={n.inferiorTime}
+            totalTime={n.totalTime}
+            isTop={n.id === topNodeId}
+          />
+        )
+      })}
+
+      {/* Legend (full mode only, top-right) */}
+      {!compact && <Legend x={CANVAS_W - 108} y={12} />}
     </svg>
   )
 }
