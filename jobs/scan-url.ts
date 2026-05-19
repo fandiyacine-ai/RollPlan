@@ -71,7 +71,9 @@ export const scanUrl = inngest.createFunction(
             system: buildScanUrlSystemPrompt(),
             videoUrl: video.publicUrl,
             videoOptions: {
-              fps: 0.1,  // 1 frame/10s — needed to reliably catch 3-5s name overlays at match starts
+              // Full scan uses 0.05fps to stay under token limits on long streams.
+              // Chunks are 20-min windows so can afford 0.1fps for better overlay detection.
+              fps: chunkIndex !== undefined ? 0.1 : 0.05,
               ...(startSeconds !== undefined ? { startSeconds } : {}),
               ...(endSeconds !== undefined ? { endSeconds } : {}),
             },
@@ -130,10 +132,15 @@ export const scanUrl = inngest.createFunction(
           throw new NonRetriableError('Video is too large to process — keep direct video files under ~1 hour. For full tournament streams use the YouTube URL instead.')
         }
         if (msg.includes('input token count exceeds') || msg.includes('maximum number of tokens allowed')) {
+          if (isYT && chunkIndex === undefined) {
+            // Full scan too long for one Gemini call — fall back to chunked scanning
+            await db.update(videos).set({ status: 'processing' }).where(eq(videos.id, videoId))
+            return null
+          }
           await db.update(videos).set({ status: 'failed' }).where(eq(videos.id, videoId))
           throw new NonRetriableError(
             isYT
-              ? 'YouTube video exceeded token limit even at low fps — this stream may be over 6 hours. Try submitting the individual mat recording URL instead of the full event stream.'
+              ? 'Video chunk exceeded token limit — the stream segment may be unusually dense. Try a shorter clip.'
               : 'Video is too long for a single analysis pass — submit as a YouTube URL or split into ~1-hour segments.'
           )
         }
