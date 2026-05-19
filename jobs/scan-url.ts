@@ -2,8 +2,8 @@ import { generateObject } from 'ai'
 import { NonRetriableError, RetryAfterError } from 'inngest'
 import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
-import { videos, matches, positionSegments, matchEvents, insights, aiCallLogs } from '../lib/db/schema'
-import { eq, inArray } from 'drizzle-orm'
+import { videos, matches, positionSegments, matchEvents, insights, aiCallLogs, tournamentOpponents } from '../lib/db/schema'
+import { eq, inArray, and, ne, not } from 'drizzle-orm'
 import { google, anthropic, GEMINI_URL_SCAN_MODEL, CLAUDE_SYNTHESIS_MODEL, estimateCostUsd } from '../lib/ai/clients'
 import { geminiVideoObject, isYouTubeUrl } from '../lib/gemini-video'
 import { UrlScanOutputSchema, FoundMatch } from '../lib/ai/schemas/url-scan'
@@ -573,6 +573,26 @@ export const scanUrl = inngest.createFunction(
     await step.run('mark-video-analysed', async () => {
       await db.update(videos).set({ status: 'analysed' }).where(eq(videos.id, videoId))
     })
+
+    // Transition auto_queued → auto_ready once all opponent videos have finished scanning
+    if (tournamentOpponentId && chunkIndex === undefined) {
+      await step.run('check-opponent-ready', async () => {
+        const opponentVideos = await db.query.videos.findMany({
+          where: eq(videos.tournamentOpponentId, tournamentOpponentId),
+        })
+        const allSettled = opponentVideos.every(v => v.status === 'analysed' || v.status === 'failed')
+        const anyAnalysed = opponentVideos.some(v => v.status === 'analysed')
+        if (allSettled && anyAnalysed) {
+          await db
+            .update(tournamentOpponents)
+            .set({ footageStatus: 'auto_ready' })
+            .where(and(
+              eq(tournamentOpponents.id, tournamentOpponentId),
+              eq(tournamentOpponents.footageStatus, 'auto_queued'),
+            ))
+        }
+      })
+    }
 
     // Track progress across the chunk chain so we can stop early.
     const thisChunkMatchCount = foundMatches.length

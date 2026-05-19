@@ -15,6 +15,13 @@
       "when": 1778840981613,
       "tag": "0001_nullable-video-user",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779216590759,
+      "tag": "0002_smoothcomp_integration",
+      "breakpoints": true
     }
   ]
 }

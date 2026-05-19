@@ -30,10 +30,19 @@ function DbError({ label, err }: { label: string; err: unknown }) {
 export default async function OpponentsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: tournamentId } = await params
 
-  let opponents: { id: string; tournamentId: string; opponentLabel: string; playerCardId: string | null; seedingNotes: string | null; createdAt: Date }[]
+  let opponents: { id: string; tournamentId: string; opponentLabel: string; playerCardId: string | null; seedingNotes: string | null; createdAt: Date; footageStatus: string; smoothcompAthleteId: string | null }[]
   try {
     opponents = await db
-      .select()
+      .select({
+        id: tournamentOpponents.id,
+        tournamentId: tournamentOpponents.tournamentId,
+        opponentLabel: tournamentOpponents.opponentLabel,
+        playerCardId: tournamentOpponents.playerCardId,
+        seedingNotes: tournamentOpponents.seedingNotes,
+        createdAt: tournamentOpponents.createdAt,
+        footageStatus: tournamentOpponents.footageStatus,
+        smoothcompAthleteId: tournamentOpponents.smoothcompAthleteId,
+      })
       .from(tournamentOpponents)
       .where(eq(tournamentOpponents.tournamentId, tournamentId))
       .orderBy(tournamentOpponents.createdAt)
@@ -155,7 +164,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
           {opponents.map((opp) => (
             <OpponentAccordion
               key={opp.id}
-              opponent={opp}
+              opponent={{ ...opp, footageStatus: opp.footageStatus ?? 'manual' }}
               matches={(matchesByOpponent[opp.id] ?? []).map(m => ({
                 ...m, format: m.format ?? null, context: m.context ?? null, label: undefined,
                 resultWinner: m.resultWinner ?? null, resultMethod: m.resultMethod ?? null, resultTechnique: m.resultTechnique ?? null,

@@ -140,6 +140,18 @@ export function CreateTournamentForm() {
             />
           </div>
 
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Smoothcomp Bracket URL <span className="text-muted-foreground/50 font-normal">(optional)</span></label>
+            <Input
+              name="smoothcompUrl"
+              type="url"
+              placeholder="smoothcomp.com/en/event/…/bracket/…"
+            />
+            <p className="text-xs text-muted-foreground/60">
+              Paste your division&apos;s bracket page. Once the bracket is published we&apos;ll auto-import your opponents.
+            </p>
+          </div>
+
           {error && (
             <p className="text-sm text-destructive">{error}</p>
           )}

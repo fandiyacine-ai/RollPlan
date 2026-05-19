@@ -26,6 +26,7 @@ type Opponent = {
   id: string
   opponentLabel: string
   seedingNotes: string | null
+  footageStatus: string
 }
 
 function ResultBadge({ winner, method, technique }: { winner: string; method: string | null; technique: string | null }) {
@@ -137,6 +138,7 @@ export function OpponentAccordion({
     ? <span className="w-2 h-2 rounded-full bg-emerald-400/60 flex-shrink-0" />
     : <span className="w-2 h-2 rounded-full border border-muted-foreground/30 flex-shrink-0" />
 
+  const { footageStatus } = opponent
   const subtitle = chunkProgress
     ? chunkProgress.done === 0
       ? <span className="text-blue-400">Scanning — splitting into {chunkProgress.total} parts…</span>
@@ -149,6 +151,14 @@ export function OpponentAccordion({
     ? `${analysed} match${analysed !== 1 ? 'es' : ''} ready${failed > 0 ? ` · ${failed} failed` : ''}`
     : failed > 0
     ? <span className="text-rose-400">{failed} failed</span>
+    : footageStatus === 'pending'
+    ? <span className="text-muted-foreground/50">Checking for past footage…</span>
+    : footageStatus === 'auto_queued'
+    ? <span className="text-blue-400">Scanning past competitions…</span>
+    : footageStatus === 'no_footage'
+    ? <span className="text-amber-400">No recordings found — add a link below</span>
+    : footageStatus === 'reused'
+    ? <span className="text-muted-foreground/50">Scouted in another tournament — add footage for this event</span>
     : <span className="text-muted-foreground/50">No footage added yet</span>
 
   const canExpand = allRows.length > 0
@@ -204,12 +214,25 @@ export function OpponentAccordion({
               Gameplan →
             </Link>
           )}
-          <ScoutForm
-            tournamentId={tournamentId}
-            opponentId={opponent.id}
-            opponentName={opponent.opponentLabel}
-            hasMatches={analysed > 0}
-          />
+          {footageStatus === 'no_footage' && analysed === 0 && (
+            <a
+              href={`https://www.youtube.com/results?search_query=${encodeURIComponent(opponent.opponentLabel + ' BJJ grappling')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
+            >
+              Search YouTube
+            </a>
+          )}
+          {/* Hide scout form when auto-discovery is actively queued with no results yet */}
+          {footageStatus !== 'pending' && !(footageStatus === 'auto_queued' && allRows.length === 0) && (
+            <ScoutForm
+              tournamentId={tournamentId}
+              opponentId={opponent.id}
+              opponentName={opponent.opponentLabel}
+              hasMatches={analysed > 0}
+            />
+          )}
           <DeleteOpponentButton opponentId={opponent.id} tournamentId={tournamentId} />
         </div>
       </div>
