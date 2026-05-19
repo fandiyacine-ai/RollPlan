@@ -41,13 +41,13 @@ export const scanUrl = inngest.createFunction(
     triggers: [{ event: 'url/submitted' }],
   },
   async ({ event, step }: {
-    event: { data: { videoId: string; userId?: string; athleteName: string; format: string; sourceType: string; eventName?: string; appearanceHint?: string; athleteImageBase64?: string; tournamentOpponentId?: string; skipScan?: boolean; startSeconds?: number; endSeconds?: number; chunkIndex?: number; chunkTotal?: number; chunkVideoIds?: string[] } }
+    event: { data: { videoId: string; userId?: string; athleteName: string; format: string; sourceType: string; eventName?: string; appearanceHint?: string; athleteImageBase64?: string; tournamentOpponentId?: string; skipScan?: boolean; startSeconds?: number; endSeconds?: number; chunkIndex?: number; chunkTotal?: number; chunkVideoIds?: string[]; matchesFoundSoFar?: number; consecutiveEmptyChunks?: number } }
     step: any
   }) => {
-    const { videoId, userId, athleteName, format, sourceType, eventName, appearanceHint, athleteImageBase64, tournamentOpponentId, skipScan, startSeconds, endSeconds, chunkIndex, chunkTotal, chunkVideoIds } = event.data
+    const { videoId, userId, athleteName, format, sourceType, eventName, appearanceHint, athleteImageBase64, tournamentOpponentId, skipScan, startSeconds, endSeconds, chunkIndex, chunkTotal, chunkVideoIds, matchesFoundSoFar, consecutiveEmptyChunks } = event.data
 
     const CHUNK_SECS = 20 * 60  // 20-minute windows — ~60 frames at 0.05fps
-    const NUM_CHUNKS = 9        // covers up to 3 hours
+    const NUM_CHUNKS = 20       // covers up to 6h40m (handles full competition day streams)
 
     // null return value signals "needs chunking" — handled after the step
     const scanStepResult: FoundMatch[] | null = skipScan
@@ -559,9 +559,18 @@ export const scanUrl = inngest.createFunction(
       await db.update(videos).set({ status: 'analysed' }).where(eq(videos.id, videoId))
     })
 
-    // Last chunk: if no matches were found across the entire batch, mark the parent video as failed
-    // so the UI surfaces a clear error rather than silently showing "No footage added yet".
-    if (chunkIndex !== undefined && chunkTotal !== undefined && chunkIndex === chunkTotal - 1 && chunkVideoIds) {
+    // Track progress across the chunk chain so we can stop early.
+    const thisChunkMatchCount = foundMatches.length
+    const newMatchesFoundSoFar = (matchesFoundSoFar ?? 0) + thisChunkMatchCount
+    const newConsecutiveEmpty = thisChunkMatchCount > 0 ? 0 : (consecutiveEmptyChunks ?? 0) + 1
+    // Stop scanning once we've found at least one match and seen 3 empty chunks in a row —
+    // the athlete's block of matches is behind us and further scanning is wasteful.
+    const shouldStopEarly = newConsecutiveEmpty >= 3 && newMatchesFoundSoFar > 0
+
+    // Finalize: runs on the last chunk OR when we stop early.
+    // If no matches were found across the entire batch, mark the parent video as failed.
+    const isLastChunk = chunkIndex !== undefined && chunkTotal !== undefined && chunkIndex === chunkTotal - 1
+    if ((isLastChunk || shouldStopEarly) && chunkVideoIds) {
       await step.run('finalize-chunk-results', async () => {
         const found = await db.select({ id: matches.id }).from(matches).where(inArray(matches.videoId, chunkVideoIds))
         if (found.length === 0) {
@@ -576,8 +585,9 @@ export const scanUrl = inngest.createFunction(
       })
     }
 
-    // Sequential chunk chain: trigger the next chunk only after this one is fully done
-    if (chunkIndex !== undefined && chunkTotal !== undefined && chunkVideoIds && chunkIndex < chunkTotal - 1) {
+    // Sequential chunk chain: trigger the next chunk only after this one is fully done.
+    // Skip if we hit the natural end or the early-stop condition.
+    if (chunkIndex !== undefined && chunkTotal !== undefined && chunkVideoIds && chunkIndex < chunkTotal - 1 && !shouldStopEarly) {
       const nextIndex = chunkIndex + 1
       // Brief cooldown so Gemini's per-minute quota has time to reset between chunks
       await step.sleep('chunk-cooldown', '30s')
@@ -598,6 +608,8 @@ export const scanUrl = inngest.createFunction(
           chunkIndex: nextIndex,
           chunkTotal,
           chunkVideoIds,
+          matchesFoundSoFar: newMatchesFoundSoFar,
+          consecutiveEmptyChunks: newConsecutiveEmpty,
         },
       })
     }

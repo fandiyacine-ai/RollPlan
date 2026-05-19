@@ -41,7 +41,7 @@ const FAQ = [
   },
   {
     q: 'Can I correct the AI analysis?',
-    a: 'Yes. On any match detail page you can flag incorrect positions or events. Corrections are noted and improve future analyses for your account.',
+    a: 'Not yet — position and event correction is on the roadmap. For now, if the AI mislabels a position you can note it in the Match Report generation prompt, or add a note to the coaching section.',
   },
   {
     q: 'Is my footage private?',
@@ -49,7 +49,7 @@ const FAQ = [
   },
   {
     q: 'What counts against my usage quota?',
-    a: 'Each AI analysis call counts towards your monthly token budget. Your current plan tier determines the limit. You can see usage in Profile Settings.',
+    a: 'Each analysed match counts towards your monthly limit. The free tier allows 10 analysed matches per calendar month — the counter resets on the 1st of each month. Failed analyses and pending jobs do not count. You can see your current usage in the nav bar.',
   },
 ]
 
