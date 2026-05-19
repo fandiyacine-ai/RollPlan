@@ -211,10 +211,12 @@ export function ScoutForm({
   tournamentId,
   opponentId,
   opponentName,
+  hasMatches = false,
 }: {
   tournamentId: string
   opponentId: string
   opponentName: string
+  hasMatches?: boolean
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -230,8 +232,8 @@ export function ScoutForm({
   const [startingSide, setStartingSide] = useState<StartingSide | null>(null)
   const [notes, setNotes] = useState('')
 
-  // single match — URL
-  const [singleUrl, setSingleUrl] = useState('')
+  // single match — URL (supports multiple rows)
+  const [singleUrls, setSingleUrls] = useState<string[]>([''])
 
   // single match — file upload
   const [uploadFile, setUploadFile] = useState<File | null>(null)
@@ -246,7 +248,7 @@ export function ScoutForm({
     setOpen(o)
     if (!o) {
       setPending(false); setMethod(null); setError(null)
-      setSingleUrl(''); setUploadFile(null); setUploadProgress(0)
+      setSingleUrls(['']); setUploadFile(null); setUploadProgress(0)
       setSessionUrls(''); setAppearanceColor(null); setStartingSide(null); setNotes('')
     }
   }
@@ -258,14 +260,16 @@ export function ScoutForm({
   }
 
   async function submitSingleUrl() {
-    const url = singleUrl.trim()
-    if (!url) { setError('A video URL is required'); return }
-    try { new URL(url) } catch { setError('Invalid URL'); return }
+    const urls = singleUrls.map(u => u.trim()).filter(Boolean)
+    if (urls.length === 0) { setError('At least one video URL is required'); return }
+    for (const url of urls) {
+      try { new URL(url) } catch { setError(`Invalid URL: ${url}`); return }
+    }
 
     setPending(true); setError(null)
     try {
       const fd = new FormData()
-      fd.set('urls', url)
+      fd.set('urls', urls.join('\n'))
       fd.set('format', format)
       fd.set('appearanceHint', buildAppearanceHint(appearanceColor, startingSide, notes))
       await submitScoutUrls(tournamentId, opponentId, fd)
@@ -347,12 +351,10 @@ export function ScoutForm({
     return <span className="text-xs text-emerald-400 font-medium">Scanning queued ✓</span>
   }
 
-  const singleUrlYtId = singleUrl.trim() ? extractYouTubeId(singleUrl.trim()) : null
-
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogTrigger>
-        <Button variant="outline" size="xs">Scout footage</Button>
+        <Button variant="outline" size="xs">{hasMatches ? '+ Add footage' : 'Scout footage'}</Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -415,23 +417,55 @@ export function ScoutForm({
 
             {singleMode === 'url' && (
               <div className="space-y-2">
-                <Input
-                  type="url"
-                  value={singleUrl}
-                  onChange={(e) => setSingleUrl(e.target.value)}
-                  placeholder="https://youtube.com/watch?v=…"
-                />
-                {singleUrlYtId && (
-                  <div className="flex items-center gap-3 rounded-md border bg-muted/30 p-2">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={`https://img.youtube.com/vi/${singleUrlYtId}/hqdefault.jpg`}
-                      alt=""
-                      className="w-20 h-12 object-cover rounded flex-shrink-0 bg-muted"
-                    />
-                    <p className="text-xs text-muted-foreground">YouTube video detected</p>
-                  </div>
-                )}
+                {singleUrls.map((url, i) => {
+                  const ytId = url.trim() ? extractYouTubeId(url.trim()) : null
+                  return (
+                    <div key={i} className="space-y-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <Input
+                          type="url"
+                          value={url}
+                          onChange={(e) => {
+                            const next = [...singleUrls]
+                            next[i] = e.target.value
+                            setSingleUrls(next)
+                          }}
+                          placeholder="https://youtube.com/watch?v=…"
+                          className="flex-1"
+                        />
+                        {singleUrls.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setSingleUrls(singleUrls.filter((_, j) => j !== i))}
+                            className="text-muted-foreground hover:text-foreground transition-colors p-1 flex-shrink-0"
+                            aria-label="Remove URL"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                      {ytId && (
+                        <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-2 py-1.5">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`} alt="" className="w-14 h-9 object-cover rounded flex-shrink-0 bg-muted" />
+                          <p className="text-xs text-muted-foreground">YouTube video detected</p>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+                <button
+                  type="button"
+                  onClick={() => setSingleUrls([...singleUrls, ''])}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                  </svg>
+                  Add another link
+                </button>
               </div>
             )}
 

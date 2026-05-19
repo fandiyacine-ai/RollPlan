@@ -208,6 +208,7 @@ export function OpponentAccordion({
             tournamentId={tournamentId}
             opponentId={opponent.id}
             opponentName={opponent.opponentLabel}
+            hasMatches={analysed > 0}
           />
           <DeleteOpponentButton opponentId={opponent.id} tournamentId={tournamentId} />
         </div>
