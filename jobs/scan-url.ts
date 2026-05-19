@@ -81,7 +81,7 @@ export const scanUrl = inngest.createFunction(
               ...(startSeconds !== undefined ? { startSeconds } : {}),
               ...(endSeconds !== undefined ? { endSeconds } : {}),
             },
-            userPrompt: buildScanUrlUserPrompt(athleteName),
+            userPrompt: buildScanUrlUserPrompt(athleteName, appearanceHint),
             schema: UrlScanOutputSchema,
           })
           scanResult = result.object
@@ -96,7 +96,7 @@ export const scanUrl = inngest.createFunction(
               role: 'user',
               content: [
                 videoFilePart(video.publicUrl, video.contentType),
-                { type: 'text', text: buildScanUrlUserPrompt(athleteName) },
+                { type: 'text', text: buildScanUrlUserPrompt(athleteName, appearanceHint) },
               ],
             }],
           })

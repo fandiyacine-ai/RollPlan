@@ -1,4 +1,4 @@
-export const SCAN_URL_PROMPT_VERSION = 'v5'
+export const SCAN_URL_PROMPT_VERSION = 'v6'
 
 export function buildScanUrlSystemPrompt(): string {
   return `You are an expert BJJ tournament stream analyst. Your task is to watch a competition recording and find all matches involving a specific athlete.
@@ -50,6 +50,16 @@ Competition streams display a result graphic after every match: e.g. "Winner: Th
 - method: "submission" | "points" | "dq" | "unknown".
 - technique: the finishing technique if visible (e.g. "rear naked choke", "armbar", "advantage").
 
+## Active scoreboard vs bracket graphic — CRITICAL
+
+Competition streams show two completely different types of athlete name displays. You must distinguish them:
+
+**VALID — Active match scoreboard**: Two athletes competing RIGHT NOW. Shows exactly two names side-by-side (or top/bottom) with a live countdown timer and score (e.g. "0 – 0", "2 – 0"). The timer is running or has just stopped. Both athletes are on the mat. This is the ONLY source you should use to record a match and identify an opponent.
+
+**INVALID — Bracket / schedule / category graphic**: Shows multiple athletes in a tournament bracket tree, a round-robin table, a category listing, or a "next match" preview card. These display who is SCHEDULED to fight — not who is fighting now. Do NOT extract opponent names from these graphics. A bracket showing "DARIO MIKEL vs EELIS VUORINEN" means they were scheduled; it does NOT mean the match took place.
+
+Rule: only record a match when the tracked athlete's name and their opponent's name are visible **together on the same active match scoreboard** with a timer visible. If you cannot confirm both names are on the same live scoreboard, do not record it.
+
 ## Name matching — CRITICAL
 - Scoreboards (Smoothcomp, IBJJF, AJP) display names in ALL CAPS. "DARIO MIKEL" = "Dario Mikel". Match names case-insensitively.
 - Accept partial last-name matches: "D. MIKEL" or "MIKEL" alone is sufficient if no other athlete shares the surname.
@@ -61,8 +71,9 @@ Competition streams display a result graphic after every match: e.g. "Winner: Th
 - Include round/bracket info if visible (e.g. "Semi-final", "Gold medal match").`
 }
 
-export function buildScanUrlUserPrompt(athleteName: string): string {
+export function buildScanUrlUserPrompt(athleteName: string, appearanceHint?: string): string {
+  const hint = appearanceHint ? `\n\nAdditional context: ${appearanceHint}` : ''
   return `Find all BJJ matches involving: ${athleteName}
 
-Scan the full video for on-screen text overlays showing this athlete's name and return the timestamp range of each match they compete in.`
+Scan the full video for on-screen text overlays showing this athlete's name on an ACTIVE MATCH SCOREBOARD (with a live timer and two athletes competing). Do NOT report matches from bracket trees, schedule graphics, or category listings — only from live scoreboards.${hint}`
 }
