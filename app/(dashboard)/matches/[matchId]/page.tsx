@@ -97,7 +97,11 @@ export default async function MatchDetailPage({
 
   const sortedPositions = Object.entries(positionStats).sort((a, b) => b[1].total - a[1].total)
   const maxPositionTime = sortedPositions[0]?.[1].total ?? 1
-  const totalMatchTime = segments.reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
+  const firstSegStart = segments[0]?.startSeconds ?? 0
+  const lastSegEnd = segments[segments.length - 1]?.endSeconds ?? 0
+  const lastEventTime = events.length > 0 ? events[events.length - 1].timestampSeconds : null
+  const matchEnd = lastEventTime !== null ? Math.min(lastEventTime + 30, lastSegEnd) : lastSegEnd
+  const totalMatchTime = matchEnd - firstSegStart
 
   // Build merged timeline
   const timelineItems: TimelineItem[] = [
