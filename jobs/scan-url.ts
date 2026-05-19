@@ -149,8 +149,14 @@ export const scanUrl = inngest.createFunction(
 
       if (!scanResult.athlete_found || scanResult.matches.length === 0) {
         if (chunkIndex !== undefined) {
+          // Empty chunk — fine, mark done and let the chain continue to the next chunk
           await db.update(videos).set({ status: 'analysed' }).where(eq(videos.id, videoId))
           return []
+        }
+        if (isYouTubeUrl(video.publicUrl)) {
+          // Full scan at sparse fps missed the athlete — retry with chunked 0.1fps scan before giving up
+          await db.update(videos).set({ status: 'processing' }).where(eq(videos.id, videoId))
+          return null  // triggers chunking
         }
         const reason = `"${athleteName}" was not found in this video. Check the name matches exactly what's shown on screen.`
         await db.update(videos).set({ status: 'failed', failureReason: reason }).where(eq(videos.id, videoId))

@@ -1,4 +1,4 @@
-export const SCAN_URL_PROMPT_VERSION = 'v2'
+export const SCAN_URL_PROMPT_VERSION = 'v3'
 
 export function buildScanUrlSystemPrompt(): string {
   return `You are an expert BJJ tournament stream analyst. Your task is to watch a competition recording and find all matches involving a specific athlete.
@@ -31,9 +31,13 @@ Competition streams display a result graphic after every match: e.g. "Winner: Th
 - method: "submission" | "points" | "dq" | "unknown".
 - technique: the finishing technique if visible (e.g. "rear naked choke", "armbar", "advantage").
 
+## Name matching — CRITICAL
+- Scoreboards (Smoothcomp, IBJJF, AJP) display names in ALL CAPS. "DARIO MIKEL" = "Dario Mikel". Match names case-insensitively.
+- Accept partial last-name matches: "D. MIKEL" or "MIKEL" alone is sufficient if no other athlete shares the surname.
+- Accents and diacritics may be stripped on screen — "MÜLLER" matches "Muller".
+
 ## Other rules
 - Only include actual BJJ matches, not warm-ups, demos, or gaps between matches.
-- If the athlete's name is abbreviated on screen (e.g. "D. Mikel" for "Dario Mikel"), still include it.
 - If the athlete does not appear in the video at all, return matches: [] and athlete_found: false.
 - Include round/bracket info if visible (e.g. "Semi-final", "Gold medal match").`
 }
