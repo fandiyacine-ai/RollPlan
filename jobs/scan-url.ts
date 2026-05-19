@@ -191,7 +191,7 @@ export const scanUrl = inngest.createFunction(
           ids.push(v.id)
         }
 
-        await db.update(videos).set({ status: 'analysed' }).where(eq(videos.id, videoId))
+        // Keep parent as 'processing' while chunks scan — finalize-chunk-results will resolve it
         return { chunkVideoIds: ids, urlOffset: ytOffset }
       })
 
@@ -573,14 +573,15 @@ export const scanUrl = inngest.createFunction(
     if ((isLastChunk || shouldStopEarly) && chunkVideoIds) {
       await step.run('finalize-chunk-results', async () => {
         const found = await db.select({ id: matches.id }).from(matches).where(inArray(matches.videoId, chunkVideoIds))
+        // Chunk r2Keys are 'chunk/{parentVideoId}/{index}' — extract parent ID
+        const chunkVideo = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
+        const parentId = chunkVideo?.r2Key.split('/')[1]
+        if (!parentId) return
         if (found.length === 0) {
-          // Chunk r2Keys are 'chunk/{parentVideoId}/{index}' — extract parent ID
-          const chunkVideo = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
-          const parentId = chunkVideo?.r2Key.split('/')[1]
-          if (parentId) {
-            const reason = `"${athleteName}" was not found in this video. Check the name matches exactly what's shown on screen.`
-            await db.update(videos).set({ status: 'failed', failureReason: reason }).where(eq(videos.id, parentId))
-          }
+          const reason = `"${athleteName}" was not found in this video. Check the name matches exactly what's shown on screen.`
+          await db.update(videos).set({ status: 'failed', failureReason: reason }).where(eq(videos.id, parentId))
+        } else {
+          await db.update(videos).set({ status: 'analysed' }).where(eq(videos.id, parentId))
         }
       })
     }

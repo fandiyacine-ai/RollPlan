@@ -141,17 +141,25 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
                 resultWinner: m.resultWinner ?? null, resultMethod: m.resultMethod ?? null, resultTechnique: m.resultTechnique ?? null,
                 failureReason: null,
               }))}
-              pendingVideos={(pendingVideosByOpponent[opp.id] ?? []).map(v => ({
-                ...v,
-                format: null, context: null, eventName: null, opponentLabel: null,
-                resultWinner: null, resultMethod: null, resultTechnique: null,
-                // A parent video that finished scanning with no matches has status 'analysed'
-                // but no match records — surface it as a failure with a clear reason.
-                status: v.status === 'analysed' ? 'failed' : v.status,
-                failureReason: v.status === 'analysed'
-                  ? (v.failureReason ?? 'Scan complete — no matches found for this athlete in the video.')
-                  : (v.failureReason ?? null),
-              }))}
+              pendingVideos={(pendingVideosByOpponent[opp.id] ?? [])
+                .filter(v => {
+                  // Hide the parent video once chunk scanning has found matches for this opponent.
+                  // The parent is marked 'analysed' when chunks succeed, but matches are linked
+                  // to chunk video IDs so the parent always appears in the no-match query.
+                  const hasMatches = (matchesByOpponent[opp.id] ?? []).length > 0
+                  return !(hasMatches && v.status === 'analysed')
+                })
+                .map(v => ({
+                  ...v,
+                  format: null, context: null, eventName: null, opponentLabel: null,
+                  resultWinner: null, resultMethod: null, resultTechnique: null,
+                  // A parent video that finished scanning with no matches has status 'analysed'
+                  // but no match records — surface it as a failure with a clear reason.
+                  status: v.status === 'analysed' ? 'failed' : v.status,
+                  failureReason: v.status === 'analysed'
+                    ? (v.failureReason ?? 'Scan complete — no matches found for this athlete in the video.')
+                    : (v.failureReason ?? null),
+                }))}
               tournamentId={tournamentId}
             />
           ))}
