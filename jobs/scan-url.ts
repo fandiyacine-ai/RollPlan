@@ -3,7 +3,7 @@ import { NonRetriableError, RetryAfterError } from 'inngest'
 import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
 import { videos, matches, positionSegments, matchEvents, insights, aiCallLogs } from '../lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { google, anthropic, GEMINI_URL_SCAN_MODEL, CLAUDE_SYNTHESIS_MODEL, estimateCostUsd } from '../lib/ai/clients'
 import { geminiVideoObject, isYouTubeUrl } from '../lib/gemini-video'
 import { UrlScanOutputSchema, FoundMatch } from '../lib/ai/schemas/url-scan'
@@ -534,6 +534,23 @@ export const scanUrl = inngest.createFunction(
     await step.run('mark-video-analysed', async () => {
       await db.update(videos).set({ status: 'analysed' }).where(eq(videos.id, videoId))
     })
+
+    // Last chunk: if no matches were found across the entire batch, mark the parent video as failed
+    // so the UI surfaces a clear error rather than silently showing "No footage added yet".
+    if (chunkIndex !== undefined && chunkTotal !== undefined && chunkIndex === chunkTotal - 1 && chunkVideoIds) {
+      await step.run('finalize-chunk-results', async () => {
+        const found = await db.select({ id: matches.id }).from(matches).where(inArray(matches.videoId, chunkVideoIds))
+        if (found.length === 0) {
+          // Chunk r2Keys are 'chunk/{parentVideoId}/{index}' — extract parent ID
+          const chunkVideo = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
+          const parentId = chunkVideo?.r2Key.split('/')[1]
+          if (parentId) {
+            const reason = `"${athleteName}" was not found in this video. Check the name matches exactly what's shown on screen.`
+            await db.update(videos).set({ status: 'failed', failureReason: reason }).where(eq(videos.id, parentId))
+          }
+        }
+      })
+    }
 
     // Sequential chunk chain: trigger the next chunk only after this one is fully done
     if (chunkIndex !== undefined && chunkTotal !== undefined && chunkVideoIds && chunkIndex < chunkTotal - 1) {

@@ -1,6 +1,6 @@
 import { db } from '../../../../../lib/db'
 import { tournamentOpponents, matches, videos } from '../../../../../lib/db/schema'
-import { eq, inArray, isNull, and, ne } from 'drizzle-orm'
+import { eq, inArray, isNull, and, notLike } from 'drizzle-orm'
 import { AddOpponentForm } from './opponent-forms'
 import { OpponentAccordion } from './opponent-accordion'
 
@@ -83,7 +83,8 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
       .where(and(
         inArray(videos.tournamentOpponentId, opponentIds),
         isNull(matches.id),
-        ne(videos.status, 'analysed'),
+        // Chunk sub-videos are an internal detail — only show the parent URL record
+        notLike(videos.r2Key, 'chunk/%'),
       ))
       .orderBy(videos.uploadedAt) as VideoRow[]
     } catch (err) {
@@ -141,9 +142,15 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
                 failureReason: null,
               }))}
               pendingVideos={(pendingVideosByOpponent[opp.id] ?? []).map(v => ({
-                ...v, format: null, context: null, eventName: null, opponentLabel: null,
+                ...v,
+                format: null, context: null, eventName: null, opponentLabel: null,
                 resultWinner: null, resultMethod: null, resultTechnique: null,
-                failureReason: v.failureReason ?? null,
+                // A parent video that finished scanning with no matches has status 'analysed'
+                // but no match records — surface it as a failure with a clear reason.
+                status: v.status === 'analysed' ? 'failed' : v.status,
+                failureReason: v.status === 'analysed'
+                  ? (v.failureReason ?? 'Scan complete — no matches found for this athlete in the video.')
+                  : (v.failureReason ?? null),
               }))}
               tournamentId={tournamentId}
             />
