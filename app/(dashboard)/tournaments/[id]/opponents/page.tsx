@@ -1,8 +1,9 @@
 import { db } from '../../../../../lib/db'
-import { tournamentOpponents, matches, videos } from '../../../../../lib/db/schema'
+import { tournaments, tournamentOpponents, matches, videos } from '../../../../../lib/db/schema'
 import { eq, inArray, isNull, and, notLike, like, sql } from 'drizzle-orm'
 import { AddOpponentForm } from './opponent-forms'
 import { OpponentAccordion } from './opponent-accordion'
+import { SyncBracketButton } from './sync-bracket-button'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,6 +30,14 @@ function DbError({ label, err }: { label: string; err: unknown }) {
 
 export default async function OpponentsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: tournamentId } = await params
+
+  const tournamentRow = await db
+    .select({ smoothcompUrl: tournaments.smoothcompUrl })
+    .from(tournaments)
+    .where(eq(tournaments.id, tournamentId))
+    .limit(1)
+    .then(r => r[0] ?? null)
+    .catch(() => null)
 
   let opponents: { id: string; tournamentId: string; opponentLabel: string; playerCardId: string | null; seedingNotes: string | null; createdAt: Date; footageStatus: string; smoothcompAthleteId: string | null }[]
   try {
@@ -141,7 +150,12 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
         <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
           Opponents ({opponents.length})
         </h2>
-        <AddOpponentForm tournamentId={tournamentId} />
+        <div className="flex items-center gap-3">
+          {tournamentRow?.smoothcompUrl?.includes('/bracket/') && opponents.length > 0 && (
+            <SyncBracketButton tournamentId={tournamentId} />
+          )}
+          <AddOpponentForm tournamentId={tournamentId} />
+        </div>
       </div>
 
       {opponents.length === 0 ? (
