@@ -43,7 +43,7 @@ export default async function AdminUsagePage() {
     .where(eq(matches.status, 'analysed'))
     .groupBy(matches.userId)
 
-  // Per-user AI cost from logs
+  // Per-user AI cost from logs (attributed records only)
   const costRows = await db
     .select({
       userId: aiCallLogs.userId,
@@ -52,6 +52,14 @@ export default async function AdminUsagePage() {
     })
     .from(aiCallLogs)
     .groupBy(aiCallLogs.userId)
+
+  // True platform-wide cost — includes all records regardless of userId attribution
+  const [platformCost] = await db
+    .select({
+      allTime: sql<number>`coalesce(sum(${aiCallLogs.costUsdEstimate}), 0)`,
+      thisMonth: sql<number>`coalesce(sum(${aiCallLogs.costUsdEstimate}) filter (where ${aiCallLogs.createdAt} >= ${startOfMonth}), 0)`,
+    })
+    .from(aiCallLogs)
 
   // Per-user gameplan counts (through tournaments)
   const gameplanRows = await db
@@ -88,8 +96,9 @@ export default async function AdminUsagePage() {
     matchesThisMonth: rows.reduce((s, r) => s + r.matchesThisMonth, 0),
     matchesAllTime: rows.reduce((s, r) => s + r.matchesAllTime, 0),
     videoMinutesAllTime: rows.reduce((s, r) => s + r.videoMinutesAllTime, 0),
-    costThisMonth: rows.reduce((s, r) => s + r.costThisMonth, 0),
-    costAllTime: rows.reduce((s, r) => s + r.costAllTime, 0),
+    // Use unfiltered platform totals so NULL-userId historical records are included
+    costThisMonth: Number(platformCost?.thisMonth ?? 0),
+    costAllTime: Number(platformCost?.allTime ?? 0),
   }
 
   const planBadge: Record<string, string> = {

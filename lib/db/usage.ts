@@ -1,5 +1,5 @@
 import { db } from '.'
-import { matches, users, videos, gameplans, tournaments, aiCallLogs } from './schema'
+import { matches, users, videos, gameplans, tournaments } from './schema'
 import { eq, and, gte, count, sum, sql } from 'drizzle-orm'
 
 export type UserUsageStats = {
@@ -10,13 +10,11 @@ export type UserUsageStats = {
   videoMinutesThisMonth: number
   gameplansThisMonth: number
   opponentsScoutedThisMonth: number
-  aiCostThisMonth: number
   // all-time
   matchesAllTime: number
   videoMinutesAllTime: number
   gameplansAllTime: number
   opponentsScoutedAllTime: number
-  aiCostAllTime: number
 }
 
 export async function getUserUsageStats(userId: string): Promise<UserUsageStats> {
@@ -50,14 +48,6 @@ export async function getUserUsageStats(userId: string): Promise<UserUsageStats>
     .innerJoin(tournaments, eq(tournaments.id, gameplans.tournamentId))
     .where(eq(tournaments.userId, userId))
 
-  const [costStats] = await db
-    .select({
-      allTime: sql<number>`coalesce(sum(${aiCallLogs.costUsdEstimate}), 0)`,
-      thisMonth: sql<number>`coalesce(sum(${aiCallLogs.costUsdEstimate}) filter (where ${aiCallLogs.createdAt} >= ${startOfMonth.toISOString()}::timestamptz), 0)`,
-    })
-    .from(aiCallLogs)
-    .where(eq(aiCallLogs.userId, userId))
-
   return {
     planTier,
     matchesThisMonth: Number(matchStats?.thisMonth ?? 0),
@@ -65,12 +55,10 @@ export async function getUserUsageStats(userId: string): Promise<UserUsageStats>
     videoMinutesThisMonth: Number(matchStats?.minutesThisMonth ?? 0),
     gameplansThisMonth: Number(gameplanStats?.thisMonth ?? 0),
     opponentsScoutedThisMonth: Number(matchStats?.opponentsThisMonth ?? 0),
-    aiCostThisMonth: Number(costStats?.thisMonth ?? 0),
     matchesAllTime: Number(matchStats?.allTime ?? 0),
     videoMinutesAllTime: Number(matchStats?.minutesAllTime ?? 0),
     gameplansAllTime: Number(gameplanStats?.allTime ?? 0),
     opponentsScoutedAllTime: Number(matchStats?.opponentsAllTime ?? 0),
-    aiCostAllTime: Number(costStats?.allTime ?? 0),
   }
 }
 

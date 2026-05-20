@@ -95,24 +95,22 @@ export default async function UsagePage() {
       {/* This month */}
       <div>
         <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">This month</p>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard label="Matches analysed" value={String(stats.matchesThisMonth)} />
           <StatCard label="Video analysed" value={fmtMinutes(stats.videoMinutesThisMonth)} />
           <StatCard label="Opponents scouted" value={String(stats.opponentsScoutedThisMonth)} />
           <StatCard label="Gameplans built" value={String(stats.gameplansThisMonth)} />
-          <StatCard label="AI cost" value={stats.aiCostThisMonth < 0.01 ? '<$0.01' : `$${stats.aiCostThisMonth.toFixed(2)}`} sub="your share of compute" />
         </div>
       </div>
 
       {/* All-time */}
       <div>
         <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">All time</p>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard label="Matches analysed" value={String(stats.matchesAllTime)} />
           <StatCard label="Video analysed" value={fmtMinutes(stats.videoMinutesAllTime)} />
           <StatCard label="Opponents scouted" value={String(stats.opponentsScoutedAllTime)} />
           <StatCard label="Gameplans built" value={String(stats.gameplansAllTime)} />
-          <StatCard label="AI cost" value={stats.aiCostAllTime < 0.01 ? '<$0.01' : `$${stats.aiCostAllTime.toFixed(2)}`} sub="your share of compute" />
         </div>
       </div>
     </div>
