@@ -4,6 +4,8 @@ import { eq, inArray, isNull, and, notLike, like, sql } from 'drizzle-orm'
 import { AddOpponentForm } from './opponent-forms'
 import { OpponentAccordion } from './opponent-accordion'
 import { SyncBracketButton } from './sync-bracket-button'
+import { PostEventBanner } from './post-event-banner'
+import { AutoRefresh } from './auto-refresh'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,12 +34,22 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
   const { id: tournamentId } = await params
 
   const tournamentRow = await db
-    .select({ smoothcompUrl: tournaments.smoothcompUrl })
+    .select({
+      name: tournaments.name,
+      smoothcompUrl: tournaments.smoothcompUrl,
+      eventDate: tournaments.eventDate,
+      outcome: tournaments.outcome,
+    })
     .from(tournaments)
     .where(eq(tournaments.id, tournamentId))
     .limit(1)
     .then(r => r[0] ?? null)
     .catch(() => null)
+
+  const eventDatePassed = tournamentRow?.eventDate
+    ? new Date(tournamentRow.eventDate) < new Date()
+    : false
+  const showPostEventBanner = eventDatePassed && !tournamentRow?.outcome
 
   let opponents: { id: string; tournamentId: string; opponentLabel: string; playerCardId: string | null; seedingNotes: string | null; createdAt: Date; footageStatus: string; smoothcompAthleteId: string | null }[]
   try {
@@ -144,8 +156,20 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
     return acc
   }, {})
 
+  const hasActiveScans = allMatches.some(m => m.status === 'processing' || m.status === 'pending' || m.status === 'uploaded')
+    || allPendingVideos.some(v => v.status === 'processing' || v.status === 'pending' || v.status === 'uploaded')
+    || opponents.some(o => o.footageStatus === 'pending' || o.footageStatus === 'auto_queued')
+
   return (
     <div className="space-y-5">
+      {hasActiveScans && <AutoRefresh />}
+      {showPostEventBanner && tournamentRow && (
+        <PostEventBanner
+          tournamentId={tournamentId}
+          tournamentName={tournamentRow.name}
+        />
+      )}
+
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
           Opponents ({opponents.length})

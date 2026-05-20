@@ -96,6 +96,25 @@ export async function updateTournament(
   }
 }
 
+export async function saveTournamentOutcome(
+  id: string,
+  outcome: string,
+  notes: string,
+): Promise<{ error?: string }> {
+  try {
+    const userId = await getOrCreateDbUserId()
+    await db
+      .update(tournaments)
+      .set({ outcome, postEventNotes: notes || null, status: 'completed' })
+      .where(and(eq(tournaments.id, id), eq(tournaments.userId, userId)))
+    revalidatePath(`/tournaments/${id}/opponents`)
+    revalidatePath('/tournaments')
+    return {}
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 export async function deleteTournament(id: string): Promise<{ error?: string }> {
   try {
     const userId = await getOrCreateDbUserId()

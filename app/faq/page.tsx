@@ -25,11 +25,31 @@ const FAQ = [
   },
   {
     q: 'How does opponent scouting work?',
-    a: 'Go to "Scout Opponent" and create a tournament entry. Add an opponent and paste their match footage URL. The AI analyses their tendencies — favourite attacks, defensive gaps, control patterns — which feeds directly into the Gameplan page.',
+    a: 'Go to "Scout Opponent" and create a tournament entry. Add an opponent and paste their match footage URL (YouTube or direct upload). The AI analyses their tendencies — favourite attacks, defensive gaps, control patterns — which feeds directly into the Gameplan page.',
+  },
+  {
+    q: 'Can I connect a Smoothcomp bracket?',
+    a: 'Yes. When creating or editing a tournament, paste any URL from your event on smoothcomp.com (schedule page, bracket page — any link works). Once a bracket URL is saved, a "Sync from bracket" button appears on the Opponents page. Clicking it pulls the latest draw and can auto-update match results so your scouting data stays accurate.',
+  },
+  {
+    q: 'Can I correct a match result the AI got wrong?',
+    a: 'Yes. Open the match detail page for any analysed match and tap "Wrong result?" next to the result badge. You can set the correct winner, method (Submission / Points / DQ / Other), or clear the result entirely. Bracket sync can also auto-correct results when you run it after the draw is published.',
   },
   {
     q: 'What is the Gameplan?',
     a: 'The Gameplan page combines your profile (belt, style, goals) with the opponent scouted data to generate a competition-day gameplan: your go-to attacks, opponent weapons to defend, and mat-side mental cues. Generate it once you have scouted footage ready.',
+  },
+  {
+    q: 'Can I rate a gameplan?',
+    a: 'Yes — use the thumbs-up / thumbs-down buttons next to the gameplan header after it\'s generated. Your rating helps you track which gameplans translated well and which didn\'t. You can change or clear your rating at any time.',
+  },
+  {
+    q: 'What is the post-event banner?',
+    a: 'After your tournament\'s event date passes, a banner appears on the Opponents page asking how it went. Pick your outcome (Gold / Silver / Bronze / Lost / Didn\'t compete) and add an optional note. This closes the loop on your prep and is stored against the tournament record.',
+  },
+  {
+    q: 'How does the Coaching Notes section work?',
+    a: 'The AI coaching report is structured into three labeled sections — MATCH FLOW (the narrative), KEY MOMENTS (turning points), and DRILL TARGETS (specific reps to prioritise). It always refers to athletes by their actual names, not generic "you / opponent" language.',
   },
   {
     q: 'How does the AI handle my training goals?',
@@ -38,10 +58,6 @@ const FAQ = [
   {
     q: 'How long does analysis take?',
     a: 'Typically 1–3 minutes for a standard match (up to ~15 minutes). Longer footage (30 min+) may take up to 5 minutes. You\'ll see an "Analysing…" badge on the match card while it processes.',
-  },
-  {
-    q: 'Can I correct the AI analysis?',
-    a: 'Not yet — position and event correction is on the roadmap. For now, if the AI mislabels a position you can note it in the Match Report generation prompt, or add a note to the coaching section.',
   },
   {
     q: 'Is my footage private?',

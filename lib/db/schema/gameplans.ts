@@ -11,6 +11,7 @@ export const gameplans = pgTable('gameplans', {
   structuredPlan: jsonb('structured_plan').notNull().default({}),
   evidence: jsonb('evidence').notNull().default({}),
   status: text('status').notNull().default('draft'), // draft | committed | reviewed
+  rating: integer('rating'),             // 1 = helpful, -1 = not helpful, null = unrated
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })
 

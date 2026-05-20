@@ -165,9 +165,10 @@ export function DeleteOpponentButton({ opponentId, tournamentId }: { opponentId:
 export function AddOpponentForm({ tournamentId }: { tournamentId: string }) {
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setPending(false) }}>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setPending(false); setError(null) } }}>
       <DialogTrigger>
         <Button size="sm">+ Add Opponent</Button>
       </DialogTrigger>
@@ -179,9 +180,15 @@ export function AddOpponentForm({ tournamentId }: { tournamentId: string }) {
           id="add-opponent-form"
           action={async (fd) => {
             setPending(true)
-            await addOpponent(tournamentId, fd)
-            setOpen(false)
-            setPending(false)
+            setError(null)
+            try {
+              await addOpponent(tournamentId, fd)
+              setOpen(false)
+            } catch (err) {
+              setError(err instanceof Error ? err.message : 'Something went wrong')
+            } finally {
+              setPending(false)
+            }
           }}
           className="space-y-3"
         >
@@ -193,6 +200,7 @@ export function AddOpponentForm({ tournamentId }: { tournamentId: string }) {
             <label className="text-xs font-medium text-muted-foreground">Seeding notes</label>
             <Input name="notes" placeholder="e.g. #3 seed, black belt 5 years" />
           </div>
+          {error && <p className="text-xs text-destructive">{error}</p>}
         </form>
         <DialogFooter>
           <DialogClose><Button variant="outline" type="button">Cancel</Button></DialogClose>

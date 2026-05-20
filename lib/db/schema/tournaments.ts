@@ -28,6 +28,9 @@ export const tournaments = pgTable('tournaments', {
   smoothcompEventId: text('smoothcomp_event_id'),
   bracketPublishedAt: timestamp('bracket_published_at'),
   bracketFetchedAt: timestamp('bracket_fetched_at'),
+  // Post-event engagement
+  outcome: text('outcome'),              // 'gold' | 'silver' | 'bronze' | 'eliminated' | 'dns' | null
+  postEventNotes: text('post_event_notes'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })
 
