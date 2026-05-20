@@ -2,9 +2,29 @@
 
 import { revalidatePath } from 'next/cache'
 import { db } from '../../../../lib/db'
-import { matches } from '../../../../lib/db/schema'
+import { matches, positionSegments } from '../../../../lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { getOrCreateDbUserId } from '../../../../lib/db/get-user'
+
+export async function correctPosition(
+  segmentId: string,
+  newPositionId: string,
+): Promise<{ error?: string }> {
+  try {
+    const segment = await db.query.positionSegments.findFirst({ where: eq(positionSegments.id, segmentId) })
+    if (!segment) return { error: 'Segment not found' }
+
+    await db.update(positionSegments).set({
+      positionId: newPositionId,
+      userCorrected: true,
+    }).where(eq(positionSegments.id, segmentId))
+
+    revalidatePath(`/matches/${segment.matchId}`)
+    return {}
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+}
 
 export async function correctMatchResult(
   matchId: string,

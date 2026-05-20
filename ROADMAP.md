@@ -14,31 +14,15 @@ Nothing actively in progress.
 
 ### P1 — Build next
 
-**Re-analyse failed matches**
-A "Re-scan" button on failed footage rows so the user doesn't have to delete and re-add the URL. Should dedup correctly against the existing video record and fire a new `url/submitted` event.
-
-**Position correction UI**
-Flag an incorrect position or event directly on the match detail timeline. Simple "wrong label" button per row, stores a correction record. The FAQ describes this as working — it needs to be real.
-
-**Plan-execution review**
-After a competition, compare the generated gameplan against the actual match result. "You planned to attack the back — did you get there? Where did the plan break down?" Requires linking a post-event match upload to the tournament gameplan.
+*(All P1 items shipped 2026-05-20 — see Shipped table.)*
 
 ### P2 — Soon
 
-**FAQ update**
-Reflect all features shipped since the last FAQ revision: scout opponent flow, bracket import, gameplan generating state, footage nudge, edit opponent, transient error resilience, post-event banner.
+**Smoothcomp bracket Phase 3 — tournament catalog**
+`canonical_tournaments` table populated from Smoothcomp competition list pages (scraped nightly for upcoming BJJ events), supplemented by a hand-curated seed of ~50 major recurring events. Users pick from the list instead of typing.
 
-**Opponent deduplication**
-When adding a scout opponent, warn if the exact name already exists in another tournament: "We already have analysis for [Name] from [Tournament X] — add footage there instead?" Exact case-insensitive match only. Fuzzy matching is v2 (false-positive risk with common names).
-
-**Match result on Gameplan page**
-When viewing a Gameplan, show W/L context for each scouted match — gives the reader confidence about how reliable the footage sample is.
-
-**Bounding box overlays on key moments**
-Gemini already estimates athlete bounding boxes during extraction. Wire them up as coloured overlay boxes (green = you, red = opponent) on the video at key event timestamps. Zero new infrastructure — just needs the UI.
-
-**Smoothcomp bracket Phase 2 — pre-event proactive gameplans**
-Once a bracket is imported and the draw is known: *"You're in Pool B — 4 potential opponents, gameplans ready."* Scan available Smoothcomp footage for every seeded opponent in the user's division automatically. Premium tier trigger.
+**Plan-execution debrief**
+Extend the post-match review section: after linking a match, generate a structured "Did the plan work?" analysis that compares the gameplan's recommended attack chain against what actually happened in the timeline.
 
 ### P3 — Later
 
@@ -64,6 +48,13 @@ Read the Match Report aloud. TTS route was partially wired — needs UI trigger 
 
 | Feature | Shipped | Notes |
 |---|---|---|
+| Re-scan failed footage | 2026-05-20 | Re-scan button on failed video rows; resets video + chunk records, re-fires url/submitted |
+| Position correction UI | 2026-05-20 | "Wrong?" button on each timeline position row; inline dropdown; marks userCorrected=true |
+| Match result strip on Gameplan page | 2026-05-20 | W/L badges from scouted matches shown under header |
+| Plan-execution review | 2026-05-20 | Link own analysed match to gameplan; planExecutions table; post-match section |
+| Opponent deduplication warning | 2026-05-20 | Warns when same name exists in another tournament; force-add option |
+| Smoothcomp Phase 2 — auto footage discovery on import | 2026-05-20 | Fires smoothcomp/discover.footage for each imported athlete |
+| FAQ update | 2026-05-20 | Added bracket import, edit opponent, re-scan, generating state, position correction, plan review |
 | Bracket import — import opponents from Smoothcomp bracket | 2026-05-20 | Selection dialog, dedup, footageStatus: pending |
 | Edit opponent (name + seeding notes) | 2026-05-20 | Pencil icon on each accordion card |
 | Footage nudge banner | 2026-05-20 | Amber banner when opponents have no footage |

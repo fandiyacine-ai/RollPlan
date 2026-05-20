@@ -1,6 +1,8 @@
 'use client'
 
 import { useRef, useState, useEffect, useMemo } from 'react'
+import { correctPosition } from './actions'
+import { POSITIONS } from '../../../../lib/taxonomy/positions'
 
 function extractYouTubeId(url: string): string | null {
   try {
@@ -97,20 +99,32 @@ const DOMINANCE_LABEL: Record<string, string> = {
 function TimelineRow({
   item,
   onSeek,
+  onCorrectPosition,
   competitorLabel,
   opponentLabel,
 }: {
   item: TimelineItem
   onSeek?: () => void
+  onCorrectPosition?: (segmentId: string, newPositionId: string) => void
   competitorLabel?: string | null
   opponentLabel?: string | null
 }) {
+  const [correcting, setCorrecting] = useState(false)
+  const [saving, setSaving] = useState(false)
   const isPosition = item.type === 'position'
+
+  async function handleCorrect(newId: string) {
+    if (!isPosition || !onCorrectPosition) return
+    setSaving(true)
+    await onCorrectPosition(item.segmentId, newId)
+    setSaving(false)
+    setCorrecting(false)
+  }
 
   return (
     <div
-      className={`relative flex items-start gap-4 pl-10 py-2.5 group ${onSeek ? 'cursor-pointer hover:bg-muted/40 rounded-lg' : ''}`}
-      onClick={onSeek}
+      className={`relative flex items-start gap-4 pl-10 py-2.5 group ${onSeek && !correcting ? 'cursor-pointer hover:bg-muted/40 rounded-lg' : ''}`}
+      onClick={correcting ? undefined : onSeek}
     >
       {/* Node */}
       <div className="absolute left-3.5 top-4 -translate-y-1/2 z-10">
@@ -129,14 +143,49 @@ function TimelineRow({
       {/* Content */}
       <div className="flex-1 min-w-0">
         {isPosition ? (
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="text-sm font-medium">{item.positionName}</span>
-            <span className={`text-[10px] font-semibold uppercase tracking-wide ${
-              item.dominance === 'dominant' ? 'text-emerald-500' :
-              item.dominance === 'inferior' ? 'text-rose-500' : 'text-muted-foreground'
-            }`}>{DOMINANCE_LABEL[item.dominance]}</span>
-            <span className="text-xs text-muted-foreground ml-auto tabular-nums">{formatTime(item.durationSeconds)}</span>
-          </div>
+          <>
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-sm font-medium">{item.positionName}</span>
+              <span className={`text-[10px] font-semibold uppercase tracking-wide ${
+                item.dominance === 'dominant' ? 'text-emerald-500' :
+                item.dominance === 'inferior' ? 'text-rose-500' : 'text-muted-foreground'
+              }`}>{DOMINANCE_LABEL[item.dominance]}</span>
+              <span className="text-xs text-muted-foreground ml-auto tabular-nums">{formatTime(item.durationSeconds)}</span>
+              {onCorrectPosition && !correcting && (
+                <button
+                  type="button"
+                  onClick={e => { e.stopPropagation(); setCorrecting(true) }}
+                  className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
+                  title="Correct this position"
+                >
+                  Wrong?
+                </button>
+              )}
+            </div>
+            {correcting && (
+              <div className="mt-1.5 flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                <select
+                  className="text-xs rounded border border-input bg-background px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring"
+                  defaultValue={POSITIONS.find(p => p.name === item.positionName)?.id ?? ''}
+                  onChange={e => handleCorrect(e.target.value)}
+                  disabled={saving}
+                >
+                  <option value="" disabled>Pick correct position…</option>
+                  {POSITIONS.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setCorrecting(false)}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Cancel
+                </button>
+                {saving && <span className="text-xs text-muted-foreground">Saving…</span>}
+              </div>
+            )}
+          </>
         ) : (
           <div className="flex items-baseline gap-2 flex-wrap">
             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
@@ -156,7 +205,7 @@ function TimelineRow({
       </div>
 
       {/* Seek arrow, shown on hover */}
-      {onSeek && (
+      {onSeek && !correcting && (
         <span className="text-muted-foreground/30 group-hover:text-muted-foreground text-xs flex-shrink-0 transition-colors self-center">▶</span>
       )}
     </div>
@@ -507,6 +556,7 @@ export function MatchContent({
                     key={i}
                     item={item}
                     onSeek={videoUrl ? () => seekTo(item.time) : undefined}
+                    onCorrectPosition={item.type === 'position' ? correctPosition : undefined}
                     competitorLabel={competitorLabel}
                     opponentLabel={opponentLabel}
                   />

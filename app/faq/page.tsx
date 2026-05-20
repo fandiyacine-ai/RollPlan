@@ -29,7 +29,19 @@ const FAQ = [
   },
   {
     q: 'Can I connect a Smoothcomp bracket?',
-    a: 'Yes. When creating or editing a tournament, paste any URL from your event on smoothcomp.com (schedule page, bracket page — any link works). Once a bracket URL is saved, a "Sync from bracket" button appears on the Opponents page. Clicking it pulls the latest draw and can auto-update match results so your scouting data stays accurate.',
+    a: 'Yes. When creating or editing a tournament, paste any URL from your event on smoothcomp.com (schedule page, bracket page — any link works). Once a bracket URL is saved, an "Import from bracket" button appears on the Opponents page. Clicking it scrapes your draw and lets you select which athletes to import in one step. After a bracket is published, a "Sync from bracket" button also appears — it pulls the latest draw and auto-updates match results.',
+  },
+  {
+    q: 'How do I import opponents from a Smoothcomp bracket?',
+    a: 'Open a tournament with a Smoothcomp bracket URL linked, then click "Import from bracket" on the Opponents page. A dialog loads your draw — uncheck yourself before clicking Import. The app auto-discovers past competition footage for every imported athlete and starts scanning immediately. You can still add opponents manually if they\'re not in the bracket.',
+  },
+  {
+    q: 'Can I edit an opponent\'s name or notes after adding them?',
+    a: 'Yes — tap the pencil icon on any opponent card on the Opponents page. You can update the name and seeding notes at any time. Existing footage scans and gameplans are not affected by the rename.',
+  },
+  {
+    q: 'What if footage analysis fails?',
+    a: 'Failed video rows show an error message and a "Re-scan" button. Click Re-scan to reset the video and re-queue it for analysis — no need to delete and re-add the URL. Common causes of failure: private or age-restricted YouTube videos, videos that have been deleted, and very short clips (under 30 seconds). If a match fails with "No matches found", the AI scanned the video but couldn\'t detect that specific athlete — try a timestamp link to the exact match start.',
   },
   {
     q: 'Can I correct a match result the AI got wrong?',
@@ -37,7 +49,15 @@ const FAQ = [
   },
   {
     q: 'What is the Gameplan?',
-    a: 'The Gameplan page combines your profile (belt, style, goals) with the opponent scouted data to generate a competition-day gameplan: your go-to attacks, opponent weapons to defend, and mat-side mental cues. Generate it once you have scouted footage ready.',
+    a: 'The Gameplan page combines your profile (belt, style, goals) with the opponent scouted data to generate a competition-day gameplan: your go-to attacks, opponent weapons to defend, and mat-side mental cues. Generate it once you have scouted footage ready. The page auto-refreshes while generating — no need to manually reload.',
+  },
+  {
+    q: 'Can I compare my gameplan against my actual match result?',
+    a: 'Yes. After a gameplan is generated, a "Post-match review" section appears at the bottom of the Gameplan page. Click "Link my match result" to connect one of your own analysed matches — it stores the link so you can quickly jump between the gameplan and the match data.',
+  },
+  {
+    q: 'Can I correct a position label the AI got wrong?',
+    a: 'Yes. On any match\'s Timeline tab, hover over a position row and click "Wrong?" — a dropdown appears inline with all 25 position types. Select the correct one and it saves immediately. Corrected positions are marked with a flag so the AI can learn from your feedback in future analysis passes.',
   },
   {
     q: 'Can I rate a gameplan?',

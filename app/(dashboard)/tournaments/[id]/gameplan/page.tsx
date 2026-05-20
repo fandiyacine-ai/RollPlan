@@ -1,11 +1,12 @@
 import { db } from '../../../../../lib/db'
-import { gameplans, tournamentOpponents, matches } from '../../../../../lib/db/schema'
-import { eq, count } from 'drizzle-orm'
+import { gameplans, tournamentOpponents, matches, planExecutions } from '../../../../../lib/db/schema'
+import { eq } from 'drizzle-orm'
 import Link from 'next/link'
 import { GenerateGameplanButton } from './generate-button'
 import { PrintButton } from './print-button'
 import { GameplanRatingWidget } from './rating-widget'
 import { AutoRefresh } from './auto-refresh'
+import { PlanExecutionSection } from './plan-execution-section'
 import type { GameplanOutput } from '../../../../../lib/ai/schemas/gameplan'
 
 export const dynamic = 'force-dynamic'
@@ -51,16 +52,29 @@ export default async function GameplanPage({
     ? opponents.find(o => o.id === selectedOpponentId) ?? opponents[0]
     : opponents[0]
 
-  const [scoutedResult] = await db
-    .select({ count: count() })
+  const scoutedMatches = await db
+    .select({
+      id: matches.id,
+      status: matches.status,
+      resultWinner: matches.resultWinner,
+      resultMethod: matches.resultMethod,
+      resultTechnique: matches.resultTechnique,
+      eventName: matches.eventName,
+    })
     .from(matches)
     .where(eq(matches.tournamentOpponentId, activeOpponent.id))
 
-  const scoutedCount = scoutedResult?.count ?? 0
+  const scoutedCount = scoutedMatches.length
 
   const existingGameplan = await db.query.gameplans.findFirst({
     where: eq(gameplans.opponentId, activeOpponent.id),
   })
+
+  const linkedExecution = existingGameplan
+    ? await db.query.planExecutions.findFirst({
+        where: eq(planExecutions.gameplanId, existingGameplan.id),
+      })
+    : null
 
   const isGenerating = existingGameplan?.status === 'generating'
   const plan = (!isGenerating && existingGameplan?.structuredPlan && Object.keys(existingGameplan.structuredPlan as object).length > 0)
@@ -103,6 +117,25 @@ export default async function GameplanPage({
                 {scoutedCount} match{scoutedCount !== 1 ? 'es' : ''} scouted
                 {existingGameplan && plan ? ` · Generated ${existingGameplan.createdAt.toLocaleDateString()} (v${existingGameplan.version})` : ''}
               </p>
+              {scoutedMatches.some(m => m.status === 'analysed' && m.resultWinner) && (
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {scoutedMatches.filter(m => m.status === 'analysed' && m.resultWinner).map(m => {
+                    const isWin = m.resultWinner === 'user'
+                    const label = m.resultMethod === 'submission'
+                      ? (isWin ? `W — Sub${m.resultTechnique ? ` (${m.resultTechnique})` : ''}` : `L — Sub${m.resultTechnique ? ` (${m.resultTechnique})` : ''}`)
+                      : m.resultMethod === 'points' ? (isWin ? 'W — Pts' : 'L — Pts')
+                      : m.resultMethod === 'walkover' ? (isWin ? 'W — WO' : 'L — WO')
+                      : isWin ? 'W' : 'L'
+                    return (
+                      <span key={m.id} className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                        isWin ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/30' : 'bg-rose-950/60 text-rose-400 border border-rose-800/30'
+                      }`}>
+                        {label}
+                      </span>
+                    )
+                  })}
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               {existingGameplan && plan && (
@@ -121,7 +154,15 @@ export default async function GameplanPage({
           </div>
 
           {plan ? (
-            <GameplanDisplay plan={plan} />
+            <>
+              <GameplanDisplay plan={plan} />
+              {existingGameplan && (
+                <PlanExecutionSection
+                  gameplanId={existingGameplan.id}
+                  linkedMatchId={linkedExecution?.actualMatchId ?? null}
+                />
+              )}
+            </>
           ) : (
             <ReadyToGenerateState
               tournamentId={tournamentId}

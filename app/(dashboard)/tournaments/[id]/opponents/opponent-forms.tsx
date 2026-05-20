@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { addOpponent, submitScoutUrls, deleteOpponent, updateOpponent } from './actions'
+import { addOpponent, submitScoutUrls, deleteOpponent, updateOpponent, rescanVideo } from './actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -233,13 +233,61 @@ export function EditOpponentButton({
   )
 }
 
+export function RescanVideoButton({ videoId, tournamentId }: { videoId: string; tournamentId: string }) {
+  const router = useRouter()
+  const [pending, setPending] = useState(false)
+
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={async () => {
+        setPending(true)
+        await rescanVideo(videoId, tournamentId)
+        router.refresh()
+        setPending(false)
+      }}
+      className="text-xs px-2 py-0.5 rounded border border-rose-800/50 text-rose-400 hover:bg-rose-950/30 transition-colors disabled:opacity-50 flex-shrink-0"
+    >
+      {pending ? 'Re-queuing…' : 'Re-scan'}
+    </button>
+  )
+}
+
 export function AddOpponentForm({ tournamentId }: { tournamentId: string }) {
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [dupeWarning, setDupeWarning] = useState<string | null>(null)
+  const formRef = useRef<HTMLFormElement>(null)
+
+  function handleClose(o: boolean) {
+    setOpen(o)
+    if (!o) { setPending(false); setError(null); setDupeWarning(null) }
+  }
+
+  async function handleSubmit(fd: FormData, force = false) {
+    setPending(true)
+    setError(null)
+    setDupeWarning(null)
+    if (force) fd.set('force', 'true')
+    try {
+      await addOpponent(tournamentId, fd)
+      setOpen(false)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Something went wrong'
+      if (msg.startsWith('DUPE:')) {
+        setDupeWarning(msg.slice(5))
+      } else {
+        setError(msg)
+      }
+    } finally {
+      setPending(false)
+    }
+  }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setPending(false); setError(null) } }}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogTrigger>
         <Button size="sm">+ Add Opponent</Button>
       </DialogTrigger>
@@ -248,19 +296,9 @@ export function AddOpponentForm({ tournamentId }: { tournamentId: string }) {
           <DialogTitle>Add Opponent</DialogTitle>
         </DialogHeader>
         <form
+          ref={formRef}
           id="add-opponent-form"
-          action={async (fd) => {
-            setPending(true)
-            setError(null)
-            try {
-              await addOpponent(tournamentId, fd)
-              setOpen(false)
-            } catch (err) {
-              setError(err instanceof Error ? err.message : 'Something went wrong')
-            } finally {
-              setPending(false)
-            }
-          }}
+          action={(fd) => handleSubmit(fd)}
           className="space-y-3"
         >
           <div className="space-y-1">
@@ -272,12 +310,35 @@ export function AddOpponentForm({ tournamentId }: { tournamentId: string }) {
             <Input name="notes" placeholder="e.g. #3 seed, black belt 5 years" />
           </div>
           {error && <p className="text-xs text-destructive">{error}</p>}
+          {dupeWarning && (
+            <div className="rounded-lg border border-amber-800/50 bg-amber-950/20 p-3 text-xs text-amber-300 space-y-2">
+              <p>
+                <span className="font-semibold text-amber-200">Already scouted</span> — you have footage for this
+                athlete from <span className="font-medium">{dupeWarning}</span>.
+              </p>
+              <p className="text-amber-400/80">Add them here anyway if you want a separate gameplan for this tournament.</p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="border-amber-800/50 text-amber-300 hover:bg-amber-950/40"
+                onClick={() => {
+                  if (!formRef.current) return
+                  handleSubmit(new FormData(formRef.current), true)
+                }}
+              >
+                Add anyway
+              </Button>
+            </div>
+          )}
         </form>
         <DialogFooter>
           <DialogClose><Button variant="outline" type="button">Cancel</Button></DialogClose>
-          <Button type="submit" form="add-opponent-form" disabled={pending}>
-            {pending ? 'Adding…' : 'Add'}
-          </Button>
+          {!dupeWarning && (
+            <Button type="submit" form="add-opponent-form" disabled={pending}>
+              {pending ? 'Adding…' : 'Add'}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

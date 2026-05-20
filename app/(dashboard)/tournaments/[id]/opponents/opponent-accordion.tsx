@@ -2,10 +2,11 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ScoutForm, DeleteOpponentButton, EditOpponentButton } from './opponent-forms'
+import { ScoutForm, DeleteOpponentButton, EditOpponentButton, RescanVideoButton } from './opponent-forms'
 
 type FootageRow = {
   id: string
+  rowType?: 'video' | 'match'
   status: string
   format: string | null
   context: string | null
@@ -266,9 +267,14 @@ export function OpponentAccordion({
                   </Link>
                 )}
                 {m.status === 'failed' && (
-                  <span className="text-xs text-rose-400 flex-shrink-0 max-w-xs truncate" title={m.failureReason ?? undefined}>
-                    {m.failureReason ?? 'Analysis failed'}
-                  </span>
+                  <div className="flex items-center gap-2 flex-shrink-0 min-w-0">
+                    <span className="text-xs text-rose-400 max-w-xs truncate" title={m.failureReason ?? undefined}>
+                      {m.failureReason ?? 'Analysis failed'}
+                    </span>
+                    {m.rowType === 'video' && (
+                      <RescanVideoButton videoId={m.id} tournamentId={tournamentId} />
+                    )}
+                  </div>
                 )}
               </div>
             )

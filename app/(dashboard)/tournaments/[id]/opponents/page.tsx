@@ -266,7 +266,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
               key={opp.id}
               opponent={{ ...opp, footageStatus: opp.footageStatus ?? 'manual' }}
               matches={(matchesByOpponent[opp.id] ?? []).map(m => ({
-                ...m, format: m.format ?? null, context: m.context ?? null, label: undefined,
+                ...m, rowType: 'match' as const, format: m.format ?? null, context: m.context ?? null, label: undefined,
                 resultWinner: m.resultWinner ?? null, resultMethod: m.resultMethod ?? null, resultTechnique: m.resultTechnique ?? null,
                 failureReason: null,
               }))}
@@ -283,6 +283,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
                 })
                 .map(v => ({
                   ...v,
+                  rowType: 'video' as const,
                   format: null, context: null, eventName: null, opponentLabel: null,
                   resultWinner: null, resultMethod: null, resultTechnique: null,
                   status: v.status === 'analysed' ? 'failed' : v.status,

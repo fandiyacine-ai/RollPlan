@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '../../../../../lib/db'
 import { tournaments, tournamentOpponents, videos, matches } from '../../../../../lib/db/schema'
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, and, inArray, like, sql, ne } from 'drizzle-orm'
 import { inngest } from '../../../../../lib/inngest'
 import { getOrCreateDbUserId } from '../../../../../lib/db/get-user'
 import { checkMonthlyLimit } from '../../../../../lib/db/usage'
@@ -11,7 +11,27 @@ import { scrapeBracket, parseSmootcompBracketUrl } from '../../../../../lib/smoo
 
 export async function addOpponent(tournamentId: string, formData: FormData) {
   const name = (formData.get('name') as string)?.trim()
+  const force = formData.get('force') === 'true'
   if (!name) throw new Error('Opponent name is required')
+
+  if (!force) {
+    const userId = await getOrCreateDbUserId()
+    const dupe = await db
+      .select({ tournamentName: tournaments.name })
+      .from(tournamentOpponents)
+      .innerJoin(tournaments, eq(tournaments.id, tournamentOpponents.tournamentId))
+      .where(and(
+        sql`lower(${tournamentOpponents.opponentLabel}) = lower(${name})`,
+        ne(tournamentOpponents.tournamentId, tournamentId),
+        eq(tournaments.userId, userId),
+      ))
+      .limit(1)
+
+    if (dupe.length > 0) {
+      // Special prefix: caught in the form to show a confirm step instead of a hard error
+      throw new Error(`DUPE:${dupe[0].tournamentName}`)
+    }
+  }
 
   await db.insert(tournamentOpponents).values({
     tournamentId,
@@ -20,6 +40,47 @@ export async function addOpponent(tournamentId: string, formData: FormData) {
   })
 
   revalidatePath(`/tournaments/${tournamentId}/opponents`)
+}
+
+export async function rescanVideo(videoId: string, tournamentId: string): Promise<{ error?: string }> {
+  try {
+    const userId = await getOrCreateDbUserId()
+
+    const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
+    if (!video || !video.tournamentOpponentId) return { error: 'Video not found' }
+
+    const opponent = await db.query.tournamentOpponents.findFirst({
+      where: eq(tournamentOpponents.id, video.tournamentOpponentId),
+    })
+    if (!opponent) return { error: 'Opponent not found' }
+
+    const tournament = await db.query.tournaments.findFirst({ where: eq(tournaments.id, tournamentId) })
+    const ruleset = tournament?.ruleset ?? 'ibjjf'
+    const format: 'gi' | 'no_gi' = ['adcc', 'ebi', 'nogi', 'no_gi'].includes(ruleset) ? 'no_gi' : 'gi'
+
+    // Reset parent video
+    await db.update(videos).set({ status: 'uploaded', failureReason: null }).where(eq(videos.id, videoId))
+
+    // Remove stale chunk videos so they get re-created fresh
+    await db.delete(videos).where(like(videos.r2Key, `chunk/${videoId}/%`))
+
+    await inngest.send({
+      name: 'url/submitted',
+      data: {
+        videoId: video.id,
+        userId,
+        athleteName: opponent.opponentLabel,
+        format,
+        sourceType: 'opponent',
+        tournamentOpponentId: opponent.id,
+      },
+    })
+
+    revalidatePath(`/tournaments/${tournamentId}/opponents`)
+    return {}
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
 }
 
 export async function submitScoutUrls(tournamentId: string, opponentId: string, formData: FormData) {
@@ -261,7 +322,7 @@ export async function importSelectedOpponents(
     const toInsert = athletes.filter(a => !existingIds.has(a.smoothcompAthleteId))
     if (toInsert.length === 0) return { count: 0 }
 
-    await db.insert(tournamentOpponents).values(
+    const inserted = await db.insert(tournamentOpponents).values(
       toInsert.map(a => ({
         tournamentId,
         opponentLabel: a.name,
@@ -269,7 +330,31 @@ export async function importSelectedOpponents(
         smoothcompProfileUrl: a.profileUrl,
         footageStatus: 'pending' as const,
       }))
-    )
+    ).returning()
+
+    // Phase 2: fire footage discovery for each imported athlete
+    const userId = await getOrCreateDbUserId()
+    for (const opp of inserted) {
+      if (!opp.smoothcompProfileUrl) continue
+      try {
+        await inngest.send({
+          name: 'smoothcomp/discover.footage',
+          data: {
+            tournamentId,
+            opponentId: opp.id,
+            profileUrl: opp.smoothcompProfileUrl,
+            athleteId: opp.smoothcompAthleteId ?? '',
+            athleteName: opp.opponentLabel,
+            userId,
+          },
+        })
+        await db.update(tournamentOpponents)
+          .set({ footageStatus: 'auto_queued' })
+          .where(eq(tournamentOpponents.id, opp.id))
+      } catch {
+        // Inngest not configured — opponent created, discovery won't auto-run
+      }
+    }
 
     revalidatePath(`/tournaments/${tournamentId}/opponents`)
     return { count: toInsert.length }
