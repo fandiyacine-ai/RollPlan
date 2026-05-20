@@ -1,10 +1,11 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
 import { db } from '../../../../../lib/db'
-import { matches, planExecutions } from '../../../../../lib/db/schema'
+import { matches, planExecutions, gameplans } from '../../../../../lib/db/schema'
 import { eq, isNull, desc, and } from 'drizzle-orm'
 import { getOrCreateDbUserId } from '../../../../../lib/db/get-user'
+import { inngest } from '../../../../../lib/inngest'
+import type { ExecutionDebrief } from '../../../../../lib/ai/schemas/execution-debrief'
 
 export type OwnMatch = {
   id: string
@@ -41,11 +42,34 @@ export async function linkMatchToGameplan(
   try {
     // Upsert: delete any existing link for this gameplan first
     await db.delete(planExecutions).where(eq(planExecutions.gameplanId, gameplanId))
-    await db.insert(planExecutions).values({ gameplanId, actualMatchId: matchId })
+    const [execution] = await db
+      .insert(planExecutions)
+      .values({ gameplanId, actualMatchId: matchId })
+      .returning()
+
+    // Fire the debrief generation job
+    try {
+      await inngest.send({
+        name: 'execution-debrief/requested',
+        data: { planExecutionId: execution.id, gameplanId, matchId },
+      })
+    } catch {
+      // Non-fatal — debrief generation is best-effort
+    }
+
     return {}
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) }
   }
+}
+
+export async function fetchExecutionDebrief(gameplanId: string): Promise<ExecutionDebrief | null> {
+  const execution = await db.query.planExecutions.findFirst({
+    where: eq(planExecutions.gameplanId, gameplanId),
+  })
+  if (!execution?.executionReview) return null
+  const review = execution.executionReview as Record<string, unknown>
+  return Object.keys(review).length > 0 ? review as ExecutionDebrief : null
 }
 
 export async function unlinkMatchFromGameplan(gameplanId: string): Promise<{ error?: string }> {

@@ -9,6 +9,7 @@ import { AutoRefresh } from './auto-refresh'
 import { PlanExecutionSection } from './plan-execution-section'
 import type { GameplanOutput } from '../../../../../lib/ai/schemas/gameplan'
 import type { MatchupPrediction } from '../../../../../lib/ai/schemas/prediction'
+import type { ExecutionDebrief } from '../../../../../lib/ai/schemas/execution-debrief'
 
 export const dynamic = 'force-dynamic'
 
@@ -187,12 +188,19 @@ export default async function GameplanPage({
           {plan ? (
             <>
               <GameplanDisplay plan={plan} />
-              {existingGameplan && (
-                <PlanExecutionSection
-                  gameplanId={existingGameplan.id}
-                  linkedMatchId={linkedExecution?.actualMatchId ?? null}
-                />
-              )}
+              {existingGameplan && (() => {
+                const reviewData = linkedExecution?.executionReview as Record<string, unknown> | undefined
+                const initialDebrief = reviewData && Object.keys(reviewData).length > 0
+                  ? reviewData as ExecutionDebrief
+                  : null
+                return (
+                  <PlanExecutionSection
+                    gameplanId={existingGameplan.id}
+                    linkedMatchId={linkedExecution?.actualMatchId ?? null}
+                    initialDebrief={initialDebrief}
+                  />
+                )
+              })()}
             </>
           ) : (
             <ReadyToGenerateState
