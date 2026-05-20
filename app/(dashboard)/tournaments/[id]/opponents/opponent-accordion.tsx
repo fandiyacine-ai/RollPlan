@@ -141,7 +141,9 @@ export function OpponentAccordion({
 
   const { footageStatus } = opponent
   const chunksFailed = chunkProgress?.failed ?? 0
-  const allChunksFailed = chunkProgress && chunkProgress.failed > 0 && chunkProgress.done === 0
+  // Only surface the failure if no successful matches came through — once there's a result
+  // the failed parent video is from an old scan attempt and shouldn't pollute the subtitle.
+  const allChunksFailed = chunkProgress && chunkProgress.failed > 0 && chunkProgress.done === 0 && analysed === 0
 
   const subtitle = allChunksFailed
     ? <span className="text-rose-400">{chunkingVideo?.failureReason ?? 'Scan failed — video may be private, age-restricted, or unavailable'}</span>

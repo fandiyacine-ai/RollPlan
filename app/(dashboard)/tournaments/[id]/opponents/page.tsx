@@ -212,11 +212,14 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
               }))}
               pendingVideos={(pendingVideosByOpponent[opp.id] ?? [])
                 .filter(v => {
-                  // Hide the parent video once chunk scanning has found matches for this opponent.
-                  // The parent is marked 'analysed' when chunks succeed, but matches are linked
-                  // to chunk video IDs so the parent always appears in the no-match query.
+                  // Once matches exist, hide parent videos that are either:
+                  // (a) 'analysed' — chunks succeeded, matches live on chunk video IDs
+                  // (b) 'failed' with chunk data — an old scan attempt that a re-submit fixed
                   const hasMatches = (matchesByOpponent[opp.id] ?? []).length > 0
-                  return !(hasMatches && v.status === 'analysed')
+                  if (!hasMatches) return true
+                  if (v.status === 'analysed') return false
+                  if (v.status === 'failed' && v.chunksTotal != null) return false
+                  return true
                 })
                 .map(v => ({
                   ...v,
