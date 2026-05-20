@@ -32,12 +32,17 @@ function parseEventDate(raw: string | null): string | null {
   return null
 }
 
+// Returns true for our synthetic placeholder IDs (ajp-*, ibjjf-*) vs real Smoothcomp numeric IDs.
+function isSyntheticId(id: string | null): boolean {
+  return !id || id.startsWith('ajp-') || id.startsWith('ibjjf-')
+}
+
 // Upsert a single event.
 // Dedup strategy (in priority order):
-//   1. Match by smoothcompEventId  — catches re-scrapes of the same event
-//   2. Match by source + name      — merges scraped events with manually seeded rows
-//      (e.g. seeded "IBJJF World Championship 2026" ← scraped "IBJJF World Championship 2026")
-// This prevents duplicate rows when the seed and the scraper find the same event.
+//   1. Match by smoothcompEventId    — catches re-scrapes of the same event
+//   2. Match by source + name        — merges scraped events with manually seeded rows
+//   3. Match by name + date (cross-source) — prevents duplicates when the same event
+//      appears on both an official website (AJP/IBJJF) AND Smoothcomp
 async function upsertEvent(
   event: ScrapedEvent,
   source: string,
@@ -66,14 +71,39 @@ async function upsertEvent(
       .limit(1)
   }
 
+  // Lookup 3: cross-source duplicate — same name + same date on a different source
+  // (e.g. "AJP Grand Slam London" scraped from ajptour.com and also found on Smoothcomp)
+  if (existing.length === 0 && parsedDate) {
+    existing = await db
+      .select({ id: canonicalTournaments.id, smoothcompEventId: canonicalTournaments.smoothcompEventId })
+      .from(canonicalTournaments)
+      .where(and(
+        ilike(canonicalTournaments.name, event.name.trim()),
+        eq(canonicalTournaments.eventDate, parsedDate),
+      ))
+      .limit(1)
+  }
+
   if (existing.length > 0) {
-    await db.update(canonicalTournaments).set({
+    const existingEventId = existing[0].smoothcompEventId
+    // Upgrade synthetic placeholder IDs (ajp-*, ibjjf-*) to a real Smoothcomp numeric ID,
+    // but never overwrite a real ID with a synthetic one.
+    const upgradeId = isSyntheticId(existingEventId) && !isSyntheticId(event.eventId)
+    const newEventId = upgradeId ? event.eventId : (existingEventId ?? event.eventId)
+
+    const baseUpdate = {
       name: event.name.trim(),
       eventDate: parsedDate,
       location: event.location?.trim() ?? null,
-      smoothcompEventId: event.eventId,  // stamp the scraped ID onto seeded rows too
+      smoothcompEventId: newEventId,
       updatedAt: new Date(),
-    }).where(eq(canonicalTournaments.id, existing[0].id))
+    }
+
+    await db.update(canonicalTournaments).set(
+      upgradeId && source === 'smoothcomp'
+        ? { ...baseUpdate, smoothcompUrl: event.url }
+        : baseUpdate,
+    ).where(eq(canonicalTournaments.id, existing[0].id))
   } else {
     await db.insert(canonicalTournaments).values({
       name: event.name.trim(),
