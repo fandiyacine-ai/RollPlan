@@ -28,8 +28,17 @@ function parseYouTubeTimestamp(url: string): number {
   try {
     const t = new URL(url).searchParams.get('t')
     if (!t) return 0
-    const s = parseInt(t)
-    return isNaN(s) ? 0 : s
+    // Handle YouTube formats: "1570", "1570s", "26m10s", "1h4m", "1h4m0s"
+    const h = t.match(/(\d+)h/)
+    const m = t.match(/(\d+)m/)
+    const s = t.match(/(\d+)s/)
+    if (h || m || s) {
+      return (parseInt(h?.[1] ?? '0') || 0) * 3600
+           + (parseInt(m?.[1] ?? '0') || 0) * 60
+           + (parseInt(s?.[1] ?? '0') || 0)
+    }
+    const n = parseInt(t)
+    return isNaN(n) ? 0 : n
   } catch { return 0 }
 }
 
@@ -319,12 +328,16 @@ export const scanUrl = inngest.createFunction(
               // found.start/end_seconds are relative to the chunk start, so we add the offset
               // to get the absolute position in the full video.
               const chunkOffset = startSeconds ?? 0
-              const clipStart = skipScan ? 0 : (chunkOffset + found.start_seconds)
-              const clipEnd = skipScan ? undefined : (chunkOffset + found.end_seconds)
+              // For skipScan, use startSeconds directly as clip start (user pointed to match timestamp).
+              // For chunk jobs, add chunk offset to the scan-reported match start.
+              const clipStart = skipScan ? chunkOffset : (chunkOffset + found.start_seconds)
+              const clipEnd = skipScan ? (endSeconds ?? undefined) : (chunkOffset + found.end_seconds)
               const matchDuration = found.end_seconds - found.start_seconds
-              const videoOptions = skipScan
-                ? { fps: 1.0 }
-                : { fps: 1.0, startSeconds: clipStart, endSeconds: clipEnd }
+              const videoOptions = {
+                fps: 1.0,
+                ...(clipStart > 0 ? { startSeconds: clipStart } : {}),
+                ...(clipEnd !== undefined ? { endSeconds: clipEnd } : {}),
+              }
               const result = await geminiVideoObject(GEMINI_URL_SCAN_MODEL, {
                 system: buildExtractMatchSystemPrompt(),
                 videoUrl: video.publicUrl,
@@ -339,8 +352,8 @@ export const scanUrl = inngest.createFunction(
                 schema: MatchExtractionOutputSchema,
                 referenceImageBase64: athleteImageBase64 || undefined,
               })
-              // Only shift timestamps if we trimmed the clip (not when skipScan)
-              extractObject = skipScan ? result.object : {
+              // Shift timestamps back to absolute stream position whenever we trimmed the clip
+              extractObject = clipStart === 0 ? result.object : {
                 ...result.object,
                 positions: result.object.positions.map(p => ({
                   ...p,

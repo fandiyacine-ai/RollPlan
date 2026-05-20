@@ -474,6 +474,9 @@ export function ScoutForm({
                   </svg>
                   Add another link
                 </button>
+                <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
+                  Tip: right-click the YouTube video at the moment the match starts → <span className="font-medium">"Copy video URL at current time"</span> — the timestamp helps the AI scan the right segment and avoid other matches in the same stream.
+                </p>
               </div>
             )}
 

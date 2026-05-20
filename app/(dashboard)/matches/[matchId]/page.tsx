@@ -168,7 +168,7 @@ export default async function MatchDetailPage({
               <>
                 <ShareButton matchId={matchId} />
                 <Link
-                  href={`/matches/${matchId}/coach`}
+                  href={`/matches/${matchId}/coach?back=${encodeURIComponent(backHref)}`}
                   className={`${buttonVariants({ size: 'sm' })} gap-1.5`}
                 >
                   Frame by Frame
