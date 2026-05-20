@@ -1,5 +1,5 @@
 import { db } from '../../../../../lib/db'
-import { tournaments, tournamentOpponents, matches, videos } from '../../../../../lib/db/schema'
+import { tournaments, tournamentOpponents, matches, videos, gameplans } from '../../../../../lib/db/schema'
 import { eq, inArray, isNull, and, notLike, like, sql } from 'drizzle-orm'
 import { AddOpponentForm } from './opponent-forms'
 import { OpponentAccordion } from './opponent-accordion'
@@ -7,6 +7,7 @@ import { SyncBracketButton } from './sync-bracket-button'
 import { PostEventBanner } from './post-event-banner'
 import { AutoRefresh } from './auto-refresh'
 import { ImportBracketDialog } from './import-bracket-dialog'
+import type { MatchupPrediction } from '../../../../../lib/ai/schemas/prediction'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,6 +74,21 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
   }
 
   const opponentIds = opponents.map(o => o.id)
+
+  // Predictions for tournament outlook card
+  const allGameplans = opponentIds.length > 0
+    ? await db
+        .select({ opponentId: gameplans.opponentId, prediction: gameplans.prediction })
+        .from(gameplans)
+        .where(eq(gameplans.tournamentId, tournamentId))
+        .catch(() => [] as { opponentId: string | null; prediction: unknown }[])
+    : []
+
+  const predictionByOpponent = Object.fromEntries(
+    allGameplans
+      .filter(g => g.opponentId && g.prediction)
+      .map(g => [g.opponentId!, g.prediction as MatchupPrediction])
+  )
 
   let allMatches: MatchRow[] = []
   let allPendingVideos: VideoRow[] = []
@@ -195,6 +211,47 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
           tournamentName={tournamentRow.name}
         />
       )}
+
+      {/* Tournament Outlook — shown when ≥2 opponents have predictions */}
+      {Object.keys(predictionByOpponent).length >= 2 && (() => {
+        const entries = opponents
+          .filter(o => predictionByOpponent[o.id])
+          .map(o => ({ name: o.opponentLabel, pred: predictionByOpponent[o.id] }))
+        const favourable = entries.filter(e => e.pred.verdict === 'favourable').length
+        const tough = entries.filter(e => e.pred.verdict === 'tough').length
+        const neutral = entries.filter(e => e.pred.verdict === 'neutral').length
+        const avgWinProb = Math.round(entries.reduce((s, e) => s + e.pred.win_probability, 0) / entries.length)
+        const overallVerdict = avgWinProb >= 60 ? 'Strong draw' : avgWinProb >= 45 ? 'Mixed draw' : 'Tough draw'
+        return (
+          <div className="rounded-xl border border-border/60 bg-card p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Tournament Outlook</p>
+                <p className="text-lg font-bold mt-0.5">{overallVerdict} <span className="text-sm font-normal text-muted-foreground">· avg {avgWinProb}% win probability</span></p>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                {favourable > 0 && <span className="px-2 py-1 rounded-full border border-emerald-800/30 bg-emerald-950/30 text-emerald-400 font-medium">{favourable} favourable</span>}
+                {neutral > 0 && <span className="px-2 py-1 rounded-full border border-zinc-700/30 bg-zinc-800/30 text-zinc-400 font-medium">{neutral} neutral</span>}
+                {tough > 0 && <span className="px-2 py-1 rounded-full border border-rose-800/30 bg-rose-950/30 text-rose-400 font-medium">{tough} tough</span>}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              {entries.map(({ name, pred }) => {
+                const colour = pred.verdict === 'favourable' ? 'bg-emerald-500' : pred.verdict === 'tough' ? 'bg-rose-500' : 'bg-amber-500'
+                return (
+                  <div key={name} className="flex items-center gap-3">
+                    <span className="text-xs text-muted-foreground w-32 truncate flex-shrink-0">{name}</span>
+                    <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div className={`h-full rounded-full ${colour}`} style={{ width: `${pred.win_probability}%` }} />
+                    </div>
+                    <span className="text-xs font-mono tabular-nums text-muted-foreground w-8 text-right flex-shrink-0">{pred.win_probability}%</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
 
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">

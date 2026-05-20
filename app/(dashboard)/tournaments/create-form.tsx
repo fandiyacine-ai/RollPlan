@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createTournament, deleteTournament, updateTournament } from './actions'
 import { Button } from '@/components/ui/button'
@@ -21,6 +21,7 @@ import {
   SelectItem,
   SelectValue,
 } from '@/components/ui/select'
+import { UPCOMING_EVENTS, searchEvents, type CatalogEvent } from '../../../lib/data/upcoming-events'
 
 export function DeleteTournamentButton({ id }: { id: string }) {
   const [pending, setPending] = useState(false)
@@ -57,113 +58,204 @@ const RULESET_OPTIONS = [
   { value: 'other', label: 'Other' },
 ]
 
+// ── Event catalog picker ──────────────────────────────────────────────────────
+
+const RULESET_BADGE: Record<string, string> = {
+  ibjjf: 'bg-blue-950/60 text-blue-400 border-blue-800/30',
+  ajp:   'bg-purple-950/60 text-purple-400 border-purple-800/30',
+  adcc:  'bg-amber-950/60 text-amber-400 border-amber-800/30',
+  ebi:   'bg-rose-950/60 text-rose-400 border-rose-800/30',
+  other: 'bg-zinc-800 text-zinc-400 border-zinc-700/30',
+}
+
+function EventCatalogPicker({ onSelect }: { onSelect: (e: CatalogEvent) => void }) {
+  const [query, setQuery] = useState('')
+  const results = searchEvents(query).slice(0, 8)
+
+  return (
+    <div className="space-y-2">
+      <Input
+        autoFocus
+        placeholder="Search events — IBJJF, ADCC, AJP…"
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+      />
+      <div className="space-y-1 max-h-56 overflow-y-auto">
+        {results.map((ev, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onSelect(ev)}
+            className="w-full text-left flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg hover:bg-muted/50 transition-colors"
+          >
+            <div className="min-w-0">
+              <p className="text-sm font-medium truncate">{ev.name}</p>
+              <p className="text-xs text-muted-foreground">{ev.location} · {new Date(ev.date).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+            </div>
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0 uppercase ${RULESET_BADGE[ev.ruleset]}`}>
+              {ev.ruleset}
+            </span>
+          </button>
+        ))}
+        {results.length === 0 && (
+          <p className="text-xs text-muted-foreground px-3 py-4 text-center">No events found — you can still enter manually below.</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Create tournament form ────────────────────────────────────────────────────
+
 export function CreateTournamentForm() {
   const [open, setOpen] = useState(false)
+  const [step, setStep] = useState<'pick' | 'form'>('pick')
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [ruleset, setRuleset] = useState('ibjjf')
+  const [prefilled, setPrefilled] = useState<CatalogEvent | null>(null)
   const router = useRouter()
 
+  function handleReset() {
+    setStep('pick')
+    setPrefilled(null)
+    setError(null)
+    setPending(false)
+    setRuleset('ibjjf')
+  }
+
+  function handleSelectEvent(ev: CatalogEvent) {
+    setPrefilled(ev)
+    setRuleset(ev.ruleset)
+    setStep('form')
+  }
+
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setError(null); setPending(false) } }}>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) handleReset() }}>
       <DialogTrigger>
         <Button size="sm">+ New Tournament</Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>New Tournament</DialogTitle>
+          <DialogTitle>
+            {step === 'pick' ? 'New Tournament' : (
+              <button type="button" onClick={() => setStep('pick')} className="flex items-center gap-2 group">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground group-hover:text-foreground transition-colors">
+                  <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                <span>New Tournament</span>
+              </button>
+            )}
+          </DialogTitle>
         </DialogHeader>
-        <form
-          id="create-tournament-form"
-          action={async (fd) => {
-            fd.set('ruleset', ruleset)
-            setPending(true)
-            setError(null)
-            const result = await createTournament(fd)
-            if (result.error) {
-              setError(result.error)
-              setPending(false)
-            } else if (result.tournamentId) {
-              setOpen(false)
-              router.push(`/tournaments/${result.tournamentId}/opponents`)
-            }
-          }}
-          className="space-y-4"
-        >
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Name *</label>
-            <Input
-              name="name"
-              required
-              placeholder="e.g. AJP Grand Slam Abu Dhabi"
-            />
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Event Date</label>
-              <Input
-                name="eventDate"
-                type="date"
-              />
+        {step === 'pick' && (
+          <>
+            <EventCatalogPicker onSelect={handleSelectEvent} />
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <div className="flex-1 h-px bg-border/60" />
+              <span>or</span>
+              <div className="flex-1 h-px bg-border/60" />
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Ruleset</label>
-              <Select value={ruleset} onValueChange={(v) => { if (v !== null) setRuleset(v) }}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {RULESET_OPTIONS.map(o => (
-                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+            <Button variant="outline" size="sm" onClick={() => setStep('form')} className="w-full">
+              Enter manually
+            </Button>
+          </>
+        )}
 
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Division</label>
-            <Input
-              name="division"
-              placeholder="e.g. Adult Male Black Belt –85 kg"
-            />
-          </div>
+        {step === 'form' && (
+          <>
+            {prefilled && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 text-sm">
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase ${RULESET_BADGE[prefilled.ruleset]}`}>
+                  {prefilled.ruleset}
+                </span>
+                <span className="font-medium truncate">{prefilled.name}</span>
+              </div>
+            )}
+            <form
+              id="create-tournament-form"
+              action={async (fd) => {
+                fd.set('ruleset', ruleset)
+                setPending(true)
+                setError(null)
+                const result = await createTournament(fd)
+                if (result.error) {
+                  setError(result.error)
+                  setPending(false)
+                } else if (result.tournamentId) {
+                  setOpen(false)
+                  router.push(`/tournaments/${result.tournamentId}/opponents`)
+                }
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Name *</label>
+                <Input
+                  name="name"
+                  required
+                  defaultValue={prefilled?.name ?? ''}
+                  placeholder="e.g. AJP Grand Slam Abu Dhabi"
+                />
+              </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Notes</label>
-            <textarea
-              name="notes"
-              rows={2}
-              placeholder="Any context about this tournament"
-              className="w-full rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 resize-none"
-            />
-          </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Event Date</label>
+                  <Input name="eventDate" type="date" defaultValue={prefilled?.date ?? ''} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Ruleset</label>
+                  <Select value={ruleset} onValueChange={(v) => { if (v !== null) setRuleset(v) }}>
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {RULESET_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Smoothcomp Bracket URL <span className="text-muted-foreground/50 font-normal">(optional)</span></label>
-            <Input
-              name="smoothcompUrl"
-              type="url"
-              placeholder="smoothcomp.com/en/event/29941/…"
-            />
-            <p className="text-xs text-muted-foreground/60">
-              Paste any URL from your event on Smoothcomp. Once the bracket is published we&apos;ll auto-import your opponents.
-            </p>
-          </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Division</label>
+                <Input name="division" placeholder="e.g. Adult Male Black Belt –85 kg" />
+              </div>
 
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
-        </form>
-        <DialogFooter>
-          <DialogClose>
-            <Button variant="outline" type="button">Cancel</Button>
-          </DialogClose>
-          <Button type="submit" form="create-tournament-form" disabled={pending}>
-            {pending ? 'Creating…' : 'Create'}
-          </Button>
-        </DialogFooter>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Notes</label>
+                <textarea
+                  name="notes"
+                  rows={2}
+                  placeholder="Any context about this tournament"
+                  className="w-full rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 resize-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Smoothcomp Bracket URL <span className="text-muted-foreground/50 font-normal">(optional)</span></label>
+                <Input
+                  name="smoothcompUrl"
+                  type="url"
+                  defaultValue={prefilled?.smoothcompUrl ?? ''}
+                  placeholder="smoothcomp.com/en/event/29941/…"
+                />
+                <p className="text-xs text-muted-foreground/60">
+                  Paste any URL from your event on Smoothcomp. Once the bracket is published we&apos;ll auto-import your opponents.
+                </p>
+              </div>
+
+              {error && <p className="text-sm text-destructive">{error}</p>}
+            </form>
+            <DialogFooter>
+              <DialogClose>
+                <Button variant="outline" type="button">Cancel</Button>
+              </DialogClose>
+              <Button type="submit" form="create-tournament-form" disabled={pending}>
+                {pending ? 'Creating…' : 'Create'}
+              </Button>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   )

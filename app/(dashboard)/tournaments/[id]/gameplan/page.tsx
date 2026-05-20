@@ -8,6 +8,7 @@ import { GameplanRatingWidget } from './rating-widget'
 import { AutoRefresh } from './auto-refresh'
 import { PlanExecutionSection } from './plan-execution-section'
 import type { GameplanOutput } from '../../../../../lib/ai/schemas/gameplan'
+import type { MatchupPrediction } from '../../../../../lib/ai/schemas/prediction'
 
 export const dynamic = 'force-dynamic'
 
@@ -76,6 +77,20 @@ export default async function GameplanPage({
       })
     : null
 
+  // All gameplans for this tournament — used for the outlook strip in the opponent selector
+  const allGameplans = await db
+    .select({ opponentId: gameplans.opponentId, prediction: gameplans.prediction })
+    .from(gameplans)
+    .where(eq(gameplans.tournamentId, tournamentId))
+
+  const predictionByOpponent = Object.fromEntries(
+    allGameplans
+      .filter(g => g.opponentId && g.prediction)
+      .map(g => [g.opponentId!, g.prediction as MatchupPrediction])
+  )
+
+  const prediction = existingGameplan?.prediction as MatchupPrediction | null ?? null
+
   const isGenerating = existingGameplan?.status === 'generating'
   const plan = (!isGenerating && existingGameplan?.structuredPlan && Object.keys(existingGameplan.structuredPlan as object).length > 0)
     ? existingGameplan.structuredPlan as GameplanOutput
@@ -88,19 +103,33 @@ export default async function GameplanPage({
       {/* Opponent selector */}
       {opponents.length > 1 && (
         <div className="flex gap-2 flex-wrap">
-          {opponents.map(opp => (
-            <Link
-              key={opp.id}
-              href={`/tournaments/${tournamentId}/gameplan?opponent=${opp.id}`}
-              className={`text-sm px-3 py-1.5 rounded-full border font-medium transition-colors ${
-                opp.id === activeOpponent.id
-                  ? 'bg-foreground text-background border-foreground'
-                  : 'hover:bg-muted'
-              }`}
-            >
-              {opp.opponentLabel}
-            </Link>
-          ))}
+          {opponents.map(opp => {
+            const oppPred = predictionByOpponent[opp.id]
+            return (
+              <Link
+                key={opp.id}
+                href={`/tournaments/${tournamentId}/gameplan?opponent=${opp.id}`}
+                className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full border font-medium transition-colors ${
+                  opp.id === activeOpponent.id
+                    ? 'bg-foreground text-background border-foreground'
+                    : 'hover:bg-muted'
+                }`}
+              >
+                {opp.opponentLabel}
+                {oppPred && (
+                  <span className={`text-[10px] font-bold px-1 py-0.5 rounded ${
+                    opp.id === activeOpponent.id
+                      ? 'bg-background/20 text-background'
+                      : oppPred.verdict === 'favourable' ? 'text-emerald-400'
+                      : oppPred.verdict === 'tough' ? 'text-rose-400'
+                      : 'text-zinc-400'
+                  }`}>
+                    {oppPred.win_probability}%
+                  </span>
+                )}
+              </Link>
+            )
+          })}
         </div>
       )}
 
@@ -152,6 +181,8 @@ export default async function GameplanPage({
               />
             </div>
           </div>
+
+          {prediction && <PredictionCard prediction={prediction} />}
 
           {plan ? (
             <>
@@ -408,5 +439,73 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground px-0.5">{title}</h3>
       {children}
     </div>
+  )
+}
+
+const VERDICT_STYLES: Record<string, { bar: string; label: string; text: string }> = {
+  favourable: { bar: 'bg-emerald-500', label: 'Favourable', text: 'text-emerald-400' },
+  neutral:    { bar: 'bg-amber-500',   label: 'Neutral',    text: 'text-amber-400' },
+  tough:      { bar: 'bg-rose-500',    label: 'Tough draw', text: 'text-rose-400' },
+}
+
+const CONFIDENCE_LABEL: Record<string, string> = {
+  low: 'Low confidence — limited match data',
+  medium: 'Medium confidence',
+  high: 'High confidence',
+}
+
+function PredictionCard({ prediction }: { prediction: MatchupPrediction }) {
+  const style = VERDICT_STYLES[prediction.verdict] ?? VERDICT_STYLES.neutral
+
+  return (
+    <Section title="Matchup Prediction">
+      <div className="rounded-xl border bg-card p-4 space-y-3">
+        {/* Win probability bar */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className={`text-2xl font-bold tabular-nums ${style.text}`}>
+              {prediction.win_probability}%
+            </span>
+            <div className="text-right">
+              <p className={`text-sm font-semibold ${style.text}`}>{style.label}</p>
+              <p className="text-xs text-muted-foreground/70">{CONFIDENCE_LABEL[prediction.confidence]}</p>
+            </div>
+          </div>
+          <div className="h-2 rounded-full bg-muted overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${style.bar}`}
+              style={{ width: `${prediction.win_probability}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Rationale */}
+        <p className="text-sm text-muted-foreground leading-relaxed">{prediction.rationale}</p>
+
+        {/* Advantages + Risks */}
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400/80">Your Edge</p>
+            {prediction.key_advantages.map((a, i) => (
+              <div key={i} className="flex gap-2 items-start">
+                <span className="w-1 h-1 rounded-full bg-emerald-500/60 flex-shrink-0 mt-1.5" />
+                <p className="text-xs text-muted-foreground leading-relaxed">{a}</p>
+              </div>
+            ))}
+          </div>
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-rose-400/80">Watch Out</p>
+            {prediction.key_risks.map((r, i) => (
+              <div key={i} className="flex gap-2 items-start">
+                <span className="w-1 h-1 rounded-full bg-rose-500/60 flex-shrink-0 mt-1.5" />
+                <p className="text-xs text-muted-foreground leading-relaxed">{r}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p className="text-[10px] text-muted-foreground/40">AI prediction · based on analysed match data</p>
+      </div>
+    </Section>
   )
 }

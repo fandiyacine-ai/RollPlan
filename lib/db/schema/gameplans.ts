@@ -10,7 +10,8 @@ export const gameplans = pgTable('gameplans', {
   promptVersion: text('prompt_version').notNull(),
   structuredPlan: jsonb('structured_plan').notNull().default({}),
   evidence: jsonb('evidence').notNull().default({}),
-  status: text('status').notNull().default('draft'), // draft | committed | reviewed
+  prediction: jsonb('prediction'),       // MatchupPrediction | null
+  status: text('status').notNull().default('draft'), // draft | committed | reviewed | generating
   rating: integer('rating'),             // 1 = helpful, -1 = not helpful, null = unrated
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })

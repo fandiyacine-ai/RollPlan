@@ -18,11 +18,11 @@ Nothing actively in progress.
 
 ### P2 — Soon
 
-**Smoothcomp bracket Phase 3 — tournament catalog**
-`canonical_tournaments` table populated from Smoothcomp competition list pages (scraped nightly for upcoming BJJ events), supplemented by a hand-curated seed of ~50 major recurring events. Users pick from the list instead of typing.
-
 **Plan-execution debrief**
 Extend the post-match review section: after linking a match, generate a structured "Did the plan work?" analysis that compares the gameplan's recommended attack chain against what actually happened in the timeline.
+
+**Smoothcomp bracket Phase 3 — live tournament catalog**
+Replace the static event seed with a scraped catalog: nightly cron pulls upcoming events from Smoothcomp, populates a `canonical_tournaments` table. Users type and autocomplete from real event data.
 
 ### P3 — Later
 
@@ -48,6 +48,8 @@ Read the Match Report aloud. TTS route was partially wired — needs UI trigger 
 
 | Feature | Shipped | Notes |
 |---|---|---|
+| Tournament event picker (catalog) | 2026-05-20 | Searchable list of ~25 major 2026 events pre-fills create form |
+| Matchup prediction | 2026-05-20 | AI win probability per opponent; Tournament Outlook card on Opponents page |
 | Re-scan failed footage | 2026-05-20 | Re-scan button on failed video rows; resets video + chunk records, re-fires url/submitted |
 | Position correction UI | 2026-05-20 | "Wrong?" button on each timeline position row; inline dropdown; marks userCorrected=true |
 | Match result strip on Gameplan page | 2026-05-20 | W/L badges from scouted matches shown under header |

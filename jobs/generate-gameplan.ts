@@ -5,7 +5,79 @@ import { tournaments, tournamentOpponents, gameplans, matches, positionSegments,
 import { eq, desc, and, isNull } from 'drizzle-orm'
 import { anthropic, CLAUDE_SYNTHESIS_MODEL, estimateCostUsd } from '../lib/ai/clients'
 import { GameplanOutputSchema, GameplanOutput } from '../lib/ai/schemas/gameplan'
+import { MatchupPredictionSchema, MatchupPrediction } from '../lib/ai/schemas/prediction'
 import { buildGameplanSystemPrompt, buildGameplanUserPrompt, GENERATE_GAMEPLAN_PROMPT_VERSION } from '../lib/ai/prompts/generate-gameplan'
+import { buildPredictionSystemPrompt, buildPredictionUserPrompt, GENERATE_PREDICTION_PROMPT_VERSION } from '../lib/ai/prompts/generate-prediction'
+
+type MatchStats = {
+  matchCount: number
+  topPositionSeconds: number
+  bottomPositionSeconds: number
+  submissionWins: number
+  submissionLosses: number
+  dominantPositions: string[]
+  commonSubmissions: string[]
+  controlRate: number
+  winRate: number
+}
+
+function computeMatchStats(
+  matchRows: Array<{ id: string; resultWinner: string | null; resultMethod: string | null; resultTechnique: string | null }>,
+  allSegments: Array<{ matchId: string; positionId: string; userRole: string; dominance: string; startSeconds: number; endSeconds: number }>,
+  allEvents: Array<{ matchId: string; eventTypeId: string; actor: string; outcome: string | null; techniqueLabel: string | null }>,
+  perspective: 'user' | 'opponent',  // 'user' = coached athlete, 'opponent' = scouted athlete
+): MatchStats {
+  const matchIds = new Set(matchRows.map(m => m.id))
+  const segments = allSegments.filter(s => matchIds.has(s.matchId))
+  const events = allEvents.filter(e => matchIds.has(e.matchId))
+
+  let topSec = 0, bottomSec = 0, dominantSec = 0, totalSec = 0
+  const positionTime: Record<string, number> = {}
+
+  for (const s of segments) {
+    const dur = Math.max(0, s.endSeconds - s.startSeconds)
+    totalSec += dur
+    if (s.userRole === 'top') topSec += dur
+    if (s.userRole === 'bottom') bottomSec += dur
+    if (s.dominance === 'dominant') dominantSec += dur
+    positionTime[s.positionId] = (positionTime[s.positionId] ?? 0) + dur
+  }
+
+  const dominantPositions = Object.entries(positionTime)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([id]) => id)
+
+  const subWinActor = perspective === 'user' ? 'user' : 'opponent'
+  const subLossActor = perspective === 'user' ? 'opponent' : 'user'
+
+  const submissionWins = events.filter(e => e.actor === subWinActor && e.eventTypeId.includes('submission') && e.outcome === 'success').length
+  const submissionLosses = events.filter(e => e.actor === subLossActor && e.eventTypeId.includes('submission') && e.outcome === 'success').length
+
+  const subTechniques = events
+    .filter(e => e.actor === subWinActor && e.eventTypeId.includes('submission') && e.techniqueLabel)
+    .map(e => e.techniqueLabel!)
+  const techCounts: Record<string, number> = {}
+  for (const t of subTechniques) techCounts[t] = (techCounts[t] ?? 0) + 1
+  const commonSubmissions = Object.entries(techCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t]) => t)
+
+  const matchesWithResult = matchRows.filter(m => m.resultWinner)
+  const winnerKey = perspective === 'user' ? 'user' : 'opponent'
+  const wins = matchesWithResult.filter(m => m.resultWinner === winnerKey).length
+  const winRate = matchesWithResult.length > 0 ? wins / matchesWithResult.length : 0.5
+
+  return {
+    matchCount: matchRows.length,
+    topPositionSeconds: topSec,
+    bottomPositionSeconds: bottomSec,
+    submissionWins,
+    submissionLosses,
+    dominantPositions,
+    commonSubmissions,
+    controlRate: totalSec > 0 ? dominantSec / totalSec : 0,
+    winRate,
+  }
+}
 
 async function fetchMatchData(matchId: string) {
   const [segments, events, matchInsights] = await Promise.all([
@@ -166,6 +238,53 @@ export const generateGameplan = inngest.createFunction(
         status: 'success',
       })
     })
+
+    const prediction = await step.run('generate-prediction', async () => {
+      // Flatten segments + events from the fetched match data
+      const yourSegments = gameplanData.yourMatches.flatMap(m =>
+        m.segments.map(s => ({ matchId: m.id, ...s }))
+      )
+      const yourEvents = gameplanData.yourMatches.flatMap(m =>
+        m.events.map(e => ({ matchId: m.id, ...e }))
+      )
+      const oppSegments = gameplanData.opponentMatches.flatMap(m =>
+        m.segments.map(s => ({ matchId: m.id, ...s }))
+      )
+      const oppEvents = gameplanData.opponentMatches.flatMap(m =>
+        m.events.map(e => ({ matchId: m.id, ...e }))
+      )
+
+      // Build match rows with result data — gameplanData doesn't carry resultWinner,
+      // so we use empty arrays (winRate defaults to 0.5); a follow-up can enrich this.
+      const yourMatchRows = gameplanData.yourMatches.map(m => ({ id: m.id, resultWinner: null, resultMethod: null, resultTechnique: null }))
+      const oppMatchRows = gameplanData.opponentMatches.map(m => ({ id: m.id, resultWinner: null, resultMethod: null, resultTechnique: null }))
+
+      const yourStats = computeMatchStats(yourMatchRows, yourSegments, yourEvents, 'user')
+      const opponentStats = computeMatchStats(oppMatchRows, oppSegments, oppEvents, 'opponent')
+
+      const { object } = await generateObject({
+        model: anthropic(CLAUDE_SYNTHESIS_MODEL),
+        schema: MatchupPredictionSchema,
+        maxRetries: 0,
+        system: buildPredictionSystemPrompt(),
+        prompt: buildPredictionUserPrompt({
+          tournament: gameplanData.tournament,
+          opponent: gameplanData.opponent,
+          yourStats,
+          opponentStats,
+        }),
+      })
+      return object as MatchupPrediction
+    }).catch(() => null)  // prediction failure must never block the gameplan
+
+    if (prediction) {
+      await step.run('store-prediction', async () => {
+        const gp = await db.query.gameplans.findFirst({ where: eq(gameplans.opponentId, opponentId) })
+        if (gp) {
+          await db.update(gameplans).set({ prediction: prediction as any }).where(eq(gameplans.id, gp.id))
+        }
+      })
+    }
 
     return { tournamentId, opponentId, yourMatchCount: gameplanData.yourMatches.length, opponentMatchCount: gameplanData.opponentMatches.length }
   }
