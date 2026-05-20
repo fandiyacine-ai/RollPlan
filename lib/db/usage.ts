@@ -29,11 +29,11 @@ export async function getUserUsageStats(userId: string): Promise<UserUsageStats>
   const [matchStats] = await db
     .select({
       allTime: count(),
-      thisMonth: sql<number>`count(*) filter (where ${matches.createdAt} >= ${startOfMonth})`,
+      thisMonth: sql<number>`count(*) filter (where ${matches.createdAt} >= ${startOfMonth.toISOString()}::timestamptz)`,
       minutesAllTime: sql<number>`coalesce(sum(${videos.durationSeconds}), 0) / 60`,
-      minutesThisMonth: sql<number>`coalesce(sum(${videos.durationSeconds}) filter (where ${matches.createdAt} >= ${startOfMonth}), 0) / 60`,
+      minutesThisMonth: sql<number>`coalesce(sum(${videos.durationSeconds}) filter (where ${matches.createdAt} >= ${startOfMonth.toISOString()}::timestamptz), 0) / 60`,
       opponentsAllTime: sql<number>`count(distinct ${matches.tournamentOpponentId})`,
-      opponentsThisMonth: sql<number>`count(distinct ${matches.tournamentOpponentId}) filter (where ${matches.createdAt} >= ${startOfMonth})`,
+      opponentsThisMonth: sql<number>`count(distinct ${matches.tournamentOpponentId}) filter (where ${matches.createdAt} >= ${startOfMonth.toISOString()}::timestamptz)`,
     })
     .from(matches)
     .leftJoin(videos, eq(videos.id, matches.videoId))
@@ -42,7 +42,7 @@ export async function getUserUsageStats(userId: string): Promise<UserUsageStats>
   const [gameplanStats] = await db
     .select({
       allTime: count(),
-      thisMonth: sql<number>`count(*) filter (where ${gameplans.createdAt} >= ${startOfMonth})`,
+      thisMonth: sql<number>`count(*) filter (where ${gameplans.createdAt} >= ${startOfMonth.toISOString()}::timestamptz)`,
     })
     .from(gameplans)
     .innerJoin(tournaments, eq(tournaments.id, gameplans.tournamentId))

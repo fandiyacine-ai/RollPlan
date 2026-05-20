@@ -31,9 +31,7 @@ export default async function UsagePage() {
       <div className="max-w-2xl space-y-4">
         <h1 className="text-lg font-semibold">My Usage</h1>
         <p className="text-sm text-rose-400">Failed to load usage data. Please try again later.</p>
-        {process.env.NODE_ENV !== 'production' && (
-          <pre className="text-xs text-muted-foreground bg-card p-4 rounded-lg overflow-auto">{String(err)}</pre>
-        )}
+        <pre className="text-xs text-muted-foreground bg-card p-4 rounded-lg overflow-auto whitespace-pre-wrap">{String(err)}</pre>
       </div>
     )
   }
