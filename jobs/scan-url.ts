@@ -3,7 +3,7 @@ import { NonRetriableError, RetryAfterError } from 'inngest'
 import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
 import { videos, matches, positionSegments, matchEvents, insights, aiCallLogs, tournamentOpponents } from '../lib/db/schema'
-import { eq, inArray, and, ne, not } from 'drizzle-orm'
+import { eq, inArray, and, ne, not, sql } from 'drizzle-orm'
 import { google, anthropic, GEMINI_URL_SCAN_MODEL, CLAUDE_SYNTHESIS_MODEL, estimateCostUsd } from '../lib/ai/clients'
 import { geminiVideoObject, isYouTubeUrl } from '../lib/gemini-video'
 import { UrlScanOutputSchema, FoundMatch } from '../lib/ai/schemas/url-scan'
@@ -639,7 +639,16 @@ export const scanUrl = inngest.createFunction(
     }
 
     await step.run('mark-video-analysed', async () => {
-      await db.update(videos).set({ status: 'analysed' }).where(eq(videos.id, videoId))
+      // Estimate duration from the furthest segment end across all matches for this video
+      const [dur] = await db
+        .select({ maxEnd: sql<number>`max(${positionSegments.endSeconds})` })
+        .from(positionSegments)
+        .innerJoin(matches, eq(matches.id, positionSegments.matchId))
+        .where(eq(matches.videoId, videoId))
+      await db.update(videos).set({
+        status: 'analysed',
+        ...(dur?.maxEnd ? { durationSeconds: Math.round(dur.maxEnd) } : {}),
+      }).where(eq(videos.id, videoId))
     })
 
     // Notify user when their own non-chunked match analysis is done
