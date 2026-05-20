@@ -120,9 +120,18 @@ export const scanUrl = inngest.createFunction(
 
         const failAndThrow = async (reason: string) => {
           await db.update(videos).set({ status: 'failed', failureReason: reason }).where(eq(videos.id, videoId))
+          // For chunk jobs, also mark the parent video failed so it doesn't stay stuck in 'processing'
+          if (chunkIndex !== undefined) {
+            const chunkVid = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
+            const parentId = chunkVid?.r2Key.split('/')[1]
+            if (parentId) await db.update(videos).set({ status: 'failed', failureReason: reason }).where(eq(videos.id, parentId))
+          }
           throw new NonRetriableError(reason)
         }
 
+        if (msg.includes('invalid argument') || msg.includes('INVALID_ARGUMENT')) {
+          await failAndThrow('This video could not be processed — it may be private, age-restricted, or the URL is no longer available.')
+        }
         if (msg.includes('10800') || msg.includes('fewer than') || msg.includes('images in your request')) {
           await failAndThrow('Stream is too long — try a shorter clip or a direct mat recording instead of the full event stream.')
         }
@@ -148,6 +157,12 @@ export const scanUrl = inngest.createFunction(
           )
         }
         await db.update(videos).set({ status: 'failed', failureReason: msg }).where(eq(videos.id, videoId))
+        // For chunk jobs, mark parent failed so it doesn't stay stuck in 'processing'
+        if (chunkIndex !== undefined) {
+          const chunkVid = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
+          const parentId = chunkVid?.r2Key.split('/')[1]
+          if (parentId) await db.update(videos).set({ status: 'failed', failureReason: msg }).where(eq(videos.id, parentId))
+        }
         throw err
       }
 

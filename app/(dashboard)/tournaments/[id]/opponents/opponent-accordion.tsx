@@ -20,6 +20,7 @@ type FootageRow = {
   failureReason: string | null
   chunksDone?: number | null
   chunksTotal?: number | null
+  chunksFailed?: number | null
 }
 
 type Opponent = {
@@ -122,10 +123,10 @@ export function OpponentAccordion({
 
   const allRows = [...pendingVideos, ...matches]
 
-  // Chunk progress comes from the parent video row when status is 'processing'
-  const chunkingVideo = pendingVideos.find(v => v.status === 'processing' && v.chunksTotal)
+  // Chunk progress comes from the parent video row (processing = in flight, failed = scan gave up)
+  const chunkingVideo = pendingVideos.find(v => (v.status === 'processing' || v.status === 'failed') && v.chunksTotal)
   const chunkProgress = chunkingVideo?.chunksTotal
-    ? { done: chunkingVideo.chunksDone ?? 0, total: chunkingVideo.chunksTotal }
+    ? { done: chunkingVideo.chunksDone ?? 0, total: chunkingVideo.chunksTotal, failed: chunkingVideo.chunksFailed ?? 0 }
     : null
 
   const analysed = matches.filter(m => m.status === 'analysed').length
@@ -139,10 +140,15 @@ export function OpponentAccordion({
     : <span className="w-2 h-2 rounded-full border border-muted-foreground/30 flex-shrink-0" />
 
   const { footageStatus } = opponent
-  const subtitle = chunkProgress
+  const chunksFailed = chunkProgress?.failed ?? 0
+  const allChunksFailed = chunkProgress && chunkProgress.failed > 0 && chunkProgress.done === 0
+
+  const subtitle = allChunksFailed
+    ? <span className="text-rose-400">{chunkingVideo?.failureReason ?? 'Scan failed — video may be private, age-restricted, or unavailable'}</span>
+    : chunkProgress
     ? chunkProgress.done === 0
       ? <span className="text-blue-400">Scanning — splitting into {chunkProgress.total} parts…</span>
-      : <><span className="text-blue-400">{chunkProgress.done}/{chunkProgress.total} parts scanned</span>{analysed > 0 ? ` · ${analysed} match${analysed !== 1 ? 'es' : ''} found so far` : ''}</>
+      : <><span className="text-blue-400">{chunkProgress.done}/{chunkProgress.total} parts scanned{chunksFailed > 0 ? ` (${chunksFailed} failed)` : ''}</span>{analysed > 0 ? ` · ${analysed} match${analysed !== 1 ? 'es' : ''} found so far` : ''}</>
     : pending > 0 && analysed === 0
     ? <span className="text-blue-400">Scanning…</span>
     : pending > 0
@@ -165,7 +171,7 @@ export function OpponentAccordion({
 
   return (
     <div className="rounded-xl border bg-card overflow-hidden">
-      {pending > 0 && (
+      {pending > 0 && !allChunksFailed && (
         <div className="h-0.5 w-full bg-muted overflow-hidden">
           {chunkProgress ? (
             <div

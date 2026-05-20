@@ -17,7 +17,7 @@ type MatchRow = {
 
 type VideoRow = {
   id: string; status: string; label: string; createdAt: Date; tournamentOpponentId: string | null
-  failureReason: string | null; chunksDone: number | null; chunksTotal: number | null
+  failureReason: string | null; chunksDone: number | null; chunksTotal: number | null; chunksFailed: number | null
 }
 
 function DbError({ label, err }: { label: string; err: unknown }) {
@@ -117,25 +117,27 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
       ))
       .orderBy(videos.uploadedAt)
 
-      // For parent videos in processing state, fetch chunk scan progress
-      const processingIds = rawVideos.filter(v => v.status === 'processing').map(v => v.id)
-      const chunkCountById: Record<string, { done: number; total: number }> = {}
-      if (processingIds.length > 0) {
+      // For parent videos in processing/failed state, fetch chunk scan progress
+      const chunkedIds = rawVideos.filter(v => v.status === 'processing' || v.status === 'failed').map(v => v.id)
+      const chunkCountById: Record<string, { done: number; total: number; failed: number }> = {}
+      if (chunkedIds.length > 0) {
         const counts = await db.select({
           parentId: sql<string>`split_part(r2_key, '/', 2)`,
           total: sql<number>`count(*)::int`,
           done: sql<number>`count(*) filter (where status = 'analysed')::int`,
+          failed: sql<number>`count(*) filter (where status = 'failed')::int`,
         })
         .from(videos)
         .where(and(like(videos.r2Key, 'chunk/%'), inArray(videos.tournamentOpponentId, opponentIds)))
         .groupBy(sql`split_part(r2_key, '/', 2)`)
-        for (const r of counts) chunkCountById[r.parentId] = { done: r.done, total: r.total }
+        for (const r of counts) chunkCountById[r.parentId] = { done: r.done, total: r.total, failed: r.failed }
       }
 
       allPendingVideos = rawVideos.map(v => ({
         ...v,
         chunksDone: chunkCountById[v.id]?.done ?? null,
         chunksTotal: chunkCountById[v.id]?.total ?? null,
+        chunksFailed: chunkCountById[v.id]?.failed ?? null,
       })) as VideoRow[]
     } catch (err) {
       return <DbError label="videos query" err={err} />
@@ -226,6 +228,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
                     : (v.failureReason ?? null),
                   chunksDone: v.chunksDone ?? null,
                   chunksTotal: v.chunksTotal ?? null,
+                  chunksFailed: v.chunksFailed ?? null,
                 }))}
               tournamentId={tournamentId}
             />
