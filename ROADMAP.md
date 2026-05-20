@@ -1,4 +1,4 @@
-# FrameMatters — Roadmap
+# RollPlan — Roadmap
 
 Features in flight, prioritised, and parked. Update this file whenever something is scoped, started, or shipped.
 
@@ -14,27 +14,27 @@ Nothing actively in progress.
 
 ### P1 — Build next
 
-*(All P1 items shipped 2026-05-20 — see Shipped table.)*
+**Freemium paywall enforcement**
+Block `submitFootageUrls` / `importCommunityFootage` when `analysedThisMonth >= 10`. Show upgrade prompt inline (scout form disabled, message shown). Free tier limit exists in DB and is displayed on `/usage` — enforcement wall is the missing piece.
+
+**Post-tournament result recording**
+Add `userResult: 'win' | 'loss' | null` and `userResultMethod` to `tournamentOpponents`. Manual W/L entry UI on each opponent accordion card — appears after tournament date has passed. Works for any organisation (IBJJF, AJP, local comp). No Smoothcomp dependency.
+
+**Fix / repurpose sync button**
+Current "Sync results from bracket" is semantically broken — it updates scouted *footage* match results instead of Yacine's actual tournament results. Repurpose: write `userResult` on `tournamentOpponents` by finding Yacine's matches in the Smoothcomp bracket. Requires user's own Smoothcomp athlete ID stored in settings. Becomes an optional shortcut, not a core feature.
 
 ### P2 — Soon
 
-**Plan-execution debrief**
-Extend the post-match review section: after linking a match, generate a structured "Did the plan work?" analysis that compares the gameplan's recommended attack chain against what actually happened in the timeline.
+**User's own Smoothcomp profile in settings**
+Add Smoothcomp profile URL field to settings page. Parse and store `smoothcompAthleteId` for the user. Unlocks: (1) auto-sync post-tournament results from bracket, (2) smart bracket pre-selection (filter out self, pre-select only plausible opponents).
 
-**Smoothcomp bracket Phase 3 — live tournament catalog**
-Replace the static event seed with a scraped catalog: nightly cron pulls upcoming events from Smoothcomp, populates a `canonical_tournaments` table. Users type and autocomplete from real event data.
+**Smart bracket opponent pre-selection**
+When importing from bracket, pre-select only athletes in the same half of the elimination draw (the opponents Yacine could realistically face). Currently defaults to all athletes. Requires knowing user's own athlete position in the bracket.
+
+**Per-match result override on match detail page**
+Small "Correct result" UI on the match analysis page — dropdown Win/Loss + method. Stores directly to `resultWinner` / `resultMethod` on that match. For when the AI extracted the result wrong and you want to fix just one match without a full bracket sync.
 
 ### P3 — Later
-
-**Smoothcomp bracket Phase 3 — tournament catalog**
-`canonical_tournaments` table populated from Smoothcomp competition list pages (scraped nightly for upcoming BJJ events), supplemented by a hand-curated seed of ~50 major recurring events (IBJJF Worlds/Euros/Pans, ADCC, AJP Grand Slam, Polaris). Users pick from the list instead of typing. Show anonymous count: *"14 athletes preparing for this event."*
-
-Catalog constraints:
-- **BJJ only** — filter Smoothcomp scrape to `sport=jiu-jitsu`
-- **Future events only** — only index events with `eventDate >= today`
-- **Stale entry cleanup** — nightly cron: delete rows where `eventDate < yesterday` AND zero users linked the event
-
-*Smoothcomp partnership — pursue in parallel.* Their incentive is real: athlete prep data is marketing data for them. Cold email with the pitch and an API ask. If granted, replace scraping with clean endpoints.
 
 **Long video chunking via FFmpeg**
 For 4–6 hour full-day tournament streams. Current chunking works with YouTube time windows (no download). This path: download → FFmpeg split → N parallel Inngest events. Build only once users consistently struggle with long YouTube streams.
@@ -42,12 +42,23 @@ For 4–6 hour full-day tournament streams. Current chunking works with YouTube 
 **Voice coaching / TTS**
 Read the Match Report aloud. TTS route was partially wired — needs UI trigger and audio playback component.
 
+**Smoothcomp partnership**
+Their incentive is real: athlete prep data is marketing data for them. Cold email with the pitch and an API ask. If granted, replace all scraping with clean endpoints.
+
 ---
 
 ## Shipped
 
 | Feature | Shipped | Notes |
 |---|---|---|
+| YouTube URL dedup — clone analysis on resubmit | 2026-05-20 | Same YouTube URL → clone from DB, skip Gemini. Quota still decrements |
+| Cross-user Smoothcomp community footage | 2026-05-20 | "X community" import button on opponent cards with matching smoothcompAthleteId |
+| Org-branded ruleset badges (IBJJF, AJP, ADCC, EBI) | 2026-05-20 | Inline SVG icons, solid colours, shared RulesetBadge component |
+| Usage tracking — /usage page | 2026-05-20 | Monthly limit bar, this-month + all-time stats (matches, video minutes, opponents, gameplans) |
+| Admin usage dashboard — /admin/usage | 2026-05-20 | Per-user table: analyses, video minutes, gameplans, AI cost. Guarded by ADMIN_CLERK_USER_ID env var |
+| aiCallLogs userId attribution | 2026-05-20 | All AI job calls now write userId to ai_call_logs |
+| Bracket import — inline URL capture | 2026-05-20 | capture-url and linking phases wired in import dialog |
+| Free tier limit (10 analysed matches/month) | 2026-05-20 | Calendar-month reset, UI pill in nav |
 | Tournament event picker (catalog) | 2026-05-20 | Searchable list of ~25 major 2026 events pre-fills create form |
 | Matchup prediction | 2026-05-20 | AI win probability per opponent; Tournament Outlook card on Opponents page |
 | Re-scan failed footage | 2026-05-20 | Re-scan button on failed video rows; resets video + chunk records, re-fires url/submitted |
@@ -56,41 +67,23 @@ Read the Match Report aloud. TTS route was partially wired — needs UI trigger 
 | Plan-execution review | 2026-05-20 | Link own analysed match to gameplan; planExecutions table; post-match section |
 | Opponent deduplication warning | 2026-05-20 | Warns when same name exists in another tournament; force-add option |
 | Smoothcomp Phase 2 — auto footage discovery on import | 2026-05-20 | Fires smoothcomp/discover.footage for each imported athlete |
-| FAQ update | 2026-05-20 | Added bracket import, edit opponent, re-scan, generating state, position correction, plan review |
 | Bracket import — import opponents from Smoothcomp bracket | 2026-05-20 | Selection dialog, dedup, footageStatus: pending |
 | Edit opponent (name + seeding notes) | 2026-05-20 | Pencil icon on each accordion card |
 | Footage nudge banner | 2026-05-20 | Amber banner when opponents have no footage |
 | Gameplan generating state + auto-refresh | 2026-05-20 | API writes 'generating' row; page polls every 5s |
-| Active tab highlighting (Opponents / Gameplan) | 2026-05-20 | TournamentNav client component, usePathname |
-| Transient scan errors resilient | 2026-05-20 | SyntaxError / Internal error → RetryAfterError in all 3 catch sites |
-| Scan-for-matches stays in 'processing' during retries | 2026-05-20 | Was permanently marking failed mid-retry |
 | Edit tournament button inside tournament layout | 2026-05-20 | Pencil icon next to tournament title |
-| Fix edit tournament dialog (stopPropagation bug) | 2026-05-20 | DialogTrigger was blocked by inner Button |
 | Gameplan rating (thumbs up / down) | 2026-05-19 | Stored on gameplans.rating |
 | Post-event banner (outcome prompt) | 2026-05-19 | Shown when event date passed + no outcome set |
-| AI disclaimer + sync hint on opponents page | 2026-05-19 | Shown when no bracket URL linked |
-| Sync results from bracket | 2026-05-19 | Corrects W/L from published Smoothcomp bracket |
+| Sync results from bracket | 2026-05-19 | ⚠️ Semantically broken — updates scouted footage results, not user's tournament results. To be reworked under P1 |
 | YouTube timestamp parsing (26m10s, 1h4m, etc.) | 2026-05-19 | parseYouTubeTimestamp handles all formats |
-| Extraction timestamp shift fix (skipScan + chunkOffset) | 2026-05-19 | clipStart applied correctly to all positions/events |
-| Frame by Frame nav forwards back= param | 2026-05-19 | Scout Opponent tab now highlighted correctly |
-| Old failed parent video hidden once matches exist | 2026-05-19 | Accordion filter + allChunksFailed guard |
-| Chunk scan failure — INVALID_ARGUMENT → NonRetriableError | 2026-05-19 | Parent video marked failed correctly |
-| YouTube &t= stripped before Gemini fileUri | 2026-05-19 | cleanYouTubeUrl() in gemini-video.ts |
-| YouTube timestamp tip in scout form | 2026-05-19 | "Copy video URL at current time" hint |
-| Auto-refresh on opponents page during scans | 2026-05-19 | <AutoRefresh /> polls every 4s |
+| Auto-refresh on opponents page during scans | 2026-05-19 | AutoRefresh polls every 4s |
 | Chunk progress bar + failed chunk detection | 2026-05-19 | chunksFailed count, allChunksFailed guard |
 | Match result badge (W/L) on detail page header | 2026-05-19 | Shows method + technique |
-| Timeline legend uses athlete names for scout footage | 2026-05-19 | Was "Your action / Opponent action" |
 | Walkover match handling | 2026-05-19 | Detected in scan, skips extraction |
 | Failure reasons surfaced to users | 2026-05-19 | Video rows show real error, not generic "failed" |
-| Row titles use opponent name (not URL/format) | 2026-05-19 | Accordion footage list |
-| Scout form error catch | — | submitScoutUrls errors now surface to user |
 | Gameplan print button | — | PrintButton on Gameplan page |
-| Free tier limit (10 analysed matches/month) | — | Calendar-month reset |
 | Position flow diagram — circular layout | — | Cap 6 nodes, 9 edges |
 | Player card share image (1080×1080) | — | Arc gauge, Arsenal/Exposed panels |
 | Match narration / Match Report | — | Regeneratable coaching summary |
-| Opponent scouting + Gameplan | — | Tournament → Opponent → Footage → Gameplan flow |
 | Match analysis share link | — | /share/match/[shortId] public page |
 | Frame by Frame AI coach | — | Per-segment video + coaching notes |
-| Position verification pass | — | Second Gemini pass on low-confidence segments |
