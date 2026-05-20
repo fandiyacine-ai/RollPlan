@@ -1,4 +1,5 @@
 export * from './users'
+export * from './canonical-tournaments'
 export * from './videos'
 export * from './matches'
 export * from './segments'

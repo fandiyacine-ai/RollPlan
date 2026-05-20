@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createTournament, deleteTournament, updateTournament } from './actions'
 import { Button } from '@/components/ui/button'
@@ -21,7 +21,7 @@ import {
   SelectItem,
   SelectValue,
 } from '@/components/ui/select'
-import { UPCOMING_EVENTS, searchEvents, type CatalogEvent } from '../../../lib/data/upcoming-events'
+import { searchCatalogAction, type CatalogEntry } from './catalog-actions'
 
 export function DeleteTournamentButton({ id }: { id: string }) {
   const [pending, setPending] = useState(false)
@@ -60,45 +60,75 @@ const RULESET_OPTIONS = [
 
 // ── Event catalog picker ──────────────────────────────────────────────────────
 
-const RULESET_BADGE: Record<string, string> = {
-  ibjjf: 'bg-blue-950/60 text-blue-400 border-blue-800/30',
-  ajp:   'bg-purple-950/60 text-purple-400 border-purple-800/30',
-  adcc:  'bg-amber-950/60 text-amber-400 border-amber-800/30',
-  ebi:   'bg-rose-950/60 text-rose-400 border-rose-800/30',
-  other: 'bg-zinc-800 text-zinc-400 border-zinc-700/30',
+const SOURCE_BADGE: Record<string, { label: string; colour: string }> = {
+  ibjjf:      { label: 'IBJJF',      colour: 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800/30' },
+  ajp:        { label: 'AJP',        colour: 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800/30' },
+  adcc:       { label: 'ADCC',       colour: 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/30' },
+  ebi:        { label: 'EBI',        colour: 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/30' },
+  smoothcomp: { label: 'SC',         colour: 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/30' },
+  other:      { label: 'Other',      colour: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700/30' },
 }
 
-function EventCatalogPicker({ onSelect }: { onSelect: (e: CatalogEvent) => void }) {
+function EventCatalogPicker({ onSelect }: { onSelect: (e: CatalogEntry) => void }) {
   const [query, setQuery] = useState('')
-  const results = searchEvents(query).slice(0, 8)
+  const [results, setResults] = useState<CatalogEntry[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const search = useCallback(async (q: string) => {
+    setLoading(true)
+    const data = await searchCatalogAction(q)
+    setResults(data)
+    setLoading(false)
+  }, [])
+
+  // Load upcoming events on mount
+  useEffect(() => { search('') }, [search])
+
+  // Debounced search on query change
+  useEffect(() => {
+    const timer = setTimeout(() => search(query), 300)
+    return () => clearTimeout(timer)
+  }, [query, search])
+
+  const badge = (source: string) => SOURCE_BADGE[source] ?? SOURCE_BADGE.other
 
   return (
     <div className="space-y-2">
       <Input
         autoFocus
-        placeholder="Search events — IBJJF, ADCC, AJP…"
+        placeholder="Search events — IBJJF, AJP, ADCC, Smoothcomp…"
         value={query}
         onChange={e => setQuery(e.target.value)}
       />
-      <div className="space-y-1 max-h-56 overflow-y-auto">
-        {results.map((ev, i) => (
-          <button
-            key={i}
-            type="button"
-            onClick={() => onSelect(ev)}
-            className="w-full text-left flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg hover:bg-muted/50 transition-colors"
-          >
-            <div className="min-w-0">
-              <p className="text-sm font-medium truncate">{ev.name}</p>
-              <p className="text-xs text-muted-foreground">{ev.location} · {new Date(ev.date).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-            </div>
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0 uppercase ${RULESET_BADGE[ev.ruleset]}`}>
-              {ev.ruleset}
-            </span>
-          </button>
-        ))}
-        {results.length === 0 && (
-          <p className="text-xs text-muted-foreground px-3 py-4 text-center">No events found — you can still enter manually below.</p>
+      <div className="space-y-0.5 max-h-60 overflow-y-auto">
+        {loading && (
+          <p className="text-xs text-muted-foreground px-3 py-4 text-center">Loading…</p>
+        )}
+        {!loading && results.map((ev) => {
+          const b = badge(ev.source)
+          return (
+            <button
+              key={ev.id}
+              type="button"
+              onClick={() => onSelect(ev)}
+              className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted/50 transition-colors"
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{ev.name}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {ev.location ?? 'Location TBC'}
+                  {ev.eventDate ? ` · ${new Date(ev.eventDate).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
+                  {ev.userCount > 0 && <span className="text-muted-foreground/60"> · {ev.userCount} preparing</span>}
+                </p>
+              </div>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border flex-shrink-0 uppercase ${b.colour}`}>
+                {b.label}
+              </span>
+            </button>
+          )
+        })}
+        {!loading && results.length === 0 && (
+          <p className="text-xs text-muted-foreground px-3 py-4 text-center">No events found — enter manually below.</p>
         )}
       </div>
     </div>
@@ -113,7 +143,7 @@ export function CreateTournamentForm() {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [ruleset, setRuleset] = useState('ibjjf')
-  const [prefilled, setPrefilled] = useState<CatalogEvent | null>(null)
+  const [prefilled, setPrefilled] = useState<CatalogEntry | null>(null)
   const router = useRouter()
 
   function handleReset() {
@@ -124,7 +154,7 @@ export function CreateTournamentForm() {
     setRuleset('ibjjf')
   }
 
-  function handleSelectEvent(ev: CatalogEvent) {
+  function handleSelectEvent(ev: CatalogEntry) {
     setPrefilled(ev)
     setRuleset(ev.ruleset)
     setStep('form')
@@ -167,9 +197,14 @@ export function CreateTournamentForm() {
           <>
             {prefilled && (
               <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 text-sm">
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase ${RULESET_BADGE[prefilled.ruleset]}`}>
-                  {prefilled.ruleset}
-                </span>
+                {(() => {
+                  const b = SOURCE_BADGE[prefilled.source] ?? SOURCE_BADGE.other
+                  return (
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase flex-shrink-0 ${b.colour}`}>
+                      {b.label}
+                    </span>
+                  )
+                })()}
                 <span className="font-medium truncate">{prefilled.name}</span>
               </div>
             )}
@@ -177,6 +212,7 @@ export function CreateTournamentForm() {
               id="create-tournament-form"
               action={async (fd) => {
                 fd.set('ruleset', ruleset)
+                if (prefilled?.id) fd.set('canonicalTournamentId', prefilled.id)
                 setPending(true)
                 setError(null)
                 const result = await createTournament(fd)
@@ -203,7 +239,7 @@ export function CreateTournamentForm() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-muted-foreground">Event Date</label>
-                  <Input name="eventDate" type="date" defaultValue={prefilled?.date ?? ''} />
+                  <Input name="eventDate" type="date" defaultValue={prefilled?.eventDate ?? ''} />
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-muted-foreground">Ruleset</label>

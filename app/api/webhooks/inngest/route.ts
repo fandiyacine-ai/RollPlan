@@ -7,10 +7,11 @@ import { smoothcompMonitorBracket } from '../../../../jobs/smoothcomp-monitor-br
 import { smoothcompProcessBracket } from '../../../../jobs/smoothcomp-process-bracket'
 import { smoothcompDiscoverFootage } from '../../../../jobs/smoothcomp-discover-footage'
 import { generateExecutionDebrief } from '../../../../jobs/generate-execution-debrief'
+import { syncTournamentCatalog } from '../../../../jobs/sync-tournament-catalog'
 
 export const maxDuration = 300
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [analyzeVideo, generateGameplan, scanUrl, smoothcompMonitorBracket, smoothcompProcessBracket, smoothcompDiscoverFootage, generateExecutionDebrief],
+  functions: [analyzeVideo, generateGameplan, scanUrl, smoothcompMonitorBracket, smoothcompProcessBracket, smoothcompDiscoverFootage, generateExecutionDebrief, syncTournamentCatalog],
 })

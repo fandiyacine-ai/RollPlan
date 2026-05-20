@@ -1,6 +1,7 @@
 import { pgTable, uuid, text, date, timestamp } from 'drizzle-orm/pg-core'
 import { users } from './users'
 import { playerCards } from './player-cards'
+import { canonicalTournaments } from './canonical-tournaments'
 
 export const tourStatusEnum = ['upcoming', 'completed', 'cancelled'] as const
 
@@ -31,6 +32,8 @@ export const tournaments = pgTable('tournaments', {
   // Post-event engagement
   outcome: text('outcome'),              // 'gold' | 'silver' | 'bronze' | 'eliminated' | 'dns' | null
   postEventNotes: text('post_event_notes'),
+  // Catalog link — set when tournament is created from the event catalog
+  canonicalTournamentId: uuid('canonical_tournament_id').references(() => canonicalTournaments.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })
 

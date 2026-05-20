@@ -32,6 +32,8 @@ export async function createTournament(
       smoothcompEventId = eventId
     }
 
+    const rawCanonicalId = (formData.get('canonicalTournamentId') as string)?.trim() || null
+
     const [tour] = await db.insert(tournaments).values({
       userId,
       name,
@@ -41,6 +43,7 @@ export async function createTournament(
       notes: (formData.get('notes') as string)?.trim() || null,
       smoothcompUrl,
       smoothcompEventId,
+      canonicalTournamentId: rawCanonicalId,
     }).returning()
 
     revalidatePath('/tournaments')
