@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { ScoutForm, DeleteOpponentButton, EditOpponentButton, RescanVideoButton } from './opponent-forms'
+import { importCommunityFootage } from './actions'
 
 type FootageRow = {
   id: string
@@ -113,13 +114,17 @@ export function OpponentAccordion({
   matches,
   pendingVideos,
   tournamentId,
+  communityMatchCount = 0,
 }: {
   opponent: Opponent
   matches: FootageRow[]
   pendingVideos: FootageRow[]
   tournamentId: string
+  communityMatchCount?: number
 }) {
   const [open, setOpen] = useState(false)
+  const [importing, startImport] = useTransition()
+  const [importDone, setImportDone] = useState(false)
 
   const allRows = [...pendingVideos, ...matches]
 
@@ -221,6 +226,34 @@ export function OpponentAccordion({
             >
               Gameplan →
             </Link>
+          )}
+          {communityMatchCount > 0 && !importDone && (
+            <button
+              type="button"
+              disabled={importing}
+              onClick={() => startImport(async () => {
+                await importCommunityFootage(opponent.id, tournamentId)
+                setImportDone(true)
+              })}
+              className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-purple-700/50 bg-purple-950/40 text-purple-300 hover:bg-purple-950/70 transition-colors disabled:opacity-50"
+              title={`${communityMatchCount} community analysis${communityMatchCount !== 1 ? 'es' : ''} available`}
+            >
+              {importing ? (
+                <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                </svg>
+              ) : (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+              )}
+              {communityMatchCount} community
+            </button>
+          )}
+          {importDone && (
+            <span className="text-xs text-emerald-400 px-2">✓ Imported</span>
           )}
           {/* Hide scout form when auto-discovery is actively queued with no results yet */}
           {footageStatus !== 'pending' && !(footageStatus === 'auto_queued' && allRows.length === 0) && (

@@ -3,11 +3,14 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '../../../../../lib/db'
 import { tournaments, tournamentOpponents, videos, matches } from '../../../../../lib/db/schema'
-import { eq, and, inArray, like, sql, ne } from 'drizzle-orm'
+import { eq, and, inArray, like, sql, ne, notInArray } from 'drizzle-orm'
+import { cloneOpponentMatches } from '../../../../../lib/db/clone-analysis'
 import { inngest } from '../../../../../lib/inngest'
 import { getOrCreateDbUserId } from '../../../../../lib/db/get-user'
 import { checkMonthlyLimit } from '../../../../../lib/db/usage'
 import { scrapeBracket, parseSmootcompBracketUrl, parseSmootcompEventUrl } from '../../../../../lib/smoothcomp/scraper'
+import { isYouTubeUrl, normalizeYouTubeUrl } from '../../../../../lib/gemini-video'
+import { cloneVideoMatches } from '../../../../../lib/db/clone-analysis'
 
 export async function addOpponent(tournamentId: string, formData: FormData) {
   const name = (formData.get('name') as string)?.trim()
@@ -114,23 +117,50 @@ export async function submitScoutUrls(tournamentId: string, opponentId: string, 
   for (const url of urls) {
     try { new URL(url) } catch { throw new Error(`Invalid URL: ${url}`) }
 
+    const storedUrl = isYouTubeUrl(url) ? normalizeYouTubeUrl(url) : url
+
     // Prevent duplicate scans: skip if this URL is already queued or analysed for this opponent
     const existing = await db.query.videos.findFirst({
-      where: (v) => and(eq(v.publicUrl, url), eq(v.tournamentOpponentId, opponentId)),
+      where: (v) => and(eq(v.publicUrl, storedUrl), eq(v.tournamentOpponentId, opponentId)),
     })
     if (existing && existing.status !== 'failed') {
       skippedUrls.push(url)
       continue
     }
 
+    // URL dedup: if this YouTube URL was already analysed for ANY opponent cross-user,
+    // clone the results silently — no Gemini call needed.
+    if (isYouTubeUrl(storedUrl)) {
+      const priorVideo = await db.query.videos.findFirst({
+        where: (v) => and(eq(v.publicUrl, storedUrl), eq(v.status, 'analysed')),
+      })
+      if (priorVideo) {
+        // Create a stub video record owned by this user
+        const [stubVideo] = await db.insert(videos).values({
+          userId,
+          r2Key: `url/${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          originalFilename: storedUrl,
+          contentType: 'video/mp4',
+          sizeBytes: 0,
+          sourceType: 'opponent',
+          publicUrl: storedUrl,
+          status: 'processing',
+          tournamentOpponentId: opponentId,
+        }).returning()
+
+        await cloneVideoMatches(priorVideo.id, stubVideo.id, opponentId, userId)
+        continue
+      }
+    }
+
     const [video] = await db.insert(videos).values({
       userId,
       r2Key: `url/${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      originalFilename: url,
+      originalFilename: storedUrl,
       contentType: 'video/mp4',
       sizeBytes: 0,
       sourceType: 'opponent',
-      publicUrl: url,
+      publicUrl: storedUrl,
       status: 'uploaded',
       tournamentOpponentId: opponentId,
     }).returning()
@@ -445,5 +475,103 @@ export async function importSelectedOpponents(
     return { count: toInsert.length }
   } catch (err) {
     return { count: 0, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+// Returns the number of cross-user analysed matches available for each smoothcompAthleteId.
+// Excludes matches already imported to the current user's opponents.
+export async function getCommunityMatchCounts(
+  smoothcompAthleteIds: string[],
+  currentUserId: string,
+  currentOpponentIds: string[],
+): Promise<Record<string, number>> {
+  if (smoothcompAthleteIds.length === 0) return {}
+
+  // Opponent IDs owned by other users with these athlete IDs
+  const otherOpponents = await db
+    .select({ id: tournamentOpponents.id, athleteId: tournamentOpponents.smoothcompAthleteId })
+    .from(tournamentOpponents)
+    .innerJoin(tournaments, eq(tournaments.id, tournamentOpponents.tournamentId))
+    .where(and(
+      inArray(tournamentOpponents.smoothcompAthleteId, smoothcompAthleteIds),
+      ne(tournaments.userId, currentUserId),
+    ))
+
+  if (otherOpponents.length === 0) return {}
+
+  const otherOpponentIds = otherOpponents.map(o => o.id)
+
+  // Count analysed matches for those opponents, excluding any already cloned to this user
+  const rows = await db
+    .select({ tournamentOpponentId: matches.tournamentOpponentId })
+    .from(matches)
+    .where(and(
+      inArray(matches.tournamentOpponentId, otherOpponentIds),
+      eq(matches.status, 'analysed'),
+    ))
+
+  // Build athleteId → count map
+  const opponentToAthlete = new Map(otherOpponents.map(o => [o.id, o.athleteId!]))
+  const counts: Record<string, number> = {}
+  for (const row of rows) {
+    const athleteId = opponentToAthlete.get(row.tournamentOpponentId ?? '')
+    if (athleteId) counts[athleteId] = (counts[athleteId] ?? 0) + 1
+  }
+  return counts
+}
+
+// Import all community-analysed matches for an opponent into this user's opponent.
+// Deduplicates: won't clone if already imported (same sourceVideoId already present).
+export async function importCommunityFootage(
+  targetOpponentId: string,
+  tournamentId: string,
+): Promise<{ imported: number; error?: string }> {
+  try {
+    const userId = await getOrCreateDbUserId()
+
+    const targetOpponent = await db.query.tournamentOpponents.findFirst({
+      where: eq(tournamentOpponents.id, targetOpponentId),
+    })
+    if (!targetOpponent?.smoothcompAthleteId) return { imported: 0, error: 'No Smoothcomp athlete ID on this opponent' }
+
+    // Find source opponents (other users, same athlete ID)
+    const sourceOpponents = await db
+      .select({ id: tournamentOpponents.id })
+      .from(tournamentOpponents)
+      .innerJoin(tournaments, eq(tournaments.id, tournamentOpponents.tournamentId))
+      .where(and(
+        eq(tournamentOpponents.smoothcompAthleteId, targetOpponent.smoothcompAthleteId),
+        ne(tournaments.userId, userId),
+      ))
+
+    if (sourceOpponents.length === 0) return { imported: 0 }
+
+    // Get video IDs already imported to this opponent to avoid duplicates
+    const existingVideoIds = await db
+      .select({ videoId: matches.videoId })
+      .from(matches)
+      .where(eq(matches.tournamentOpponentId, targetOpponentId))
+      .then(rows => new Set(rows.map(r => r.videoId)))
+
+    let imported = 0
+    for (const src of sourceOpponents) {
+      // Find analysed matches not already present in target
+      const srcMatches = await db
+        .select().from(matches)
+        .where(and(
+          eq(matches.tournamentOpponentId, src.id),
+          eq(matches.status, 'analysed'),
+          notInArray(matches.videoId, existingVideoIds.size > 0 ? [...existingVideoIds] : ['__none__']),
+        ))
+
+      if (srcMatches.length === 0) continue
+      const { cloned } = await cloneOpponentMatches(src.id, targetOpponentId, userId)
+      imported += cloned
+    }
+
+    revalidatePath(`/tournaments/${tournamentId}/opponents`)
+    return { imported }
+  } catch (err) {
+    return { imported: 0, error: err instanceof Error ? err.message : String(err) }
   }
 }

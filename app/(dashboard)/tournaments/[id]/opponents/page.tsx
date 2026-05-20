@@ -8,6 +8,8 @@ import { PostEventBanner } from './post-event-banner'
 import { AutoRefresh } from './auto-refresh'
 import { ImportBracketDialog } from './import-bracket-dialog'
 import type { MatchupPrediction } from '../../../../../lib/ai/schemas/prediction'
+import { getOrCreateDbUserId } from '../../../../../lib/db/get-user'
+import { getCommunityMatchCounts } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -74,6 +76,18 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
   }
 
   const opponentIds = opponents.map(o => o.id)
+
+  // Community footage counts (cross-user, same Smoothcomp athlete ID)
+  const userId = await getOrCreateDbUserId().catch(() => null)
+  const smoothcompIds = opponents.map(o => o.smoothcompAthleteId).filter(Boolean) as string[]
+  const communityCountByAthleteId: Record<string, number> = userId && smoothcompIds.length > 0
+    ? await getCommunityMatchCounts(smoothcompIds, userId, opponentIds).catch(() => ({}))
+    : {}
+  const communityCountByOpponentId: Record<string, number> = Object.fromEntries(
+    opponents
+      .filter(o => o.smoothcompAthleteId && communityCountByAthleteId[o.smoothcompAthleteId!])
+      .map(o => [o.id, communityCountByAthleteId[o.smoothcompAthleteId!]])
+  )
 
   // Predictions for tournament outlook card
   const allGameplans = opponentIds.length > 0
@@ -344,6 +358,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
                   chunksFailed: v.chunksFailed ?? null,
                 }))}
               tournamentId={tournamentId}
+              communityMatchCount={communityCountByOpponentId[opp.id] ?? 0}
             />
           ))}
         </div>

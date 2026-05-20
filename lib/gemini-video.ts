@@ -39,6 +39,23 @@ function cleanYouTubeUrl(url: string): string {
   } catch { return url }
 }
 
+// Canonical form for dedup: youtu.be/ID and youtube.com/watch?v=ID → same key.
+// Strips all params except 'v'. Used before storing and before dedup lookups.
+export function normalizeYouTubeUrl(url: string): string {
+  try {
+    const u = new URL(url)
+    if (u.hostname === 'youtu.be') {
+      const id = u.pathname.slice(1).split('?')[0]
+      return `https://www.youtube.com/watch?v=${id}`
+    }
+    if (u.hostname === 'youtube.com' || u.hostname === 'www.youtube.com') {
+      const id = u.searchParams.get('v')
+      if (id) return `https://www.youtube.com/watch?v=${id}`
+    }
+    return url
+  } catch { return url }
+}
+
 export async function geminiVideoObject<T extends z.ZodTypeAny>(
   model: string,
   params: {
