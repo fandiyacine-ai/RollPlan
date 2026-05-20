@@ -29,6 +29,16 @@ function buildGeminiSchema(schema: z.ZodTypeAny): unknown {
   return sanitizeForGemini(z.toJSONSchema(schema))
 }
 
+// Gemini rejects YouTube URLs that contain &t= timestamps — strip it before use.
+// We pass the offset ourselves via startOffset/endOffset in videoMetadata.
+function cleanYouTubeUrl(url: string): string {
+  try {
+    const u = new URL(url)
+    u.searchParams.delete('t')
+    return u.toString()
+  } catch { return url }
+}
+
 export async function geminiVideoObject<T extends z.ZodTypeAny>(
   model: string,
   params: {
@@ -43,7 +53,7 @@ export async function geminiVideoObject<T extends z.ZodTypeAny>(
   const { system, videoUrl, videoOptions, userPrompt, schema, referenceImageBase64 } = params
 
   const filePart: Record<string, unknown> = {
-    fileData: { mimeType: 'video/mp4', fileUri: videoUrl },
+    fileData: { mimeType: 'video/mp4', fileUri: cleanYouTubeUrl(videoUrl) },
   }
 
   if (videoOptions) {
