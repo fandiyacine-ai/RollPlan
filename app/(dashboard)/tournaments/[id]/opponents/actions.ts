@@ -312,14 +312,77 @@ export async function importSelectedOpponents(
   try {
     if (athletes.length === 0) return { count: 0 }
 
-    // Skip athletes already in the tournament
-    const existing = await db.select({ sid: tournamentOpponents.smoothcompAthleteId })
+    // Fetch existing opponents for this tournament (id + athleteId + name)
+    const existing = await db
+      .select({
+        id: tournamentOpponents.id,
+        sid: tournamentOpponents.smoothcompAthleteId,
+        name: tournamentOpponents.opponentLabel,
+        footageStatus: tournamentOpponents.footageStatus,
+      })
       .from(tournamentOpponents)
       .where(eq(tournamentOpponents.tournamentId, tournamentId))
 
-    const existingIds = new Set(existing.map(e => e.sid).filter(Boolean))
+    const existingByAthleteId = new Map(existing.filter(e => e.sid).map(e => [e.sid!, e]))
+    const existingByNameLower = new Map(existing.map(e => [e.name.toLowerCase(), e]))
 
-    const toInsert = athletes.filter(a => !existingIds.has(a.smoothcompAthleteId))
+    // Separate into: already matched by athleteId, matched by name only (manually added), truly new
+    const toLink: Array<{ existingId: string; athlete: typeof athletes[number]; needsDiscovery: boolean }> = []
+    const toInsert: typeof athletes = []
+
+    for (const a of athletes) {
+      if (existingByAthleteId.has(a.smoothcompAthleteId)) continue // exact match, skip
+      const nameMatch = existingByNameLower.get(a.name.toLowerCase())
+      if (nameMatch) {
+        // Manually-added row: link Smoothcomp data instead of creating a duplicate
+        toLink.push({
+          existingId: nameMatch.id,
+          athlete: a,
+          needsDiscovery: nameMatch.footageStatus === 'manual' || nameMatch.footageStatus === 'pending',
+        })
+      } else {
+        toInsert.push(a)
+      }
+    }
+
+    if (toInsert.length === 0 && toLink.length === 0) return { count: 0 }
+
+    // Link Smoothcomp data onto existing manually-added opponents
+    const userId = await getOrCreateDbUserId()
+    for (const { existingId, athlete, needsDiscovery } of toLink) {
+      if (needsDiscovery) {
+        await db.update(tournamentOpponents).set({
+          smoothcompAthleteId: athlete.smoothcompAthleteId,
+          smoothcompProfileUrl: athlete.profileUrl,
+          footageStatus: 'pending',
+        }).where(eq(tournamentOpponents.id, existingId))
+      } else {
+        await db.update(tournamentOpponents).set({
+          smoothcompAthleteId: athlete.smoothcompAthleteId,
+          smoothcompProfileUrl: athlete.profileUrl,
+        }).where(eq(tournamentOpponents.id, existingId))
+      }
+
+      if (needsDiscovery) {
+        try {
+          await inngest.send({
+            name: 'smoothcomp/discover.footage',
+            data: {
+              tournamentId,
+              opponentId: existingId,
+              profileUrl: athlete.profileUrl,
+              athleteId: athlete.smoothcompAthleteId,
+              athleteName: athlete.name,
+              userId,
+            },
+          })
+          await db.update(tournamentOpponents)
+            .set({ footageStatus: 'auto_queued' })
+            .where(eq(tournamentOpponents.id, existingId))
+        } catch { /* Inngest not configured */ }
+      }
+    }
+
     if (toInsert.length === 0) return { count: 0 }
 
     const inserted = await db.insert(tournamentOpponents).values(
@@ -333,7 +396,6 @@ export async function importSelectedOpponents(
     ).returning()
 
     // Phase 2: fire footage discovery for each imported athlete
-    const userId = await getOrCreateDbUserId()
     for (const opp of inserted) {
       if (!opp.smoothcompProfileUrl) continue
       try {

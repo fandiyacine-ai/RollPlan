@@ -261,9 +261,10 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
           {tournamentRow?.smoothcompUrl?.includes('/bracket/') && opponents.length > 0 && (
             <SyncBracketButton tournamentId={tournamentId} />
           )}
-          {tournamentRow?.smoothcompUrl?.includes('/bracket/') && (
-            <ImportBracketDialog tournamentId={tournamentId} />
-          )}
+          <ImportBracketDialog
+            tournamentId={tournamentId}
+            hasBracketUrl={!!tournamentRow?.smoothcompUrl?.includes('/bracket/')}
+          />
           <AddOpponentForm tournamentId={tournamentId} />
         </div>
       </div>
@@ -298,23 +299,14 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
               Add the athletes you might meet in your bracket — the AI will scout their footage and build you a gameplan for each.
             </p>
           </div>
-          {tournamentRow?.smoothcompUrl?.includes('/bracket/') ? (
-            <div className="flex flex-col items-center gap-3">
-              <ImportBracketDialog tournamentId={tournamentId} />
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span>or</span>
-                <AddOpponentForm tournamentId={tournamentId} />
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2">
-              <AddOpponentForm tournamentId={tournamentId} />
-              <p className="text-xs text-muted-foreground max-w-xs">
-                Have a Smoothcomp bracket URL?{' '}
-                <span className="font-medium text-foreground/70">Edit your tournament</span> to add it — you can then import your full draw in one click.
-              </p>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            <ImportBracketDialog
+              tournamentId={tournamentId}
+              hasBracketUrl={!!tournamentRow?.smoothcompUrl?.includes('/bracket/')}
+            />
+            <span className="text-xs text-muted-foreground">or</span>
+            <AddOpponentForm tournamentId={tournamentId} />
+          </div>
         </div>
       ) : (
         <div className="space-y-3">

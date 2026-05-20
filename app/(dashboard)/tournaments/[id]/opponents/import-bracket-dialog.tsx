@@ -18,6 +18,7 @@ type Athlete = { name: string; smoothcompAthleteId: string; profileUrl: string }
 
 type State =
   | { phase: 'idle' }
+  | { phase: 'no-url' }
   | { phase: 'loading' }
   | { phase: 'unpublished' }
   | { phase: 'selecting'; athletes: Athlete[] }
@@ -25,7 +26,7 @@ type State =
   | { phase: 'done'; count: number }
   | { phase: 'error'; message: string }
 
-export function ImportBracketDialog({ tournamentId }: { tournamentId: string }) {
+export function ImportBracketDialog({ tournamentId, hasBracketUrl = true }: { tournamentId: string; hasBracketUrl?: boolean }) {
   const [open, setOpen] = useState(false)
   const [state, setState] = useState<State>({ phase: 'idle' })
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -34,6 +35,10 @@ export function ImportBracketDialog({ tournamentId }: { tournamentId: string }) 
   async function handleOpen(o: boolean) {
     setOpen(o)
     if (o && state.phase === 'idle') {
+      if (!hasBracketUrl) {
+        setState({ phase: 'no-url' })
+        return
+      }
       setState({ phase: 'loading' })
       const result = await fetchBracketAthletes(tournamentId)
       if (result.error) {
@@ -87,6 +92,26 @@ export function ImportBracketDialog({ tournamentId }: { tournamentId: string }) 
         <DialogHeader>
           <DialogTitle>Import opponents from bracket</DialogTitle>
         </DialogHeader>
+
+        {state.phase === 'no-url' && (
+          <div className="py-6 space-y-3">
+            <p className="text-sm font-medium">No bracket URL linked</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              To import opponents from Smoothcomp, add a bracket URL to this tournament first.
+              Go to your tournament settings and paste a URL like{' '}
+              <span className="font-mono text-foreground/70">smoothcomp.com/en/event/…/bracket/…</span>
+            </p>
+            <a
+              href={`/tournaments/${tournamentId}`}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+            >
+              Edit tournament settings
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
+            </a>
+          </div>
+        )}
 
         {state.phase === 'loading' && (
           <div className="py-8 flex flex-col items-center gap-3 text-muted-foreground">
@@ -160,7 +185,7 @@ export function ImportBracketDialog({ tournamentId }: { tournamentId: string }) 
         )}
 
         <DialogFooter>
-          {(state.phase === 'done' || state.phase === 'unpublished' || state.phase === 'error') && (
+          {(state.phase === 'done' || state.phase === 'unpublished' || state.phase === 'error' || state.phase === 'no-url') && (
             <DialogClose>
               <Button variant="outline" type="button">Close</Button>
             </DialogClose>
