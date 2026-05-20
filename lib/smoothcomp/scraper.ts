@@ -384,6 +384,149 @@ async function findEventYouTubeStream(eventId: string): Promise<string | null> {
   return result.streams[0]?.youtubeUrl ?? null
 }
 
+type ScrapedEvent = { name: string; eventId: string; url: string; date: string | null; location: string | null }
+
+// Scrape ibjjf.com events calendar for upcoming competitions.
+// Selectors are best-effort — IBJJF may update their site structure.
+export async function scrapeIbjjfEvents(): Promise<ScrapedEvent[]> {
+  const browser = await launchBrowser()
+  try {
+    const page = await newPage(browser)
+
+    // Try the calendar page, then fall back to the plain events list
+    for (const url of ['https://ibjjf.com/events/calendar', 'https://ibjjf.com/events']) {
+      try {
+        await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 })
+        await page.waitForTimeout(3000)
+        break
+      } catch { /* try next */ }
+    }
+
+    const todayIso = new Date().toISOString().slice(0, 10)
+
+    const events = await page.evaluate((today: string) => {
+      const results: Array<{ name: string; eventId: string; url: string; date: string | null; location: string | null }> = []
+      const seen = new Set<string>()
+
+      // IBJJF renders event detail links like /events/european-open-2026
+      const links = document.querySelectorAll<HTMLAnchorElement>('a[href]')
+      for (const link of Array.from(links)) {
+        const href = link.href
+        // Must look like an event detail URL, not nav links
+        const slugM = href.match(/\/events\/([a-z0-9][a-z0-9-]+[a-z0-9])(?:[/?#]|$)/)
+        if (!slugM) continue
+        const slug = slugM[1]
+        // Skip generic pages
+        if (['calendar', 'schedule', 'results', 'register', 'athletes'].includes(slug)) continue
+        if (seen.has(slug)) continue
+        seen.add(slug)
+
+        // Name: prefer a heading inside the link, then the link text itself
+        const nameEl = link.querySelector('h1,h2,h3,h4,[class*="title"],[class*="name"]')
+        const rawName = (nameEl?.textContent ?? link.textContent ?? '').trim().replace(/\s+/g, ' ')
+        if (rawName.length < 5 || rawName.length > 120) continue
+        if (['home', 'events', 'news', 'contact', 'about'].includes(rawName.toLowerCase())) continue
+
+        // Prefix "IBJJF" if absent so names are consistent with the seed
+        const name = /ibjjf/i.test(rawName) ? rawName : `IBJJF ${rawName}`
+
+        const card = link.closest('[class*="card"],[class*="event"],[class*="competition"],article,li,tr')
+
+        // Date — try <time>, then elements with date-like class names
+        const timeEl = (card ?? link).querySelector<HTMLElement>('time,[class*="date"],[class*="when"]')
+        const dateText = timeEl?.getAttribute('datetime') ?? timeEl?.textContent?.trim().replace(/\s+/g, ' ') ?? null
+
+        // Skip past events if we can parse the date
+        if (dateText) {
+          try { if (new Date(dateText).toISOString().slice(0, 10) < today) continue } catch {}
+        }
+
+        const locEl = card?.querySelector<HTMLElement>('[class*="location"],[class*="city"],[class*="venue"],[class*="country"]')
+        const location = locEl?.textContent?.trim().replace(/\s+/g, ' ') ?? null
+
+        results.push({ name, eventId: `ibjjf-${slug}`, url: href, date: dateText, location })
+      }
+      return results
+    }, todayIso)
+
+    return events
+  } catch {
+    return []
+  } finally {
+    await browser.close()
+  }
+}
+
+// Scrape ajptour.com for upcoming competitions (Grand Slams, Tours, Opens).
+// Covers regional events (Estonia, Germany, etc.) not in the manual seed.
+// Selectors are best-effort — AJP may update their site structure.
+export async function scrapeAjpEvents(): Promise<ScrapedEvent[]> {
+  const browser = await launchBrowser()
+  try {
+    const page = await newPage(browser)
+
+    for (const url of [
+      'https://ajptour.com/en/competitions',
+      'https://ajptour.com/en/events',
+      'https://ajptour.com/en/calendar',
+    ]) {
+      try {
+        await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 })
+        await page.waitForTimeout(3000)
+        // Consider loaded if there are any link or card elements on the page
+        const hasLinks = await page.$('a[href]').catch(() => null)
+        if (hasLinks) break
+      } catch { /* try next */ }
+    }
+
+    const todayIso = new Date().toISOString().slice(0, 10)
+
+    const events = await page.evaluate((today: string) => {
+      const results: Array<{ name: string; eventId: string; url: string; date: string | null; location: string | null }> = []
+      const seen = new Set<string>()
+
+      const links = document.querySelectorAll<HTMLAnchorElement>('a[href]')
+      for (const link of Array.from(links)) {
+        const href = link.href
+        // AJP competition URL patterns: /competition/xxx, /competitions/xxx, /event/xxx
+        const slugM = href.match(/\/(?:competition|competitions|event)s?\/([a-z0-9][a-z0-9-]+)(?:[/?#]|$)/)
+        if (!slugM) continue
+        const slug = slugM[1]
+        if (['list', 'all', 'upcoming', 'past', 'results'].includes(slug)) continue
+        if (seen.has(slug)) continue
+        seen.add(slug)
+
+        const nameEl = link.querySelector('h1,h2,h3,h4,[class*="title"],[class*="name"]')
+        const rawName = (nameEl?.textContent ?? link.textContent ?? '').trim().replace(/\s+/g, ' ')
+        if (rawName.length < 4 || rawName.length > 120) continue
+
+        const name = /ajp/i.test(rawName) ? rawName : `AJP ${rawName}`
+
+        const card = link.closest('[class*="card"],[class*="competition"],[class*="event"],article,li')
+
+        const timeEl = (card ?? link).querySelector<HTMLElement>('time,[class*="date"],[class*="when"]')
+        const dateText = timeEl?.getAttribute('datetime') ?? timeEl?.textContent?.trim().replace(/\s+/g, ' ') ?? null
+
+        if (dateText) {
+          try { if (new Date(dateText).toISOString().slice(0, 10) < today) continue } catch {}
+        }
+
+        const locEl = card?.querySelector<HTMLElement>('[class*="location"],[class*="city"],[class*="country"],[class*="venue"]')
+        const location = locEl?.textContent?.trim().replace(/\s+/g, ' ') ?? null
+
+        results.push({ name, eventId: `ajp-${slug}`, url: href, date: dateText, location })
+      }
+      return results
+    }, todayIso)
+
+    return events
+  } catch {
+    return []
+  } finally {
+    await browser.close()
+  }
+}
+
 // Scrape the Smoothcomp competitions list for upcoming BJJ events.
 // Only returns events with a date in the future — past events are excluded.
 export async function scrapeUpcomingCompetitions(discipline = 'jiu-jitsu'): Promise<Array<{
