@@ -27,15 +27,16 @@ export default async function AdminUsagePage() {
   const startOfMonth = new Date()
   startOfMonth.setDate(1)
   startOfMonth.setHours(0, 0, 0, 0)
+  const som = startOfMonth.toISOString()
 
   // Per-user match + video stats
   const matchRows = await db
     .select({
       userId: matches.userId,
       matchesAllTime: sql<number>`count(*)`,
-      matchesThisMonth: sql<number>`count(*) filter (where ${matches.createdAt} >= ${startOfMonth})`,
+      matchesThisMonth: sql<number>`count(*) filter (where ${matches.createdAt} >= ${som}::timestamptz)`,
       videoMinutesAllTime: sql<number>`coalesce(sum(${videos.durationSeconds}), 0) / 60`,
-      videoMinutesThisMonth: sql<number>`coalesce(sum(${videos.durationSeconds}) filter (where ${matches.createdAt} >= ${startOfMonth}), 0) / 60`,
+      videoMinutesThisMonth: sql<number>`coalesce(sum(${videos.durationSeconds}) filter (where ${matches.createdAt} >= ${som}::timestamptz), 0) / 60`,
       lastMatch: sql<string>`max(${matches.createdAt})`,
     })
     .from(matches)
@@ -48,7 +49,7 @@ export default async function AdminUsagePage() {
     .select({
       userId: aiCallLogs.userId,
       totalCost: sql<number>`coalesce(sum(${aiCallLogs.costUsdEstimate}), 0)`,
-      costThisMonth: sql<number>`coalesce(sum(${aiCallLogs.costUsdEstimate}) filter (where ${aiCallLogs.createdAt} >= ${startOfMonth}), 0)`,
+      costThisMonth: sql<number>`coalesce(sum(${aiCallLogs.costUsdEstimate}) filter (where ${aiCallLogs.createdAt} >= ${som}::timestamptz), 0)`,
     })
     .from(aiCallLogs)
     .groupBy(aiCallLogs.userId)
@@ -57,7 +58,7 @@ export default async function AdminUsagePage() {
   const [platformCost] = await db
     .select({
       allTime: sql<number>`coalesce(sum(${aiCallLogs.costUsdEstimate}), 0)`,
-      thisMonth: sql<number>`coalesce(sum(${aiCallLogs.costUsdEstimate}) filter (where ${aiCallLogs.createdAt} >= ${startOfMonth}), 0)`,
+      thisMonth: sql<number>`coalesce(sum(${aiCallLogs.costUsdEstimate}) filter (where ${aiCallLogs.createdAt} >= ${som}::timestamptz), 0)`,
     })
     .from(aiCallLogs)
 
