@@ -22,7 +22,21 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
 
 export default async function UsagePage() {
   const userId = await getOrCreateDbUserId()
-  const stats = await getUserUsageStats(userId)
+  let stats: Awaited<ReturnType<typeof getUserUsageStats>>
+  try {
+    stats = await getUserUsageStats(userId)
+  } catch (err) {
+    console.error('[/usage] getUserUsageStats failed:', err)
+    return (
+      <div className="max-w-2xl space-y-4">
+        <h1 className="text-lg font-semibold">My Usage</h1>
+        <p className="text-sm text-rose-400">Failed to load usage data. Please try again later.</p>
+        {process.env.NODE_ENV !== 'production' && (
+          <pre className="text-xs text-muted-foreground bg-card p-4 rounded-lg overflow-auto">{String(err)}</pre>
+        )}
+      </div>
+    )
+  }
 
   const pct = isFinite(stats.monthlyLimit)
     ? Math.min(100, (stats.matchesThisMonth / stats.monthlyLimit) * 100)
