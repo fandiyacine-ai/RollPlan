@@ -7,7 +7,7 @@ import { eq, and, inArray, like, sql, ne } from 'drizzle-orm'
 import { inngest } from '../../../../../lib/inngest'
 import { getOrCreateDbUserId } from '../../../../../lib/db/get-user'
 import { checkMonthlyLimit } from '../../../../../lib/db/usage'
-import { scrapeBracket, parseSmootcompBracketUrl } from '../../../../../lib/smoothcomp/scraper'
+import { scrapeBracket, parseSmootcompBracketUrl, parseSmootcompEventUrl } from '../../../../../lib/smoothcomp/scraper'
 
 export async function addOpponent(tournamentId: string, formData: FormData) {
   const name = (formData.get('name') as string)?.trim()
@@ -281,6 +281,29 @@ export async function updateOpponent(opponentId: string, tournamentId: string, f
   }).where(eq(tournamentOpponents.id, opponentId))
 
   revalidatePath(`/tournaments/${tournamentId}/opponents`)
+}
+
+export async function linkBracketUrl(
+  tournamentId: string,
+  url: string,
+): Promise<{ error?: string }> {
+  try {
+    const userId = await getOrCreateDbUserId()
+    const trimmed = url.trim()
+    const bracketParsed = parseSmootcompBracketUrl(trimmed)
+    const eventId = bracketParsed?.eventId ?? parseSmootcompEventUrl(trimmed)
+    if (!eventId) {
+      return { error: 'Invalid Smoothcomp URL — paste any URL from your event page on smoothcomp.com' }
+    }
+    await db.update(tournaments).set({
+      smoothcompUrl: trimmed,
+      smoothcompEventId: eventId,
+    }).where(and(eq(tournaments.id, tournamentId), eq(tournaments.userId, userId)))
+    revalidatePath(`/tournaments/${tournamentId}/opponents`)
+    return {}
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
 }
 
 export async function fetchBracketAthletes(tournamentId: string): Promise<{

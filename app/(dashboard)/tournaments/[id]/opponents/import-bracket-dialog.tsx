@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { fetchBracketAthletes, importSelectedOpponents } from './actions'
+import { fetchBracketAthletes, importSelectedOpponents, linkBracketUrl } from './actions'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -18,7 +18,8 @@ type Athlete = { name: string; smoothcompAthleteId: string; profileUrl: string }
 
 type State =
   | { phase: 'idle' }
-  | { phase: 'no-url' }
+  | { phase: 'capture-url' }
+  | { phase: 'linking' }
   | { phase: 'loading' }
   | { phase: 'unpublished' }
   | { phase: 'selecting'; athletes: Athlete[] }
@@ -30,13 +31,40 @@ export function ImportBracketDialog({ tournamentId, hasBracketUrl = true }: { to
   const [open, setOpen] = useState(false)
   const [state, setState] = useState<State>({ phase: 'idle' })
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bracketUrlInput, setBracketUrlInput] = useState('')
+  const [urlLinked, setUrlLinked] = useState(false)
   const router = useRouter()
+
+  async function loadBracket() {
+    setState({ phase: 'loading' })
+    const result = await fetchBracketAthletes(tournamentId)
+    if (result.error) {
+      setState({ phase: 'error', message: result.error })
+    } else if (!result.bracketIsPublished) {
+      setState({ phase: 'unpublished' })
+    } else {
+      setSelected(new Set(result.athletes.map(a => a.smoothcompAthleteId)))
+      setState({ phase: 'selecting', athletes: result.athletes })
+    }
+  }
+
+  async function handleLinkAndImport() {
+    if (!bracketUrlInput.trim()) return
+    setState({ phase: 'linking' })
+    const result = await linkBracketUrl(tournamentId, bracketUrlInput)
+    if (result.error) {
+      setState({ phase: 'error', message: result.error })
+    } else {
+      setUrlLinked(true)
+      await loadBracket()
+    }
+  }
 
   async function handleOpen(o: boolean) {
     setOpen(o)
     if (o && state.phase === 'idle') {
       if (!hasBracketUrl) {
-        setState({ phase: 'no-url' })
+        setState({ phase: 'capture-url' })
         return
       }
       setState({ phase: 'loading' })
@@ -52,7 +80,7 @@ export function ImportBracketDialog({ tournamentId, hasBracketUrl = true }: { to
       }
     }
     if (!o) {
-      // Reset so re-opening re-fetches (bracket may have been published)
+      if (urlLinked) router.refresh()
       setState({ phase: 'idle' })
       setSelected(new Set())
     }
@@ -93,23 +121,31 @@ export function ImportBracketDialog({ tournamentId, hasBracketUrl = true }: { to
           <DialogTitle>Import opponents from bracket</DialogTitle>
         </DialogHeader>
 
-        {state.phase === 'no-url' && (
-          <div className="py-6 space-y-3">
-            <p className="text-sm font-medium">No bracket URL linked</p>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              To import opponents from Smoothcomp, add a bracket URL to this tournament first.
-              Go to your tournament settings and paste a URL like{' '}
-              <span className="font-mono text-foreground/70">smoothcomp.com/en/event/…/bracket/…</span>
+        {state.phase === 'capture-url' && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Paste your Smoothcomp bracket URL to import opponents directly from your draw.
             </p>
-            <a
-              href={`/tournaments/${tournamentId}`}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
-            >
-              Edit tournament settings
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 12h14M12 5l7 7-7 7"/>
-              </svg>
-            </a>
+            <input
+              type="url"
+              placeholder="https://smoothcomp.com/en/event/…/bracket/…"
+              value={bracketUrlInput}
+              onChange={e => setBracketUrlInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleLinkAndImport() }}
+              className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground">Any URL from your Smoothcomp event page works.</p>
+          </div>
+        )}
+
+        {state.phase === 'linking' && (
+          <div className="py-8 flex flex-col items-center gap-3 text-muted-foreground">
+            <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+            </svg>
+            <p className="text-sm">Linking bracket…</p>
           </div>
         )}
 
@@ -185,7 +221,17 @@ export function ImportBracketDialog({ tournamentId, hasBracketUrl = true }: { to
         )}
 
         <DialogFooter>
-          {(state.phase === 'done' || state.phase === 'unpublished' || state.phase === 'error' || state.phase === 'no-url') && (
+          {state.phase === 'capture-url' && (
+            <>
+              <DialogClose>
+                <Button variant="outline" type="button">Cancel</Button>
+              </DialogClose>
+              <Button onClick={handleLinkAndImport} disabled={!bracketUrlInput.trim()}>
+                Link &amp; Import
+              </Button>
+            </>
+          )}
+          {(state.phase === 'done' || state.phase === 'unpublished' || state.phase === 'error') && (
             <DialogClose>
               <Button variant="outline" type="button">Close</Button>
             </DialogClose>

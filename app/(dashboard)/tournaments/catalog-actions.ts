@@ -18,7 +18,16 @@ export type CatalogEntry = {
 export async function searchCatalogAction(query: string): Promise<CatalogEntry[]> {
   try {
     const today = new Date().toISOString().slice(0, 10)
-    const q = query.trim()
+    // Split into tokens so "Estonia AJP" matches "AJP Estonia 2026" (order-independent)
+    const tokens = query.trim().split(/\s+/).filter(t => t.length >= 2)
+
+    // Each token must appear in name OR location (AND across tokens)
+    const tokenFilters = tokens.map(t =>
+      or(
+        ilike(canonicalTournaments.name, `%${t}%`),
+        ilike(canonicalTournaments.location, `%${t}%`),
+      )
+    )
 
     const rows = await db
       .select({
@@ -35,20 +44,13 @@ export async function searchCatalogAction(query: string): Promise<CatalogEntry[]
       .leftJoin(tournaments, eq(tournaments.canonicalTournamentId, canonicalTournaments.id))
       .where(
         and(
-          // Include events with unknown date or future date
-          or(
-            isNull(canonicalTournaments.eventDate),
-            gte(canonicalTournaments.eventDate, today),
-          ),
-          q ? or(
-            ilike(canonicalTournaments.name, `%${q}%`),
-            ilike(canonicalTournaments.location, `%${q}%`),
-          ) : undefined,
+          or(isNull(canonicalTournaments.eventDate), gte(canonicalTournaments.eventDate, today)),
+          tokenFilters.length > 0 ? and(...tokenFilters) : undefined,
         ),
       )
       .groupBy(canonicalTournaments.id)
       .orderBy(asc(canonicalTournaments.eventDate))
-      .limit(10)
+      .limit(20)
 
     return rows as CatalogEntry[]
   } catch {
