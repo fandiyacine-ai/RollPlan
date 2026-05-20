@@ -229,6 +229,7 @@ export const generateGameplan = inngest.createFunction(
       }
 
       await db.insert(aiCallLogs).values({
+        userId: userId ?? null,
         jobId: tournamentId,
         model: CLAUDE_SYNTHESIS_MODEL,
         promptVersion: GENERATE_GAMEPLAN_PROMPT_VERSION,

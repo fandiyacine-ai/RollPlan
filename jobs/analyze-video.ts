@@ -54,7 +54,7 @@ export const analyzeVideo = inngest.createFunction(
       return { geminiFileUri }
     })
 
-    await step.run('extract-positions-events', async () => {
+    const { matchUserId } = await step.run('extract-positions-events', async () => {
       const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
       if (!video?.publicUrl) throw new Error('Video has no public URL')
 
@@ -141,6 +141,7 @@ export const analyzeVideo = inngest.createFunction(
       })
 
       await db.insert(aiCallLogs).values({
+        userId: match.userId ?? null,
         jobId: matchId,
         model: GEMINI_VIDEO_MODEL,
         promptVersion: EXTRACT_MATCH_PROMPT_VERSION,
@@ -151,7 +152,7 @@ export const analyzeVideo = inngest.createFunction(
         status: 'success',
       })
 
-      return { segmentCount: object.positions.length, eventCount: object.events.length }
+      return { segmentCount: object.positions.length, eventCount: object.events.length, matchUserId: match.userId }
     })
 
     await step.run('verify-positions', async () => {
@@ -209,6 +210,7 @@ export const analyzeVideo = inngest.createFunction(
       }
 
       await db.insert(aiCallLogs).values({
+        userId: matchUserId ?? null,
         jobId: matchId,
         model: GEMINI_VIDEO_MODEL,
         promptVersion: VERIFY_POSITIONS_PROMPT_VERSION,
@@ -282,6 +284,7 @@ export const analyzeVideo = inngest.createFunction(
       )
 
       await db.insert(aiCallLogs).values({
+        userId: matchUserId ?? null,
         jobId: matchId,
         model: CLAUDE_SYNTHESIS_MODEL,
         promptVersion: GENERATE_INSIGHTS_PROMPT_VERSION,

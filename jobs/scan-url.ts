@@ -115,6 +115,7 @@ export const scanUrl = inngest.createFunction(
         }
 
         await db.insert(aiCallLogs).values({
+          userId: userId ?? null,
           jobId: videoId,
           model: GEMINI_URL_SCAN_MODEL,
           promptVersion: SCAN_URL_PROMPT_VERSION,
@@ -478,6 +479,7 @@ export const scanUrl = inngest.createFunction(
           })
 
           await db.insert(aiCallLogs).values({
+            userId: userId ?? null,
             jobId: matchId,
             model: GEMINI_URL_SCAN_MODEL,
             promptVersion: EXTRACT_MATCH_PROMPT_VERSION,
@@ -533,6 +535,7 @@ export const scanUrl = inngest.createFunction(
               }
 
               await db.insert(aiCallLogs).values({
+                userId: userId ?? null,
                 jobId: matchId,
                 model: GEMINI_URL_SCAN_MODEL,
                 promptVersion: VERIFY_POSITIONS_PROMPT_VERSION,
@@ -593,6 +596,7 @@ export const scanUrl = inngest.createFunction(
             )
 
             await db.insert(aiCallLogs).values({
+              userId: userId ?? null,
               jobId: matchId,
               model: CLAUDE_SYNTHESIS_MODEL,
               promptVersion: GENERATE_INSIGHTS_PROMPT_VERSION,
