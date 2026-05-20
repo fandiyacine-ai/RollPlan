@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select'
 import { searchCatalogAction, type CatalogEntry } from './catalog-actions'
 import { countryFlag, giNoGi } from '../../../lib/tournament-utils'
+import { RulesetBadge } from '@/components/ruleset-badge'
 
 export function DeleteTournamentButton({ id }: { id: string }) {
   const [pending, setPending] = useState(false)
@@ -61,15 +62,6 @@ const RULESET_OPTIONS = [
 
 // ── Event catalog picker ──────────────────────────────────────────────────────
 
-const SOURCE_BADGE: Record<string, { label: string; colour: string }> = {
-  ibjjf:      { label: 'IBJJF',      colour: 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800/30' },
-  ajp:        { label: 'AJP',        colour: 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800/30' },
-  adcc:       { label: 'ADCC',       colour: 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/30' },
-  ebi:        { label: 'EBI',        colour: 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/30' },
-  smoothcomp: { label: 'SC',         colour: 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/30' },
-  other:      { label: 'Other',      colour: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700/30' },
-}
-
 function EventCatalogPicker({ onSelect }: { onSelect: (e: CatalogEntry) => void }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<CatalogEntry[]>([])
@@ -91,8 +83,6 @@ function EventCatalogPicker({ onSelect }: { onSelect: (e: CatalogEntry) => void 
     return () => clearTimeout(timer)
   }, [query, search])
 
-  const badge = (source: string) => SOURCE_BADGE[source] ?? SOURCE_BADGE.other
-
   return (
     <div className="space-y-2">
       <Input
@@ -106,7 +96,6 @@ function EventCatalogPicker({ onSelect }: { onSelect: (e: CatalogEntry) => void 
           <p className="text-xs text-muted-foreground px-3 py-4 text-center">Loading…</p>
         )}
         {!loading && results.map((ev) => {
-          const b = badge(ev.source)
           const flag = countryFlag(ev.location)
           const format = giNoGi(ev.ruleset, ev.name)
           const dateStr = ev.eventDate
@@ -126,16 +115,12 @@ function EventCatalogPicker({ onSelect }: { onSelect: (e: CatalogEntry) => void 
                   {ev.name}
                 </p>
                 <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
-                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
-                    format === 'nogi'
-                      ? 'bg-orange-950/40 text-orange-400 border-orange-800/30'
-                      : 'bg-blue-950/40 text-blue-400 border-blue-800/30'
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                    format === 'nogi' ? 'bg-orange-500 text-white' : 'bg-sky-500 text-white'
                   }`}>
                     {format === 'nogi' ? 'No-Gi' : 'Gi'}
                   </span>
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase ${b.colour}`}>
-                    {b.label}
-                  </span>
+                  <RulesetBadge ruleset={ev.ruleset} />
                 </div>
               </div>
               {/* Meta row */}
@@ -240,14 +225,7 @@ export function CreateTournamentForm() {
           <>
             {prefilled && (
               <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 text-sm">
-                {(() => {
-                  const b = SOURCE_BADGE[prefilled.source] ?? SOURCE_BADGE.other
-                  return (
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase flex-shrink-0 ${b.colour}`}>
-                      {b.label}
-                    </span>
-                  )
-                })()}
+                <RulesetBadge ruleset={prefilled.ruleset} />
                 <span className="font-medium truncate">{prefilled.name}</span>
               </div>
             )}

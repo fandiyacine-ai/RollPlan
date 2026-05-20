@@ -13,6 +13,7 @@ import { ControlTrendChart, type TrendPoint } from './progress-chart'
 import { TransitionDiagram, type TransitionData } from './transition-diagram'
 import { ShareCardButton } from './share-card-button'
 import type { ShareCardData } from './share-card'
+import { RulesetBadge } from '@/components/ruleset-badge'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,13 +31,6 @@ const BELT_STYLE: Record<string, { bg: string; text: string }> = {
   green:  { bg: 'bg-green-600',   text: 'text-white' },
 }
 
-const RULESET_BADGE: Record<string, { label: string; color: string }> = {
-  ibjjf:  { label: 'IBJJF',   color: 'text-blue-400 bg-blue-950/40 border-blue-900/30' },
-  ajp:    { label: 'AJP',     color: 'text-purple-400 bg-purple-950/40 border-purple-900/30' },
-  adcc:   { label: 'ADCC',    color: 'text-amber-400 bg-amber-950/40 border-amber-900/30' },
-  nogi:   { label: 'No-Gi',   color: 'text-zinc-400 bg-zinc-800/40 border-zinc-700/30' },
-  ebi:    { label: 'EBI',     color: 'text-rose-400 bg-rose-950/40 border-rose-900/30' },
-}
 
 function fmt(s: number): string {
   if (s < 60) return `${Math.round(s)}s`
@@ -627,7 +621,6 @@ export default async function PlayerCardPage() {
               <div className="divide-y divide-border/40">
                 {upcomingTournaments.map(t => {
                   const days = daysUntil(t.eventDate)
-                  const rulesetInfo = t.ruleset ? RULESET_BADGE[t.ruleset] : null
                   return (
                     <div key={t.id} className="px-4 py-3 space-y-1.5">
                       <div className="flex items-start justify-between gap-2">
@@ -644,11 +637,7 @@ export default async function PlayerCardPage() {
                         {t.eventDate && (
                           <p className="text-xs text-muted-foreground">{fmtDate(t.eventDate)}</p>
                         )}
-                        {rulesetInfo && (
-                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${rulesetInfo.color}`}>
-                            {rulesetInfo.label}
-                          </span>
-                        )}
+                        {t.ruleset && <RulesetBadge ruleset={t.ruleset} />}
                       </div>
                       <div className="flex items-center gap-3 pt-0.5">
                         {t.gameplanCount > 0 ? (

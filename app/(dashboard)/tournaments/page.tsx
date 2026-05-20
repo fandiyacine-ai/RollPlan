@@ -4,17 +4,9 @@ import { desc, eq } from 'drizzle-orm'
 import Link from 'next/link'
 import { CreateTournamentForm, DeleteTournamentButton, EditTournamentButton } from './create-form'
 import { countryFlag, giNoGi } from '../../../lib/tournament-utils'
+import { RulesetBadge } from '@/components/ruleset-badge'
 
 export const dynamic = 'force-dynamic'
-
-const RULESET_BADGE: Record<string, { label: string; colour: string }> = {
-  ibjjf:  { label: 'IBJJF',  colour: 'bg-blue-950/60 text-blue-400 border-blue-800/40' },
-  ajp:    { label: 'AJP',    colour: 'bg-purple-950/60 text-purple-400 border-purple-800/40' },
-  adcc:   { label: 'ADCC',   colour: 'bg-amber-950/60 text-amber-400 border-amber-800/40' },
-  ebi:    { label: 'EBI',    colour: 'bg-rose-950/60 text-rose-400 border-rose-800/40' },
-  nogi:   { label: 'No-Gi',  colour: 'bg-zinc-800 text-zinc-400 border-zinc-700' },
-  other:  { label: 'Other',  colour: 'bg-zinc-800 text-zinc-400 border-zinc-700' },
-}
 
 const STATUS_BADGE: Record<string, string> = {
   upcoming:  'bg-blue-950/60 text-blue-400 border border-blue-800/40',
@@ -57,7 +49,7 @@ export default async function TournamentsPage() {
   return (
     <div className="space-y-6 max-w-2xl">
       {/* Step guide */}
-      <div className="bg-card border border-border/60 rounded-xl p-5">
+      <div className="border border-dashed border-border/60 rounded-xl p-5 bg-muted/20">
         <div className="flex items-start gap-3">
           {[
             { n: '1', title: 'Create a tournament', body: 'Name the event, ruleset, and division you\'re competing in.' },
@@ -70,7 +62,7 @@ export default async function TournamentsPage() {
                 <p className="font-medium text-sm mt-1">{step.title}</p>
                 <p className="text-xs text-muted-foreground mt-1">{step.body}</p>
               </div>
-              {i < 2 && <div className="pt-4 text-muted-foreground/50 font-light text-lg select-none">→</div>}
+              {i < 2 && <div className="pt-4 text-muted-foreground/40 font-light text-lg select-none">→</div>}
             </div>
           ))}
         </div>
@@ -89,7 +81,6 @@ export default async function TournamentsPage() {
       ) : (
         <div className="space-y-2.5">
           {allTournaments.map((t) => {
-            const rb = RULESET_BADGE[t.ruleset] ?? RULESET_BADGE.other
             const format = giNoGi(t.ruleset, t.name)
             const flag = countryFlag(t.location ?? null)
             const days = t.status === 'upcoming' ? daysUntil(t.eventDate) : null
@@ -107,13 +98,11 @@ export default async function TournamentsPage() {
                       <p className="font-semibold text-sm leading-snug">{t.name}</p>
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase ${rb.colour}`}>
-                        {rb.label}
-                      </span>
-                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
+                      <RulesetBadge ruleset={t.ruleset} />
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
                         format === 'nogi'
-                          ? 'bg-orange-950/40 text-orange-400 border-orange-800/30'
-                          : 'bg-blue-950/40 text-blue-400 border-blue-800/30'
+                          ? 'bg-orange-500 text-white'
+                          : 'bg-sky-500 text-white'
                       }`}>
                         {format === 'nogi' ? 'No-Gi' : 'Gi'}
                       </span>
