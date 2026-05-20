@@ -3,6 +3,7 @@ import { tournaments } from '../../../../lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { EditTournamentButton } from '../create-form'
 
 const RULESET_LABEL: Record<string, string> = {
   ibjjf: 'IBJJF', ajp: 'AJP', adcc: 'ADCC', ebi: 'EBI', other: 'Other',
@@ -37,7 +38,19 @@ export default async function TournamentLayout({
         <Link href="/tournaments" className="text-xs text-muted-foreground hover:text-foreground inline-block mb-3">
           ← Tournaments
         </Link>
-        <h1 className="text-2xl font-bold">{tournament.name}</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold">{tournament.name}</h1>
+          <EditTournamentButton tournament={{
+            id: tournament.id,
+            name: tournament.name,
+            eventDate: tournament.eventDate ?? null,
+            division: tournament.division ?? null,
+            ruleset: tournament.ruleset,
+            notes: tournament.notes ?? null,
+            status: tournament.status,
+            smoothcompUrl: tournament.smoothcompUrl ?? null,
+          }} />
+        </div>
         <p className="text-sm text-muted-foreground mt-1">
           {RULESET_LABEL[tournament.ruleset] ?? tournament.ruleset}
           {tournament.division ? ` · ${tournament.division}` : ''}

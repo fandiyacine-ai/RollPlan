@@ -196,11 +196,10 @@ export function EditTournamentButton({ tournament }: { tournament: TournamentDat
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setError(null); setPending(false) } }}>
-      <DialogTrigger>
+      <DialogTrigger onClick={e => e.stopPropagation()}>
         <Button
           variant="ghost"
           size="icon-sm"
-          onClick={e => { e.preventDefault(); e.stopPropagation() }}
           aria-label="Edit tournament"
           className="text-muted-foreground hover:text-foreground"
         >
