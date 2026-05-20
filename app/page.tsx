@@ -167,10 +167,14 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
+      <footer className="border-t px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
         <span className="font-extrabold tracking-tight text-foreground [font-family:var(--font-brand)]">
           Frame<span className="text-muted-foreground font-bold">Matters</span>
         </span>
+        <div className="flex items-center gap-5">
+          <Link href="/faq" className="hover:text-foreground transition-colors">FAQ</Link>
+          <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
+        </div>
         <p className="text-center sm:text-right max-w-sm">
           Your video is processed by Google Gemini AI and stored securely.
           You own your data and can delete it at any time from your account.

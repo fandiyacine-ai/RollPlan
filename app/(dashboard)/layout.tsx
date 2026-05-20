@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import Link from 'next/link'
 import { Nav } from './nav'
 import { getOrCreateDbUserId } from '../../lib/db/get-user'
 import { checkMonthlyLimit } from '../../lib/db/usage'
@@ -25,9 +26,13 @@ async function UsagePill() {
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <Nav usageSlot={<Suspense fallback={null}><UsagePill /></Suspense>} />
-      <main className="p-6">{children}</main>
+      <main className="p-6 flex-1">{children}</main>
+      <footer className="px-6 py-4 border-t border-border/40 flex items-center justify-center gap-6 text-xs text-muted-foreground/60">
+        <Link href="/faq" className="hover:text-muted-foreground transition-colors">FAQ</Link>
+        <Link href="/contact" className="hover:text-muted-foreground transition-colors">Contact</Link>
+      </footer>
     </div>
   )
 }

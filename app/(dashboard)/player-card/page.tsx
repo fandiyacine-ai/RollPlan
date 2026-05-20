@@ -1,7 +1,7 @@
 import React from 'react'
 import { db } from '../../../lib/db'
-import { matches, insights, videos, positionSegments, matchEvents, users } from '../../../lib/db/schema'
-import { desc, eq, inArray, isNull, and, ne, or } from 'drizzle-orm'
+import { matches, insights, videos, positionSegments, matchEvents, users, tournaments, tournamentOpponents, gameplans } from '../../../lib/db/schema'
+import { desc, eq, inArray, isNull, and, ne, or, sql } from 'drizzle-orm'
 import Link from 'next/link'
 import { buttonVariants } from '../../../components/ui/button'
 import RefreshPoller from './refresh-poller'
@@ -30,6 +30,14 @@ const BELT_STYLE: Record<string, { bg: string; text: string }> = {
   green:  { bg: 'bg-green-600',   text: 'text-white' },
 }
 
+const RULESET_BADGE: Record<string, { label: string; color: string }> = {
+  ibjjf:  { label: 'IBJJF',   color: 'text-blue-400 bg-blue-950/40 border-blue-900/30' },
+  ajp:    { label: 'AJP',     color: 'text-purple-400 bg-purple-950/40 border-purple-900/30' },
+  adcc:   { label: 'ADCC',    color: 'text-amber-400 bg-amber-950/40 border-amber-900/30' },
+  nogi:   { label: 'No-Gi',   color: 'text-zinc-400 bg-zinc-800/40 border-zinc-700/30' },
+  ebi:    { label: 'EBI',     color: 'text-rose-400 bg-rose-950/40 border-rose-900/30' },
+}
+
 function fmt(s: number): string {
   if (s < 60) return `${Math.round(s)}s`
   const m = Math.floor(s / 60)
@@ -39,6 +47,17 @@ function fmt(s: number): string {
 
 function initials(name: string): string {
   return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+}
+
+function fmtDate(d: string | null): string {
+  if (!d) return ''
+  return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function daysUntil(d: string | null): number | null {
+  if (!d) return null
+  const target = new Date(d + 'T12:00:00')
+  return Math.ceil((target.getTime() - Date.now()) / 86400000)
 }
 
 export default async function PlayerCardPage() {
@@ -66,6 +85,8 @@ export default async function PlayerCardPage() {
       context: matches.context,
       createdAt: matches.createdAt,
       sourceType: videos.sourceType,
+      resultWinner: matches.resultWinner,
+      resultMethod: matches.resultMethod,
     })
     .from(matches)
     .leftJoin(videos, eq(matches.videoId, videos.id))
@@ -102,6 +123,29 @@ export default async function PlayerCardPage() {
       : Promise.resolve([]),
   ])
 
+  // ── Upcoming tournaments for sidebar ──
+  const upcomingTournaments = dbUser ? await db
+    .select({
+      id: tournaments.id,
+      name: tournaments.name,
+      eventDate: tournaments.eventDate,
+      ruleset: tournaments.ruleset,
+      opponentCount: sql<number>`count(distinct ${tournamentOpponents.id})::int`,
+      gameplanCount: sql<number>`count(distinct ${gameplans.id})::int`,
+    })
+    .from(tournaments)
+    .leftJoin(tournamentOpponents, eq(tournamentOpponents.tournamentId, tournaments.id))
+    .leftJoin(gameplans, eq(gameplans.tournamentId, tournaments.id))
+    .where(and(
+      eq(tournaments.userId, dbUser.id),
+      or(eq(tournaments.status, 'upcoming'), isNull(tournaments.status)),
+    ))
+    .groupBy(tournaments.id)
+    .orderBy(sql`CASE WHEN ${tournaments.eventDate} IS NULL THEN 1 ELSE 0 END, ${tournaments.eventDate} ASC`)
+    .limit(5)
+    .catch(() => [] as { id: string; name: string; eventDate: string | null; ruleset: string | null; opponentCount: number; gameplanCount: number }[])
+    : []
+
   // ── Stats ──
   const totalAnalyzedTime = allSegments.reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
   const totalDominantTime = allSegments.filter(s => s.dominance === 'dominant').reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
@@ -110,9 +154,12 @@ export default async function PlayerCardPage() {
   const underPressurePct = totalAnalyzedTime > 0 ? Math.round((totalInferiorTime / totalAnalyzedTime) * 100) : 0
   const avgMatchDuration = ownAnalysedIds.length > 0 ? Math.round(totalAnalyzedTime / ownAnalysedIds.length) : 0
   const subAttempts = allEvents.filter(e => e.actor === 'user' && e.eventTypeId.includes('submission')).length
-  const avgAiScore = allInsights.length > 0
-    ? Math.round(allInsights.reduce((acc, i) => acc + i.confidence, 0) / allInsights.length * 100)
-    : null
+
+  // ── Record ──
+  const wins = recentMatches.filter(m => m.status === 'analysed' && m.resultWinner === 'user').length
+  const losses = recentMatches.filter(m => m.status === 'analysed' && m.resultWinner === 'opponent').length
+  const subWins = recentMatches.filter(m => m.resultWinner === 'user' && m.resultMethod === 'submission').length
+  const hasRecord = wins > 0 || losses > 0
 
   // ── Per-match trend (chronological) ──
   const perMatchTrend: TrendPoint[] = ownAnalysedIds
@@ -131,7 +178,6 @@ export default async function PlayerCardPage() {
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
     .slice(-20)
 
-  // trend delta: last 3 vs previous 3
   const trendDelta = (() => {
     if (perMatchTrend.length < 4) return null
     const recent = perMatchTrend.slice(-3)
@@ -186,20 +232,15 @@ export default async function PlayerCardPage() {
   }
   const transitionEdges = Object.entries(transitionCounts).flatMap(([fromId, tos]) =>
     Object.entries(tos).map(([toId, { count, yourActionCount }]) => ({
-      fromId,
-      toId,
-      count,
+      fromId, toId, count,
       yourAction: yourActionCount >= count / 2,
     }))
   ).sort((a, b) => b.count - a.count)
 
   const transitionData: TransitionData = {
     nodes: sortedPositions.slice(0, 6).map(([id, s]) => ({
-      id,
-      name: POSITION_MAP[id] ?? id,
-      totalTime: s.total,
-      dominantTime: s.dominant,
-      inferiorTime: s.inferior,
+      id, name: POSITION_MAP[id] ?? id,
+      totalTime: s.total, dominantTime: s.dominant, inferiorTime: s.inferior,
     })),
     edges: transitionEdges,
   }
@@ -219,20 +260,6 @@ export default async function PlayerCardPage() {
 
   const isProcessing = scanningVideos.length > 0 || recentMatches.some(m => m.status === 'pending' || m.status === 'processing')
   const isEmpty = recentMatches.length === 0 && scanningVideos.length === 0 && failedVideos.length === 0
-
-  if (isEmpty) {
-    return (
-      <div className="max-w-2xl space-y-6">
-        <ProfileHeader name={displayName} dbUser={dbUser} />
-        <div className="rounded-xl border border-dashed border-border p-16 text-center space-y-4">
-          <p className="text-muted-foreground text-sm">No match footage analysed yet.</p>
-          <Link href="/upload" className={buttonVariants({ size: 'sm', className: 'rounded-full' })}>
-            Analyse your first match
-          </Link>
-        </div>
-      </div>
-    )
-  }
 
   const matchesSub = pendingCount > 0 ? `${pendingCount} analysing…` : undefined
 
@@ -255,273 +282,409 @@ export default async function PlayerCardPage() {
   }
 
   return (
-    <div className="max-w-5xl space-y-8">
+    <div className="max-w-6xl">
       {isProcessing && <RefreshPoller />}
 
-      <ProfileHeader name={displayName} dbUser={dbUser} />
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_288px] gap-6 items-start">
 
-      {/* Stats strip */}
-      {ownAnalysedIds.length > 0 && (
-        <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
-          {/* Control rate — featured */}
-          <div className="px-5 pt-4 pb-3.5 border-b border-border/60">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Control Rate</p>
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className={`text-2xl font-bold tabular-nums leading-none ${
-                controlPct >= 55 ? 'text-emerald-400' : controlPct < 35 ? 'text-rose-400' : 'text-foreground'
-              }`}>{controlPct}%</span>
-              {trendDelta != null && trendDelta !== 0 && (
-                <span className={`text-xs font-semibold ${trendDelta > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {trendDelta > 0 ? '↑' : '↓'}{Math.abs(trendDelta)}%
-                </span>
+        {/* ── Left: Analytics ── */}
+        <div className="space-y-5 min-w-0">
+          <ProfileHeader name={displayName} dbUser={dbUser} />
+
+          {isEmpty ? (
+            <div className="rounded-xl border border-dashed border-border p-14 text-center space-y-4">
+              <p className="text-muted-foreground text-sm">No match footage analysed yet.</p>
+              <Link href="/upload" className={buttonVariants({ size: 'sm', className: 'rounded-full' })}>
+                Analyse your first match
+              </Link>
+            </div>
+          ) : (
+            <>
+              {/* Stats strip */}
+              {ownAnalysedIds.length > 0 && (
+                <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+                  <div className="px-5 pt-3.5 pb-3 border-b border-border/60">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">Control Rate</p>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className={`text-2xl font-bold tabular-nums leading-none ${
+                        controlPct >= 55 ? 'text-emerald-400' : controlPct < 35 ? 'text-rose-400' : 'text-foreground'
+                      }`}>{controlPct}%</span>
+                      {trendDelta != null && trendDelta !== 0 && (
+                        <span className={`text-xs font-semibold ${trendDelta > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {trendDelta > 0 ? '↑' : '↓'}{Math.abs(trendDelta)}%
+                        </span>
+                      )}
+                      <span className="text-xs text-muted-foreground">{underPressurePct}% under pressure</span>
+                    </div>
+                    <div className="mt-2 h-1 rounded-full bg-muted overflow-hidden max-w-xs">
+                      <div className="h-full rounded-full" style={{
+                        width: `${controlPct}%`,
+                        background: controlPct >= 55 ? '#4ade80' : controlPct < 35 ? '#f87171' : '#71717a',
+                      }} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-4 divide-x divide-border/40">
+                    {[
+                      { label: 'Matches', value: String(ownAnalysedIds.length), sub: matchesSub },
+                      { label: 'Mat Time', value: fmt(totalAnalyzedTime) },
+                      { label: 'Avg Match', value: avgMatchDuration > 0 ? fmt(avgMatchDuration) : '—' },
+                      { label: 'Attacks', value: String(subAttempts), sub: 'sub attempts' },
+                    ].map(({ label, value, sub }) => (
+                      <div key={label} className="px-3 py-2.5">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">{label}</p>
+                        <p className="text-sm font-semibold tabular-nums mt-0.5">{value}</p>
+                        {sub && <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
-              <span className="text-xs text-muted-foreground">{underPressurePct}% under pressure</span>
-            </div>
-            <div className="mt-2.5 h-1 rounded-full bg-muted overflow-hidden max-w-sm">
-              <div className="h-full rounded-full" style={{
-                width: `${controlPct}%`,
-                background: controlPct >= 55 ? '#4ade80' : controlPct < 35 ? '#f87171' : '#71717a',
-              }} />
-            </div>
-          </div>
-          {/* Secondary stats */}
-          <div className="grid grid-cols-4 divide-x divide-border/40">
-            {[
-              { label: 'Matches', value: String(ownAnalysedIds.length), sub: matchesSub },
-              { label: 'Mat Time', value: fmt(totalAnalyzedTime) },
-              { label: 'Avg Match', value: avgMatchDuration > 0 ? fmt(avgMatchDuration) : '—' },
-              { label: 'Attacks', value: String(subAttempts), sub: 'submission attempts' },
-            ].map(({ label, value, sub }) => (
-              <div key={label} className="px-4 py-3">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">{label}</p>
-                <p className="text-base font-semibold tabular-nums mt-0.5">{value}</p>
-                {sub && <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* Progress over time */}
-      {ownAnalysedIds.length >= 2 && (
-        <div className="rounded-xl border border-border/60 overflow-hidden bg-card">
-          <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Progress Over Time</h2>
-            {trendDelta !== null && trendDelta !== 0 && (
-              <span className={`text-xs font-semibold ${trendDelta > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {trendDelta > 0 ? '↑' : '↓'} {Math.abs(trendDelta)}% vs prev 3 matches
-              </span>
+              {/* Progress over time */}
+              {ownAnalysedIds.length >= 2 && (
+                <div className="rounded-xl border border-border/60 overflow-hidden bg-card">
+                  <div className="px-5 py-2.5 border-b border-border/60 flex items-center justify-between">
+                    <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Progress Over Time</h2>
+                    {trendDelta !== null && trendDelta !== 0 && (
+                      <span className={`text-xs font-semibold ${trendDelta > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {trendDelta > 0 ? '↑' : '↓'} {Math.abs(trendDelta)}% vs prev 3
+                      </span>
+                    )}
+                  </div>
+                  <div className="px-5 pt-3 pb-1">
+                    <div className="flex items-center gap-5 text-xs text-muted-foreground mb-3">
+                      <span className="flex items-center gap-1.5">
+                        <span className="inline-block w-4 h-0.5 bg-emerald-400 rounded-full" />Control Rate
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="inline-block w-4 h-0.5 bg-rose-500/50 rounded-full" />Under Pressure
+                      </span>
+                    </div>
+                    <ControlTrendChart data={perMatchTrend} />
+                  </div>
+                </div>
+              )}
+
+              {/* Processing banner */}
+              {pendingCount > 0 && (
+                <div className="rounded-xl border border-blue-900/30 bg-blue-950/10 px-4 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                    <p className="text-sm text-muted-foreground">
+                      {pendingCount} match{pendingCount !== 1 ? 'es' : ''} being analysed
+                    </p>
+                  </div>
+                  <Link href="/matches" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                    View →
+                  </Link>
+                </div>
+              )}
+
+              {/* Game DNA */}
+              {(sharpPositions.length > 0 || exposedPositions.length > 0) && (
+                <div className="rounded-xl border border-border/60 overflow-hidden bg-card">
+                  <div className="px-5 py-2.5 border-b border-border/60 flex items-center justify-between">
+                    <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Game DNA</h2>
+                    <span className="text-xs text-muted-foreground">{ownAnalysedIds.length} match{ownAnalysedIds.length !== 1 ? 'es' : ''}</span>
+                  </div>
+                  <div className="grid grid-cols-2 divide-x divide-border/60">
+                    <div className="p-4 space-y-3">
+                      <p className="text-[10px] font-semibold text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />Strongest
+                      </p>
+                      {sharpPositions.length > 0 ? sharpPositions.map(([id, s]) => {
+                        const pct = Math.round((s.dominant / s.total) * 100)
+                        return (
+                          <div key={id}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm">{POSITION_MAP[id] ?? id}</span>
+                              <span className="text-xs font-bold text-emerald-400 tabular-nums">{pct}%</span>
+                            </div>
+                            <div className="h-1 rounded-full bg-muted overflow-hidden">
+                              <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        )
+                      }) : <p className="text-xs text-muted-foreground">Not enough data yet</p>}
+                    </div>
+                    <div className="p-4 space-y-3">
+                      <p className="text-[10px] font-semibold text-rose-400 uppercase tracking-widest flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-400 inline-block" />Exposed
+                      </p>
+                      {exposedPositions.length > 0 ? exposedPositions.map(([id, s]) => {
+                        const pct = Math.round((s.inferior / s.total) * 100)
+                        return (
+                          <div key={id}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm">{POSITION_MAP[id] ?? id}</span>
+                              <span className="text-xs font-bold text-rose-400 tabular-nums">{pct}%</span>
+                            </div>
+                            <div className="h-1 rounded-full bg-muted overflow-hidden">
+                              <div className="h-full bg-rose-500 rounded-full" style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        )
+                      }) : <p className="text-xs text-muted-foreground">Not enough data yet</p>}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Signature techniques */}
+              {(topMyTech.length >= 2 || topTheirTech.length >= 2) && (
+                <div className="rounded-xl border border-border/60 overflow-hidden bg-card">
+                  <div className="px-5 py-2.5 border-b border-border/60">
+                    <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Signature Game</h2>
+                  </div>
+                  <div className="grid grid-cols-2 divide-x divide-border/60">
+                    <div className="p-4 space-y-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Your Weapons</p>
+                      {topMyTech.length > 0 ? topMyTech.map(([tech, count]) => (
+                        <div key={tech}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm capitalize">{tech}</span>
+                            <span className="text-xs text-muted-foreground tabular-nums">{count}×</span>
+                          </div>
+                          <div className="h-1 rounded-full bg-muted overflow-hidden">
+                            <div className="h-full bg-foreground/40 rounded-full" style={{ width: `${(count / maxMyTech) * 100}%` }} />
+                          </div>
+                        </div>
+                      )) : <p className="text-xs text-muted-foreground">Not enough data yet</p>}
+                    </div>
+                    <div className="p-4 space-y-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Opponent Threats</p>
+                      {topTheirTech.length > 0 ? topTheirTech.map(([tech, count]) => (
+                        <div key={tech}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm capitalize">{tech}</span>
+                            <span className="text-xs text-muted-foreground tabular-nums">{count}×</span>
+                          </div>
+                          <div className="h-1 rounded-full bg-muted overflow-hidden">
+                            <div className="h-full bg-rose-500/50 rounded-full" style={{ width: `${(count / maxTheirTech) * 100}%` }} />
+                          </div>
+                        </div>
+                      )) : <p className="text-xs text-muted-foreground">Not enough data yet</p>}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Time & Control */}
+              {sortedPositions.length > 0 && (
+                <div className="space-y-2.5">
+                  <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Time & Control</h2>
+                  <div className="rounded-xl border bg-card p-4 space-y-3.5">
+                    {sortedPositions.slice(0, 10).map(([posId, stats]) => {
+                      const barPct = (stats.total / maxPositionTime) * 100
+                      const domPct = (stats.dominant / stats.total) * 100
+                      const infPct = (stats.inferior / stats.total) * 100
+                      const neuPct = Math.max(0, 100 - domPct - infPct)
+                      return (
+                        <div key={posId}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm">{POSITION_MAP[posId] ?? posId}</span>
+                            <span className="text-xs text-muted-foreground tabular-nums">{fmt(stats.total)}</span>
+                          </div>
+                          <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                            <div className="h-full flex rounded-full overflow-hidden" style={{ width: `${barPct}%` }}>
+                              <div className="bg-emerald-500" style={{ width: `${domPct}%` }} />
+                              <div className="bg-zinc-500/60" style={{ width: `${neuPct}%` }} />
+                              <div className="bg-rose-500" style={{ width: `${infPct}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" /> In Control</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-zinc-500/60 inline-block" /> Neutral</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-rose-500 inline-block" /> Under Pressure</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Position Transition Flow */}
+              {transitionData.nodes.length >= 3 && transitionEdges.length >= 3 && (
+                <div className="rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950">
+                  <div className="px-5 py-2.5 border-b border-zinc-800/80 flex items-center justify-between flex-wrap gap-2">
+                    <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">Position Flow</h2>
+                    <div className="flex items-center gap-4 text-[10px] text-zinc-600">
+                      <span className="flex items-center gap-1.5"><span className="w-5 h-0.5 bg-emerald-500 inline-block rounded-full" />Your move</span>
+                      <span className="flex items-center gap-1.5"><span className="w-5 h-0.5 bg-rose-500 inline-block rounded-full" />Opponent move</span>
+                    </div>
+                  </div>
+                  <div className="py-1">
+                    <TransitionDiagram data={transitionData} />
+                  </div>
+                  <p className="px-5 pb-3 text-[10px] text-zinc-800">Arrow weight = transition frequency · {ownAnalysedIds.length} matches</p>
+                </div>
+              )}
+
+              {/* Failed videos */}
+              {failedVideos.length > 0 && (
+                <div className="space-y-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Failed</h2>
+                  {failedVideos.map((v) => (
+                    <div key={v.id} className="rounded-xl border border-rose-900/40 bg-rose-950/20 p-4 flex items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate">{v.originalFilename}</p>
+                        <p className="text-xs text-rose-400 mt-0.5">Analysis failed — remove or resubmit</p>
+                      </div>
+                      <DeleteVideoButton videoId={v.id} />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Footer */}
+              <div className="flex items-center justify-between pt-2 border-t border-border/40">
+                <p className="text-xs text-muted-foreground">
+                  Stats from {ownAnalysedIds.length} analysed match{ownAnalysedIds.length !== 1 ? 'es' : ''}
+                </p>
+                <div className="flex items-center gap-2">
+                  {ownAnalysedIds.length > 0 && <ShareCardButton data={shareCardData} />}
+                  <ClearAllButton />
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* ── Right: Sidebar ── */}
+        <aside className="space-y-4 lg:sticky lg:top-20">
+
+          {/* My Record — only shown once results are logged */}
+          {hasRecord && (
+            <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-border/60">
+                <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">My Record</h2>
+              </div>
+              <div className="px-4 py-3 grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-2xl font-bold text-emerald-400 tabular-nums">{wins}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">Wins</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-rose-400 tabular-nums">{losses}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">Losses</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold tabular-nums">{ownAnalysedIds.length - wins - losses}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">N/R</p>
+                </div>
+              </div>
+              {wins > 0 && (
+                <div className="px-4 pb-3 border-t border-border/40 pt-2.5 flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">Finish rate</p>
+                  <p className="text-xs font-semibold tabular-nums">
+                    {wins > 0 ? `${Math.round((subWins / wins) * 100)}%` : '—'}
+                    <span className="text-muted-foreground font-normal"> by sub</span>
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* My Stats — compact key numbers */}
+          {ownAnalysedIds.length > 0 && (
+            <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-border/60">
+                <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">My Stats</h2>
+              </div>
+              <div className="divide-y divide-border/40">
+                {[
+                  { label: 'Control rate', value: `${controlPct}%`, accent: controlPct >= 55 ? 'text-emerald-400' : controlPct < 35 ? 'text-rose-400' : '' },
+                  { label: 'Under pressure', value: `${underPressurePct}%`, accent: underPressurePct >= 50 ? 'text-rose-400' : '' },
+                  { label: 'Total mat time', value: fmt(totalAnalyzedTime), accent: '' },
+                  { label: 'Sub attempts', value: String(subAttempts), accent: '' },
+                ].map(({ label, value, accent }) => (
+                  <div key={label} className="px-4 py-2.5 flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">{label}</p>
+                    <p className={`text-xs font-semibold tabular-nums ${accent}`}>{value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Upcoming Tournaments */}
+          <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-border/60 flex items-center justify-between">
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Upcoming</h2>
+              <Link href="/tournaments" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                All →
+              </Link>
+            </div>
+            {upcomingTournaments.length === 0 ? (
+              <div className="px-4 py-6 text-center space-y-2">
+                <p className="text-xs text-muted-foreground">No upcoming tournaments</p>
+                <Link href="/tournaments" className="text-xs font-medium text-primary hover:underline">
+                  + Add tournament
+                </Link>
+              </div>
+            ) : (
+              <div className="divide-y divide-border/40">
+                {upcomingTournaments.map(t => {
+                  const days = daysUntil(t.eventDate)
+                  const rulesetInfo = t.ruleset ? RULESET_BADGE[t.ruleset] : null
+                  return (
+                    <div key={t.id} className="px-4 py-3 space-y-1.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-medium leading-snug line-clamp-2">{t.name}</p>
+                        {days !== null && days >= 0 && (
+                          <span className={`text-[10px] font-bold tabular-nums flex-shrink-0 mt-0.5 ${
+                            days === 0 ? 'text-rose-400' : days <= 7 ? 'text-rose-400' : days <= 30 ? 'text-amber-400' : 'text-muted-foreground'
+                          }`}>
+                            {days === 0 ? 'Today!' : `${days}d`}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {t.eventDate && (
+                          <p className="text-xs text-muted-foreground">{fmtDate(t.eventDate)}</p>
+                        )}
+                        {rulesetInfo && (
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${rulesetInfo.color}`}>
+                            {rulesetInfo.label}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 pt-0.5">
+                        {t.gameplanCount > 0 ? (
+                          <>
+                            <Link href={`/tournaments/${t.id}/gameplan`} className="text-xs font-medium text-primary hover:underline">
+                              Gameplan →
+                            </Link>
+                            <Link href={`/tournaments/${t.id}/opponents`} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                              {t.opponentCount} opponent{t.opponentCount !== 1 ? 's' : ''}
+                            </Link>
+                          </>
+                        ) : (
+                          <Link href={`/tournaments/${t.id}/opponents`} className="text-xs font-medium text-primary hover:underline">
+                            {t.opponentCount > 0 ? `${t.opponentCount} opponents — scout →` : 'Add opponents →'}
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             )}
           </div>
-          <div className="px-5 pt-3 pb-1">
-            <div className="flex items-center gap-5 text-xs text-muted-foreground mb-3">
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block w-4 h-0.5 bg-emerald-400 rounded-full" />
-                Control Rate
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block w-4 h-0.5 bg-rose-500/50 rounded-full" />
-                Under Pressure
-              </span>
-            </div>
-            <ControlTrendChart data={perMatchTrend} />
-          </div>
-        </div>
-      )}
 
-      {/* Processing banner */}
-      {pendingCount > 0 && (
-        <div className="rounded-xl border border-blue-900/30 bg-blue-950/10 px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-            <p className="text-sm text-muted-foreground">
-              {pendingCount} match{pendingCount !== 1 ? 'es' : ''} being analysed
-            </p>
-          </div>
-          <Link href="/matches" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-            View in My Matches →
+          {/* Settings shortcut */}
+          <Link
+            href="/settings"
+            className="flex items-center justify-between px-4 py-3 rounded-xl border border-border/60 bg-card text-xs text-muted-foreground hover:text-foreground hover:border-border transition-colors group"
+          >
+            <span>Profile &amp; training goals</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-40 group-hover:opacity-80 transition-opacity">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
           </Link>
-        </div>
-      )}
 
-      {/* Game DNA */}
-      {(sharpPositions.length > 0 || exposedPositions.length > 0) && (
-        <div className="rounded-xl border border-border/60 overflow-hidden bg-card">
-          <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Game DNA</h2>
-            <span className="text-xs text-muted-foreground">{ownAnalysedIds.length} match{ownAnalysedIds.length !== 1 ? 'es' : ''}</span>
-          </div>
-          <div className="grid grid-cols-2 divide-x divide-border/60">
-            <div className="p-5 space-y-4">
-              <p className="text-[10px] font-semibold text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-                Strongest Positions
-              </p>
-              {sharpPositions.length > 0 ? sharpPositions.map(([id, s]) => {
-                const pct = Math.round((s.dominant / s.total) * 100)
-                return (
-                  <div key={id}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm">{POSITION_MAP[id] ?? id}</span>
-                      <span className="text-xs font-bold text-emerald-400 tabular-nums">{pct}%</span>
-                    </div>
-                    <div className="h-1 rounded-full bg-muted overflow-hidden">
-                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                )
-              }) : <p className="text-xs text-muted-foreground">Not enough data yet</p>}
-            </div>
-            <div className="p-5 space-y-4">
-              <p className="text-[10px] font-semibold text-rose-400 uppercase tracking-widest flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-400 inline-block" />
-                Exposed Positions
-              </p>
-              {exposedPositions.length > 0 ? exposedPositions.map(([id, s]) => {
-                const pct = Math.round((s.inferior / s.total) * 100)
-                return (
-                  <div key={id}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm">{POSITION_MAP[id] ?? id}</span>
-                      <span className="text-xs font-bold text-rose-400 tabular-nums">{pct}%</span>
-                    </div>
-                    <div className="h-1 rounded-full bg-muted overflow-hidden">
-                      <div className="h-full bg-rose-500 rounded-full" style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                )
-              }) : <p className="text-xs text-muted-foreground">Not enough data yet</p>}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Signature techniques */}
-      {(topMyTech.length >= 2 || topTheirTech.length >= 2) && (
-        <div className="rounded-xl border border-border/60 overflow-hidden bg-card">
-          <div className="px-5 py-3 border-b border-border/60">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Signature Game</h2>
-          </div>
-          <div className="grid grid-cols-2 divide-x divide-border/60">
-            <div className="p-5 space-y-4">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Your Weapons</p>
-              {topMyTech.length > 0 ? topMyTech.map(([tech, count]) => (
-                <div key={tech}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-sm capitalize">{tech}</span>
-                    <span className="text-xs text-muted-foreground tabular-nums">{count}×</span>
-                  </div>
-                  <div className="h-1 rounded-full bg-muted overflow-hidden">
-                    <div className="h-full bg-foreground/40 rounded-full" style={{ width: `${(count / maxMyTech) * 100}%` }} />
-                  </div>
-                </div>
-              )) : <p className="text-xs text-muted-foreground">Not enough data yet</p>}
-            </div>
-            <div className="p-5 space-y-4">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Opponent Threats</p>
-              {topTheirTech.length > 0 ? topTheirTech.map(([tech, count]) => (
-                <div key={tech}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-sm capitalize">{tech}</span>
-                    <span className="text-xs text-muted-foreground tabular-nums">{count}×</span>
-                  </div>
-                  <div className="h-1 rounded-full bg-muted overflow-hidden">
-                    <div className="h-full bg-rose-500/50 rounded-full" style={{ width: `${(count / maxTheirTech) * 100}%` }} />
-                  </div>
-                </div>
-              )) : <p className="text-xs text-muted-foreground">Not enough data yet</p>}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Time & Control */}
-      {sortedPositions.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Time & Control</h2>
-          <div className="rounded-xl border bg-card p-5 space-y-4">
-            {sortedPositions.slice(0, 10).map(([posId, stats]) => {
-              const barPct = (stats.total / maxPositionTime) * 100
-              const domPct = (stats.dominant / stats.total) * 100
-              const infPct = (stats.inferior / stats.total) * 100
-              const neuPct = Math.max(0, 100 - domPct - infPct)
-              return (
-                <div key={posId}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-sm">{POSITION_MAP[posId] ?? posId}</span>
-                    <span className="text-xs text-muted-foreground tabular-nums">{fmt(stats.total)}</span>
-                  </div>
-                  <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                    <div className="h-full flex rounded-full overflow-hidden" style={{ width: `${barPct}%` }}>
-                      <div className="bg-emerald-500" style={{ width: `${domPct}%` }} />
-                      <div className="bg-zinc-500/60" style={{ width: `${neuPct}%` }} />
-                      <div className="bg-rose-500" style={{ width: `${infPct}%` }} />
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-          <div className="flex items-center gap-5 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" /> In Control</span>
-            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-zinc-500/60 inline-block" /> Neutral</span>
-            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-rose-500 inline-block" /> Under Pressure</span>
-          </div>
-        </div>
-      )}
-
-      {/* Position Transition Flow */}
-      {transitionData.nodes.length >= 3 && transitionEdges.length >= 3 && (
-        <div className="rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950">
-          <div className="px-5 py-3 border-b border-zinc-800/80 flex items-center justify-between flex-wrap gap-2">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">Position Flow</h2>
-            <div className="flex items-center gap-4 text-[10px] text-zinc-600">
-              <span className="flex items-center gap-1.5">
-                <span className="w-5 h-0.5 bg-emerald-500 inline-block rounded-full" />Your move
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-5 h-0.5 bg-rose-500 inline-block rounded-full" />Opponent move
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/20 border border-emerald-500 inline-block" />In control
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500/20 border border-rose-500 inline-block" />Under pressure
-              </span>
-            </div>
-          </div>
-          <div className="py-1">
-            <TransitionDiagram data={transitionData} />
-          </div>
-          <p className="px-5 pb-3 text-[10px] text-zinc-800">Arrow weight = transition frequency · {ownAnalysedIds.length} matches</p>
-        </div>
-      )}
-
-      {/* Failed videos */}
-      {failedVideos.length > 0 && (
-        <div className="space-y-2">
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Failed</h2>
-          {failedVideos.map((v) => (
-            <div key={v.id} className="rounded-xl border border-rose-900/40 bg-rose-950/20 p-4 flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <p className="font-medium text-sm truncate">{v.originalFilename}</p>
-                <p className="text-xs text-rose-400 mt-0.5">Analysis failed — remove or resubmit</p>
-              </div>
-              <DeleteVideoButton videoId={v.id} />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Footer */}
-      <div className="flex items-center justify-between pt-2 border-t border-border/40">
-        <p className="text-xs text-muted-foreground">
-          Stats based on {ownAnalysedIds.length} analysed match{ownAnalysedIds.length !== 1 ? 'es' : ''}
-        </p>
-        <div className="flex items-center gap-2">
-          {ownAnalysedIds.length > 0 && <ShareCardButton data={shareCardData} />}
-          <ClearAllButton />
-        </div>
+        </aside>
       </div>
     </div>
   )
@@ -535,13 +698,13 @@ function ProfileHeader({ name, dbUser }: { name: string; dbUser: typeof users.$i
   const style = dbUser?.primaryStyle
 
   return (
-    <div className="flex items-center gap-4">
-      <div className="w-14 h-14 rounded-full bg-primary/10 border border-primary/20 text-primary flex items-center justify-center text-lg font-bold flex-shrink-0">
+    <div className="flex items-center gap-3.5">
+      <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/20 text-primary flex items-center justify-center text-base font-bold flex-shrink-0">
         {initials(name)}
       </div>
       <div>
         <div className="flex items-center gap-2.5 flex-wrap">
-          <h1 className="text-2xl font-black tracking-tight">{name}</h1>
+          <h1 className="text-xl font-black tracking-tight">{name}</h1>
           {belt && (
             <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${BELT_STYLE[belt]?.bg ?? 'bg-muted'} ${BELT_STYLE[belt]?.text ?? 'text-foreground'}`}>
               {belt.charAt(0).toUpperCase() + belt.slice(1)} Belt
@@ -550,34 +713,11 @@ function ProfileHeader({ name, dbUser }: { name: string; dbUser: typeof users.$i
         </div>
         <p className="text-sm text-muted-foreground mt-0.5">
           {gym ?? (
-            <Link href="#" className="hover:text-foreground transition-colors">Add gym →</Link>
+            <Link href="/settings" className="hover:text-foreground transition-colors">Add gym →</Link>
           )}
           {style && ` · ${style === 'no_gi' ? 'No-Gi' : style === 'both' ? 'Gi & No-Gi' : 'Gi'}`}
         </p>
       </div>
-    </div>
-  )
-}
-
-function StatCard({ label, value, sub, accent, trend }: {
-  label: string; value: string; sub?: string; accent?: 'good' | 'bad'; trend?: number | null
-}) {
-  return (
-    <div className="rounded-xl border bg-card px-5 py-4 space-y-1">
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</p>
-      <div className="flex items-end justify-between mt-2">
-        <p className={`text-3xl font-black tabular-nums tracking-tight leading-none ${
-          accent === 'good' ? 'text-emerald-400' : accent === 'bad' ? 'text-rose-400' : 'text-foreground'
-        }`}>
-          {value}
-        </p>
-        {trend != null && trend !== 0 && (
-          <span className={`text-xs font-bold mb-0.5 ${trend > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {trend > 0 ? '↑' : '↓'}{Math.abs(trend)}%
-          </span>
-        )}
-      </div>
-      {sub && <p className="text-[11px] text-muted-foreground">{sub}</p>}
     </div>
   )
 }
