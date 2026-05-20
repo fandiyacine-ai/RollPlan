@@ -11,6 +11,7 @@ import { MatchExtractionOutputSchema, type MatchExtractionOutput } from '../lib/
 import { PositionVerificationSchema } from '../lib/ai/schemas/position-verification'
 import { InsightsOutputSchema } from '../lib/ai/schemas/insights'
 import { buildScanUrlSystemPrompt, buildScanUrlUserPrompt, SCAN_URL_PROMPT_VERSION } from '../lib/ai/prompts/scan-url'
+import { createNotification } from '../lib/db/notifications'
 import { buildExtractMatchSystemPrompt, buildExtractMatchUserPrompt, EXTRACT_MATCH_PROMPT_VERSION } from '../lib/ai/prompts/extract-match'
 import { buildVerifyPositionsSystemPrompt, buildVerifyPositionsUserPrompt, VERIFY_POSITIONS_PROMPT_VERSION } from '../lib/ai/prompts/verify-positions'
 import { buildGenerateInsightsSystemPrompt, GENERATE_INSIGHTS_PROMPT_VERSION } from '../lib/ai/prompts/generate-insights'
@@ -637,6 +638,19 @@ export const scanUrl = inngest.createFunction(
       await db.update(videos).set({ status: 'analysed' }).where(eq(videos.id, videoId))
     })
 
+    // Notify user when their own non-chunked match analysis is done
+    if (!tournamentOpponentId && userId && chunkIndex === undefined) {
+      await step.run('notify-video-analysed', async () => {
+        await createNotification(
+          userId,
+          'video_analysed',
+          'Match analysis ready',
+          `Your footage has been analysed and matches are ready to review.`,
+          '/matches',
+        )
+      })
+    }
+
     // Transition auto_queued → auto_ready once all opponent videos have finished scanning
     if (tournamentOpponentId && chunkIndex === undefined) {
       await step.run('check-opponent-ready', async () => {
@@ -653,6 +667,20 @@ export const scanUrl = inngest.createFunction(
               eq(tournamentOpponents.id, tournamentOpponentId),
               eq(tournamentOpponents.footageStatus, 'auto_queued'),
             ))
+          if (userId) {
+            const opponent = await db.query.tournamentOpponents.findFirst({
+              where: eq(tournamentOpponents.id, tournamentOpponentId),
+            })
+            if (opponent) {
+              await createNotification(
+                userId,
+                'scout_ready',
+                `Scouting ready — ${opponent.opponentLabel}`,
+                'Footage analysis complete. View timeline and generate a gameplan.',
+                `/tournaments/${opponent.tournamentId}/opponents`,
+              )
+            }
+          }
         }
       })
     }
@@ -680,6 +708,15 @@ export const scanUrl = inngest.createFunction(
           await db.update(videos).set({ status: 'failed', failureReason: reason }).where(eq(videos.id, parentId))
         } else {
           await db.update(videos).set({ status: 'analysed' }).where(eq(videos.id, parentId))
+          if (!tournamentOpponentId && userId) {
+            await createNotification(
+              userId,
+              'video_analysed',
+              'Match analysis ready',
+              `${found.length} match${found.length > 1 ? 'es' : ''} found and ready to review.`,
+              '/matches',
+            )
+          }
         }
       })
     }

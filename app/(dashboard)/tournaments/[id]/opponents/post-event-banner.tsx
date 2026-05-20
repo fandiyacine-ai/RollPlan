@@ -42,11 +42,11 @@ export function PostEventBanner({
   }
 
   return (
-    <div className="rounded-xl border border-amber-800/40 bg-amber-950/20 p-4 space-y-3">
+    <div className="rounded-xl border border-amber-200 dark:border-amber-800/40 bg-amber-50 dark:bg-amber-950/20 p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold">How did {tournamentName} go?</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Your event date has passed — close the loop.</p>
+          <p className="text-sm font-semibold text-amber-900 dark:text-foreground">How did {tournamentName} go?</p>
+          <p className="text-xs text-amber-700 dark:text-muted-foreground mt-0.5">Your event date has passed — close the loop.</p>
         </div>
         <button
           onClick={() => setDismissed(true)}
@@ -66,8 +66,8 @@ export function PostEventBanner({
             onClick={() => setSelected(o.value)}
             className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${
               selected === o.value
-                ? 'border-amber-600 bg-amber-900/40 text-amber-300 font-medium'
-                : 'border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground'
+                ? 'border-amber-500 bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 font-medium'
+                : 'border-amber-300 dark:border-border text-amber-700 dark:text-muted-foreground hover:border-amber-500 dark:hover:border-foreground/40 hover:text-amber-900 dark:hover:text-foreground'
             }`}
           >
             {o.label}

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { UserButton } from '@clerk/nextjs'
 import { ThemeToggle } from './theme-toggle'
+import { NotificationBell } from './notifications/bell'
 import { buttonVariants } from '@/components/ui/button'
 
 const NAV = [
@@ -80,6 +81,7 @@ export function Nav({ usageSlot }: { usageSlot?: React.ReactNode }) {
 
       <div className="flex items-center gap-3">
         {usageSlot}
+        <NotificationBell />
         <ThemeToggle />
         <Link
           href="/settings"

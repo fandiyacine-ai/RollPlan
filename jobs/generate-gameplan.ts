@@ -8,6 +8,7 @@ import { GameplanOutputSchema, GameplanOutput } from '../lib/ai/schemas/gameplan
 import { MatchupPredictionSchema, MatchupPrediction } from '../lib/ai/schemas/prediction'
 import { buildGameplanSystemPrompt, buildGameplanUserPrompt, GENERATE_GAMEPLAN_PROMPT_VERSION } from '../lib/ai/prompts/generate-gameplan'
 import { buildPredictionSystemPrompt, buildPredictionUserPrompt, GENERATE_PREDICTION_PROMPT_VERSION } from '../lib/ai/prompts/generate-prediction'
+import { createNotification } from '../lib/db/notifications'
 
 type MatchStats = {
   matchCount: number
@@ -238,6 +239,18 @@ export const generateGameplan = inngest.createFunction(
         status: 'success',
       })
     })
+
+    if (userId) {
+      await step.run('notify-gameplan-ready', async () => {
+        await createNotification(
+          userId,
+          'gameplan_ready',
+          `Gameplan ready — ${gameplanData.opponent.name}`,
+          `Your gameplan for ${gameplanData.tournament.name} is ready to review.`,
+          `/tournaments/${tournamentId}/gameplan?opponent=${opponentId}`,
+        )
+      })
+    }
 
     const prediction = await step.run('generate-prediction', async () => {
       // Flatten segments + events from the fetched match data
