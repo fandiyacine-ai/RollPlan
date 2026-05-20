@@ -131,12 +131,18 @@ export const generateGameplan = inngest.createFunction(
         where: eq(gameplans.opponentId, opponentId),
       })
 
+      const evidence = {
+        user_match_ids: gameplanData.yourMatches.map(m => m.id),
+        opponent_match_ids: gameplanData.opponentMatches.map(m => m.id),
+      }
+
       if (existingGameplan) {
         await db.update(gameplans).set({
           structuredPlan: plan as any,
-          version: existingGameplan.version + 1,
+          version: existingGameplan.status === 'generating' ? existingGameplan.version : existingGameplan.version + 1,
           promptVersion: GENERATE_GAMEPLAN_PROMPT_VERSION,
           status: 'committed',
+          evidence,
         }).where(eq(gameplans.id, existingGameplan.id))
       } else {
         await db.insert(gameplans).values({
@@ -145,10 +151,7 @@ export const generateGameplan = inngest.createFunction(
           structuredPlan: plan as any,
           promptVersion: GENERATE_GAMEPLAN_PROMPT_VERSION,
           status: 'committed',
-          evidence: {
-            user_match_ids: gameplanData.yourMatches.map(m => m.id),
-            opponent_match_ids: gameplanData.opponentMatches.map(m => m.id),
-          },
+          evidence,
         })
       }
 

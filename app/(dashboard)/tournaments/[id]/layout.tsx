@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { EditTournamentButton } from '../create-form'
+import { TournamentNav } from './tournament-nav'
 
 const RULESET_LABEL: Record<string, string> = {
   ibjjf: 'IBJJF', ajp: 'AJP', adcc: 'ADCC', ebi: 'EBI', other: 'Other',
@@ -58,20 +59,7 @@ export default async function TournamentLayout({
         </p>
       </div>
 
-      <nav className="flex gap-1 border-b pb-0">
-        {[
-          { href: `/tournaments/${id}/opponents`, label: 'Opponents' },
-          { href: `/tournaments/${id}/gameplan`, label: 'Gameplan' },
-        ].map(({ href, label }) => (
-          <Link
-            key={href}
-            href={href}
-            className="text-sm px-4 py-2 font-medium text-muted-foreground hover:text-foreground border-b-2 border-transparent hover:border-foreground/30 transition-colors -mb-px"
-          >
-            {label}
-          </Link>
-        ))}
-      </nav>
+      <TournamentNav id={id} />
 
       {children}
     </div>

@@ -165,6 +165,26 @@ export const scanUrl = inngest.createFunction(
               : 'Video is too long for a single analysis pass — submit as a YouTube URL or split into ~1-hour segments.'
           )
         }
+        // Transient Gemini/network errors — don't mark as permanently failed, let Inngest retry
+        if (
+          err instanceof SyntaxError ||
+          msg.includes('Unexpected end of JSON') ||
+          msg.includes('Unexpected token') ||
+          msg.includes('JSON input') ||
+          msg.includes('Internal error encountered') ||
+          msg.includes('high demand') ||
+          msg.includes('overloaded') ||
+          msg.includes('503') ||
+          msg.includes('500') ||
+          msg.includes('UNAVAILABLE')
+        ) {
+          if (chunkIndex !== undefined) {
+            throw new RetryAfterError('Gemini transient error in chunk scan — retrying.', '3m')
+          }
+          // For non-chunk scans, leave video in 'processing' so UI shows scanning, not failed
+          await db.update(videos).set({ status: 'processing' }).where(eq(videos.id, videoId))
+          throw new RetryAfterError('Gemini transient error during scan — retrying.', '3m')
+        }
         await db.update(videos).set({ status: 'failed', failureReason: msg }).where(eq(videos.id, videoId))
         // For chunk jobs, mark parent failed so it doesn't stay stuck in 'processing'
         if (chunkIndex !== undefined) {
@@ -394,7 +414,7 @@ export const scanUrl = inngest.createFunction(
             }
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err)
-            // Transient Gemini errors — leave status as 'processing' so UI doesn't flash 'failed'
+            // Transient errors — leave status as 'processing' so UI doesn't flash 'failed'
             // during a retry, and use RetryAfterError so we don't hammer the API immediately.
             if (
               msg.includes('high demand') ||
@@ -402,9 +422,14 @@ export const scanUrl = inngest.createFunction(
               msg.includes('503') ||
               msg.includes('500') ||
               msg.includes('overloaded') ||
-              msg.includes('UNAVAILABLE')
+              msg.includes('UNAVAILABLE') ||
+              // Truncated/malformed JSON from Gemini — transient network issue, safe to retry
+              err instanceof SyntaxError ||
+              msg.includes('Unexpected end of JSON') ||
+              msg.includes('Unexpected token') ||
+              msg.includes('JSON input')
             ) {
-              throw new RetryAfterError('Gemini temporarily unavailable during extraction — retrying.', '3m')
+              throw new RetryAfterError('Gemini returned an incomplete response — retrying.', '3m')
             }
             await db.update(matches).set({ status: 'failed' }).where(eq(matches.id, matchId))
             throw err
@@ -578,8 +603,18 @@ export const scanUrl = inngest.createFunction(
             })
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err)
-            if (msg.includes('overloaded') || msg.includes('529') || msg.includes('high demand')) {
-              throw new RetryAfterError('Claude temporarily unavailable during insights — retrying.', '3m')
+            if (
+              msg.includes('overloaded') ||
+              msg.includes('529') ||
+              msg.includes('high demand') ||
+              msg.includes('Internal error') ||
+              msg.includes('503') ||
+              msg.includes('500') ||
+              err instanceof SyntaxError ||
+              msg.includes('Unexpected end of JSON') ||
+              msg.includes('JSON input')
+            ) {
+              throw new RetryAfterError('Transient error during insights — retrying.', '3m')
             }
             await db.update(matches).set({ status: 'failed' }).where(eq(matches.id, matchId))
             throw err

@@ -6,6 +6,7 @@ import { OpponentAccordion } from './opponent-accordion'
 import { SyncBracketButton } from './sync-bracket-button'
 import { PostEventBanner } from './post-event-banner'
 import { AutoRefresh } from './auto-refresh'
+import { ImportBracketDialog } from './import-bracket-dialog'
 
 export const dynamic = 'force-dynamic'
 
@@ -162,9 +163,32 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
     || allPendingVideos.some(v => v.status === 'processing' || v.status === 'pending' || v.status === 'uploaded')
     || opponents.some(o => o.footageStatus === 'pending' || o.footageStatus === 'auto_queued')
 
+  // Opponents with no footage and no active scans — need user action
+  const opponentsNeedingFootage = opponents.filter(o => {
+    const hasAnyRow = (allMatches.some(m => m.tournamentOpponentId === o.id))
+      || (allPendingVideos.some(v => v.tournamentOpponentId === o.id))
+    const isAutoSearching = o.footageStatus === 'pending' || o.footageStatus === 'auto_queued'
+    return !hasAnyRow && !isAutoSearching
+  })
+
   return (
     <div className="space-y-5">
       {hasActiveScans && <AutoRefresh />}
+      {opponentsNeedingFootage.length > 0 && (
+        <div className="rounded-lg border border-amber-800/40 bg-amber-950/20 px-4 py-3 flex items-start gap-3 text-xs text-amber-300">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5 text-amber-400">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <span>
+            <span className="font-semibold text-amber-200">
+              {opponentsNeedingFootage.length === 1
+                ? `${opponentsNeedingFootage[0].opponentLabel} needs scouting footage.`
+                : `${opponentsNeedingFootage.length} opponents need scouting footage.`}
+            </span>{' '}
+            Expand each opponent below and click <span className="font-medium">"Scout footage"</span> to add YouTube links or upload videos. The AI will analyse their game and generate a gameplan.
+          </span>
+        </div>
+      )}
       {showPostEventBanner && tournamentRow && (
         <PostEventBanner
           tournamentId={tournamentId}
@@ -176,9 +200,12 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
         <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
           Opponents ({opponents.length})
         </h2>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {tournamentRow?.smoothcompUrl?.includes('/bracket/') && opponents.length > 0 && (
             <SyncBracketButton tournamentId={tournamentId} />
+          )}
+          {tournamentRow?.smoothcompUrl?.includes('/bracket/') && (
+            <ImportBracketDialog tournamentId={tournamentId} />
           )}
           <AddOpponentForm tournamentId={tournamentId} />
         </div>
@@ -199,8 +226,8 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
       )}
 
       {opponents.length === 0 ? (
-        <div className="bg-card border border-border/60 rounded-xl p-8 text-center">
-          <div className="flex items-center justify-center gap-2 mb-4">
+        <div className="bg-card border border-border/60 rounded-xl p-8 text-center space-y-4">
+          <div className="flex items-center justify-center gap-2">
             <span className="text-primary text-sm font-semibold">Step 2 of 3</span>
             <div className="flex items-center gap-1">
               <span className="text-primary text-lg">●</span>
@@ -208,10 +235,29 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
               <span className="text-muted-foreground/40 text-lg">●</span>
             </div>
           </div>
-          <h3 className="text-lg font-semibold mb-2">Who are you facing?</h3>
-          <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-            Add the athletes you might meet in your bracket. Once you add them, scout their footage and the AI will build you a gameplan for each.
-          </p>
+          <div>
+            <h3 className="text-lg font-semibold mb-1">Who are you facing?</h3>
+            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+              Add the athletes you might meet in your bracket — the AI will scout their footage and build you a gameplan for each.
+            </p>
+          </div>
+          {tournamentRow?.smoothcompUrl?.includes('/bracket/') ? (
+            <div className="flex flex-col items-center gap-3">
+              <ImportBracketDialog tournamentId={tournamentId} />
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>or</span>
+                <AddOpponentForm tournamentId={tournamentId} />
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-2">
+              <AddOpponentForm tournamentId={tournamentId} />
+              <p className="text-xs text-muted-foreground max-w-xs">
+                Have a Smoothcomp bracket URL?{' '}
+                <span className="font-medium text-foreground/70">Edit your tournament</span> to add it — you can then import your full draw in one click.
+              </p>
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-3">

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { GenerateGameplanButton } from './generate-button'
 import { PrintButton } from './print-button'
 import { GameplanRatingWidget } from './rating-widget'
+import { AutoRefresh } from './auto-refresh'
 import type { GameplanOutput } from '../../../../../lib/ai/schemas/gameplan'
 
 export const dynamic = 'force-dynamic'
@@ -26,13 +27,21 @@ export default async function GameplanPage({
 
   if (opponents.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground">
-        <p className="font-medium">No opponents added yet</p>
-        <p className="text-sm mt-1">
+      <div className="rounded-xl border border-dashed p-10 text-center space-y-3">
+        <div className="flex items-center justify-center gap-2 mb-1">
+          <span className="text-primary text-sm font-semibold">Step 3 of 3</span>
+          <div className="flex items-center gap-1">
+            <span className="text-primary text-lg">●</span>
+            <span className="text-primary text-lg">●</span>
+            <span className="text-primary text-lg">●</span>
+          </div>
+        </div>
+        <p className="font-semibold">No opponents added yet</p>
+        <p className="text-sm text-muted-foreground">
           <Link href={`/tournaments/${tournamentId}/opponents`} className="underline hover:no-underline">
-            Add opponents
+            Add opponents and scout their footage
           </Link>{' '}
-          and scout their footage before generating a gameplan.
+          first — then come back here to generate your gameplan.
         </p>
       </div>
     )
@@ -42,7 +51,6 @@ export default async function GameplanPage({
     ? opponents.find(o => o.id === selectedOpponentId) ?? opponents[0]
     : opponents[0]
 
-  // Count analysed opponent matches
   const [scoutedResult] = await db
     .select({ count: count() })
     .from(matches)
@@ -50,15 +58,19 @@ export default async function GameplanPage({
 
   const scoutedCount = scoutedResult?.count ?? 0
 
-  // Load existing gameplan if any
   const existingGameplan = await db.query.gameplans.findFirst({
     where: eq(gameplans.opponentId, activeOpponent.id),
   })
 
-  const plan = existingGameplan?.structuredPlan as GameplanOutput | null
+  const isGenerating = existingGameplan?.status === 'generating'
+  const plan = (!isGenerating && existingGameplan?.structuredPlan && Object.keys(existingGameplan.structuredPlan as object).length > 0)
+    ? existingGameplan.structuredPlan as GameplanOutput
+    : null
 
   return (
     <div className="space-y-5">
+      {isGenerating && <AutoRefresh intervalMs={5000} />}
+
       {/* Opponent selector */}
       {opponents.length > 1 && (
         <div className="flex gap-2 flex-wrap">
@@ -78,48 +90,150 @@ export default async function GameplanPage({
         </div>
       )}
 
-      {/* Scouting status */}
       {scoutedCount === 0 ? (
-        <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-          <p className="font-medium">No footage analysed for {activeOpponent.opponentLabel}</p>
-          <p className="text-sm mt-1">
-            <Link href={`/tournaments/${tournamentId}/opponents`} className="underline hover:no-underline">
-              Submit scouting footage
-            </Link>{' '}
-            first, then come back to generate the gameplan.
-          </p>
-        </div>
+        <NoFootageState tournamentId={tournamentId} opponentLabel={activeOpponent.opponentLabel} />
+      ) : isGenerating ? (
+        <GeneratingState opponentLabel={activeOpponent.opponentLabel} />
       ) : (
         <>
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="font-semibold">vs. {activeOpponent.opponentLabel}</h2>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="font-semibold truncate">vs. {activeOpponent.opponentLabel}</h2>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {scoutedCount} match{scoutedCount !== 1 ? 'es' : ''} scouted
-                {existingGameplan ? ` · Generated ${existingGameplan.createdAt.toLocaleDateString()} (v${existingGameplan.version})` : ''}
+                {existingGameplan && plan ? ` · Generated ${existingGameplan.createdAt.toLocaleDateString()} (v${existingGameplan.version})` : ''}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              {existingGameplan && (
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {existingGameplan && plan && (
                 <GameplanRatingWidget
                   gameplanId={existingGameplan.id}
                   initialRating={existingGameplan.rating ?? null}
                 />
               )}
               {plan && <PrintButton />}
-              <GenerateGameplanButton tournamentId={tournamentId} opponentId={activeOpponent.id} />
+              <GenerateGameplanButton
+                tournamentId={tournamentId}
+                opponentId={activeOpponent.id}
+                label={plan ? 'Regenerate' : 'Generate Gameplan'}
+              />
             </div>
           </div>
 
           {plan ? (
             <GameplanDisplay plan={plan} />
           ) : (
-            <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-              <p className="text-sm">Click "Generate Gameplan" to build an AI-powered gameplan for this matchup.</p>
-            </div>
+            <ReadyToGenerateState
+              tournamentId={tournamentId}
+              opponentId={activeOpponent.id}
+              scoutedCount={scoutedCount}
+            />
           )}
         </>
       )}
+    </div>
+  )
+}
+
+function NoFootageState({ tournamentId, opponentLabel }: { tournamentId: string; opponentLabel: string }) {
+  return (
+    <div className="rounded-xl border border-dashed p-10 text-center space-y-2">
+      <p className="font-semibold">No footage analysed for {opponentLabel}</p>
+      <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+        <Link href={`/tournaments/${tournamentId}/opponents`} className="underline hover:no-underline">
+          Add scouting footage
+        </Link>{' '}
+        for this opponent. Once the AI analyses at least one match, you can generate a gameplan.
+      </p>
+    </div>
+  )
+}
+
+function ReadyToGenerateState({
+  tournamentId,
+  opponentId,
+  scoutedCount,
+}: {
+  tournamentId: string
+  opponentId: string
+  scoutedCount: number
+}) {
+  return (
+    <div className="rounded-xl border bg-card p-8 text-center space-y-4">
+      <div className="flex items-center justify-center gap-2 mb-1">
+        <span className="text-primary text-sm font-semibold">Step 3 of 3</span>
+        <div className="flex items-center gap-1">
+          <span className="text-primary text-lg">●</span>
+          <span className="text-primary text-lg">●</span>
+          <span className="text-primary text-lg">●</span>
+        </div>
+      </div>
+      <div>
+        <h3 className="font-semibold text-lg mb-1">Ready to build your gameplan</h3>
+        <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+          AI has analysed {scoutedCount} match{scoutedCount !== 1 ? 'es' : ''} of scouting footage.
+          Click below to generate a tailored gameplan — takes about 30 seconds.
+        </p>
+      </div>
+      <GenerateGameplanButton tournamentId={tournamentId} opponentId={opponentId} />
+    </div>
+  )
+}
+
+function GeneratingState({ opponentLabel }: { opponentLabel: string }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-semibold">vs. {opponentLabel}</h2>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="inline-flex h-2 w-2 rounded-full bg-primary animate-pulse" />
+            <p className="text-xs text-muted-foreground">AI is building your gameplan…</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Skeleton cards that pulse while generating */}
+      <div className="rounded-xl border bg-card p-4 space-y-3 animate-pulse">
+        <div className="h-3 w-16 rounded bg-muted" />
+        <div className="h-4 w-full rounded bg-muted" />
+        <div className="h-4 w-3/4 rounded bg-muted" />
+      </div>
+
+      <div className="space-y-2">
+        <div className="h-3 w-24 rounded bg-muted animate-pulse" />
+        <div className="rounded-xl border bg-card p-4 space-y-2 animate-pulse">
+          <div className="h-4 w-1/2 rounded bg-muted" />
+          <div className="h-3 w-full rounded bg-muted" />
+          <div className="h-3 w-5/6 rounded bg-muted" />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="h-3 w-32 rounded bg-muted animate-pulse" />
+        <div className="rounded-xl border bg-card overflow-hidden animate-pulse">
+          <div className="px-4 pt-4 pb-3 border-b border-border/60">
+            <div className="h-4 w-40 rounded bg-muted" />
+          </div>
+          <div className="px-4 py-3 space-y-3">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="flex gap-3 items-start">
+                <div className="w-5 h-5 rounded-full bg-muted flex-shrink-0" />
+                <div className="flex-1 h-3 rounded bg-muted" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2">
+        {[1, 2].map(i => (
+          <div key={i} className="rounded-xl border bg-card p-4 space-y-2 animate-pulse">
+            <div className="h-3 w-24 rounded bg-muted" />
+            <div className="h-3 w-full rounded bg-muted" />
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

@@ -2,8 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ScoutForm } from './opponent-forms'
-import { DeleteOpponentButton } from './opponent-forms'
+import { ScoutForm, DeleteOpponentButton, EditOpponentButton } from './opponent-forms'
 
 type FootageRow = {
   id: string
@@ -231,6 +230,12 @@ export function OpponentAccordion({
               hasMatches={analysed > 0}
             />
           )}
+          <EditOpponentButton
+            opponentId={opponent.id}
+            tournamentId={tournamentId}
+            currentName={opponent.opponentLabel}
+            currentNotes={opponent.seedingNotes}
+          />
           <DeleteOpponentButton opponentId={opponent.id} tournamentId={tournamentId} />
         </div>
       </div>

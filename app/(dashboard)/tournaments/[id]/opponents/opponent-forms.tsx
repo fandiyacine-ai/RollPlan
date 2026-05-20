@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { addOpponent, submitScoutUrls, deleteOpponent } from './actions'
+import { addOpponent, submitScoutUrls, deleteOpponent, updateOpponent } from './actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -159,6 +159,77 @@ export function DeleteOpponentButton({ opponentId, tournamentId }: { opponentId:
         <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
       </svg>
     </Button>
+  )
+}
+
+export function EditOpponentButton({
+  opponentId,
+  tournamentId,
+  currentName,
+  currentNotes,
+}: {
+  opponentId: string
+  tournamentId: string
+  currentName: string
+  currentNotes: string | null
+}) {
+  const [open, setOpen] = useState(false)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setPending(false); setError(null) } }}>
+      <DialogTrigger onClick={e => e.stopPropagation()}>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Edit opponent"
+          className="text-muted-foreground hover:text-foreground"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit Opponent</DialogTitle>
+        </DialogHeader>
+        <form
+          id="edit-opponent-form"
+          action={async (fd) => {
+            setPending(true)
+            setError(null)
+            try {
+              await updateOpponent(opponentId, tournamentId, fd)
+              setOpen(false)
+            } catch (err) {
+              setError(err instanceof Error ? err.message : 'Something went wrong')
+            } finally {
+              setPending(false)
+            }
+          }}
+          className="space-y-3"
+        >
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Name *</label>
+            <Input name="name" required defaultValue={currentName} />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Seeding notes</label>
+            <Input name="notes" defaultValue={currentNotes ?? ''} placeholder="e.g. #3 seed, black belt 5 years" />
+          </div>
+          {error && <p className="text-xs text-destructive">{error}</p>}
+        </form>
+        <DialogFooter>
+          <DialogClose><Button variant="outline" type="button">Cancel</Button></DialogClose>
+          <Button type="submit" form="edit-opponent-form" disabled={pending}>
+            {pending ? 'Saving…' : 'Save'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

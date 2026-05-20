@@ -1,34 +1,28 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 export function GenerateGameplanButton({
   tournamentId,
   opponentId,
+  label = 'Generate Gameplan',
 }: {
   tournamentId: string
   opponentId: string
+  label?: string
 }) {
   const [pending, setPending] = useState(false)
-  const [done, setDone] = useState(false)
+  const router = useRouter()
 
   async function handleGenerate() {
     setPending(true)
-    const res = await fetch('/api/gameplans/generate', {
+    await fetch('/api/gameplans/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tournamentId, opponentId }),
     })
-    setPending(false)
-    if (res.ok) setDone(true)
-  }
-
-  if (done) {
-    return (
-      <p className="text-sm text-muted-foreground font-medium">
-        Generating… refresh in ~30 seconds.
-      </p>
-    )
+    router.refresh()
   }
 
   return (
@@ -37,7 +31,7 @@ export function GenerateGameplanButton({
       disabled={pending}
       className="text-sm px-4 py-2 rounded-full bg-foreground text-background font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
     >
-      {pending ? 'Queuing…' : 'Generate Gameplan'}
+      {pending ? 'Starting…' : label}
     </button>
   )
 }

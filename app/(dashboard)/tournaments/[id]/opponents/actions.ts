@@ -209,3 +209,71 @@ export async function deleteOpponent(opponentId: string, tournamentId: string): 
     return { error: err instanceof Error ? err.message : String(err) }
   }
 }
+
+export async function updateOpponent(opponentId: string, tournamentId: string, formData: FormData): Promise<void> {
+  const name = (formData.get('name') as string)?.trim()
+  if (!name) throw new Error('Opponent name is required')
+
+  await db.update(tournamentOpponents).set({
+    opponentLabel: name,
+    seedingNotes: (formData.get('notes') as string)?.trim() || null,
+  }).where(eq(tournamentOpponents.id, opponentId))
+
+  revalidatePath(`/tournaments/${tournamentId}/opponents`)
+}
+
+export async function fetchBracketAthletes(tournamentId: string): Promise<{
+  athletes: Array<{ name: string; smoothcompAthleteId: string; profileUrl: string }>
+  bracketIsPublished: boolean
+  error?: string
+}> {
+  try {
+    const tournament = await db.query.tournaments.findFirst({ where: eq(tournaments.id, tournamentId) })
+    if (!tournament?.smoothcompUrl) return { athletes: [], bracketIsPublished: false, error: 'No bracket URL linked to this tournament' }
+    if (!parseSmootcompBracketUrl(tournament.smoothcompUrl)) {
+      return { athletes: [], bracketIsPublished: false, error: 'A specific bracket URL is required (smoothcomp.com/en/event/…/bracket/…)' }
+    }
+
+    const bracket = await scrapeBracket(tournament.smoothcompUrl)
+    if (!bracket) return { athletes: [], bracketIsPublished: false, error: 'Failed to load the bracket page' }
+    if (!bracket.bracketIsPublished) return { athletes: [], bracketIsPublished: false }
+
+    return { athletes: bracket.athletes, bracketIsPublished: true }
+  } catch (err) {
+    return { athletes: [], bracketIsPublished: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export async function importSelectedOpponents(
+  tournamentId: string,
+  athletes: Array<{ name: string; smoothcompAthleteId: string; profileUrl: string }>
+): Promise<{ count: number; error?: string }> {
+  try {
+    if (athletes.length === 0) return { count: 0 }
+
+    // Skip athletes already in the tournament
+    const existing = await db.select({ sid: tournamentOpponents.smoothcompAthleteId })
+      .from(tournamentOpponents)
+      .where(eq(tournamentOpponents.tournamentId, tournamentId))
+
+    const existingIds = new Set(existing.map(e => e.sid).filter(Boolean))
+
+    const toInsert = athletes.filter(a => !existingIds.has(a.smoothcompAthleteId))
+    if (toInsert.length === 0) return { count: 0 }
+
+    await db.insert(tournamentOpponents).values(
+      toInsert.map(a => ({
+        tournamentId,
+        opponentLabel: a.name,
+        smoothcompAthleteId: a.smoothcompAthleteId,
+        smoothcompProfileUrl: a.profileUrl,
+        footageStatus: 'pending' as const,
+      }))
+    )
+
+    revalidatePath(`/tournaments/${tournamentId}/opponents`)
+    return { count: toInsert.length }
+  } catch (err) {
+    return { count: 0, error: err instanceof Error ? err.message : String(err) }
+  }
+}
