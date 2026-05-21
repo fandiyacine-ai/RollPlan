@@ -299,24 +299,19 @@ export default async function PlayerCardPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {/* Control rate — most important, gets special treatment */}
                   <div className="rounded-xl border border-border/60 bg-card p-4 space-y-2 col-span-2 sm:col-span-1">
-                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/50">Control Rate</p>
+                    <p className="text-xs text-muted-foreground font-medium">Control Rate</p>
                     <div className="flex items-end gap-2">
-                      <span className={`text-5xl font-black tabular-nums leading-none ${
-                        controlPct >= 55 ? 'text-emerald-400' : controlPct < 35 ? 'text-rose-400' : 'text-foreground'
-                      }`}>{controlPct}%</span>
+                      <span className="text-3xl font-bold tabular-nums leading-none">{controlPct}%</span>
                       {trendDelta != null && trendDelta !== 0 && (
-                        <span className={`text-xs font-black mb-1 ${trendDelta > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        <span className={`text-xs font-medium mb-1 ${trendDelta > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                           {trendDelta > 0 ? '↑' : '↓'}{Math.abs(trendDelta)}
                         </span>
                       )}
                     </div>
-                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                      <div className="h-full rounded-full transition-all" style={{
-                        width: `${controlPct}%`,
-                        background: controlPct >= 55 ? '#4ade80' : controlPct < 35 ? '#f87171' : '#71717a',
-                      }} />
+                    <div className="h-1 rounded-full bg-muted overflow-hidden">
+                      <div className="h-full rounded-full bg-foreground/40 transition-all" style={{ width: `${controlPct}%` }} />
                     </div>
-                    <p className="text-[9px] text-muted-foreground/50">{underPressurePct}% under pressure</p>
+                    <p className="text-xs text-muted-foreground">{underPressurePct}% under pressure</p>
                   </div>
                   {[
                     { label: 'Matches', value: String(ownAnalysedIds.length), sub: matchesSub },
@@ -324,9 +319,9 @@ export default async function PlayerCardPage() {
                     { label: 'Attacks', value: String(subAttempts), sub: 'sub attempts' },
                   ].map(({ label, value, sub }) => (
                     <div key={label} className="rounded-xl border border-border/60 bg-card p-4 space-y-1.5">
-                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/50">{label}</p>
-                      <p className="text-4xl font-black tabular-nums leading-none">{value}</p>
-                      {sub && <p className="text-[9px] text-muted-foreground/50">{sub}</p>}
+                      <p className="text-xs text-muted-foreground font-medium">{label}</p>
+                      <p className="text-3xl font-bold tabular-nums leading-none">{value}</p>
+                      {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
                     </div>
                   ))}
                 </div>
@@ -339,7 +334,7 @@ export default async function PlayerCardPage() {
                 return (
                   <div className="rounded-xl border border-border/60 bg-card px-4 py-3 flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">Top gap to close</p>
+                      <p className="text-xs font-medium text-muted-foreground mb-0.5">Top gap to close</p>
                       <p className="text-sm font-semibold leading-snug">{POSITION_MAP[posId] ?? posId}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{pct}% of mat time under pressure here</p>
                     </div>
@@ -357,9 +352,9 @@ export default async function PlayerCardPage() {
               {ownAnalysedIds.length >= 2 && (
                 <div className="rounded-xl border border-border/60 overflow-hidden bg-card">
                   <div className="px-5 py-2.5 border-b border-border/60 flex items-center justify-between">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                    <h2 className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                       <svg className="w-3 h-3 opacity-50" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 9l3-3 2 2 5-5.5"/></svg>
-                      Progress Over Time
+                      Progress over time
                     </h2>
                     {trendDelta !== null && trendDelta !== 0 && (
                       <span className={`text-xs font-semibold ${trendDelta > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -401,8 +396,8 @@ export default async function PlayerCardPage() {
                 <div className="rounded-xl border border-border/60 overflow-hidden bg-card">
                   <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between">
                     <div>
-                      <h2 className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/50 flex items-center gap-1.5">
-                        <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2 2c3.5 0 5.5 2 5.5 4s2 4 5.5 4"/><path d="M10 2c-3.5 0-5.5 2-5.5 4s-2 4-5.5 4"/></svg>
+                      <h2 className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                        <svg className="w-3 h-3 opacity-50" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2 2c3.5 0 5.5 2 5.5 4s2 4 5.5 4"/><path d="M10 2c-3.5 0-5.5 2-5.5 4s-2 4-5.5 4"/></svg>
                         Game DNA
                       </h2>
                       <p className="text-[10px] text-muted-foreground/50 mt-0.5">% of time in that position in control / under pressure</p>
@@ -411,18 +406,16 @@ export default async function PlayerCardPage() {
                   </div>
                   <div className="grid grid-cols-2 divide-x divide-border/60">
                     <div className="p-4 space-y-3.5">
-                      <p className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.18em] flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />Strongest
-                      </p>
+                      <p className="text-xs font-medium text-emerald-500">Strongest</p>
                       {sharpPositions.length > 0 ? sharpPositions.map(([id, s]) => {
                         const pct = Math.round((s.dominant / s.total) * 100)
                         return (
                           <div key={id}>
                             <div className="flex items-center justify-between mb-1.5">
-                              <span className="text-sm font-semibold">{POSITION_MAP[id] ?? id}</span>
-                              <span className="text-sm font-black text-emerald-400 tabular-nums">{pct}%</span>
+                              <span className="text-sm font-medium">{POSITION_MAP[id] ?? id}</span>
+                              <span className="text-sm font-semibold text-emerald-500 tabular-nums">{pct}%</span>
                             </div>
-                            <div className="h-2 rounded-full bg-muted overflow-hidden">
+                            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                               <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
                             </div>
                           </div>
@@ -430,18 +423,16 @@ export default async function PlayerCardPage() {
                       }) : <p className="text-xs text-muted-foreground">Not enough data yet</p>}
                     </div>
                     <div className="p-4 space-y-3.5">
-                      <p className="text-[9px] font-black text-rose-400 uppercase tracking-[0.18em] flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-400 inline-block" />Exposed
-                      </p>
+                      <p className="text-xs font-medium text-rose-500">Exposed</p>
                       {exposedPositions.length > 0 ? exposedPositions.map(([id, s]) => {
                         const pct = Math.round((s.inferior / s.total) * 100)
                         return (
                           <div key={id}>
                             <div className="flex items-center justify-between mb-1.5">
-                              <span className="text-sm font-semibold">{POSITION_MAP[id] ?? id}</span>
-                              <span className="text-sm font-black text-rose-400 tabular-nums">{pct}%</span>
+                              <span className="text-sm font-medium">{POSITION_MAP[id] ?? id}</span>
+                              <span className="text-sm font-semibold text-rose-500 tabular-nums">{pct}%</span>
                             </div>
-                            <div className="h-2 rounded-full bg-muted overflow-hidden">
+                            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                               <div className="h-full bg-rose-500 rounded-full" style={{ width: `${pct}%` }} />
                             </div>
                           </div>
@@ -456,14 +447,14 @@ export default async function PlayerCardPage() {
               {(topMyTech.length >= 2 || topTheirTech.length >= 2) && (
                 <div className="rounded-xl border border-border/60 overflow-hidden bg-card">
                   <div className="px-5 py-2.5 border-b border-border/60">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                    <h2 className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                       <svg className="w-3 h-3 opacity-50" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="6" cy="6" r="4.5"/><circle cx="6" cy="6" r="1.5"/></svg>
-                      Signature Game
+                      Signature game
                     </h2>
                   </div>
                   <div className="grid grid-cols-2 divide-x divide-border/60">
                     <div className="p-4 space-y-3">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Your Weapons</p>
+                      <p className="text-xs font-medium text-muted-foreground">Your weapons</p>
                       {topMyTech.length > 0 ? topMyTech.map(([tech, count]) => (
                         <div key={tech}>
                           <div className="flex items-center justify-between mb-1">
@@ -477,7 +468,7 @@ export default async function PlayerCardPage() {
                       )) : <p className="text-xs text-muted-foreground">Not enough data yet</p>}
                     </div>
                     <div className="p-4 space-y-3">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Opponent Threats</p>
+                      <p className="text-xs font-medium text-muted-foreground">Opponent threats</p>
                       {topTheirTech.length > 0 ? topTheirTech.map(([tech, count]) => (
                         <div key={tech}>
                           <div className="flex items-center justify-between mb-1">
@@ -497,9 +488,9 @@ export default async function PlayerCardPage() {
               {/* Time & Control */}
               {sortedPositions.length > 0 && (
                 <div className="space-y-2">
-                  <h2 className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/50 flex items-center gap-1.5">
-                    <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="6" cy="6" r="4.5"/><path d="M6 3.5v2.5l1.5 1"/></svg>
-                    Time &amp; Control
+                  <h2 className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                    <svg className="w-3 h-3 opacity-50" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="6" cy="6" r="4.5"/><path d="M6 3.5v2.5l1.5 1"/></svg>
+                    Time &amp; control
                   </h2>
                   <div className="rounded-xl border bg-card px-4 py-3 space-y-3">
                     {sortedPositions.slice(0, 10).map(([posId, stats]) => {
@@ -513,7 +504,7 @@ export default async function PlayerCardPage() {
                             <span className="text-sm font-semibold">{POSITION_MAP[posId] ?? posId}</span>
                             <span className="text-xs text-muted-foreground tabular-nums font-medium">{fmt(stats.total)}</span>
                           </div>
-                          <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
+                          <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
                             <div className="h-full flex rounded-full overflow-hidden" style={{ width: `${barPct}%` }}>
                               <div className="bg-emerald-500" style={{ width: `${domPct}%` }} />
                               <div className="bg-zinc-500/50" style={{ width: `${neuPct}%` }} />
@@ -524,7 +515,7 @@ export default async function PlayerCardPage() {
                       )
                     })}
                   </div>
-                  <div className="flex items-center gap-4 text-[9px] text-muted-foreground font-bold uppercase tracking-wider">
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground font-medium">
                     <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" /> In Control</span>
                     <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-zinc-500/50 inline-block" /> Neutral</span>
                     <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-rose-500 inline-block" /> Under Pressure</span>
@@ -536,9 +527,9 @@ export default async function PlayerCardPage() {
               {transitionData.nodes.length >= 3 && transitionEdges.length >= 3 && (
                 <div className="rounded-xl overflow-hidden border border-border/60 bg-card">
                   <div className="px-5 py-2.5 border-b border-border/60 flex items-center justify-between flex-wrap gap-2">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                    <h2 className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                       <svg className="w-3 h-3 opacity-50" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="2" cy="6" r="1.5"/><circle cx="10" cy="2.5" r="1.5"/><circle cx="10" cy="9.5" r="1.5"/><path d="M3.5 5.5l5-2.5M3.5 6.5l5 2.5"/></svg>
-                      Position Flow
+                      Position flow
                     </h2>
                     <div className="flex items-center gap-4 text-[10px] text-muted-foreground/60">
                       <span className="flex items-center gap-1.5"><span className="w-5 h-0.5 bg-emerald-500 inline-block rounded-full" />Your move</span>
@@ -555,7 +546,7 @@ export default async function PlayerCardPage() {
               {/* Failed videos */}
               {failedVideos.length > 0 && (
                 <div className="space-y-2">
-                  <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Failed</h2>
+                  <h2 className="text-xs font-medium text-muted-foreground">Failed</h2>
                   {failedVideos.map((v) => (
                     <div key={v.id} className="rounded-xl border border-border/60 bg-card p-4 flex items-center justify-between gap-4">
                       <div className="min-w-0">
@@ -589,20 +580,20 @@ export default async function PlayerCardPage() {
           {hasRecord && (
             <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
               <div className="px-4 py-2.5 border-b border-border/60">
-                <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">My Record</h2>
+                <h2 className="text-xs font-medium text-muted-foreground">My record</h2>
               </div>
               <div className="px-4 py-3 grid grid-cols-3 gap-2 text-center">
                 <div>
                   <p className="text-2xl font-bold text-emerald-400 tabular-nums">{wins}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">Wins</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Wins</p>
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-rose-400 tabular-nums">{losses}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">Losses</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Losses</p>
                 </div>
                 <div>
                   <p className="text-2xl font-bold tabular-nums">{ownAnalysedIds.length - wins - losses}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">N/R</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">N/R</p>
                 </div>
               </div>
               {wins > 0 && (
@@ -621,7 +612,7 @@ export default async function PlayerCardPage() {
           {ownAnalysedIds.length > 0 && (
             <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
               <div className="px-4 py-2.5 border-b border-border/60">
-                <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">My Stats</h2>
+                <h2 className="text-xs font-medium text-muted-foreground">My stats</h2>
               </div>
               <div className="divide-y divide-border/40">
                 {[
@@ -642,7 +633,7 @@ export default async function PlayerCardPage() {
           {/* Upcoming Tournaments */}
           <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
             <div className="px-4 py-2.5 border-b border-border/60 flex items-center justify-between">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Upcoming</h2>
+              <h2 className="text-xs font-medium text-muted-foreground">Upcoming</h2>
               <Link href="/tournaments" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
                 All →
               </Link>
@@ -725,19 +716,19 @@ function ProfileHeader({ name, dbUser }: { name: string; dbUser: typeof users.$i
 
   return (
     <div className="flex items-center gap-4">
-      <div className="w-16 h-16 rounded-full bg-foreground/[0.07] border border-border/60 text-foreground flex items-center justify-center text-xl font-black flex-shrink-0 tracking-tight">
+      <div className="w-14 h-14 rounded-full bg-foreground/[0.06] border border-border/60 text-foreground flex items-center justify-center text-base font-semibold flex-shrink-0">
         {initials(name)}
       </div>
       <div className="min-w-0">
-        <h1 className="text-2xl font-black tracking-tight leading-none">{name.toUpperCase()}</h1>
-        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+        <h1 className="text-xl font-semibold leading-snug">{name}</h1>
+        <div className="flex items-center gap-2 mt-1 flex-wrap">
           {belt && (
-            <span className={`text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-[0.14em] ${BELT_STYLE[belt]?.bg ?? 'bg-muted'} ${BELT_STYLE[belt]?.text ?? 'text-foreground'}`}>
+            <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${BELT_STYLE[belt]?.bg ?? 'bg-muted'} ${BELT_STYLE[belt]?.text ?? 'text-foreground'}`}>
               {belt} belt
             </span>
           )}
           {gym ? (
-            <span className="text-xs text-muted-foreground font-medium">{gym}{style ? ` · ${style === 'no_gi' ? 'No-Gi' : style === 'both' ? 'Gi & No-Gi' : 'Gi'}` : ''}</span>
+            <span className="text-xs text-muted-foreground">{gym}{style ? ` · ${style === 'no_gi' ? 'No-Gi' : style === 'both' ? 'Gi & No-Gi' : 'Gi'}` : ''}</span>
           ) : (
             <Link href="/settings" className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2">Set gym in settings →</Link>
           )}

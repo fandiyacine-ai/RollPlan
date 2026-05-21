@@ -121,17 +121,49 @@ export default async function MatchesPage() {
 
   const isEmpty = allMatches.length === 0 && scanningVideos.length === 0 && failedVideos.length === 0
 
+  // Aggregate stats for sidebar
+  const analysedCount = allMatches.filter(m => m.status === 'analysed').length
+  const wins = allMatches.filter(m => m.resultWinner === 'user').length
+  const losses = allMatches.filter(m => m.resultWinner === 'opponent').length
+  const totalMatTime = allSegments.reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
+  const perMatchRates = analysedIds.map(id => {
+    const segs = allSegments.filter(s => s.matchId === id)
+    const total = segs.reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
+    const dom = segs.filter(s => s.dominance === 'dominant').reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
+    return total > 0 ? (dom / total) * 100 : null
+  }).filter((r): r is number => r !== null)
+  const avgControlRate = perMatchRates.length > 0
+    ? Math.round(perMatchRates.reduce((a, b) => a + b, 0) / perMatchRates.length)
+    : null
+
   if (isEmpty) {
     return (
-      <div className="max-w-xl space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-black tracking-tight uppercase">My Matches</h1>
+      <div className="max-w-5xl">
+        <div className="flex items-center justify-between mb-10">
+          <h1 className="text-2xl font-semibold">My Matches</h1>
           <Link href="/upload" className={buttonVariants({ size: 'sm' })}>+ Analyse</Link>
         </div>
-        <div className="rounded-xl border border-dashed p-16 text-center space-y-4">
-          <p className="text-muted-foreground text-sm">No matches analysed yet.</p>
-          <Link href="/upload" className={buttonVariants({ size: 'sm', className: 'rounded-full' })}>
-            Analyse your first match
+        <div className="rounded-2xl border border-dashed border-border/60 p-10 space-y-8">
+          <div className="max-w-lg">
+            <h2 className="text-lg font-semibold mb-1.5">Upload match footage.</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              AI breaks it into positions, events, and coaching notes — automatically.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[
+              { title: 'Position breakdown', body: 'Time in guard, side control, back mount — and how much you controlled each.' },
+              { title: 'Control rate', body: 'A single number for how dominant you were across the whole match.' },
+              { title: 'Coaching notes', body: 'AI insights on patterns to drill and moments to study frame by frame.' },
+            ].map(({ title, body }) => (
+              <div key={title} className="rounded-xl border border-border/60 bg-card p-4 space-y-1.5">
+                <p className="text-sm font-semibold">{title}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{body}</p>
+              </div>
+            ))}
+          </div>
+          <Link href="/upload" className={buttonVariants()}>
+            Analyse your first match →
           </Link>
         </div>
       </div>
@@ -139,91 +171,140 @@ export default async function MatchesPage() {
   }
 
   return (
-    <div className="max-w-5xl space-y-6">
+    <div className="max-w-6xl">
       {isProcessing && <RefreshPoller />}
 
-      {/* Page header */}
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 mb-1">FrameMatters</p>
-          <div className="flex items-baseline gap-3">
-            <h1 className="text-2xl font-black tracking-tight uppercase leading-none">My Matches</h1>
-            {allMatches.length > 0 && (
-              <span className="text-sm text-muted-foreground tabular-nums font-medium">{allMatches.length} total</span>
-            )}
-          </div>
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 mb-8">
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-2xl font-semibold">My Matches</h1>
+          <span className="text-sm text-muted-foreground tabular-nums">{allMatches.length} total</span>
         </div>
         <Link href="/upload" className={buttonVariants({ size: 'sm' })}>+ Analyse</Link>
       </div>
 
-      {/* In Progress */}
-      {scanningVideos.length > 0 && (
-        <div className="space-y-2">
-          {scanningVideos.map((v) => (
-            <div key={v.id} className="rounded-xl border border-border/60 bg-card px-4 py-3 flex items-center justify-between gap-4">
-              <div className="min-w-0 flex items-center gap-3">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse flex-shrink-0" />
-                <div className="min-w-0">
-                  <p className="font-medium text-sm truncate">{v.originalFilename}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {v.sourceType === 'public_url' ? 'Scanning for matches…' : 'Analysing…'}
-                  </p>
+      <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-8 items-start">
+
+        {/* ── Sidebar ── */}
+        <aside className="space-y-3 lg:sticky lg:top-20">
+          <div className="rounded-xl border border-border/60 bg-card p-4">
+            <p className="text-xs text-muted-foreground font-medium mb-1">Analysed</p>
+            <p className="text-3xl font-bold tabular-nums leading-none">{analysedCount}</p>
+            {allMatches.length !== analysedCount && (
+              <p className="text-xs text-muted-foreground mt-1">{allMatches.length - analysedCount} pending</p>
+            )}
+          </div>
+
+          {(wins > 0 || losses > 0) && (
+            <div className="rounded-xl border border-border/60 bg-card p-4">
+              <p className="text-xs text-muted-foreground font-medium mb-2.5">Record</p>
+              <div className="flex items-end gap-4">
+                <div>
+                  <p className="text-2xl font-bold text-emerald-500 tabular-nums leading-none">{wins}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">wins</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-rose-500 tabular-nums leading-none">{losses}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">losses</p>
                 </div>
               </div>
-              <span className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded border border-blue-800/40 text-blue-400 flex-shrink-0">
-                Analysing
-              </span>
             </div>
-          ))}
-        </div>
-      )}
+          )}
 
-      {/* Failed */}
-      {failedVideos.length > 0 && (
-        <div className="space-y-2">
-          {failedVideos.map((v) => (
-            <div key={v.id} className="rounded-xl border border-rose-800/30 bg-rose-950/10 px-4 py-3 flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <p className="font-medium text-sm truncate">{v.originalFilename}</p>
-                <p className="text-xs text-rose-400 mt-0.5">Analysis failed — remove or resubmit</p>
-              </div>
-              <DeleteVideoButton videoId={v.id} />
+          {avgControlRate !== null && (
+            <div className="rounded-xl border border-border/60 bg-card p-4">
+              <p className="text-xs text-muted-foreground font-medium mb-1">Avg control</p>
+              <p className="text-3xl font-bold tabular-nums leading-none">{avgControlRate}%</p>
             </div>
-          ))}
-        </div>
-      )}
+          )}
 
-      {/* Match timeline — grouped by month */}
-      <div>
-        {(() => {
-          let lastMonthKey: string | null = null
-          return allMatches.map((match) => {
-            const monthKey = match.createdAt.toLocaleDateString('en', { month: 'long', year: 'numeric' })
-            const showMonth = monthKey !== lastMonthKey
-            lastMonthKey = monthKey
-            const matchSegs = allSegments.filter(s => s.matchId === match.id)
-            const matchInsightsList = allInsights.filter(i => i.matchId === match.id)
-            return (
-              <React.Fragment key={match.id}>
-                {showMonth && (
-                  <div className="pb-3 pt-2 first:pt-0">
-                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">
-                      {monthKey}
-                    </span>
+          {totalMatTime > 0 && (
+            <div className="rounded-xl border border-border/60 bg-card p-4">
+              <p className="text-xs text-muted-foreground font-medium mb-1">Mat time</p>
+              <p className="text-2xl font-bold tabular-nums leading-none">{fmt(totalMatTime)}</p>
+            </div>
+          )}
+
+          {analysedCount > 0 && (
+            <Link
+              href="/player-card"
+              className="flex items-center justify-between px-4 py-2.5 rounded-xl border border-border/60 bg-card text-xs text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+            >
+              <span>Full stats</span>
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2 6h8M7 3l3 3-3 3"/></svg>
+            </Link>
+          )}
+        </aside>
+
+        {/* ── Match list ── */}
+        <div className="min-w-0 space-y-4">
+          {/* In Progress */}
+          {scanningVideos.length > 0 && (
+            <div className="space-y-2">
+              {scanningVideos.map((v) => (
+                <div key={v.id} className="rounded-xl border border-border/60 bg-card px-4 py-3 flex items-center justify-between gap-4">
+                  <div className="min-w-0 flex items-center gap-3">
+                    <span className="w-1.5 h-1.5 rounded-full bg-foreground/30 animate-pulse flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">{v.originalFilename}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {v.sourceType === 'public_url' ? 'Scanning for matches…' : 'Analysing…'}
+                      </p>
+                    </div>
                   </div>
-                )}
-                <div className="pb-3">
-                  <MatchCard
-                    match={match}
-                    segments={matchSegs}
-                    insightsList={matchInsightsList}
-                    deleteButton={<DeleteMatchButton matchId={match.id} videoId={match.videoId ?? ''} />}
-                  />
+                  <span className="text-xs text-muted-foreground flex-shrink-0">Analysing…</span>
                 </div>
-              </React.Fragment>
-            )
-          })
-        })()}
+              ))}
+            </div>
+          )}
+
+          {/* Failed */}
+          {failedVideos.length > 0 && (
+            <div className="space-y-2">
+              {failedVideos.map((v) => (
+                <div key={v.id} className="rounded-xl border border-border/60 bg-card px-4 py-3 flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate">{v.originalFilename}</p>
+                    <p className="text-xs text-rose-500 mt-0.5">Analysis failed — remove or resubmit</p>
+                  </div>
+                  <DeleteVideoButton videoId={v.id} />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Match timeline grouped by month */}
+          <div>
+            {(() => {
+              let lastMonthKey: string | null = null
+              return allMatches.map((match) => {
+                const monthKey = match.createdAt.toLocaleDateString('en', { month: 'long', year: 'numeric' })
+                const showMonth = monthKey !== lastMonthKey
+                lastMonthKey = monthKey
+                const matchSegs = allSegments.filter(s => s.matchId === match.id)
+                const matchInsightsList = allInsights.filter(i => i.matchId === match.id)
+                return (
+                  <React.Fragment key={match.id}>
+                    {showMonth && (
+                      <div className="pb-3 pt-2 first:pt-0">
+                        <span className="text-xs text-muted-foreground font-medium">{monthKey}</span>
+                      </div>
+                    )}
+                    <div className="pb-3">
+                      <MatchCard
+                        match={match}
+                        segments={matchSegs}
+                        insightsList={matchInsightsList}
+                        deleteButton={<DeleteMatchButton matchId={match.id} videoId={match.videoId ?? ''} />}
+                      />
+                    </div>
+                  </React.Fragment>
+                )
+              })
+            })()}
+          </div>
+        </div>
+
       </div>
     </div>
   )
@@ -292,22 +373,22 @@ function MatchCard({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               {isAnalysed ? (
-                <Link href={`/matches/${match.id}`} className="font-black text-sm tracking-tight hover:text-primary transition-colors line-clamp-1 block">
+                <Link href={`/matches/${match.id}`} className="font-medium text-sm hover:text-primary transition-colors line-clamp-1 block">
                   {title}
                 </Link>
               ) : (
-                <span className="font-black text-sm tracking-tight line-clamp-1 block">{title}</span>
+                <span className="font-medium text-sm line-clamp-1 block">{title}</span>
               )}
               <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                 {match.resultWinner && (
-                  <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${
+                  <span className={`text-xs font-medium px-1.5 py-0.5 rounded-sm border ${
                     match.resultWinner === 'user'
-                      ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/30'
-                      : 'bg-rose-950/60 text-rose-400 border border-rose-800/30'
+                      ? 'text-emerald-500 border-emerald-500/30'
+                      : 'text-rose-500 border-rose-500/30'
                   }`}>
                     {match.resultWinner === 'user'
-                      ? (match.resultMethod === 'submission' ? 'W — Sub' : match.resultMethod === 'points' ? 'W — Pts' : 'W')
-                      : (match.resultMethod === 'submission' ? 'L — Sub' : match.resultMethod === 'points' ? 'L — Pts' : 'L')}
+                      ? (match.resultMethod === 'submission' ? 'W · Sub' : match.resultMethod === 'points' ? 'W · Pts' : 'W')
+                      : (match.resultMethod === 'submission' ? 'L · Sub' : match.resultMethod === 'points' ? 'L · Pts' : 'L')}
                   </span>
                 )}
                 {match.opponentLabel && match.opponentLabel.toLowerCase() !== 'unknown' && match.context !== 'opponent' && (
@@ -317,8 +398,8 @@ function MatchCard({
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
               {!isAnalysed && (
-                <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-widest border ${
-                  match.status === 'failed' ? 'border-rose-800/40 text-rose-400' : 'border-border text-muted-foreground'
+                <span className={`text-xs font-medium ${
+                  match.status === 'failed' ? 'text-rose-500' : 'text-muted-foreground'
                 }`}>
                   {STATUS_LABEL[match.status] ?? match.status}
                 </span>
@@ -327,10 +408,11 @@ function MatchCard({
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider bg-muted text-muted-foreground">{contextLabel}</span>
-            <span className="text-[9px] px-1.5 py-0.5 rounded border border-border text-muted-foreground font-bold uppercase tracking-wider">{formatLabel}</span>
-            <span className="text-[9px] text-muted-foreground/50 ml-auto font-medium">{dateStr}</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-muted-foreground">{contextLabel}</span>
+            <span className="text-muted-foreground/30">·</span>
+            <span className="text-xs text-muted-foreground">{formatLabel}</span>
+            <span className="text-xs text-muted-foreground/50 ml-auto">{dateStr}</span>
           </div>
         </div>
       </div>
@@ -342,7 +424,7 @@ function MatchCard({
             <div className="h-full rounded-full bg-foreground/50" style={{ width: `${domPct ?? 50}%` }} />
           </div>
           <div className="flex items-center gap-2 text-[10px] text-muted-foreground flex-wrap">
-            <span className="font-black text-foreground/70 uppercase tracking-wider">{domPct !== null ? `${domPct}% ctrl` : '—'}</span>
+            <span className="font-medium text-foreground/70">{domPct !== null ? `${domPct}% ctrl` : '—'}</span>
             <span className="opacity-30">·</span>
             <span>{fmt(totalTime)}</span>
             {topPos && (

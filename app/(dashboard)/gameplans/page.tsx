@@ -14,38 +14,21 @@ function daysUntil(dateStr: string | null): number | null {
 }
 
 function ConfidenceDots({ level }: { level: 'low' | 'medium' | 'high' | null }) {
-  if (!level) {
-    return (
-      <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40 border border-border/40 px-1.5 py-0.5 rounded">
-        No data
-      </span>
-    )
-  }
-  const map = {
-    high:   { label: 'High', color: 'text-emerald-400 border-emerald-800/40' },
-    medium: { label: 'Med',  color: 'text-amber-400 border-amber-800/40' },
-    low:    { label: 'Low',  color: 'text-zinc-500 border-zinc-700/40' },
-  }
-  const { label, color } = map[level]
-  return (
-    <span className={`text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded border ${color}`} title={`${level} confidence`}>
-      {label}
-    </span>
-  )
+  if (!level) return <span className="text-[10px] text-muted-foreground/30">—</span>
+  const map = { high: 'High', medium: 'Med', low: 'Low' }
+  return <span className="text-[10px] text-muted-foreground/50">{map[level]}</span>
 }
 
 function WinBar({ probability, verdict }: { probability: number; verdict: string }) {
-  const barColor = verdict === 'favourable' ? 'bg-emerald-500' : verdict === 'tough' ? 'bg-rose-500' : 'bg-amber-500'
-  const numColor = verdict === 'favourable' ? 'text-emerald-400' : verdict === 'tough' ? 'text-rose-400' : 'text-amber-400'
   const verdictLabel = verdict === 'favourable' ? 'Favourable' : verdict === 'tough' ? 'Tough' : 'Even'
   return (
     <div className="space-y-1.5">
       <div className="flex items-end justify-between gap-2">
-        <span className={`text-3xl font-black tabular-nums leading-none ${numColor}`}>{probability}%</span>
-        <span className={`text-[9px] font-bold uppercase tracking-widest mb-0.5 ${numColor}`}>{verdictLabel}</span>
+        <span className="text-2xl font-semibold tabular-nums leading-none">{probability}%</span>
+        <span className="text-xs text-muted-foreground mb-0.5">{verdictLabel}</span>
       </div>
-      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-        <div className={`h-full rounded-full ${barColor}`} style={{ width: `${probability}%` }} />
+      <div className="h-1 rounded-full bg-muted overflow-hidden">
+        <div className={`h-full rounded-full ${probability >= 50 ? 'bg-zinc-500' : 'bg-zinc-400'}`} style={{ width: `${probability}%` }} />
       </div>
     </div>
   )
@@ -76,7 +59,7 @@ function GameCard({
     >
       {/* Header bar */}
       <div className="px-4 pt-4 pb-3 border-b border-border/40 flex items-start justify-between gap-2">
-        <p className="font-black text-base leading-tight tracking-tight">{opponent.opponentLabel}</p>
+        <p className="font-semibold text-sm leading-tight">{opponent.opponentLabel}</p>
         <ConfidenceDots level={confidence} />
       </div>
 
@@ -99,35 +82,30 @@ function GameCard({
           <div className="space-y-3">
             {/* ATTACK chain */}
             <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground/50 mb-2">Attack</p>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {plan.primary_chain.steps.map((step, i) => (
-                  <span key={i} className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-black text-muted-foreground/30 tabular-nums">{i + 1}</span>
-                    <span className="text-xs font-semibold bg-foreground/[0.06] border border-border/40 px-2 py-0.5 rounded-md max-w-[9rem] truncate">{step}</span>
-                    {i < plan.primary_chain.steps.length - 1 && (
-                      <svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground/25 flex-shrink-0">
-                        <path d="M2 6h8M7 3l3 3-3 3"/>
-                      </svg>
-                    )}
-                  </span>
+              <p className="text-xs text-muted-foreground mb-1.5">Attack</p>
+              <ol className="space-y-0.5">
+                {plan.primary_chain.steps.slice(0, 3).map((step, i) => (
+                  <li key={i} className="text-xs text-foreground/80 flex gap-1.5">
+                    <span className="text-muted-foreground/30 tabular-nums flex-shrink-0">{i + 1}.</span>
+                    <span className="line-clamp-1">{step}</span>
+                  </li>
                 ))}
-              </div>
+              </ol>
             </div>
 
             {/* DANGER */}
             {plan.defensive_priorities[0] && (
               <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.15em] text-rose-500/60 mb-1">Danger</p>
-                <p className="text-xs font-semibold text-rose-400/90 line-clamp-1">{plan.defensive_priorities[0].threat}</p>
+                <p className="text-xs text-muted-foreground mb-1">Danger</p>
+                <p className="text-xs text-rose-500 line-clamp-1">{plan.defensive_priorities[0].threat}</p>
               </div>
             )}
 
             {/* MINDSET */}
             {plan.mental_cues[0] && (
               <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground/50 mb-1">Mindset</p>
-                <p className="text-xs font-medium leading-snug line-clamp-1">{plan.mental_cues[0]}</p>
+                <p className="text-xs text-muted-foreground mb-1">Mindset</p>
+                <p className="text-xs text-foreground/70 leading-snug line-clamp-1">{plan.mental_cues[0]}</p>
               </div>
             )}
           </div>
@@ -136,7 +114,7 @@ function GameCard({
 
       {/* Source footage footnote */}
       <div className="px-4 pb-3 border-t border-border/30">
-        <p className="text-[9px] text-muted-foreground/40 uppercase tracking-widest mt-2.5 mb-0.5">Scout data</p>
+        <p className="text-[10px] text-muted-foreground/40 mt-2.5 mb-0.5">Scout data</p>
         {matchSources.length > 0 ? (
           <p className="text-[10px] text-muted-foreground/60 truncate">
             {matchSources[0]}{matchSources.length > 1 ? ` +${matchSources.length - 1} more` : ''}
@@ -174,7 +152,7 @@ export default async function GameplansPage() {
   if (allTournaments.length === 0) {
     return (
       <div className="max-w-xl space-y-4">
-        <h1 className="text-xl font-black tracking-tight uppercase">Gameplans</h1>
+        <h1 className="text-2xl font-semibold">Gameplans</h1>
         <div className="rounded-xl border border-dashed p-10 text-center space-y-2">
           <p className="font-semibold">No tournaments yet</p>
           <p className="text-sm text-muted-foreground">
@@ -247,146 +225,121 @@ export default async function GameplansPage() {
   })
 
   return (
-    <div className="max-w-6xl space-y-8">
+    <div className="max-w-5xl">
       {/* Page header */}
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 mb-1">FrameMatters</p>
-          <h1 className="text-2xl font-black tracking-tight uppercase leading-none">Gameplans</h1>
-        </div>
+      <div className="flex items-center justify-between gap-4 mb-10">
+        <h1 className="text-2xl font-semibold">Gameplans</h1>
         <p className="text-sm text-muted-foreground tabular-nums">
-          {upcomingCount} upcoming tournament{upcomingCount !== 1 ? 's' : ''}
+          {upcomingCount} upcoming
         </p>
       </div>
 
-      {/* Next-match shortcut — fight card style */}
-      {nextEntry && (() => {
-        const { tournament: t, opponents } = nextEntry
-        const days = daysUntil(t.eventDate)
-        if (opponents.length === 0) return null
-        return (
-          <div className="rounded-xl border border-rose-900/50 bg-rose-950/20 overflow-hidden">
-            <div className="px-4 py-2.5 bg-rose-950/40 border-b border-rose-900/40 flex items-center justify-between gap-2">
-              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-rose-400/80 flex items-center gap-1.5">
-                <svg className="w-2.5 h-2.5" viewBox="0 0 12 12" fill="currentColor"><polygon points="2,1 11,6 2,11"/></svg>
-                Up next
-              </p>
-              {days !== null && (
-                <span className={`text-xs font-black tabular-nums ${
-                  days <= 3 ? 'text-rose-400' : days <= 14 ? 'text-amber-400' : 'text-muted-foreground'
-                }`}>
-                  {days === 0 ? 'TODAY' : days < 0 ? `${Math.abs(days)}D AGO` : `${days}D AWAY`}
-                </span>
-              )}
-            </div>
-            <div className="px-4 py-3 flex items-center gap-4 flex-wrap">
-              <p className="font-black text-base tracking-tight">{t.name}</p>
-              <div className="flex gap-2 flex-wrap">
-                {(() => {
-                  const withPlan = opponents.filter(o => o.plan)
-                  const noPlanCount = opponents.length - withPlan.length
-                  return (
-                    <>
-                      {withPlan.map(({ opponent }) => (
-                        <Link
-                          key={opponent.id}
-                          href={`/tournaments/${t.id}/gameplan?opponent=${opponent.id}`}
-                          className="text-xs px-3 py-1.5 rounded-lg border border-rose-700/50 bg-rose-950/40 text-rose-300 hover:bg-rose-950/70 font-bold transition-colors"
-                        >
-                          {opponent.opponentLabel} →
-                        </Link>
-                      ))}
-                      {noPlanCount > 0 && (
-                        <Link
-                          href={`/tournaments/${t.id}/opponents`}
-                          className="text-xs px-3 py-1.5 rounded-lg border border-border/40 bg-background hover:bg-muted text-muted-foreground font-medium transition-colors"
-                        >
-                          +{noPlanCount} to scout →
-                        </Link>
+      {/* Timeline */}
+      <div className="relative">
+        {/* Vertical rail — hidden on mobile */}
+        <div className="absolute left-[5px] top-2 bottom-0 w-px bg-border/40 hidden sm:block" />
+
+        <div className="space-y-12">
+          {tournamentData.map(({ tournament, opponents }) => {
+            const days = daysUntil(tournament.eventDate)
+            const dateLabel = tournament.eventDate
+              ? new Date(tournament.eventDate + 'T12:00:00').toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })
+              : null
+            const isPast = tournament.status === 'upcoming' && days !== null && days < 0
+            const isNext = nextEntry?.tournament.id === tournament.id
+            const isCompleted = tournament.status === 'completed'
+
+            return (
+              <div key={tournament.id} className={`relative sm:pl-8 ${isPast ? 'opacity-40' : ''}`}>
+                {/* Timeline node dot */}
+                <div className={`
+                  hidden sm:block absolute left-0 top-[7px] w-[11px] h-[11px] rounded-full border-2 transition-colors
+                  ${isNext
+                    ? 'border-foreground bg-foreground'
+                    : isCompleted
+                    ? 'border-border/50 bg-muted'
+                    : 'border-border bg-background'
+                  }
+                `} />
+
+                {/* Tournament anchor row */}
+                <div className="flex items-start justify-between gap-4 mb-5">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      {isNext && (
+                        <span className="text-[10px] font-medium text-muted-foreground border border-border/60 px-1.5 py-0.5 rounded-full leading-none">
+                          Up next
+                        </span>
                       )}
-                    </>
-                  )
-                })()}
-              </div>
-            </div>
-          </div>
-        )
-      })()}
-
-      {tournamentData.map(({ tournament, opponents }) => {
-        const days = daysUntil(tournament.eventDate)
-        const dateLabel = tournament.eventDate
-          ? new Date(tournament.eventDate + 'T12:00:00').toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })
-          : null
-
-        const isPast = tournament.status === 'upcoming' && days !== null && days < 0
-        return (
-          <div key={tournament.id} className={`space-y-4 ${isPast ? 'opacity-40' : ''}`}>
-            {/* Tournament header */}
-            <div className="flex items-center justify-between gap-3 pb-2 border-b border-border/40">
-              <div className="min-w-0 flex items-center gap-3 flex-wrap">
-                <h2 className="font-black text-base tracking-tight uppercase">{tournament.name}</h2>
-                {dateLabel && (
-                  <span className="text-xs text-muted-foreground font-medium">{dateLabel}</span>
-                )}
-              </div>
-              <div className="shrink-0 flex items-center gap-2">
-                {tournament.status === 'upcoming' && days !== null && (
-                  <span className={`text-xs font-black tabular-nums ${
-                    days <= 3 ? 'text-rose-400' : days <= 14 ? 'text-amber-400' : 'text-muted-foreground'
-                  }`}>
-                    {days === 0 ? 'TODAY' : days < 0 ? `${Math.abs(days)}D AGO` : `${days}D`}
-                  </span>
-                )}
-                {tournament.status === 'completed' && (
-                  <span className="text-[9px] px-2 py-0.5 rounded border border-emerald-800/40 text-emerald-400 font-black uppercase tracking-widest">Done</span>
-                )}
-              </div>
-            </div>
-
-            {/* Opponent game cards */}
-            {(() => {
-              if (opponents.length === 0) return (
-                <p className="text-xs text-muted-foreground">
-                  No opponents added.{' '}
-                  <Link href={`/tournaments/${tournament.id}/opponents`} className="underline hover:no-underline">Add opponents →</Link>
-                </p>
-              )
-              const withData = opponents.filter(o => o.plan || o.matchCount > 0)
-              const noDataCount = opponents.length - withData.length
-              if (withData.length === 0) return (
-                <p className="text-xs text-muted-foreground">
-                  {opponents.length} opponent{opponents.length !== 1 ? 's' : ''} added — no footage scouted yet.{' '}
-                  <Link href={`/tournaments/${tournament.id}/opponents`} className="underline hover:no-underline">Start scouting →</Link>
-                </p>
-              )
-              return (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {withData.map(({ opponent, plan, prediction, matchCount, matchSources }) => (
-                      <GameCard
-                        key={opponent.id}
-                        opponent={opponent}
-                        tournamentId={tournament.id}
-                        plan={plan}
-                        prediction={prediction}
-                        matchCount={matchCount}
-                        matchSources={matchSources}
-                      />
-                    ))}
+                      <h2 className="font-semibold text-base leading-snug">{tournament.name}</h2>
+                    </div>
+                    {dateLabel && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{dateLabel}</p>
+                    )}
                   </div>
-                  {noDataCount > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      +{noDataCount} opponent{noDataCount !== 1 ? 's' : ''} without footage.{' '}
-                      <Link href={`/tournaments/${tournament.id}/opponents`} className="underline hover:no-underline">Scout →</Link>
-                    </p>
-                  )}
-                </>
-              )
-            })()}
-          </div>
-        )
-      })}
+                  <div className="flex items-center gap-2 flex-shrink-0 pt-0.5">
+                    {tournament.status === 'upcoming' && days !== null && (
+                      <span className={`text-xs font-medium tabular-nums ${
+                        days <= 3 ? 'text-rose-500' : days <= 14 ? 'text-amber-500' : 'text-muted-foreground'
+                      }`}>
+                        {days === 0 ? 'Today' : days < 0 ? `${Math.abs(days)}d ago` : `${days}d`}
+                      </span>
+                    )}
+                    {isCompleted && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded border border-border/40 text-muted-foreground font-medium">
+                        Done
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Opponent cards — left border brackets them under this tournament */}
+                <div className="border-l border-border/40 pl-4 ml-0.5">
+                  {(() => {
+                    if (opponents.length === 0) return (
+                      <p className="text-xs text-muted-foreground py-1">
+                        No opponents added.{' '}
+                        <Link href={`/tournaments/${tournament.id}/opponents`} className="underline hover:no-underline">Add opponents →</Link>
+                      </p>
+                    )
+                    const withData = opponents.filter(o => o.plan || o.matchCount > 0)
+                    const noDataCount = opponents.length - withData.length
+                    if (withData.length === 0) return (
+                      <p className="text-xs text-muted-foreground py-1">
+                        {opponents.length} opponent{opponents.length !== 1 ? 's' : ''} added — no footage scouted yet.{' '}
+                        <Link href={`/tournaments/${tournament.id}/opponents`} className="underline hover:no-underline">Start scouting →</Link>
+                      </p>
+                    )
+                    return (
+                      <>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                          {withData.map(({ opponent, plan, prediction, matchCount, matchSources }) => (
+                            <GameCard
+                              key={opponent.id}
+                              opponent={opponent}
+                              tournamentId={tournament.id}
+                              plan={plan}
+                              prediction={prediction}
+                              matchCount={matchCount}
+                              matchSources={matchSources}
+                            />
+                          ))}
+                        </div>
+                        {noDataCount > 0 && (
+                          <p className="text-xs text-muted-foreground mt-3">
+                            +{noDataCount} opponent{noDataCount !== 1 ? 's' : ''} without footage.{' '}
+                            <Link href={`/tournaments/${tournament.id}/opponents`} className="underline hover:no-underline">Scout →</Link>
+                          </p>
+                        )}
+                      </>
+                    )
+                  })()}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }

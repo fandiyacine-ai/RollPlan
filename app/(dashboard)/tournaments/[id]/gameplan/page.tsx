@@ -36,8 +36,8 @@ export default async function GameplanPage({
   if (opponents.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border/50 p-10 text-center space-y-3">
-        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/40">Step 3 of 3</p>
-        <p className="font-black text-xl uppercase tracking-tight">No opponents yet</p>
+        <p className="text-xs text-muted-foreground font-medium">Step 3 of 3</p>
+        <p className="font-semibold text-lg">No opponents yet</p>
         <p className="text-sm text-muted-foreground max-w-sm mx-auto">
           <Link href={`/tournaments/${tournamentId}/opponents`} className="text-foreground underline underline-offset-2 hover:no-underline">
             Add opponents and scout their footage
@@ -118,8 +118,8 @@ export default async function GameplanPage({
           {/* Mobile: ultra-compact strip — opponent + generate only */}
           <div className="flex sm:hidden items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
-              {plan && <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-primary/20 text-primary border border-primary/30 uppercase tracking-[0.14em] flex-shrink-0">AI</span>}
-              <span className="text-xs font-black uppercase tracking-tight truncate">{activeOpponent.opponentLabel}</span>
+              {plan && <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-foreground/[0.06] text-foreground/60 border border-border/40 flex-shrink-0">AI</span>}
+              <span className="text-sm font-semibold truncate">{activeOpponent.opponentLabel}</span>
               <span className="text-[10px] text-muted-foreground/50 flex-shrink-0">{scoutedCount}m</span>
             </div>
             <GenerateGameplanButton
@@ -132,13 +132,13 @@ export default async function GameplanPage({
           {/* Desktop: full matchup header */}
           <div className="hidden sm:flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/40 mb-1.5">Gameplan</p>
-              <h2 className="text-xl font-black tracking-tight uppercase leading-tight">
+              <p className="text-xs text-muted-foreground font-medium mb-1.5">Gameplan</p>
+              <h2 className="text-xl font-semibold leading-snug">
                 {athleteName ? `${athleteName} vs. ${activeOpponent.opponentLabel}` : `vs. ${activeOpponent.opponentLabel}`}
               </h2>
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                 {plan && (
-                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-primary/20 text-primary border border-primary/30 uppercase tracking-[0.14em]">AI</span>
+                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-foreground/[0.06] text-foreground/60 border border-border/40">AI</span>
                 )}
                 <p className="text-xs text-muted-foreground">
                   {scoutedCount} match{scoutedCount !== 1 ? 'es' : ''} scouted
@@ -147,7 +147,7 @@ export default async function GameplanPage({
               </div>
               {scoutedMatches.some(m => m.status === 'analysed' && m.resultWinner) && (
                 <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                  <span className="text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground/40">Footage:</span>
+                  <span className="text-xs text-muted-foreground">Footage:</span>
                   {scoutedMatches.filter(m => m.status === 'analysed' && m.resultWinner).map(m => {
                     const isWin = m.resultWinner === 'user'
                     const label = m.resultMethod === 'submission'
@@ -226,8 +226,8 @@ export default async function GameplanPage({
 function NoFootageState({ tournamentId, opponentLabel }: { tournamentId: string; opponentLabel: string }) {
   return (
     <div className="rounded-xl border border-dashed border-border/50 p-10 text-center space-y-3">
-      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/40">No footage</p>
-      <p className="font-black text-lg uppercase tracking-tight">{opponentLabel}</p>
+      <p className="text-xs text-muted-foreground font-medium">No footage</p>
+      <p className="font-semibold text-base">{opponentLabel}</p>
       <p className="text-sm text-muted-foreground max-w-sm mx-auto">
         <Link href={`/tournaments/${tournamentId}/opponents`} className="text-foreground underline underline-offset-2 hover:no-underline">
           Add scouting footage
@@ -250,8 +250,8 @@ function ReadyToGenerateState({
   return (
     <div className="rounded-xl border border-border/60 bg-card p-8 text-center space-y-5">
       <div>
-        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/40 mb-3">Step 3 of 3</p>
-        <h3 className="font-black text-xl uppercase tracking-tight mb-2">Ready to build your gameplan</h3>
+        <p className="text-xs text-muted-foreground font-medium mb-3">Step 3 of 3</p>
+        <h3 className="font-semibold text-lg mb-2">Ready to build your gameplan</h3>
         <p className="text-sm text-muted-foreground max-w-sm mx-auto">
           {scoutedCount} match{scoutedCount !== 1 ? 'es' : ''} analysed — generate a tailored fight plan in ~30 seconds.
         </p>
@@ -265,8 +265,8 @@ function GeneratingState({ opponentLabel, athleteName }: { opponentLabel: string
   return (
     <div className="space-y-4">
       <div>
-        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/40 mb-1.5">Gameplan</p>
-        <h2 className="text-xl font-black tracking-tight uppercase leading-tight">
+        <p className="text-xs text-muted-foreground font-medium mb-1.5">Gameplan</p>
+        <h2 className="text-xl font-semibold leading-snug">
           {athleteName ? `${athleteName} vs. ${opponentLabel}` : `vs. ${opponentLabel}`}
         </h2>
         <div className="flex items-center gap-2 mt-2">
@@ -313,12 +313,11 @@ function GameplanDisplay({ plan }: { plan: GameplanOutput }) {
       <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-3">
         {/* Attack chain */}
         <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
-          <div className="px-5 py-3 border-b border-border/60 flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-foreground/40 flex-shrink-0" />
-            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/50">Attack Chain</p>
+          <div className="px-5 py-3 border-b border-border/60">
+            <p className="text-xs font-medium text-muted-foreground">Attack chain</p>
           </div>
           <div className="p-5 space-y-3.5">
-            <p className="text-sm font-black tracking-tight">{plan.primary_chain.label}</p>
+            <p className="text-sm font-semibold">{plan.primary_chain.label}</p>
             {/* Mobile: vertical numbered list, clamped */}
             <div className="flex flex-col gap-1.5 sm:hidden">
               {plan.primary_chain.steps.slice(0, 4).map((step, i) => (
@@ -346,15 +345,14 @@ function GameplanDisplay({ plan }: { plan: GameplanOutput }) {
         </div>
 
         {/* Danger card */}
-        <div className="rounded-xl border border-rose-900/40 bg-rose-950/20 overflow-hidden">
-          <div className="px-5 py-3 border-b border-rose-900/40 flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0" />
-            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-rose-400/70">Danger</p>
+        <div className="rounded-xl border border-border/40 bg-card overflow-hidden">
+          <div className="px-5 py-3 border-b border-border/40">
+            <p className="text-xs font-medium text-rose-500">Danger</p>
           </div>
           <div className="p-5 space-y-3.5">
             {plan.defensive_priorities.slice(0, 2).map((d, i) => (
               <div key={i} className="space-y-0.5">
-                <p className="text-xs font-black text-foreground leading-snug">{d.threat}</p>
+                <p className="text-xs font-semibold text-foreground leading-snug">{d.threat}</p>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">{d.counter}</p>
               </div>
             ))}
@@ -365,13 +363,13 @@ function GameplanDisplay({ plan }: { plan: GameplanOutput }) {
       {/* Start Here */}
       <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
         <div className="px-5 py-3 border-b border-border/60">
-          <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/50">Start Here</p>
+          <p className="text-xs font-medium text-muted-foreground">Start here</p>
         </div>
         <div className="p-5 space-y-2">
-          <p className="text-sm font-semibold leading-snug">{plan.opening.recommendation}</p>
+          <p className="text-sm font-medium leading-snug">{plan.opening.recommendation}</p>
           {plan.opening.if_scrambled && (
             <div className="flex gap-2.5 items-start pt-2.5 border-t border-border/40">
-              <span className="text-[9px] font-black text-amber-400 uppercase tracking-[0.14em] mt-0.5 flex-shrink-0 whitespace-nowrap">If scrambled</span>
+              <span className="text-xs font-medium text-muted-foreground mt-0.5 flex-shrink-0 whitespace-nowrap">If scrambled</span>
               <p className="text-xs text-muted-foreground leading-relaxed">{plan.opening.if_scrambled}</p>
             </div>
           )}
@@ -381,7 +379,7 @@ function GameplanDisplay({ plan }: { plan: GameplanOutput }) {
       {/* Mat Cues — inline horizontal */}
       {plan.mental_cues.length > 0 && (
         <div className="rounded-xl border border-border/60 bg-card px-5 py-3.5 flex items-center gap-3 flex-wrap">
-          <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/50 flex-shrink-0">Mat Cues</p>
+          <p className="text-xs font-medium text-muted-foreground flex-shrink-0">Mat cues</p>
           <div className="flex flex-wrap gap-1.5">
             {plan.mental_cues.map((cue, i) => (
               <span key={i} className="text-xs px-2.5 py-1 rounded-full border border-border/60 bg-foreground/[0.04] font-medium">
@@ -397,7 +395,7 @@ function GameplanDisplay({ plan }: { plan: GameplanOutput }) {
         <div className="rounded-xl border border-border/60 bg-card p-4 flex gap-3 items-start">
           <div className="w-1 self-stretch rounded-full bg-amber-500/40 flex-shrink-0" />
           <div>
-            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/50">Ruleset</p>
+            <p className="text-xs font-medium text-muted-foreground">Ruleset</p>
             <p className="text-xs text-foreground mt-1 leading-relaxed">{plan.format_notes}</p>
           </div>
         </div>
@@ -409,7 +407,7 @@ function GameplanDisplay({ plan }: { plan: GameplanOutput }) {
           <div className="grid gap-2 sm:grid-cols-2">
             {plan.secondary_options.map((opt, i) => (
               <div key={i} className="rounded-xl border border-border/60 bg-card p-4 space-y-1.5">
-                <p className="text-xs font-black tracking-tight">{opt.label}</p>
+                <p className="text-xs font-semibold">{opt.label}</p>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">{opt.rationale}</p>
               </div>
             ))}
@@ -421,22 +419,22 @@ function GameplanDisplay({ plan }: { plan: GameplanOutput }) {
       <Section title="Opponent Intel">
         <div className="space-y-2">
           <div className="grid gap-2 sm:grid-cols-2">
-            <div className="rounded-xl border border-rose-900/40 bg-rose-950/20 p-4 space-y-1.5">
-              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-rose-400/70">Their Weapon</p>
+            <div className="rounded-xl border border-border/40 bg-card p-4 space-y-1.5">
+              <p className="text-xs font-medium text-rose-500">Their weapon</p>
               <p className="text-xs leading-relaxed">{plan.opponent_intel.biggest_threat}</p>
             </div>
-            <div className="rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-4 space-y-1.5">
-              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-400/70">Their Gap</p>
+            <div className="rounded-xl border border-border/40 bg-card p-4 space-y-1.5">
+              <p className="text-xs font-medium text-emerald-500">Their gap</p>
               <p className="text-xs leading-relaxed">{plan.opponent_intel.biggest_weakness}</p>
             </div>
           </div>
           {plan.opponent_intel.patterns.length > 0 && (
             <div className="rounded-xl border border-border/60 bg-card px-5 py-4 space-y-2.5">
-              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/50">Patterns</p>
+              <p className="text-xs font-medium text-muted-foreground">Patterns</p>
               <div className="space-y-2">
                 {plan.opponent_intel.patterns.map((p, i) => (
                   <div key={i} className="flex gap-2.5 items-start">
-                    <span className="text-[10px] font-black text-muted-foreground/25 tabular-nums flex-shrink-0 mt-0.5">{String(i + 1).padStart(2, '0')}</span>
+                    <span className="text-[10px] text-muted-foreground/30 tabular-nums flex-shrink-0 mt-0.5">{i + 1}.</span>
                     <p className="text-xs text-muted-foreground leading-relaxed">{p}</p>
                   </div>
                 ))}
@@ -452,7 +450,7 @@ function GameplanDisplay({ plan }: { plan: GameplanOutput }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2.5">
-      <h3 className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/50 px-0.5">{title}</h3>
+      <h3 className="text-xs font-medium text-muted-foreground px-0.5">{title}</h3>
       {children}
     </div>
   )
@@ -480,18 +478,18 @@ function PredictionCard({ prediction }: { prediction: MatchupPrediction }) {
         <div className="px-5 py-5 border-b border-border/60">
           <div className="flex items-end justify-between gap-4">
             <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/50 mb-2">Win probability</p>
-              <span className={`text-5xl font-black tabular-nums leading-none ${style.text}`}>
+              <p className="text-xs font-medium text-muted-foreground mb-2">Win probability</p>
+              <span className="text-3xl font-bold tabular-nums leading-none">
                 {prediction.win_probability}%
               </span>
             </div>
             <div className="text-right pb-1">
-              <p className={`text-sm font-black uppercase tracking-[0.14em] ${style.text}`}>{style.label}</p>
+              <p className={`text-sm font-semibold ${style.text}`}>{style.label}</p>
               <p className="text-xs text-muted-foreground/50 mt-1">{CONFIDENCE_LABEL[prediction.confidence]}</p>
             </div>
           </div>
-          <div className="h-1.5 rounded-full bg-muted overflow-hidden mt-4">
-            <div className={`h-full rounded-full transition-all ${style.bar}`} style={{ width: `${prediction.win_probability}%` }} />
+          <div className="h-1 rounded-full bg-muted overflow-hidden mt-4">
+            <div className="h-full rounded-full bg-foreground/30 transition-all" style={{ width: `${prediction.win_probability}%` }} />
           </div>
         </div>
 
@@ -503,17 +501,13 @@ function PredictionCard({ prediction }: { prediction: MatchupPrediction }) {
         {/* Advantages + Risks */}
         <div className="grid sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-border/60">
           <div className="px-5 py-4 space-y-2">
-            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-400/70 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />Your Edge
-            </p>
+            <p className="text-xs font-medium text-emerald-500">Your edge</p>
             {prediction.key_advantages.map((a, i) => (
               <p key={i} className="text-xs text-muted-foreground leading-relaxed">{a}</p>
             ))}
           </div>
           <div className="px-5 py-4 space-y-2">
-            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-rose-400/70 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-400 flex-shrink-0" />Watch Out
-            </p>
+            <p className="text-xs font-medium text-rose-500">Watch out</p>
             {prediction.key_risks.map((r, i) => (
               <p key={i} className="text-xs text-muted-foreground leading-relaxed">{r}</p>
             ))}
