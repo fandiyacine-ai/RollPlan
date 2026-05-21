@@ -75,9 +75,11 @@ export function Nav({ usageSlot }: { usageSlot?: React.ReactNode }) {
             </Suspense>
           </div>
 
-          <Link href="/upload" className={`hidden sm:inline-flex ${buttonVariants({ size: 'sm' })}`}>
-            + Analyse My Match
-          </Link>
+          <div className="hidden sm:block">
+            <Link href="/upload" className={buttonVariants({ size: 'sm' })}>
+              + Analyse My Match
+            </Link>
+          </div>
         </div>
 
         {/* Right: desktop icons + mobile controls */}
@@ -104,9 +106,11 @@ export function Nav({ usageSlot }: { usageSlot?: React.ReactNode }) {
           <UserButton />
 
           {/* Mobile: compact CTA + hamburger */}
-          <Link href="/upload" className={`sm:hidden ${buttonVariants({ size: 'sm' })}`}>
-            + Analyse
-          </Link>
+          <div className="sm:hidden">
+            <Link href="/upload" className={buttonVariants({ size: 'sm' })}>
+              + Analyse
+            </Link>
+          </div>
           <button
             className="sm:hidden p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
             onClick={() => setOpen(o => !o)}
