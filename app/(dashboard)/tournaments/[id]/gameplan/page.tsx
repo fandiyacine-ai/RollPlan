@@ -140,9 +140,9 @@ export default async function GameplanPage({
         <GeneratingState opponentLabel={activeOpponent.opponentLabel} />
       ) : (
         <>
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             <div className="min-w-0">
-              <h2 className="font-semibold truncate">vs. {activeOpponent.opponentLabel}</h2>
+              <h2 className="font-semibold">vs. {activeOpponent.opponentLabel}</h2>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {scoutedCount} match{scoutedCount !== 1 ? 'es' : ''} scouted
                 {existingGameplan && plan ? ` · Generated ${existingGameplan.createdAt.toLocaleDateString()} (v${existingGameplan.version})` : ''}
@@ -167,7 +167,7 @@ export default async function GameplanPage({
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
               {existingGameplan && plan && (
                 <GameplanRatingWidget
                   gameplanId={existingGameplan.id}

@@ -50,19 +50,21 @@ export default async function TournamentsPage() {
     <div className="space-y-6 max-w-2xl">
       {/* Step guide */}
       <div className="border border-dashed border-border/60 rounded-xl p-5 bg-muted/20">
-        <div className="flex items-start gap-3">
+        <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-3">
           {[
             { n: '1', title: 'Create a tournament', body: 'Name the event, ruleset, and division you\'re competing in.' },
             { n: '2', title: 'Name your opponents', body: 'Add the athletes you might face and submit their match footage.' },
             { n: '3', title: 'AI builds your gameplan', body: 'Get a tailored gameplan for each opponent based on their footage.' },
           ].map((step, i) => (
             <div key={step.n} className="contents">
-              <div className="flex-1 text-center">
-                <p className="text-primary font-bold text-base">{step.n}</p>
-                <p className="font-medium text-sm mt-1">{step.title}</p>
-                <p className="text-xs text-muted-foreground mt-1">{step.body}</p>
+              <div className="flex-1 sm:text-center flex sm:block items-start gap-3">
+                <p className="text-primary font-bold text-base shrink-0 w-5">{step.n}</p>
+                <div>
+                  <p className="font-medium text-sm">{step.title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{step.body}</p>
+                </div>
               </div>
-              {i < 2 && <div className="pt-4 text-muted-foreground/40 font-light text-lg select-none">→</div>}
+              {i < 2 && <div className="hidden sm:block pt-4 text-muted-foreground/40 font-light text-lg select-none">→</div>}
             </div>
           ))}
         </div>
