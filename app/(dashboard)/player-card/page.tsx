@@ -276,10 +276,10 @@ export default async function PlayerCardPage() {
   }
 
   return (
-    <div className="max-w-6xl">
+    <div className="w-full max-w-7xl">
       {isProcessing && <RefreshPoller />}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_288px] gap-6 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_280px] gap-6 items-start">
 
         {/* ── Left: Analytics ── */}
         <div className="space-y-5 min-w-0">
@@ -294,43 +294,41 @@ export default async function PlayerCardPage() {
             </div>
           ) : (
             <>
-              {/* Stats strip */}
+              {/* Hero stats strip */}
               {ownAnalysedIds.length > 0 && (
-                <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
-                  <div className="px-5 pt-3.5 pb-3 border-b border-border/60">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">Control Rate</p>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className={`text-2xl font-bold tabular-nums leading-none ${
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {/* Control rate — most important, gets special treatment */}
+                  <div className="rounded-xl border border-border/60 bg-card p-4 space-y-2 col-span-2 sm:col-span-1">
+                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/50">Control Rate</p>
+                    <div className="flex items-end gap-2">
+                      <span className={`text-5xl font-black tabular-nums leading-none ${
                         controlPct >= 55 ? 'text-emerald-400' : controlPct < 35 ? 'text-rose-400' : 'text-foreground'
                       }`}>{controlPct}%</span>
                       {trendDelta != null && trendDelta !== 0 && (
-                        <span className={`text-xs font-semibold ${trendDelta > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {trendDelta > 0 ? '↑' : '↓'}{Math.abs(trendDelta)}%
+                        <span className={`text-xs font-black mb-1 ${trendDelta > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {trendDelta > 0 ? '↑' : '↓'}{Math.abs(trendDelta)}
                         </span>
                       )}
-                      <span className="text-xs text-muted-foreground">{underPressurePct}% under pressure</span>
                     </div>
-                    <div className="mt-2 h-1 rounded-full bg-muted overflow-hidden max-w-xs">
-                      <div className="h-full rounded-full" style={{
+                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{
                         width: `${controlPct}%`,
                         background: controlPct >= 55 ? '#4ade80' : controlPct < 35 ? '#f87171' : '#71717a',
                       }} />
                     </div>
+                    <p className="text-[9px] text-muted-foreground/50">{underPressurePct}% under pressure</p>
                   </div>
-                  <div className="grid grid-cols-4 divide-x divide-border/40">
-                    {[
-                      { label: 'Matches', value: String(ownAnalysedIds.length), sub: matchesSub },
-                      { label: 'Mat Time', value: fmt(totalAnalyzedTime) },
-                      { label: 'Avg Match', value: avgMatchDuration > 0 ? fmt(avgMatchDuration) : '—' },
-                      { label: 'Attacks', value: String(subAttempts), sub: 'sub attempts' },
-                    ].map(({ label, value, sub }) => (
-                      <div key={label} className="px-3 py-2.5">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">{label}</p>
-                        <p className="text-sm font-semibold tabular-nums mt-0.5">{value}</p>
-                        {sub && <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>}
-                      </div>
-                    ))}
-                  </div>
+                  {[
+                    { label: 'Matches', value: String(ownAnalysedIds.length), sub: matchesSub },
+                    { label: 'Mat Time', value: fmt(totalAnalyzedTime), sub: avgMatchDuration > 0 ? `avg ${fmt(avgMatchDuration)}` : undefined },
+                    { label: 'Attacks', value: String(subAttempts), sub: 'sub attempts' },
+                  ].map(({ label, value, sub }) => (
+                    <div key={label} className="rounded-xl border border-border/60 bg-card p-4 space-y-1.5">
+                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/50">{label}</p>
+                      <p className="text-4xl font-black tabular-nums leading-none">{value}</p>
+                      {sub && <p className="text-[9px] text-muted-foreground/50">{sub}</p>}
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -401,49 +399,49 @@ export default async function PlayerCardPage() {
               {/* Game DNA */}
               {(sharpPositions.length > 0 || exposedPositions.length > 0) && (
                 <div className="rounded-xl border border-border/60 overflow-hidden bg-card">
-                  <div className="px-5 py-2.5 border-b border-border/60 flex items-center justify-between">
+                  <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between">
                     <div>
-                      <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                      <svg className="w-3 h-3 opacity-50" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2 2c3.5 0 5.5 2 5.5 4s2 4 5.5 4"/><path d="M10 2c-3.5 0-5.5 2-5.5 4s-2 4-5.5 4"/></svg>
-                      Game DNA
-                    </h2>
-                      <p className="text-[10px] text-muted-foreground/60 mt-0.5">% of time in that position you spent in control / under pressure</p>
+                      <h2 className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/50 flex items-center gap-1.5">
+                        <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2 2c3.5 0 5.5 2 5.5 4s2 4 5.5 4"/><path d="M10 2c-3.5 0-5.5 2-5.5 4s-2 4-5.5 4"/></svg>
+                        Game DNA
+                      </h2>
+                      <p className="text-[10px] text-muted-foreground/50 mt-0.5">% of time in that position in control / under pressure</p>
                     </div>
-                    <span className="text-xs text-muted-foreground shrink-0 ml-3">{ownAnalysedIds.length} match{ownAnalysedIds.length !== 1 ? 'es' : ''}</span>
+                    <span className="text-xs text-muted-foreground/50 shrink-0 ml-3 tabular-nums">{ownAnalysedIds.length} matches</span>
                   </div>
                   <div className="grid grid-cols-2 divide-x divide-border/60">
-                    <div className="p-4 space-y-3">
-                      <p className="text-[10px] font-semibold text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <div className="p-4 space-y-3.5">
+                      <p className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.18em] flex items-center gap-1.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />Strongest
                       </p>
                       {sharpPositions.length > 0 ? sharpPositions.map(([id, s]) => {
                         const pct = Math.round((s.dominant / s.total) * 100)
                         return (
                           <div key={id}>
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm">{POSITION_MAP[id] ?? id}</span>
-                              <span className="text-xs font-bold text-emerald-400 tabular-nums">{pct}%</span>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-sm font-semibold">{POSITION_MAP[id] ?? id}</span>
+                              <span className="text-sm font-black text-emerald-400 tabular-nums">{pct}%</span>
                             </div>
-                            <div className="h-1 rounded-full bg-muted overflow-hidden">
+                            <div className="h-2 rounded-full bg-muted overflow-hidden">
                               <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
                             </div>
                           </div>
                         )
                       }) : <p className="text-xs text-muted-foreground">Not enough data yet</p>}
                     </div>
-                    <div className="p-4 space-y-3">
-                      <p className="text-[10px] font-semibold text-rose-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <div className="p-4 space-y-3.5">
+                      <p className="text-[9px] font-black text-rose-400 uppercase tracking-[0.18em] flex items-center gap-1.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-rose-400 inline-block" />Exposed
                       </p>
                       {exposedPositions.length > 0 ? exposedPositions.map(([id, s]) => {
                         const pct = Math.round((s.inferior / s.total) * 100)
                         return (
                           <div key={id}>
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm">{POSITION_MAP[id] ?? id}</span>
-                              <span className="text-xs font-bold text-rose-400 tabular-nums">{pct}%</span>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-sm font-semibold">{POSITION_MAP[id] ?? id}</span>
+                              <span className="text-sm font-black text-rose-400 tabular-nums">{pct}%</span>
                             </div>
-                            <div className="h-1 rounded-full bg-muted overflow-hidden">
+                            <div className="h-2 rounded-full bg-muted overflow-hidden">
                               <div className="h-full bg-rose-500 rounded-full" style={{ width: `${pct}%` }} />
                             </div>
                           </div>
@@ -499,11 +497,11 @@ export default async function PlayerCardPage() {
               {/* Time & Control */}
               {sortedPositions.length > 0 && (
                 <div className="space-y-2">
-                  <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                    <svg className="w-3 h-3 opacity-50" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="6" cy="6" r="4.5"/><path d="M6 3.5v2.5l1.5 1"/></svg>
+                  <h2 className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/50 flex items-center gap-1.5">
+                    <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="6" cy="6" r="4.5"/><path d="M6 3.5v2.5l1.5 1"/></svg>
                     Time &amp; Control
                   </h2>
-                  <div className="rounded-xl border bg-card px-3 py-2.5 space-y-2">
+                  <div className="rounded-xl border bg-card px-4 py-3 space-y-3">
                     {sortedPositions.slice(0, 10).map(([posId, stats]) => {
                       const barPct = (stats.total / maxPositionTime) * 100
                       const domPct = (stats.dominant / stats.total) * 100
@@ -511,14 +509,14 @@ export default async function PlayerCardPage() {
                       const neuPct = Math.max(0, 100 - domPct - infPct)
                       return (
                         <div key={posId}>
-                          <div className="flex items-center justify-between mb-0.5">
-                            <span className="text-xs">{POSITION_MAP[posId] ?? posId}</span>
-                            <span className="text-[10px] text-muted-foreground tabular-nums">{fmt(stats.total)}</span>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-semibold">{POSITION_MAP[posId] ?? posId}</span>
+                            <span className="text-xs text-muted-foreground tabular-nums font-medium">{fmt(stats.total)}</span>
                           </div>
-                          <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
+                          <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
                             <div className="h-full flex rounded-full overflow-hidden" style={{ width: `${barPct}%` }}>
                               <div className="bg-emerald-500" style={{ width: `${domPct}%` }} />
-                              <div className="bg-zinc-500/60" style={{ width: `${neuPct}%` }} />
+                              <div className="bg-zinc-500/50" style={{ width: `${neuPct}%` }} />
                               <div className="bg-rose-500" style={{ width: `${infPct}%` }} />
                             </div>
                           </div>
@@ -526,10 +524,10 @@ export default async function PlayerCardPage() {
                       )
                     })}
                   </div>
-                  <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
-                    <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-sm bg-emerald-500 inline-block" /> In Control</span>
-                    <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-sm bg-zinc-500/60 inline-block" /> Neutral</span>
-                    <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-sm bg-rose-500 inline-block" /> Under Pressure</span>
+                  <div className="flex items-center gap-4 text-[9px] text-muted-foreground font-bold uppercase tracking-wider">
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" /> In Control</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-zinc-500/50 inline-block" /> Neutral</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-rose-500 inline-block" /> Under Pressure</span>
                   </div>
                 </div>
               )}
@@ -726,25 +724,24 @@ function ProfileHeader({ name, dbUser }: { name: string; dbUser: typeof users.$i
   const style = dbUser?.primaryStyle
 
   return (
-    <div className="flex items-center gap-3.5">
-      <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/20 text-primary flex items-center justify-center text-base font-bold flex-shrink-0">
+    <div className="flex items-center gap-4">
+      <div className="w-16 h-16 rounded-full bg-foreground/[0.07] border border-border/60 text-foreground flex items-center justify-center text-xl font-black flex-shrink-0 tracking-tight">
         {initials(name)}
       </div>
-      <div>
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <h1 className="text-xl font-black tracking-tight">{name}</h1>
+      <div className="min-w-0">
+        <h1 className="text-2xl font-black tracking-tight leading-none">{name.toUpperCase()}</h1>
+        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
           {belt && (
-            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${BELT_STYLE[belt]?.bg ?? 'bg-muted'} ${BELT_STYLE[belt]?.text ?? 'text-foreground'}`}>
-              {belt.charAt(0).toUpperCase() + belt.slice(1)} Belt
+            <span className={`text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-[0.14em] ${BELT_STYLE[belt]?.bg ?? 'bg-muted'} ${BELT_STYLE[belt]?.text ?? 'text-foreground'}`}>
+              {belt} belt
             </span>
           )}
-        </div>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {gym ?? (
-            <Link href="/settings" className="hover:text-foreground transition-colors underline underline-offset-2">Set gym &amp; training style in settings →</Link>
+          {gym ? (
+            <span className="text-xs text-muted-foreground font-medium">{gym}{style ? ` · ${style === 'no_gi' ? 'No-Gi' : style === 'both' ? 'Gi & No-Gi' : 'Gi'}` : ''}</span>
+          ) : (
+            <Link href="/settings" className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2">Set gym in settings →</Link>
           )}
-          {style && ` · ${style === 'no_gi' ? 'No-Gi' : style === 'both' ? 'Gi & No-Gi' : 'Gi'}`}
-        </p>
+        </div>
       </div>
     </div>
   )

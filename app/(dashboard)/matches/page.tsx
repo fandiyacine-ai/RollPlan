@@ -121,10 +121,10 @@ export default async function MatchesPage() {
 
   if (isEmpty) {
     return (
-      <div className="max-w-2xl space-y-6">
+      <div className="max-w-xl space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-lg font-bold">My Matches</h1>
-          <Link href="/upload" className={buttonVariants({ size: 'sm' })}>+ Analyse My Match</Link>
+          <h1 className="text-2xl font-black tracking-tight uppercase">My Matches</h1>
+          <Link href="/upload" className={buttonVariants({ size: 'sm' })}>+ Analyse</Link>
         </div>
         <div className="rounded-xl border border-dashed p-16 text-center space-y-4">
           <p className="text-muted-foreground text-sm">No matches analysed yet.</p>
@@ -137,35 +137,38 @@ export default async function MatchesPage() {
   }
 
   return (
-    <div className="max-w-3xl space-y-5">
+    <div className="max-w-5xl space-y-6">
       {isProcessing && <RefreshPoller />}
 
       {/* Page header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-baseline gap-2.5">
-          <h1 className="text-lg font-bold">My Matches</h1>
-          {allMatches.length > 0 && (
-            <span className="text-sm text-muted-foreground">{allMatches.length}</span>
-          )}
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 mb-1">FrameMatters</p>
+          <div className="flex items-baseline gap-3">
+            <h1 className="text-2xl font-black tracking-tight uppercase leading-none">My Matches</h1>
+            {allMatches.length > 0 && (
+              <span className="text-sm text-muted-foreground tabular-nums font-medium">{allMatches.length} total</span>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Link href="/upload" className={buttonVariants({ size: 'sm' })}>+ Analyse</Link>
-        </div>
+        <Link href="/upload" className={buttonVariants({ size: 'sm' })}>+ Analyse</Link>
       </div>
 
       {/* In Progress */}
       {scanningVideos.length > 0 && (
         <div className="space-y-2">
           {scanningVideos.map((v) => (
-            <div key={v.id} className="rounded-xl border border-border/60 bg-card p-4 flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <p className="font-medium text-sm truncate">{v.originalFilename}</p>
-                <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-foreground/40 animate-pulse inline-block" />
-                  {v.sourceType === 'public_url' ? 'Scanning for matches…' : 'Analysing…'}
-                </p>
+            <div key={v.id} className="rounded-xl border border-border/60 bg-card px-4 py-3 flex items-center justify-between gap-4">
+              <div className="min-w-0 flex items-center gap-3">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm truncate">{v.originalFilename}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {v.sourceType === 'public_url' ? 'Scanning for matches…' : 'Analysing…'}
+                  </p>
+                </div>
               </div>
-              <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-muted text-muted-foreground border border-border flex-shrink-0">
+              <span className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded border border-blue-800/40 text-blue-400 flex-shrink-0">
                 Analysing
               </span>
             </div>
@@ -177,7 +180,7 @@ export default async function MatchesPage() {
       {failedVideos.length > 0 && (
         <div className="space-y-2">
           {failedVideos.map((v) => (
-            <div key={v.id} className="rounded-xl border border-border/60 bg-card p-4 flex items-center justify-between gap-4">
+            <div key={v.id} className="rounded-xl border border-rose-800/30 bg-rose-950/10 px-4 py-3 flex items-center justify-between gap-4">
               <div className="min-w-0">
                 <p className="font-medium text-sm truncate">{v.originalFilename}</p>
                 <p className="text-xs text-rose-400 mt-0.5">Analysis failed — remove or resubmit</p>
@@ -188,22 +191,22 @@ export default async function MatchesPage() {
         </div>
       )}
 
-      {/* Match timeline */}
+      {/* Match timeline — grouped by month */}
       <div>
         {(() => {
-          let lastYear: number | null = null
+          let lastMonthKey: string | null = null
           return allMatches.map((match) => {
-            const matchYear = match.createdAt.getFullYear()
-            const showYear = matchYear !== lastYear
-            lastYear = matchYear
+            const monthKey = match.createdAt.toLocaleDateString('en', { month: 'long', year: 'numeric' })
+            const showMonth = monthKey !== lastMonthKey
+            lastMonthKey = monthKey
             const matchSegs = allSegments.filter(s => s.matchId === match.id)
             const matchInsightsList = allInsights.filter(i => i.matchId === match.id)
             return (
               <React.Fragment key={match.id}>
-                {showYear && (
-                  <div className="pb-3 pt-1">
-                    <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40">
-                      {matchYear}
+                {showMonth && (
+                  <div className="pb-3 pt-2 first:pt-0">
+                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">
+                      {monthKey}
                     </span>
                   </div>
                 )}
@@ -268,44 +271,50 @@ function MatchCard({
 
   return (
     <div className="rounded-xl border bg-card overflow-hidden">
-      {/* Header */}
+      {/* Top row: title + meta + status */}
       <div className="flex items-stretch">
+        {/* Thumbnail */}
         {match.videoPublicUrl ? (
-          <VideoThumbnail src={match.videoPublicUrl} className="w-32 h-[84px] object-cover flex-shrink-0" />
+          <VideoThumbnail src={match.videoPublicUrl} className="w-28 h-20 object-cover flex-shrink-0" />
         ) : (
-          <div className="w-32 h-[84px] bg-muted flex-shrink-0 flex items-center justify-center">
-            <svg className="w-6 h-6 text-muted-foreground/25" fill="currentColor" viewBox="0 0 24 24">
+          <div className="w-28 h-20 bg-muted/50 flex-shrink-0 flex items-center justify-center border-r border-border/40">
+            <svg className="w-5 h-5 text-muted-foreground/20" fill="currentColor" viewBox="0 0 24 24">
               <path d="M8 5v14l11-7z" />
             </svg>
           </div>
         )}
 
-        <div className="flex-1 px-4 py-3 min-w-0 flex flex-col justify-between">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
+        {/* Main content */}
+        <div className="flex-1 px-4 py-3 min-w-0 flex flex-col justify-between gap-1.5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
               {isAnalysed ? (
-                <Link href={`/matches/${match.id}`} className="font-semibold text-sm hover:text-primary transition-colors line-clamp-1 block">
+                <Link href={`/matches/${match.id}`} className="font-black text-sm tracking-tight hover:text-primary transition-colors line-clamp-1 block">
                   {title}
                 </Link>
               ) : (
-                <span className="font-semibold text-sm line-clamp-1 block">{title}</span>
+                <span className="font-black text-sm tracking-tight line-clamp-1 block">{title}</span>
               )}
               {match.opponentLabel && match.opponentLabel.toLowerCase() !== 'unknown' && match.context !== 'opponent' && (
-                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">vs. {match.opponentLabel}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">vs. <span className="font-semibold text-foreground/70">{match.opponentLabel}</span></p>
               )}
             </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${STATUS_CHIP[match.status] ?? 'bg-muted text-muted-foreground'}`}>
-                {STATUS_LABEL[match.status] ?? match.status}
-              </span>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {!isAnalysed && (
+                <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-widest border ${
+                  match.status === 'failed' ? 'border-rose-800/40 text-rose-400' : 'border-border text-muted-foreground'
+                }`}>
+                  {STATUS_LABEL[match.status] ?? match.status}
+                </span>
+              )}
               {deleteButton}
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 mt-2">
-            <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-muted text-muted-foreground">{contextLabel}</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground font-medium">{formatLabel}</span>
-            <span className="text-[10px] text-muted-foreground ml-auto">{dateStr}</span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider bg-muted text-muted-foreground">{contextLabel}</span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded border border-border text-muted-foreground font-bold uppercase tracking-wider">{formatLabel}</span>
+            <span className="text-[9px] text-muted-foreground/50 ml-auto font-medium">{dateStr}</span>
           </div>
         </div>
       </div>
@@ -314,30 +323,22 @@ function MatchCard({
       {isAnalysed && segments.length > 0 && (
         <div className="px-4 py-2.5 border-t border-border/40 space-y-1.5">
           <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-            <div className="h-full rounded-full bg-foreground/60" style={{ width: `${domPct ?? 50}%` }} />
+            <div className="h-full rounded-full bg-foreground/50" style={{ width: `${domPct ?? 50}%` }} />
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
-            <span className="font-semibold text-foreground/80">{domPct !== null ? `${domPct}% ctrl` : '—'}</span>
-            <span className="opacity-40">·</span>
+          <div className="flex items-center gap-2 text-[10px] text-muted-foreground flex-wrap">
+            <span className="font-black text-foreground/70 uppercase tracking-wider">{domPct !== null ? `${domPct}% ctrl` : '—'}</span>
+            <span className="opacity-30">·</span>
             <span>{fmt(totalTime)}</span>
             {topPos && (
               <>
-                <span className="opacity-40">·</span>
+                <span className="opacity-30">·</span>
                 <span>{POSITION_MAP[topPos] ?? topPos}</span>
               </>
             )}
             {avgConfidence !== null && (
               <>
-                <span className="opacity-40">·</span>
-                <span
-                  className="inline-flex items-center gap-0.5"
-                  title="How confident the AI was in its analysis of this match"
-                >
-                  <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" className="opacity-50">
-                    <path d="M12 2L9.19 8.63L2 9.24l5.46 4.73L5.82 21 12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2z" />
-                  </svg>
-                  Coverage {avgConfidence}%
-                </span>
+                <span className="opacity-30">·</span>
+                <span title="How confident the AI was in its analysis of this match">Coverage {avgConfidence}%</span>
               </>
             )}
           </div>
@@ -346,28 +347,25 @@ function MatchCard({
 
       {/* Insight + actions */}
       {isAnalysed && (
-        <div className="px-4 py-3 border-t border-border/40">
-          {topInsight && (
-            <div className="flex gap-2 items-start mb-2.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/35 mt-[5px] flex-shrink-0" />
-              <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+        <div className="px-4 py-3 border-t border-border/40 flex items-center justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            {topInsight && (
+              <p className="text-xs text-muted-foreground leading-relaxed line-clamp-1">
                 {topInsight.description}
               </p>
-            </div>
-          )}
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] text-muted-foreground/60">
-              {extraCount > 0 ? `+${extraCount} more insight${extraCount > 1 ? 's' : ''}` : ''}
-            </span>
-            <div className="flex gap-1.5">
-              <Link href={`/matches/${match.id}`} className={buttonVariants({ variant: 'outline', size: 'xs' })}>
-                Full Review
-              </Link>
-              <Link href={`/matches/${match.id}/coach`} className={`${buttonVariants({ size: 'xs' })} gap-1.5`}>
-                Frame by Frame
-                <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-white/20 leading-none tracking-wide">AI</span>
-              </Link>
-            </div>
+            )}
+            {extraCount > 0 && (
+              <span className="text-[10px] text-muted-foreground/50">+{extraCount} insight{extraCount > 1 ? 's' : ''}</span>
+            )}
+          </div>
+          <div className="flex gap-1.5 flex-shrink-0">
+            <Link href={`/matches/${match.id}`} className={buttonVariants({ variant: 'outline', size: 'xs' })}>
+              Review
+            </Link>
+            <Link href={`/matches/${match.id}/coach`} className={`${buttonVariants({ size: 'xs' })} gap-1`}>
+              Frame by Frame
+              <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-white/20 leading-none">AI</span>
+            </Link>
           </div>
         </div>
       )}
@@ -376,10 +374,10 @@ function MatchCard({
       {!isAnalysed && (
         <div className="px-4 py-2.5 border-t border-border/40 flex items-center justify-between">
           {match.status === 'failed' ? (
-            <p className="text-xs text-rose-400">Analysis failed. Try uploading again.</p>
+            <p className="text-xs text-rose-400 font-medium">Analysis failed — try uploading again.</p>
           ) : (
-            <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-foreground/40 animate-pulse" />
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
               <p className="text-xs text-muted-foreground">Analysing your footage…</p>
             </div>
           )}
