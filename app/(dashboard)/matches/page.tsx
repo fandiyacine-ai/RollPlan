@@ -303,7 +303,11 @@ function MatchCard({
           </div>
 
           <div className="flex items-center gap-1.5 mt-2">
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">{contextLabel}</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+              match.sourceType === 'own_competition' || (match.context === 'competition' && !match.sourceType)
+                ? 'bg-emerald-950/50 text-emerald-400 border border-emerald-800/30'
+                : 'bg-muted text-muted-foreground'
+            }`}>{contextLabel}</span>
             <span className="text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground font-medium">{formatLabel}</span>
             <span className="text-[10px] text-muted-foreground ml-auto">{dateStr}</span>
           </div>

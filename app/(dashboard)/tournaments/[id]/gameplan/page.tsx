@@ -3,6 +3,7 @@ import { gameplans, tournamentOpponents, matches, planExecutions } from '../../.
 import { eq } from 'drizzle-orm'
 import Link from 'next/link'
 import { GenerateGameplanButton } from './generate-button'
+import { OpponentSelector } from './opponent-selector'
 import { PrintButton } from './print-button'
 import { GameplanRatingWidget } from './rating-widget'
 import { AutoRefresh } from './auto-refresh'
@@ -103,35 +104,12 @@ export default async function GameplanPage({
 
       {/* Opponent selector */}
       {opponents.length > 1 && (
-        <div className="flex gap-2 flex-wrap">
-          {opponents.map(opp => {
-            const oppPred = predictionByOpponent[opp.id]
-            return (
-              <Link
-                key={opp.id}
-                href={`/tournaments/${tournamentId}/gameplan?opponent=${opp.id}`}
-                className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full border font-medium transition-colors ${
-                  opp.id === activeOpponent.id
-                    ? 'bg-foreground text-background border-foreground'
-                    : 'hover:bg-muted'
-                }`}
-              >
-                {opp.opponentLabel}
-                {oppPred && (
-                  <span className={`text-[10px] font-bold px-1 py-0.5 rounded ${
-                    opp.id === activeOpponent.id
-                      ? 'bg-background/20 text-background'
-                      : oppPred.verdict === 'favourable' ? 'text-emerald-400'
-                      : oppPred.verdict === 'tough' ? 'text-rose-400'
-                      : 'text-zinc-400'
-                  }`}>
-                    {oppPred.win_probability}%
-                  </span>
-                )}
-              </Link>
-            )
-          })}
-        </div>
+        <OpponentSelector
+          opponents={opponents}
+          activeId={activeOpponent.id}
+          tournamentId={tournamentId}
+          predictionByOpponent={predictionByOpponent}
+        />
       )}
 
       {scoutedCount === 0 ? (

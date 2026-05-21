@@ -334,6 +334,27 @@ export default async function PlayerCardPage() {
                 </div>
               )}
 
+              {/* Top gap callout — above the fold */}
+              {exposedPositions.length > 0 && (() => {
+                const [posId, stats] = exposedPositions[0]
+                const pct = Math.round((stats.inferior / stats.total) * 100)
+                return (
+                  <div className="rounded-xl border border-rose-900/30 bg-rose-950/10 px-4 py-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-rose-400/80 mb-0.5">Top gap to close</p>
+                      <p className="text-sm font-semibold leading-snug">{POSITION_MAP[posId] ?? posId}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{pct}% of mat time under pressure here</p>
+                    </div>
+                    <Link
+                      href="/upload"
+                      className="text-xs font-medium text-rose-400 hover:text-rose-300 transition-colors flex-shrink-0"
+                    >
+                      Drill it →
+                    </Link>
+                  </div>
+                )
+              })()}
+
               {/* Progress over time */}
               {ownAnalysedIds.length >= 2 && (
                 <div className="rounded-xl border border-border/60 overflow-hidden bg-card">

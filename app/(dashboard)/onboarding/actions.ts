@@ -1,11 +1,24 @@
 'use server'
 
 import { db } from '@/lib/db'
-import { users } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { users, tournaments } from '@/lib/db/schema'
+import { and, eq, gte, sql } from 'drizzle-orm'
 import { getOrCreateDbUserId } from '@/lib/db/get-user'
 import { createTournament } from '../tournaments/actions'
 import { addOpponent, submitScoutUrls } from '../tournaments/[id]/opponents/actions'
+
+export async function getPreparingStats(): Promise<{ athleteCount: number }> {
+  try {
+    const today = new Date().toISOString().slice(0, 10)
+    const [row] = await db
+      .select({ count: sql<number>`count(distinct ${tournaments.userId})::int` })
+      .from(tournaments)
+      .where(and(eq(tournaments.status, 'upcoming'), gte(tournaments.eventDate, today)))
+    return { athleteCount: row?.count ?? 0 }
+  } catch {
+    return { athleteCount: 0 }
+  }
+}
 
 export async function completeOnboarding() {
   const userId = await getOrCreateDbUserId()

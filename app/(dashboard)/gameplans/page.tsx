@@ -226,6 +226,7 @@ export default async function GameplansPage() {
   )
 
   const upcomingCount = sorted.filter(t => t.status === 'upcoming').length
+  const nextEntry = tournamentData.find(({ tournament: t }) => t.status === 'upcoming' && t.eventDate)
 
   return (
     <div className="max-w-2xl space-y-8">
@@ -235,6 +236,46 @@ export default async function GameplansPage() {
           {upcomingCount} upcoming tournament{upcomingCount !== 1 ? 's' : ''}
         </p>
       </div>
+
+      {/* Next-match shortcut */}
+      {nextEntry && (() => {
+        const { tournament: t, opponents } = nextEntry
+        const days = daysUntil(t.eventDate)
+        const hasGameplans = opponents.some(o => o.plan)
+        if (!hasGameplans && opponents.length === 0) return null
+        return (
+          <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-primary/70">Up next</p>
+              {days !== null && (
+                <span className={`text-xs font-bold tabular-nums ${
+                  days <= 3 ? 'text-rose-400' : days <= 14 ? 'text-amber-400' : 'text-primary/70'
+                }`}>
+                  {days === 0 ? 'Today' : days < 0 ? `${Math.abs(days)}d ago` : `${days}d away`}
+                </span>
+              )}
+            </div>
+            <p className="font-semibold text-sm">{t.name}</p>
+            <div className="flex gap-2 flex-wrap">
+              {opponents.map(({ opponent, plan }) => (
+                <Link
+                  key={opponent.id}
+                  href={`/tournaments/${t.id}/gameplan?opponent=${opponent.id}`}
+                  className="text-xs px-3 py-1.5 rounded-full border border-primary/30 bg-background hover:bg-muted font-medium transition-colors"
+                >
+                  {opponent.opponentLabel}
+                  {plan ? ' →' : ' · no gameplan yet'}
+                </Link>
+              ))}
+              {opponents.length === 0 && (
+                <Link href={`/tournaments/${t.id}/opponents`} className="text-xs text-primary hover:underline">
+                  Add opponents →
+                </Link>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {tournamentData.map(({ tournament, opponents }) => {
         const days = daysUntil(tournament.eventDate)
