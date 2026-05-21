@@ -72,7 +72,9 @@ function GameCard({
         <p className="font-semibold text-sm leading-tight">{opponent.opponentLabel}</p>
         <div className="flex items-center gap-1.5 shrink-0">
           <ConfidenceDots level={confidence} />
-          {confidence && <span className="text-[10px] text-muted-foreground capitalize">{confidence}</span>}
+          <span className="text-[10px] text-muted-foreground capitalize">
+            {confidence ? `${confidence} data` : 'No data'}
+          </span>
         </div>
       </div>
 
