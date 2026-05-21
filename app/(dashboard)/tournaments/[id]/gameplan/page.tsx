@@ -137,7 +137,8 @@ export default async function GameplanPage({
                 {existingGameplan && plan ? ` · Generated ${existingGameplan.createdAt.toLocaleDateString()} (v${existingGameplan.version})` : ''}
               </p>
               {scoutedMatches.some(m => m.status === 'analysed' && m.resultWinner) && (
-                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                  <span className="text-[10px] text-muted-foreground/50">{activeOpponent.opponentLabel} in footage:</span>
                   {scoutedMatches.filter(m => m.status === 'analysed' && m.resultWinner).map(m => {
                     const isWin = m.resultWinner === 'user'
                     const label = m.resultMethod === 'submission'
