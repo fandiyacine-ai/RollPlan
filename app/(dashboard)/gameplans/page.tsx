@@ -104,7 +104,7 @@ function GameCard({
                 {plan.primary_chain.steps.map((step, i) => (
                   <span key={i} className="flex items-center gap-1.5">
                     <span className="text-[10px] font-black text-muted-foreground/30 tabular-nums">{i + 1}</span>
-                    <span className="text-xs font-semibold bg-foreground/[0.06] border border-border/40 px-2 py-0.5 rounded-md">{step}</span>
+                    <span className="text-xs font-semibold bg-foreground/[0.06] border border-border/40 px-2 py-0.5 rounded-md max-w-[9rem] truncate">{step}</span>
                     {i < plan.primary_chain.steps.length - 1 && (
                       <svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground/25 flex-shrink-0">
                         <path d="M2 6h8M7 3l3 3-3 3"/>

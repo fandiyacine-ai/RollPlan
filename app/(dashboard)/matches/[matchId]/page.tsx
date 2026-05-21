@@ -129,9 +129,15 @@ export default async function MatchDetailPage({
   ].sort((a, b) => a.time - b.time)
 
   const displayDate = match.recordedAt ?? match.createdAt
-  const displayOpponent = (match.opponentLabel && match.opponentLabel.toLowerCase() !== 'unknown')
+  const knownOpponent = (match.opponentLabel && match.opponentLabel.toLowerCase() !== 'unknown')
     ? match.opponentLabel
-    : 'Unknown opponent'
+    : null
+
+  const displayTitle = match.tournamentOpponentId
+    ? `${match.competitorLabel || 'You'} vs. ${knownOpponent ?? 'Unknown'}`
+    : knownOpponent
+    ? `vs. ${knownOpponent}`
+    : `${match.format === 'no_gi' ? 'No-Gi' : 'Gi'} ${match.context === 'sparring' ? 'Sparring' : match.context === 'drilling' ? 'Drilling' : 'Competition'}`
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -144,9 +150,7 @@ export default async function MatchDetailPage({
           <div>
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-bold">
-                {match.tournamentOpponentId
-                  ? `${match.competitorLabel || 'Unknown'} vs. ${displayOpponent}`
-                  : `vs. ${displayOpponent}`}
+                {displayTitle}
               </h1>
               {match.resultWinner && (
                 <MatchResultBadge winner={match.resultWinner} method={match.resultMethod} technique={match.resultTechnique} />
@@ -171,7 +175,7 @@ export default async function MatchDetailPage({
                 href={`/tournaments/${tournamentOpponentRow.tournamentId}/gameplan?opponent=${tournamentOpponentRow.id}`}
                 className="text-xs text-primary hover:underline mt-1 inline-block"
               >
-                View Gameplan for {displayOpponent} →
+                View Gameplan for {knownOpponent ?? 'Opponent'} →
               </Link>
             )}
           </div>

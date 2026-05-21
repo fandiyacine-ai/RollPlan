@@ -72,6 +72,8 @@ export default async function MatchesPage() {
       ruleset: matches.ruleset,
       eventName: matches.eventName,
       opponentLabel: matches.opponentLabel,
+      resultWinner: matches.resultWinner,
+      resultMethod: matches.resultMethod,
       createdAt: matches.createdAt,
       videoPublicUrl: videos.publicUrl,
       sourceType: videos.sourceType,
@@ -235,7 +237,8 @@ function MatchCard({
 }: {
   match: {
     id: string; videoId: string | null; status: string; format: string; context: string
-    eventName: string | null; opponentLabel: string | null; createdAt: Date; videoPublicUrl: string | null
+    eventName: string | null; opponentLabel: string | null; resultWinner: string | null
+    resultMethod: string | null; createdAt: Date; videoPublicUrl: string | null
     sourceType: string | null
   }
   segments: { endSeconds: number; startSeconds: number; positionId: string; dominance: string }[]
@@ -295,9 +298,22 @@ function MatchCard({
               ) : (
                 <span className="font-black text-sm tracking-tight line-clamp-1 block">{title}</span>
               )}
-              {match.opponentLabel && match.opponentLabel.toLowerCase() !== 'unknown' && match.context !== 'opponent' && (
-                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">vs. <span className="font-semibold text-foreground/70">{match.opponentLabel}</span></p>
-              )}
+              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                {match.resultWinner && (
+                  <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${
+                    match.resultWinner === 'user'
+                      ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/30'
+                      : 'bg-rose-950/60 text-rose-400 border border-rose-800/30'
+                  }`}>
+                    {match.resultWinner === 'user'
+                      ? (match.resultMethod === 'submission' ? 'W — Sub' : match.resultMethod === 'points' ? 'W — Pts' : 'W')
+                      : (match.resultMethod === 'submission' ? 'L — Sub' : match.resultMethod === 'points' ? 'L — Pts' : 'L')}
+                  </span>
+                )}
+                {match.opponentLabel && match.opponentLabel.toLowerCase() !== 'unknown' && match.context !== 'opponent' && (
+                  <p className="text-xs text-muted-foreground line-clamp-1">vs. <span className="font-semibold text-foreground/70">{match.opponentLabel}</span></p>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
               {!isAnalysed && (

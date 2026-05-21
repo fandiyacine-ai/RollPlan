@@ -97,7 +97,7 @@ export default async function TournamentsPage() {
                   <div className="min-w-0 space-y-1.5">
                     <div className="flex items-center gap-2 flex-wrap">
                       {flag && <span className="text-base leading-none">{flag}</span>}
-                      <p className="font-semibold text-sm leading-snug">{t.name}</p>
+                      <p className="font-semibold text-sm leading-snug line-clamp-2">{t.name}</p>
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <RulesetBadge ruleset={t.ruleset} />

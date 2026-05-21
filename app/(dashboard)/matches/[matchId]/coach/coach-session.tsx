@@ -257,7 +257,7 @@ export default function CoachSession({
       {/* Header */}
       <div className="flex items-center justify-between py-2 border-b flex-shrink-0">
         <div>
-          <Link href="/matches" className="text-xs text-muted-foreground hover:text-foreground transition-colors">← My Matches</Link>
+          <Link href={`/matches/${match.id}`} className="text-xs text-muted-foreground hover:text-foreground transition-colors">← Match</Link>
           <h1 className="font-semibold text-sm mt-0.5">
             {match.competitorLabel ?? 'You'} vs {match.opponentLabel && match.opponentLabel.toLowerCase() !== 'unknown' ? match.opponentLabel : 'Unknown opponent'}
             {match.eventName && <span className="text-muted-foreground font-normal"> · {match.eventName}</span>}

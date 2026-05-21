@@ -115,8 +115,22 @@ export default async function GameplanPage({
         <GeneratingState opponentLabel={activeOpponent.opponentLabel} athleteName={athleteName} />
       ) : (
         <>
-          {/* Matchup header */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          {/* Mobile: ultra-compact strip — opponent + generate only */}
+          <div className="flex sm:hidden items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              {plan && <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-primary/20 text-primary border border-primary/30 uppercase tracking-[0.14em] flex-shrink-0">AI</span>}
+              <span className="text-xs font-black uppercase tracking-tight truncate">{activeOpponent.opponentLabel}</span>
+              <span className="text-[10px] text-muted-foreground/50 flex-shrink-0">{scoutedCount}m</span>
+            </div>
+            <GenerateGameplanButton
+              tournamentId={tournamentId}
+              opponentId={activeOpponent.id}
+              label={plan ? 'Regen' : 'Generate'}
+            />
+          </div>
+
+          {/* Desktop: full matchup header */}
+          <div className="hidden sm:flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/40 mb-1.5">Gameplan</p>
               <h2 className="text-xl font-black tracking-tight uppercase leading-tight">
@@ -171,6 +185,16 @@ export default async function GameplanPage({
           {plan ? (
             <>
               <GameplanDisplay plan={plan} />
+              {/* Mobile: rating + print after content, not before */}
+              {existingGameplan && plan && (
+                <div className="flex sm:hidden items-center gap-2">
+                  <GameplanRatingWidget
+                    gameplanId={existingGameplan.id}
+                    initialRating={existingGameplan.rating ?? null}
+                  />
+                  <PrintButton />
+                </div>
+              )}
               {prediction && <PredictionCard prediction={prediction} />}
               {existingGameplan && (() => {
                 const reviewData = linkedExecution?.executionReview as Record<string, unknown> | undefined
@@ -295,7 +319,17 @@ function GameplanDisplay({ plan }: { plan: GameplanOutput }) {
           </div>
           <div className="p-5 space-y-3.5">
             <p className="text-sm font-black tracking-tight">{plan.primary_chain.label}</p>
-            <div className="flex flex-wrap items-center gap-1.5">
+            {/* Mobile: vertical numbered list, clamped */}
+            <div className="flex flex-col gap-1.5 sm:hidden">
+              {plan.primary_chain.steps.slice(0, 4).map((step, i) => (
+                <div key={i} className="flex gap-2 items-start">
+                  <span className="text-[10px] font-black text-muted-foreground/25 tabular-nums flex-shrink-0 mt-0.5">{i + 1}</span>
+                  <span className="text-xs font-semibold leading-snug line-clamp-2">{step}</span>
+                </div>
+              ))}
+            </div>
+            {/* Desktop: horizontal chain */}
+            <div className="hidden sm:flex flex-wrap items-center gap-1.5">
               {plan.primary_chain.steps.slice(0, 4).map((step, i, arr) => (
                 <span key={i} className="flex items-center gap-1.5">
                   <span className="flex items-center gap-1.5">
