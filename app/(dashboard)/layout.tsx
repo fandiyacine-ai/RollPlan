@@ -4,6 +4,10 @@ import { auth } from '@clerk/nextjs/server'
 import { Nav } from './nav'
 import { getOrCreateDbUserId } from '../../lib/db/get-user'
 import { checkMonthlyLimit } from '../../lib/db/usage'
+import { db } from '../../lib/db'
+import { users } from '../../lib/db/schema'
+import { eq } from 'drizzle-orm'
+import { OnboardingWizard } from './onboarding/wizard'
 
 async function UsagePill() {
   try {
@@ -29,8 +33,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const { userId: clerkId } = await auth()
   const isAdmin = !!process.env.ADMIN_CLERK_USER_ID && clerkId === process.env.ADMIN_CLERK_USER_ID
 
+  const userId = await getOrCreateDbUserId()
+  const user = await db.query.users.findFirst({ where: eq(users.id, userId) })
+  const showOnboarding = !user?.onboardingComplete || user.onboardingComplete === 'false'
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      {showOnboarding && <OnboardingWizard />}
       <Nav usageSlot={<Suspense fallback={null}><UsagePill /></Suspense>} />
       <main className="p-6 flex-1">{children}</main>
       <footer className="px-6 py-4 border-t border-border/40 flex items-center justify-center gap-6 text-xs text-muted-foreground/60">
