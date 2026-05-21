@@ -128,10 +128,10 @@ function GameCard({
       {/* Data confidence footnote */}
       <p className="text-[10px] text-muted-foreground/60 pt-0.5 border-t border-border/40">
         {matchCount === 0
-          ? 'No footage — prediction only'
+          ? 'No footage — prediction based on style, not match data'
           : matchCount === 1
-          ? '1 match scouted — treat as directional'
-          : `${matchCount} matches scouted`}
+          ? '1 match analysed — limited data, may not be accurate'
+          : `${matchCount} matches analysed`}
       </p>
     </Link>
   )

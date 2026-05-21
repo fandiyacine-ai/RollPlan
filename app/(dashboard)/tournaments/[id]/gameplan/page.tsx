@@ -320,123 +320,126 @@ function GeneratingState({ opponentLabel }: { opponentLabel: string }) {
 
 function GameplanDisplay({ plan }: { plan: GameplanOutput }) {
   return (
-    <div className="space-y-4">
-      {/* Summary card */}
-      <div className="rounded-xl border bg-card p-4 space-y-2">
-        <div className="flex items-center gap-2">
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Overview</p>
-          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-foreground text-background leading-none tracking-wide">AI</span>
-        </div>
-        <p className="text-sm leading-relaxed">{plan.summary}</p>
-        {plan.format_notes && (
-          <p className="text-xs text-muted-foreground border-t border-border/60 pt-2 mt-1">{plan.format_notes}</p>
-        )}
-      </div>
-
-      {/* Opening */}
-      <Section title="Opening">
-        <div className="rounded-xl border bg-card p-4 space-y-2">
-          <p className="text-sm font-semibold">{plan.opening.recommendation}</p>
-          <p className="text-sm text-muted-foreground leading-relaxed">{plan.opening.rationale}</p>
-          {plan.opening.if_scrambled && (
-            <div className="flex gap-2 items-start pt-1 border-t border-border/60">
-              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mt-0.5 flex-shrink-0">If scrambled</span>
-              <p className="text-xs text-muted-foreground">{plan.opening.if_scrambled}</p>
-            </div>
-          )}
-        </div>
-      </Section>
-
-      {/* Primary chain */}
-      <Section title="Primary Attack Chain">
-        <div className="rounded-xl border bg-card overflow-hidden">
-          <div className="px-4 pt-4 pb-3 border-b border-border/60">
-            <span className="text-sm font-semibold">{plan.primary_chain.label}</span>
+    <div className="space-y-3">
+      {/* Row 1: Attack + Danger side by side */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Attack card */}
+        <div className="rounded-xl border bg-card p-4 space-y-2.5">
+          <div className="flex items-center gap-2">
+            <span className="text-base leading-none">⚔</span>
+            <p className="text-xs font-bold uppercase tracking-widest text-foreground">Attack</p>
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-foreground text-background leading-none tracking-wide ml-auto">AI</span>
           </div>
-          <ol className="px-4 py-3 space-y-2">
-            {plan.primary_chain.steps.map((step, i) => (
-              <li key={i} className="flex gap-3 items-start">
-                <span className="w-5 h-5 rounded-full bg-foreground text-background text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
+          <p className="text-sm font-semibold text-foreground leading-snug">{plan.primary_chain.label}</p>
+          <ol className="space-y-1.5">
+            {plan.primary_chain.steps.slice(0, 3).map((step, i) => (
+              <li key={i} className="flex gap-2.5 items-start">
+                <span className="w-4 h-4 rounded-full bg-foreground text-background text-[9px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
                   {i + 1}
                 </span>
-                <p className="text-sm leading-relaxed">{step}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{step}</p>
               </li>
             ))}
           </ol>
-          <div className="px-4 pb-3">
-            <p className="text-xs text-muted-foreground italic">{plan.primary_chain.rationale}</p>
+        </div>
+
+        {/* Danger card */}
+        <div className="rounded-xl border bg-card p-4 space-y-2.5">
+          <div className="flex items-center gap-2">
+            <span className="text-base leading-none">⚠</span>
+            <p className="text-xs font-bold uppercase tracking-widest text-rose-400">Danger</p>
+          </div>
+          <div className="space-y-2">
+            {plan.defensive_priorities.slice(0, 2).map((d, i) => (
+              <div key={i} className="flex gap-2.5 items-start">
+                <div className="w-1 self-stretch rounded-full bg-rose-500/50 flex-shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-foreground leading-snug">{d.threat}</p>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed mt-0.5">{d.counter}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      </Section>
+      </div>
+
+      {/* Opening / Start here */}
+      <div className="rounded-xl border bg-card p-4 space-y-2">
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Start Here</p>
+        <p className="text-sm font-semibold leading-snug">{plan.opening.recommendation}</p>
+        {plan.opening.if_scrambled && (
+          <div className="flex gap-2 items-start pt-1.5 border-t border-border/40">
+            <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wide mt-0.5 flex-shrink-0 whitespace-nowrap">If scrambled</span>
+            <p className="text-xs text-muted-foreground leading-relaxed">{plan.opening.if_scrambled}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Mat-side cues */}
+      {plan.mental_cues.length > 0 && (
+        <div className="rounded-xl border bg-card p-4 space-y-2.5">
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">🧠 Mat Cues</p>
+          <div className="flex flex-wrap gap-2">
+            {plan.mental_cues.map((cue, i) => (
+              <span key={i} className="text-xs px-2.5 py-1 rounded-full border border-border bg-muted font-medium">
+                {cue}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Rules reminder */}
+      {plan.format_notes && (
+        <div className="rounded-xl border bg-card p-3 flex gap-2 items-start">
+          <span className="text-base leading-none shrink-0">📋</span>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Ruleset</p>
+            <p className="text-xs text-foreground mt-0.5 leading-relaxed">{plan.format_notes}</p>
+          </div>
+        </div>
+      )}
 
       {/* Secondary options */}
       {plan.secondary_options.length > 0 && (
-        <Section title="Secondary Options">
+        <Section title="Backup Plans">
           <div className="grid gap-2 sm:grid-cols-2">
             {plan.secondary_options.map((opt, i) => (
               <div key={i} className="rounded-xl border bg-card p-3 space-y-1">
-                <p className="text-sm font-semibold">{opt.label}</p>
-                <p className="text-xs text-muted-foreground leading-relaxed">{opt.rationale}</p>
+                <p className="text-xs font-semibold">{opt.label}</p>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">{opt.rationale}</p>
               </div>
             ))}
           </div>
         </Section>
       )}
 
-      {/* Defensive priorities */}
-      <Section title="Watch Out For">
-        <div className="space-y-2">
-          {plan.defensive_priorities.map((d, i) => (
-            <div key={i} className="rounded-xl border border-border bg-card p-3 flex gap-3">
-              <div className="w-1 rounded-full bg-destructive/60 flex-shrink-0 self-stretch" />
-              <div className="space-y-0.5 min-w-0">
-                <p className="text-sm font-semibold">{d.threat}</p>
-                <p className="text-xs text-muted-foreground leading-relaxed">{d.counter}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      {/* Opponent intel */}
+      {/* Opponent intel — below the fold */}
       <Section title="Opponent Intel">
         <div className="space-y-2">
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="rounded-xl border bg-card p-3 space-y-1">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Their Weapon</p>
-              <p className="text-sm leading-relaxed">{plan.opponent_intel.biggest_threat}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-rose-400/80">Their Weapon</p>
+              <p className="text-xs leading-relaxed">{plan.opponent_intel.biggest_threat}</p>
             </div>
             <div className="rounded-xl border bg-card p-3 space-y-1">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Their Gap</p>
-              <p className="text-sm leading-relaxed">{plan.opponent_intel.biggest_weakness}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-400/80">Their Gap</p>
+              <p className="text-xs leading-relaxed">{plan.opponent_intel.biggest_weakness}</p>
             </div>
           </div>
           {plan.opponent_intel.patterns.length > 0 && (
             <div className="rounded-xl border bg-card px-4 py-3 space-y-1.5">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Patterns</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">Patterns</p>
               {plan.opponent_intel.patterns.map((p, i) => (
                 <div key={i} className="flex gap-2 items-start">
-                  <span className="w-1 h-1 rounded-full bg-muted-foreground/50 flex-shrink-0 mt-2" />
-                  <p className="text-sm text-muted-foreground leading-relaxed">{p}</p>
+                  <span className="w-1 h-1 rounded-full bg-muted-foreground/50 flex-shrink-0 mt-1.5 shrink-0" />
+                  <p className="text-xs text-muted-foreground leading-relaxed">{p}</p>
                 </div>
               ))}
             </div>
           )}
         </div>
       </Section>
-
-      {/* Mental cues */}
-      {plan.mental_cues.length > 0 && (
-        <Section title="Mat-Side Cues">
-          <div className="flex flex-wrap gap-2">
-            {plan.mental_cues.map((cue, i) => (
-              <span key={i} className="text-sm px-3 py-1.5 rounded-full border border-border bg-muted font-medium">
-                {cue}
-              </span>
-            ))}
-          </div>
-        </Section>
-      )}
     </div>
   )
 }
