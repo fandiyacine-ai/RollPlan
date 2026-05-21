@@ -430,6 +430,9 @@ export async function scrapeIbjjfEvents(): Promise<ScrapedEvent[]> {
         // Prefix "IBJJF" if absent so names are consistent with the seed
         const name = /ibjjf/i.test(rawName) ? rawName : `IBJJF ${rawName}`
 
+        // Real event names always contain a year — nav links and category headers don't
+        if (!/20\d{2}/.test(name)) continue
+
         const card = link.closest('[class*="card"],[class*="event"],[class*="competition"],article,li,tr')
 
         // Date — try <time>, then elements with date-like class names
@@ -501,6 +504,9 @@ export async function scrapeAjpEvents(): Promise<ScrapedEvent[]> {
         if (rawName.length < 4 || rawName.length > 120) continue
 
         const name = /ajp/i.test(rawName) ? rawName : `AJP ${rawName}`
+
+        // Real event names always contain a year — nav links and category headers don't
+        if (!/20\d{2}/.test(name)) continue
 
         const card = link.closest('[class*="card"],[class*="competition"],[class*="event"],article,li')
 
