@@ -387,20 +387,13 @@ async function findEventYouTubeStream(eventId: string): Promise<string | null> {
 type ScrapedEvent = { name: string; eventId: string; url: string; date: string | null; location: string | null }
 
 // Scrape ibjjf.com events calendar for upcoming competitions.
-// Selectors are best-effort — IBJJF may update their site structure.
+// Events are rendered as .event-row divs — there are no <a href> links to individual events.
 export async function scrapeIbjjfEvents(): Promise<ScrapedEvent[]> {
   const browser = await launchBrowser()
   try {
     const page = await newPage(browser)
-
-    // Try the calendar page, then fall back to the plain events list
-    for (const url of ['https://ibjjf.com/events/calendar', 'https://ibjjf.com/events']) {
-      try {
-        await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 })
-        await page.waitForTimeout(3000)
-        break
-      } catch { /* try next */ }
-    }
+    await page.goto('https://ibjjf.com/events/calendar', { waitUntil: 'networkidle', timeout: 30000 })
+    await page.waitForTimeout(3000)
 
     const todayIso = new Date().toISOString().slice(0, 10)
 
@@ -408,46 +401,50 @@ export async function scrapeIbjjfEvents(): Promise<ScrapedEvent[]> {
       const results: Array<{ name: string; eventId: string; url: string; date: string | null; location: string | null }> = []
       const seen = new Set<string>()
 
-      // IBJJF renders event detail links like /events/european-open-2026
-      const links = document.querySelectorAll<HTMLAnchorElement>('a[href]')
-      for (const link of Array.from(links)) {
-        const href = link.href
-        // Must look like an event detail URL, not nav links
-        const slugM = href.match(/\/events\/([a-z0-9][a-z0-9-]+[a-z0-9])(?:[/?#]|$)/)
-        if (!slugM) continue
-        const slug = slugM[1]
-        // Skip generic pages
-        if (['calendar', 'schedule', 'results', 'register', 'athletes'].includes(slug)) continue
-        if (seen.has(slug)) continue
-        seen.add(slug)
+      // Year comes from the page title, e.g. "Calendar 2026 | IBJJF"
+      const yearMatch = document.title.match(/(\d{4})/)
+      const year = yearMatch ? yearMatch[1] : String(new Date().getFullYear())
 
-        // Name: prefer a heading inside the link, then the link text itself
-        const nameEl = link.querySelector('h1,h2,h3,h4,[class*="title"],[class*="name"]')
-        const rawName = (nameEl?.textContent ?? link.textContent ?? '').trim().replace(/\s+/g, ' ')
-        if (rawName.length < 5 || rawName.length > 120) continue
-        if (['home', 'events', 'news', 'contact', 'about'].includes(rawName.toLowerCase())) continue
+      // Events render as <div class="col-12 event-row"><div>
+      //   <div class="date">Jan 15 - Jan 24*</div>
+      //   <div class="name my-1">European IBJJF Jiu-Jitsu Championship 2026</div>
+      //   <div class="local"><span class="icon">…</span>Lisbon, Portugal</div>
+      // </div></div>
+      const rows = document.querySelectorAll<HTMLElement>('.event-row')
+      for (const row of Array.from(rows)) {
+        const nameEl = row.querySelector<HTMLElement>('.name')
+        const dateEl = row.querySelector<HTMLElement>('.date')
+        const localEl = row.querySelector<HTMLElement>('.local')
 
-        // Prefix "IBJJF" if absent so names are consistent with the seed
+        const rawName = nameEl?.textContent?.trim().replace(/\s+/g, ' ') ?? ''
+        if (rawName.length < 5 || rawName.length > 150) continue
+
         const name = /ibjjf/i.test(rawName) ? rawName : `IBJJF ${rawName}`
-
-        // Real event names always contain a year — nav links and category headers don't
         if (!/20\d{2}/.test(name)) continue
 
-        const card = link.closest('[class*="card"],[class*="event"],[class*="competition"],article,li,tr')
+        if (seen.has(name)) continue
+        seen.add(name)
 
-        // Date — try <time>, then elements with date-like class names
-        const timeEl = (card ?? link).querySelector<HTMLElement>('time,[class*="date"],[class*="when"]')
-        const dateText = timeEl?.getAttribute('datetime') ?? timeEl?.textContent?.trim().replace(/\s+/g, ' ') ?? null
-
-        // Skip past events if we can parse the date
-        if (dateText) {
-          try { if (new Date(dateText).toISOString().slice(0, 10) < today) continue } catch {}
+        // Parse "Jan 15 - Jan 24*" or "Jan 9" → take the start date, append year
+        const rawDate = dateEl?.textContent?.replace(/\*/g, '').trim() ?? ''
+        const startDateStr = rawDate.split(/\s*-\s*/)[0].trim()
+        let eventDate: string | null = null
+        if (startDateStr) {
+          try {
+            const d = new Date(`${startDateStr} ${year}`)
+            if (!isNaN(d.getTime())) eventDate = d.toISOString().slice(0, 10)
+          } catch { /* unparseable */ }
         }
 
-        const locEl = card?.querySelector<HTMLElement>('[class*="location"],[class*="city"],[class*="venue"],[class*="country"]')
-        const location = locEl?.textContent?.trim().replace(/\s+/g, ' ') ?? null
+        if (eventDate && eventDate < today) continue
 
-        results.push({ name, eventId: `ibjjf-${slug}`, url: href, date: dateText, location })
+        // Strip the map-marker icon character from location text
+        const location = localEl?.textContent?.trim().replace(/\s+/g, ' ').replace(/^\S+\s*/, '') ?? null
+
+        // Stable synthetic ID from name slug
+        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80)
+
+        results.push({ name, eventId: `ibjjf-${slug}`, url: window.location.href, date: eventDate, location })
       }
       return results
     }, todayIso)
@@ -460,27 +457,17 @@ export async function scrapeIbjjfEvents(): Promise<ScrapedEvent[]> {
   }
 }
 
-// Scrape ajptour.com for upcoming competitions (Grand Slams, Tours, Opens).
-// Covers regional events (Estonia, Germany, etc.) not in the manual seed.
-// Selectors are best-effort — AJP may update their site structure.
+// Scrape ajptour.com for upcoming competitions.
+// Events are loaded by a React/webpack bundle after page load — requires a longer wait.
 export async function scrapeAjpEvents(): Promise<ScrapedEvent[]> {
   const browser = await launchBrowser()
   try {
     const page = await newPage(browser)
 
-    for (const url of [
-      'https://ajptour.com/en/competitions',
-      'https://ajptour.com/en/events',
-      'https://ajptour.com/en/calendar',
-    ]) {
-      try {
-        await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 })
-        await page.waitForTimeout(3000)
-        // Consider loaded if there are any link or card elements on the page
-        const hasLinks = await page.$('a[href]').catch(() => null)
-        if (hasLinks) break
-      } catch { /* try next */ }
-    }
+    // The site redirects /en/events → /en/events/upcoming
+    await page.goto('https://ajptour.com/en/events/upcoming', { waitUntil: 'networkidle', timeout: 30000 })
+    // Give the JS bundle extra time to render event cards
+    await page.waitForTimeout(8000)
 
     const todayIso = new Date().toISOString().slice(0, 10)
 
@@ -488,39 +475,34 @@ export async function scrapeAjpEvents(): Promise<ScrapedEvent[]> {
       const results: Array<{ name: string; eventId: string; url: string; date: string | null; location: string | null }> = []
       const seen = new Set<string>()
 
-      const links = document.querySelectorAll<HTMLAnchorElement>('a[href]')
+      // AJP events render as linked cards with /en/event/[id] hrefs once the bundle loads
+      const links = document.querySelectorAll<HTMLAnchorElement>('a[href*="/event/"], a[href*="/competition/"]')
       for (const link of Array.from(links)) {
         const href = link.href
-        // AJP competition URL patterns: /competition/xxx, /competitions/xxx, /event/xxx
-        const slugM = href.match(/\/(?:competition|competitions|event)s?\/([a-z0-9][a-z0-9-]+)(?:[/?#]|$)/)
-        if (!slugM) continue
-        const slug = slugM[1]
-        if (['list', 'all', 'upcoming', 'past', 'results'].includes(slug)) continue
-        if (seen.has(slug)) continue
-        seen.add(slug)
+        const idMatch = href.match(/\/(?:event|competition)\/(\d+)/)
+        if (!idMatch) continue
+        const eventId = idMatch[1]
+        if (seen.has(eventId)) continue
+        seen.add(eventId)
 
-        const nameEl = link.querySelector('h1,h2,h3,h4,[class*="title"],[class*="name"]')
+        const nameEl = link.querySelector('[class*="title"],[class*="name"],h1,h2,h3,h4,strong')
         const rawName = (nameEl?.textContent ?? link.textContent ?? '').trim().replace(/\s+/g, ' ')
-        if (rawName.length < 4 || rawName.length > 120) continue
+        if (rawName.length < 4 || rawName.length > 150) continue
 
         const name = /ajp/i.test(rawName) ? rawName : `AJP ${rawName}`
-
-        // Real event names always contain a year — nav links and category headers don't
         if (!/20\d{2}/.test(name)) continue
 
-        const card = link.closest('[class*="card"],[class*="competition"],[class*="event"],article,li')
-
-        const timeEl = (card ?? link).querySelector<HTMLElement>('time,[class*="date"],[class*="when"]')
-        const dateText = timeEl?.getAttribute('datetime') ?? timeEl?.textContent?.trim().replace(/\s+/g, ' ') ?? null
-
+        const card = link.closest('article, [class*="card"], [class*="event"], li')
+        const timeEl = card?.querySelector<HTMLElement>('time, [class*="date"], [datetime]')
+        const dateText = timeEl?.getAttribute('datetime') ?? timeEl?.textContent?.trim() ?? null
         if (dateText) {
           try { if (new Date(dateText).toISOString().slice(0, 10) < today) continue } catch {}
         }
 
-        const locEl = card?.querySelector<HTMLElement>('[class*="location"],[class*="city"],[class*="country"],[class*="venue"]')
+        const locEl = card?.querySelector<HTMLElement>('[class*="location"], [class*="city"], [class*="country"]')
         const location = locEl?.textContent?.trim().replace(/\s+/g, ' ') ?? null
 
-        results.push({ name, eventId: `ajp-${slug}`, url: href, date: dateText, location })
+        results.push({ name, eventId: `ajp-${eventId}`, url: href, date: dateText, location })
       }
       return results
     }, todayIso)
