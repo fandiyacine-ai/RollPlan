@@ -205,12 +205,12 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
     <div className="space-y-5">
       {hasActiveScans && <AutoRefresh />}
       {opponentsNeedingFootage.length > 0 && (
-        <div className="rounded-lg border border-amber-200 dark:border-amber-800/40 bg-amber-50 dark:bg-amber-950/20 px-4 py-3 flex items-start gap-3 text-xs text-amber-800 dark:text-amber-300">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5 text-amber-500 dark:text-amber-400">
+        <div className="rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start gap-3 text-xs text-foreground/80">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5 opacity-50">
             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
           </svg>
           <span>
-            <span className="font-semibold text-amber-900 dark:text-amber-200">
+            <span className="font-semibold">
               {opponentsNeedingFootage.length === 1
                 ? `${opponentsNeedingFootage[0].opponentLabel} needs scouting footage.`
                 : `${opponentsNeedingFootage.length} opponents need scouting footage.`}
@@ -244,9 +244,9 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
                 <p className="text-lg font-bold mt-0.5">{overallVerdict} <span className="text-sm font-normal text-muted-foreground">· avg {avgWinProb}% win probability</span></p>
               </div>
               <div className="flex items-center gap-2 text-xs">
-                {favourable > 0 && <span className="px-2 py-1 rounded-full border border-emerald-800/30 bg-emerald-950/30 text-emerald-400 font-medium">{favourable} favourable</span>}
-                {neutral > 0 && <span className="px-2 py-1 rounded-full border border-zinc-700/30 bg-zinc-800/30 text-zinc-400 font-medium">{neutral} neutral</span>}
-                {tough > 0 && <span className="px-2 py-1 rounded-full border border-rose-800/30 bg-rose-950/30 text-rose-400 font-medium">{tough} tough</span>}
+                {favourable > 0 && <span className="px-2 py-1 rounded-full border border-border bg-muted text-emerald-600 dark:text-emerald-400 font-medium">{favourable} favourable</span>}
+                {neutral > 0 && <span className="px-2 py-1 rounded-full border border-border bg-muted text-muted-foreground font-medium">{neutral} neutral</span>}
+                {tough > 0 && <span className="px-2 py-1 rounded-full border border-border bg-muted text-rose-600 dark:text-rose-400 font-medium">{tough} tough</span>}
               </div>
             </div>
             <div className="space-y-1.5">

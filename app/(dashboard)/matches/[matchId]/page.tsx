@@ -138,8 +138,8 @@ export default async function MatchDetailPage({
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-bold">
                 {match.tournamentOpponentId
-                  ? `${match.competitorLabel || 'Unknown'} vs. ${match.opponentLabel}`
-                  : `vs. ${match.opponentLabel}`}
+                  ? `${match.competitorLabel || 'Unknown'} vs. ${match.opponentLabel || 'Unknown opponent'}`
+                  : `vs. ${match.opponentLabel || 'Unknown opponent'}`}
               </h1>
               {match.resultWinner && (
                 <MatchResultBadge winner={match.resultWinner} method={match.resultMethod} technique={match.resultTechnique} />

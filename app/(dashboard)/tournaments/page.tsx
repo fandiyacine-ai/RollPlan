@@ -9,9 +9,9 @@ import { RulesetBadge } from '@/components/ruleset-badge'
 export const dynamic = 'force-dynamic'
 
 const STATUS_BADGE: Record<string, string> = {
-  upcoming:  'bg-blue-950/60 text-blue-400 border border-blue-800/40',
-  completed: 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/40',
-  cancelled: 'bg-zinc-800 text-zinc-400 border border-zinc-700',
+  upcoming:  'bg-muted text-muted-foreground border border-border',
+  completed: 'bg-muted text-muted-foreground border border-border',
+  cancelled: 'bg-muted text-muted-foreground border border-border',
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -101,11 +101,7 @@ export default async function TournamentsPage() {
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <RulesetBadge ruleset={t.ruleset} />
-                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                        format === 'nogi'
-                          ? 'bg-orange-500 text-white'
-                          : 'bg-sky-500 text-white'
-                      }`}>
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
                         {format === 'nogi' ? 'No-Gi' : 'Gi'}
                       </span>
                       {t.division && (
