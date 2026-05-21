@@ -127,9 +127,9 @@ function GameCard({
           {plan.format_notes && (
             <div className="flex gap-2">
               <span className="shrink-0 w-4">📋</span>
-              <div>
+              <div className="min-w-0">
                 <span className="text-muted-foreground">Rules  </span>
-                <span className="font-medium">{plan.format_notes}</span>
+                <span className="font-medium line-clamp-1">{plan.format_notes}</span>
               </div>
             </div>
           )}
@@ -320,8 +320,9 @@ export default async function GameplansPage() {
           ? new Date(tournament.eventDate + 'T12:00:00').toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })
           : null
 
+        const isPast = tournament.status === 'upcoming' && days !== null && days < 0
         return (
-          <div key={tournament.id} className="space-y-3">
+          <div key={tournament.id} className={`space-y-3 ${isPast ? 'opacity-50' : ''}`}>
             {/* Tournament header */}
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">

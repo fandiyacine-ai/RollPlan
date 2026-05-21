@@ -349,7 +349,7 @@ function GameplanDisplay({ plan }: { plan: GameplanOutput }) {
                 <div className="w-1 self-stretch rounded-full bg-rose-500/50 flex-shrink-0 mt-0.5" />
                 <div className="min-w-0">
                   <p className="text-xs font-semibold text-foreground leading-snug">{d.threat}</p>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed mt-0.5">{d.counter}</p>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed mt-0.5 line-clamp-2">{d.counter}</p>
                 </div>
               </div>
             ))}
@@ -389,7 +389,7 @@ function GameplanDisplay({ plan }: { plan: GameplanOutput }) {
           <span className="text-base leading-none shrink-0">📋</span>
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Ruleset</p>
-            <p className="text-xs text-foreground mt-0.5 leading-relaxed">{plan.format_notes}</p>
+            <p className="text-xs text-foreground mt-0.5 leading-relaxed line-clamp-3">{plan.format_notes}</p>
           </div>
         </div>
       )}
@@ -401,7 +401,7 @@ function GameplanDisplay({ plan }: { plan: GameplanOutput }) {
             {plan.secondary_options.map((opt, i) => (
               <div key={i} className="rounded-xl border bg-card p-3 space-y-1">
                 <p className="text-xs font-semibold">{opt.label}</p>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">{opt.rationale}</p>
+                <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">{opt.rationale}</p>
               </div>
             ))}
           </div>
@@ -427,7 +427,7 @@ function GameplanDisplay({ plan }: { plan: GameplanOutput }) {
               {plan.opponent_intel.patterns.map((p, i) => (
                 <div key={i} className="flex gap-2 items-start">
                   <span className="w-1 h-1 rounded-full bg-muted-foreground/50 flex-shrink-0 mt-1.5 shrink-0" />
-                  <p className="text-xs text-muted-foreground leading-relaxed">{p}</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{p}</p>
                 </div>
               ))}
             </div>
@@ -485,7 +485,7 @@ function PredictionCard({ prediction }: { prediction: MatchupPrediction }) {
         </div>
 
         {/* Rationale */}
-        <p className="text-sm text-muted-foreground leading-relaxed">{prediction.rationale}</p>
+        <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">{prediction.rationale}</p>
 
         {/* Advantages + Risks */}
         <div className="grid gap-2 sm:grid-cols-2">
