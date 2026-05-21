@@ -245,8 +245,7 @@ export default async function GameplansPage() {
       {nextEntry && (() => {
         const { tournament: t, opponents } = nextEntry
         const days = daysUntil(t.eventDate)
-        const hasGameplans = opponents.some(o => o.plan)
-        if (!hasGameplans && opponents.length === 0) return null
+        if (opponents.length === 0) return null
         return (
           <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
             <div className="flex items-center justify-between gap-2">
@@ -261,21 +260,31 @@ export default async function GameplansPage() {
             </div>
             <p className="font-semibold text-sm">{t.name}</p>
             <div className="flex gap-2 flex-wrap">
-              {opponents.map(({ opponent, plan }) => (
-                <Link
-                  key={opponent.id}
-                  href={`/tournaments/${t.id}/gameplan?opponent=${opponent.id}`}
-                  className="text-xs px-3 py-1.5 rounded-full border border-primary/30 bg-background hover:bg-muted font-medium transition-colors"
-                >
-                  {opponent.opponentLabel}
-                  {plan ? ' →' : ' · no gameplan yet'}
-                </Link>
-              ))}
-              {opponents.length === 0 && (
-                <Link href={`/tournaments/${t.id}/opponents`} className="text-xs text-primary hover:underline">
-                  Add opponents →
-                </Link>
-              )}
+              {(() => {
+                const withPlan = opponents.filter(o => o.plan)
+                const noPlanCount = opponents.length - withPlan.length
+                return (
+                  <>
+                    {withPlan.map(({ opponent }) => (
+                      <Link
+                        key={opponent.id}
+                        href={`/tournaments/${t.id}/gameplan?opponent=${opponent.id}`}
+                        className="text-xs px-3 py-1.5 rounded-full border border-primary/30 bg-background hover:bg-muted font-medium transition-colors"
+                      >
+                        {opponent.opponentLabel} →
+                      </Link>
+                    ))}
+                    {noPlanCount > 0 && (
+                      <Link
+                        href={`/tournaments/${t.id}/opponents`}
+                        className="text-xs px-3 py-1.5 rounded-full border border-border/40 bg-background hover:bg-muted text-muted-foreground transition-colors"
+                      >
+                        +{noPlanCount} to scout →
+                      </Link>
+                    )}
+                  </>
+                )
+              })()}
             </div>
           </div>
         )

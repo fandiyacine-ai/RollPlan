@@ -1,3 +1,4 @@
+import { currentUser } from '@clerk/nextjs/server'
 import { db } from '../../../../../lib/db'
 import { gameplans, tournamentOpponents, matches, planExecutions } from '../../../../../lib/db/schema'
 import { eq } from 'drizzle-orm'
@@ -23,6 +24,9 @@ export default async function GameplanPage({
 }) {
   const { id: tournamentId } = await params
   const { opponent: selectedOpponentId } = await searchParams
+
+  const clerkUser = await currentUser().catch(() => null)
+  const athleteName = clerkUser?.firstName ?? clerkUser?.username ?? null
 
   const opponents = await db
     .select()
@@ -115,12 +119,14 @@ export default async function GameplanPage({
       {scoutedCount === 0 ? (
         <NoFootageState tournamentId={tournamentId} opponentLabel={activeOpponent.opponentLabel} />
       ) : isGenerating ? (
-        <GeneratingState opponentLabel={activeOpponent.opponentLabel} />
+        <GeneratingState opponentLabel={activeOpponent.opponentLabel} athleteName={athleteName} />
       ) : (
         <>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             <div className="min-w-0">
-              <h2 className="font-semibold">vs. {activeOpponent.opponentLabel}</h2>
+              <h2 className="font-semibold">
+                {athleteName ? `${athleteName} vs. ${activeOpponent.opponentLabel}` : `vs. ${activeOpponent.opponentLabel}`}
+              </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {scoutedCount} match{scoutedCount !== 1 ? 'es' : ''} scouted
                 {existingGameplan && plan ? ` · Generated ${existingGameplan.createdAt.toLocaleDateString()} (v${existingGameplan.version})` : ''}
@@ -238,12 +244,14 @@ function ReadyToGenerateState({
   )
 }
 
-function GeneratingState({ opponentLabel }: { opponentLabel: string }) {
+function GeneratingState({ opponentLabel, athleteName }: { opponentLabel: string; athleteName: string | null }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-semibold">vs. {opponentLabel}</h2>
+          <h2 className="font-semibold">
+            {athleteName ? `${athleteName} vs. ${opponentLabel}` : `vs. ${opponentLabel}`}
+          </h2>
           <div className="flex items-center gap-2 mt-1">
             <span className="inline-flex h-2 w-2 rounded-full bg-primary animate-pulse" />
             <p className="text-xs text-muted-foreground">AI is building your gameplan…</p>

@@ -4,6 +4,15 @@ import { users } from './schema'
 import { eq } from 'drizzle-orm'
 
 export async function getOrCreateDbUserId(): Promise<string> {
+  // Dev-only bypass: resolve user by email, skipping Clerk entirely
+  if (process.env.NODE_ENV === 'development' && process.env.DEV_BYPASS_AUTH === 'true') {
+    const devEmail = process.env.DEV_USER_EMAIL
+    if (devEmail) {
+      const devUser = await db.query.users.findFirst({ where: eq(users.email, devEmail) })
+      if (devUser) return devUser.id
+    }
+  }
+
   const { userId: clerkId } = await auth()
   if (!clerkId) throw new Error('Not authenticated')
 

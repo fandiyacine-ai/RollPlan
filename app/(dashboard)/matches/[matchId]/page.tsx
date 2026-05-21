@@ -206,8 +206,8 @@ export default async function MatchDetailPage({
               <p className="text-2xl font-bold mt-1">{segments.length}</p>
             </div>
             <div className="rounded-lg border p-4">
-              <p className="text-xs text-muted-foreground">Events</p>
-              <p className="text-2xl font-bold mt-1">{events.length}</p>
+              <p className="text-xs text-muted-foreground">Notes</p>
+              <p className="text-2xl font-bold mt-1">{matchInsights.length}</p>
             </div>
           </div>
 

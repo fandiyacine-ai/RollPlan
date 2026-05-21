@@ -4,6 +4,14 @@ import { NextResponse } from 'next/server'
 const isPublicRoute = createRouteMatcher(['/', '/sign-in(.*)', '/sign-up(.*)', '/faq', '/api/(.*)', '/share/(.*)'])
 
 export default clerkMiddleware(async (auth, request) => {
+  // Dev-only bypass: set DEV_BYPASS_AUTH=true in .env.local for localhost UX review
+  if (process.env.NODE_ENV === 'development' && process.env.DEV_BYPASS_AUTH === 'true') {
+    if (request.nextUrl.pathname === '/') {
+      return NextResponse.redirect(new URL('/player-card', request.url))
+    }
+    return NextResponse.next()
+  }
+
   const { userId } = await auth()
 
   // Authenticated user landing on the homepage → send straight to the app
