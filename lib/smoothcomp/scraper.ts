@@ -538,10 +538,10 @@ export async function scrapeUpcomingCompetitions(discipline = 'jiu-jitsu'): Prom
 }>> {
   const browser = await launchBrowser()
   try {
-    const page = await newPage(browser)
+    const page = await newStealthPage(browser)
     // Force discipline to jiu-jitsu — we never want MMA/wrestling bleed-through
-    await page.goto(`${SC_BASE}/en/competitions?sport=${encodeURIComponent('jiu-jitsu')}`, { waitUntil: 'networkidle' })
-    await page.waitForTimeout(3000)
+    await page.goto(`${SC_BASE}/en/competitions?sport=${encodeURIComponent('jiu-jitsu')}`, { waitUntil: 'networkidle', timeout: 30000 })
+    await page.waitForTimeout(5000)
 
     const todayIso = new Date().toISOString().slice(0, 10)
 
