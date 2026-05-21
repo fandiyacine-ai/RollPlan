@@ -34,13 +34,13 @@ export default async function TournamentLayout({
   if (!tournament) notFound()
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-5xl">
       <div>
-        <Link href="/tournaments" className="text-xs text-muted-foreground hover:text-foreground inline-block mb-3">
+        <Link href="/tournaments" className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/50 hover:text-muted-foreground inline-block mb-3 transition-colors">
           ← Tournaments
         </Link>
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold">{tournament.name}</h1>
+        <div className="flex items-center gap-2.5">
+          <h1 className="text-2xl font-black tracking-tight uppercase">{tournament.name}</h1>
           <EditTournamentButton tournament={{
             id: tournament.id,
             name: tournament.name,
@@ -52,10 +52,10 @@ export default async function TournamentLayout({
             smoothcompUrl: tournament.smoothcompUrl ?? null,
           }} />
         </div>
-        <p className="text-sm text-muted-foreground mt-1">
-          {RULESET_LABEL[tournament.ruleset] ?? tournament.ruleset}
-          {tournament.division ? ` · ${tournament.division}` : ''}
-          {tournament.eventDate ? ` · ${new Date(tournament.eventDate).toLocaleDateString()}` : ''}
+        <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1.5 flex-wrap">
+          <span className="font-semibold">{RULESET_LABEL[tournament.ruleset] ?? tournament.ruleset}</span>
+          {tournament.division && <><span className="opacity-30">·</span><span>{tournament.division}</span></>}
+          {tournament.eventDate && <><span className="opacity-30">·</span><span>{new Date(tournament.eventDate).toLocaleDateString()}</span></>}
         </p>
       </div>
 
