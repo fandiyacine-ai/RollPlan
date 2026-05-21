@@ -226,7 +226,11 @@ export default async function GameplansPage() {
   )
 
   const upcomingCount = sorted.filter(t => t.status === 'upcoming').length
-  const nextEntry = tournamentData.find(({ tournament: t }) => t.status === 'upcoming' && t.eventDate)
+  // Find nearest FUTURE upcoming tournament (skip past-dated ones still marked upcoming)
+  const nextEntry = tournamentData.find(({ tournament: t }) => {
+    const days = daysUntil(t.eventDate)
+    return t.status === 'upcoming' && days !== null && days >= 0
+  })
 
   return (
     <div className="max-w-2xl space-y-8">
@@ -310,25 +314,44 @@ export default async function GameplansPage() {
             </div>
 
             {/* Opponent game cards */}
-            {opponents.length === 0 ? (
-              <p className="text-xs text-muted-foreground pl-1">
-                No opponents added.{' '}
-                <Link href={`/tournaments/${tournament.id}/opponents`} className="underline hover:no-underline">Add opponents →</Link>
-              </p>
-            ) : (
-              <div className="grid grid-cols-1 gap-3">
-                {opponents.map(({ opponent, plan, prediction, matchCount }) => (
-                  <GameCard
-                    key={opponent.id}
-                    opponent={opponent}
-                    tournamentId={tournament.id}
-                    plan={plan}
-                    prediction={prediction}
-                    matchCount={matchCount}
-                  />
-                ))}
-              </div>
-            )}
+            {(() => {
+              if (opponents.length === 0) return (
+                <p className="text-xs text-muted-foreground pl-1">
+                  No opponents added.{' '}
+                  <Link href={`/tournaments/${tournament.id}/opponents`} className="underline hover:no-underline">Add opponents →</Link>
+                </p>
+              )
+              const withData = opponents.filter(o => o.plan || o.matchCount > 0)
+              const noDataCount = opponents.length - withData.length
+              if (withData.length === 0) return (
+                <p className="text-xs text-muted-foreground pl-1">
+                  {opponents.length} opponent{opponents.length !== 1 ? 's' : ''} added — no footage scouted yet.{' '}
+                  <Link href={`/tournaments/${tournament.id}/opponents`} className="underline hover:no-underline">Start scouting →</Link>
+                </p>
+              )
+              return (
+                <>
+                  <div className="grid grid-cols-1 gap-3">
+                    {withData.map(({ opponent, plan, prediction, matchCount }) => (
+                      <GameCard
+                        key={opponent.id}
+                        opponent={opponent}
+                        tournamentId={tournament.id}
+                        plan={plan}
+                        prediction={prediction}
+                        matchCount={matchCount}
+                      />
+                    ))}
+                  </div>
+                  {noDataCount > 0 && (
+                    <p className="text-xs text-muted-foreground pl-1">
+                      +{noDataCount} opponent{noDataCount !== 1 ? 's' : ''} without footage.{' '}
+                      <Link href={`/tournaments/${tournament.id}/opponents`} className="underline hover:no-underline">Scout →</Link>
+                    </p>
+                  )}
+                </>
+              )
+            })()}
           </div>
         )
       })}
