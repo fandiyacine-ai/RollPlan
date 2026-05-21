@@ -14,6 +14,15 @@ Nothing actively in progress.
 
 ### P1 — Build next
 
+**Match Day tab — "Game Day" surface**
+New top-level nav item. Lists all upcoming tournaments sorted by date with countdown. Tap tournament → see all opponents as scannable game cards (not full gameplans). Each card: 3 priority moves, 1 danger, confidence score, result prediction. Zero extra taps on match day. Mobile-first design — this is the hero screen for the native app.
+
+**AI confidence scores — transparency layer**
+Every gameplan and analysis insight shows a confidence indicator (●●● high / ●●○ medium / ●○○ low) driven by: number of matches scouted, recency of footage, competition vs training context. Gameplan header shows: "Based on 1 match from 2024 — treat as directional." Individual insight cards show their own confidence. Builds trust by being honest about AI limitations.
+
+**Gameplan format redesign — cards not prose**
+Replace the long-form article with structured cards: Attack priorities (top 3), Danger zones (top 2), Key scenario ("if he pulls guard, do X"), Ruleset reminders. Same AI output, different presentation. Scannable in 30 seconds on match day.
+
 **Freemium paywall enforcement**
 Block `submitFootageUrls` / `importCommunityFootage` when `analysedThisMonth >= 10`. Show upgrade prompt inline (scout form disabled, message shown). Free tier limit exists in DB and is displayed on `/usage` — enforcement wall is the missing piece.
 
@@ -24,6 +33,15 @@ Add `userResult: 'win' | 'loss' | null` and `userResultMethod` to `tournamentOpp
 Current "Sync results from bracket" is semantically broken — it updates scouted *footage* match results instead of Yacine's actual tournament results. Repurpose: write `userResult` on `tournamentOpponents` by finding Yacine's matches in the Smoothcomp bracket. Requires user's own Smoothcomp athlete ID stored in settings. Becomes an optional shortcut, not a core feature.
 
 ### P2 — Soon
+
+**UX Agent (on-demand)**
+Domain-specific agent that knows BJJ competition prep, the athlete persona, and match-day pressure. Run it with `/ux-review` before any major UI release. It screenshots all key pages, maps the user journey against the 3 jobs-to-be-done (prep, match day, debrief), and outputs a prioritised list of gaps and fixes. System prompt includes: gi/no-gi context, bracket format, competition stress, what an athlete needs in 30 seconds vs 30 minutes.
+
+**Onboarding flow — first-time user**
+New users land on an empty player card with no guidance. Needs: step-by-step wizard (create tournament → add opponent → add footage), or at minimum a contextual empty state that drives the first action. Without this, any paid acquisition is wasted.
+
+**Player card redesign — prescriptive not descriptive**
+Replace "39% control rate" with "Your guard retention is your biggest gap — you get put on your back 60% of the time." Data stays the same; framing becomes actionable. Each stat card answers "so what?" and "what to drill."
 
 **User's own Smoothcomp profile in settings**
 Add Smoothcomp profile URL field to settings page. Parse and store `smoothcompAthleteId` for the user. Unlocks: (1) auto-sync post-tournament results from bracket, (2) smart bracket pre-selection (filter out self, pre-select only plausible opponents).

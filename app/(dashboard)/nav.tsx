@@ -11,7 +11,8 @@ import { buttonVariants } from '@/components/ui/button'
 const NAV = [
   { href: '/player-card', label: 'My Stats' },
   { href: '/matches', label: 'My Matches' },
-  { href: '/tournaments', label: 'Scout Opponent' },
+  { href: '/tournaments', label: 'Scout' },
+  { href: '/gameplans', label: 'Gameplans' },
 ]
 
 function NavLinks({ onLinkClick }: { onLinkClick?: () => void }) {
