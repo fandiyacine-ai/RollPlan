@@ -339,15 +339,15 @@ export default async function PlayerCardPage() {
                 const [posId, stats] = exposedPositions[0]
                 const pct = Math.round((stats.inferior / stats.total) * 100)
                 return (
-                  <div className="rounded-xl border border-rose-900/30 bg-rose-950/10 px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="rounded-xl border border-border/60 bg-card px-4 py-3 flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-rose-400/80 mb-0.5">Top gap to close</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">Top gap to close</p>
                       <p className="text-sm font-semibold leading-snug">{POSITION_MAP[posId] ?? posId}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{pct}% of mat time under pressure here</p>
                     </div>
                     <Link
                       href="/upload"
-                      className="text-xs font-medium text-rose-400 hover:text-rose-300 transition-colors flex-shrink-0"
+                      className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
                     >
                       Drill it →
                     </Link>
@@ -382,9 +382,9 @@ export default async function PlayerCardPage() {
 
               {/* Processing banner */}
               {pendingCount > 0 && (
-                <div className="rounded-xl border border-blue-900/30 bg-blue-950/10 px-4 py-3 flex items-center justify-between">
+                <div className="rounded-xl border border-border/60 bg-card px-4 py-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-foreground/40 animate-pulse" />
                     <p className="text-sm text-muted-foreground">
                       {pendingCount} match{pendingCount !== 1 ? 'es' : ''} being analysed
                     </p>
@@ -544,7 +544,7 @@ export default async function PlayerCardPage() {
                 <div className="space-y-2">
                   <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Failed</h2>
                   {failedVideos.map((v) => (
-                    <div key={v.id} className="rounded-xl border border-rose-900/40 bg-rose-950/20 p-4 flex items-center justify-between gap-4">
+                    <div key={v.id} className="rounded-xl border border-border/60 bg-card p-4 flex items-center justify-between gap-4">
                       <div className="min-w-0">
                         <p className="font-medium text-sm truncate">{v.originalFilename}</p>
                         <p className="text-xs text-rose-400 mt-0.5">Analysis failed — remove or resubmit</p>
