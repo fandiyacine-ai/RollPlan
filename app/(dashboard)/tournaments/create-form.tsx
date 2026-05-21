@@ -67,12 +67,14 @@ function EventCatalogPicker({ onSelect }: { onSelect: (e: CatalogEntry) => void 
   const [results, setResults] = useState<CatalogEntry[]>([])
   const [loading, setLoading] = useState(true)
 
+  const userLocale = typeof navigator !== 'undefined' ? navigator.language : undefined
+
   const search = useCallback(async (q: string) => {
     setLoading(true)
-    const data = await searchCatalogAction(q)
+    const data = await searchCatalogAction(q, userLocale)
     setResults(data)
     setLoading(false)
-  }, [])
+  }, [userLocale])
 
   // Load upcoming events on mount
   useEffect(() => { search('') }, [search])
