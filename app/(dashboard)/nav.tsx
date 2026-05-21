@@ -11,9 +11,83 @@ import { buttonVariants } from '@/components/ui/button'
 const NAV = [
   { href: '/player-card', label: 'My Stats' },
   { href: '/matches', label: 'My Matches' },
-  { href: '/tournaments', label: 'Scout' },
+  { href: '/tournaments', label: 'Tournaments' },
   { href: '/gameplans', label: 'Gameplans' },
 ]
+
+const TAB_NAV = [
+  {
+    href: '/player-card',
+    label: 'Stats',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/><path d="M12 8v4l3 3"/>
+      </svg>
+    ),
+  },
+  {
+    href: '/matches',
+    label: 'Matches',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M15 10l-4 4L7 10"/><rect x="3" y="3" width="18" height="18" rx="2"/>
+      </svg>
+    ),
+  },
+  {
+    href: '/tournaments',
+    label: 'Tournaments',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>
+      </svg>
+    ),
+  },
+  {
+    href: '/gameplans',
+    label: 'Gameplans',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+      </svg>
+    ),
+  },
+]
+
+function BottomTabBar() {
+  const path = usePathname()
+  const searchParams = useSearchParams()
+  const back = searchParams.get('back') ?? ''
+
+  return (
+    <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-t border-border/60">
+      <div className="flex items-stretch h-16">
+        {TAB_NAV.map(({ href, label, icon }) => {
+          let active: boolean
+          if (path.startsWith('/matches/')) {
+            if (href === '/tournaments') active = back.startsWith('/tournaments')
+            else if (href === '/matches') active = !back.startsWith('/tournaments')
+            else active = false
+          } else {
+            active = path === href || path.startsWith(href + '/')
+          }
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                active ? 'text-foreground' : 'text-muted-foreground/60'
+              }`}
+            >
+              {icon}
+              <span className={`text-[10px] font-medium ${active ? 'text-foreground' : ''}`}>{label}</span>
+            </Link>
+          )
+        })}
+      </div>
+    </nav>
+  )
+}
 
 function NavLinks({ onLinkClick }: { onLinkClick?: () => void }) {
   const path = usePathname()
@@ -55,6 +129,8 @@ export function Nav({ usageSlot }: { usageSlot?: React.ReactNode }) {
   const [open, setOpen] = useState(false)
 
   return (
+    <>
+    <Suspense fallback={null}><BottomTabBar /></Suspense>
     <nav className="border-b border-border/60 px-4 sm:px-6 sticky top-0 z-40 bg-background/90 backdrop-blur-sm">
       <div className="h-14 flex items-center justify-between">
         {/* Left: brand + desktop nav */}
@@ -163,5 +239,6 @@ export function Nav({ usageSlot }: { usageSlot?: React.ReactNode }) {
         </div>
       )}
     </nav>
+    </>
   )
 }

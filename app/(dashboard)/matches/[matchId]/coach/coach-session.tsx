@@ -259,7 +259,7 @@ export default function CoachSession({
         <div>
           <Link href="/matches" className="text-xs text-muted-foreground hover:text-foreground transition-colors">← My Matches</Link>
           <h1 className="font-semibold text-sm mt-0.5">
-            {match.competitorLabel ?? 'You'} vs {match.opponentLabel}
+            {match.competitorLabel ?? 'You'} vs {match.opponentLabel && match.opponentLabel.toLowerCase() !== 'unknown' ? match.opponentLabel : 'Unknown opponent'}
             {match.eventName && <span className="text-muted-foreground font-normal"> · {match.eventName}</span>}
           </h1>
         </div>

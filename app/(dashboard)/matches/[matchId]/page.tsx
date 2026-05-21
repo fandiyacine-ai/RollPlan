@@ -1,5 +1,5 @@
 import { db } from '../../../../lib/db'
-import { matches, videos, positionSegments, matchEvents, insights } from '../../../../lib/db/schema'
+import { matches, videos, positionSegments, matchEvents, insights, tournamentOpponents } from '../../../../lib/db/schema'
 import { eq, asc } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -79,6 +79,10 @@ export default async function MatchDetailPage({
     ? await db.query.videos.findFirst({ where: eq(videos.id, match.videoId) })
     : null
 
+  const tournamentOpponentRow = match.tournamentOpponentId
+    ? await db.query.tournamentOpponents.findFirst({ where: eq(tournamentOpponents.id, match.tournamentOpponentId) })
+    : null
+
   const [segments, events, matchInsights] = await Promise.all([
     db.select().from(positionSegments).where(eq(positionSegments.matchId, matchId)).orderBy(asc(positionSegments.startSeconds)),
     db.select().from(matchEvents).where(eq(matchEvents.matchId, matchId)).orderBy(asc(matchEvents.timestampSeconds)),
@@ -125,6 +129,9 @@ export default async function MatchDetailPage({
   ].sort((a, b) => a.time - b.time)
 
   const displayDate = match.recordedAt ?? match.createdAt
+  const displayOpponent = (match.opponentLabel && match.opponentLabel.toLowerCase() !== 'unknown')
+    ? match.opponentLabel
+    : 'Unknown opponent'
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -138,8 +145,8 @@ export default async function MatchDetailPage({
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-bold">
                 {match.tournamentOpponentId
-                  ? `${match.competitorLabel || 'Unknown'} vs. ${match.opponentLabel || 'Unknown opponent'}`
-                  : `vs. ${match.opponentLabel || 'Unknown opponent'}`}
+                  ? `${match.competitorLabel || 'Unknown'} vs. ${displayOpponent}`
+                  : `vs. ${displayOpponent}`}
               </h1>
               {match.resultWinner && (
                 <MatchResultBadge winner={match.resultWinner} method={match.resultMethod} technique={match.resultTechnique} />
@@ -158,6 +165,14 @@ export default async function MatchDetailPage({
             )}
             {video?.originalFilename && (
               <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-xs">{video.originalFilename}</p>
+            )}
+            {tournamentOpponentRow && (
+              <Link
+                href={`/tournaments/${tournamentOpponentRow.tournamentId}/gameplan?opponent=${tournamentOpponentRow.id}`}
+                className="text-xs text-primary hover:underline mt-1 inline-block"
+              >
+                View Gameplan for {displayOpponent} →
+              </Link>
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">

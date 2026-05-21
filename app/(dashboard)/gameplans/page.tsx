@@ -107,9 +107,9 @@ function GameCard({
           {plan.defensive_priorities[0] && (
             <div className="flex gap-2">
               <span className="shrink-0 w-4">⚠</span>
-              <div>
+              <div className="min-w-0">
                 <span className="text-muted-foreground">Danger  </span>
-                <span className="font-medium">{plan.defensive_priorities[0].threat}</span>
+                <span className="font-medium line-clamp-1">{plan.defensive_priorities[0].threat}</span>
               </div>
             </div>
           )}
@@ -303,7 +303,7 @@ export default async function GameplansPage() {
                         href={`/tournaments/${t.id}/opponents`}
                         className="text-xs px-3 py-1.5 rounded-full border border-border/40 bg-background hover:bg-muted text-muted-foreground transition-colors"
                       >
-                        +{noPlanCount} to scout →
+                        +{noPlanCount} opponent{noPlanCount !== 1 ? 's' : ''} to scout →
                       </Link>
                     )}
                   </>

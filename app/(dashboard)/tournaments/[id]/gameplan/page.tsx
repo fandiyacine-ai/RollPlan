@@ -173,11 +173,10 @@ export default async function GameplanPage({
             </div>
           </div>
 
-          {prediction && <PredictionCard prediction={prediction} />}
-
           {plan ? (
             <>
               <GameplanDisplay plan={plan} />
+              {prediction && <PredictionCard prediction={prediction} />}
               {existingGameplan && (() => {
                 const reviewData = linkedExecution?.executionReview as Record<string, unknown> | undefined
                 const initialDebrief = reviewData && Object.keys(reviewData).length > 0
