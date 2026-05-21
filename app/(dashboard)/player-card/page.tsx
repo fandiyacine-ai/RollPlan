@@ -378,8 +378,11 @@ export default async function PlayerCardPage() {
               {(sharpPositions.length > 0 || exposedPositions.length > 0) && (
                 <div className="rounded-xl border border-border/60 overflow-hidden bg-card">
                   <div className="px-5 py-2.5 border-b border-border/60 flex items-center justify-between">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Game DNA</h2>
-                    <span className="text-xs text-muted-foreground">{ownAnalysedIds.length} match{ownAnalysedIds.length !== 1 ? 'es' : ''}</span>
+                    <div>
+                      <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Game DNA</h2>
+                      <p className="text-[10px] text-muted-foreground/60 mt-0.5">% of time in that position you spent in control / under pressure</p>
+                    </div>
+                    <span className="text-xs text-muted-foreground shrink-0 ml-3">{ownAnalysedIds.length} match{ownAnalysedIds.length !== 1 ? 'es' : ''}</span>
                   </div>
                   <div className="grid grid-cols-2 divide-x divide-border/60">
                     <div className="p-4 space-y-3">
@@ -702,7 +705,7 @@ function ProfileHeader({ name, dbUser }: { name: string; dbUser: typeof users.$i
         </div>
         <p className="text-sm text-muted-foreground mt-0.5">
           {gym ?? (
-            <Link href="/settings" className="hover:text-foreground transition-colors">Add gym →</Link>
+            <Link href="/settings" className="hover:text-foreground transition-colors underline underline-offset-2">Set gym &amp; training style in settings →</Link>
           )}
           {style && ` · ${style === 'no_gi' ? 'No-Gi' : style === 'both' ? 'Gi & No-Gi' : 'Gi'}`}
         </p>

@@ -7,7 +7,6 @@ import { buttonVariants } from '../../../components/ui/button'
 import RefreshPoller from '../player-card/refresh-poller'
 import { DeleteMatchButton } from '../player-card/delete-match-button'
 import { DeleteVideoButton } from '../player-card/delete-video-button'
-import { ClearAllButton } from '../player-card/clear-all-button'
 import { VideoThumbnail } from '../player-card/video-thumbnail'
 import { POSITIONS } from '../../../lib/taxonomy/positions'
 import { auth } from '@clerk/nextjs/server'
@@ -150,7 +149,6 @@ export default async function MatchesPage() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <ClearAllButton />
           <Link href="/upload" className={buttonVariants({ size: 'sm' })}>+ Analyse</Link>
         </div>
       </div>

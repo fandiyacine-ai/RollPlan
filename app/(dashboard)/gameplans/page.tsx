@@ -245,16 +245,18 @@ export default async function GameplansPage() {
         return (
           <div key={tournament.id} className="space-y-3">
             {/* Tournament header */}
-            <div className="flex items-baseline justify-between gap-3">
+            <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <h2 className="font-semibold truncate">{tournament.name}</h2>
-                {dateLabel && (
-                  <p className="text-xs text-muted-foreground mt-0.5">{dateLabel}</p>
-                )}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="font-semibold">{tournament.name}</h2>
+                  {dateLabel && (
+                    <span className="text-sm text-muted-foreground">{dateLabel}</span>
+                  )}
+                </div>
               </div>
               <div className="shrink-0 flex items-center gap-2">
                 {tournament.status === 'upcoming' && days !== null && (
-                  <span className={`text-xs font-bold tabular-nums ${
+                  <span className={`text-sm font-bold tabular-nums ${
                     days <= 3 ? 'text-rose-400' : days <= 14 ? 'text-amber-400' : 'text-muted-foreground'
                   }`}>
                     {days === 0 ? 'Today' : days < 0 ? `${Math.abs(days)}d ago` : `${days}d`}
