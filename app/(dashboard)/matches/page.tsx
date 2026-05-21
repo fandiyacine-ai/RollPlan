@@ -186,49 +186,52 @@ export default async function MatchesPage() {
       <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-8 items-start">
 
         {/* ── Sidebar ── */}
-        <aside className="space-y-3 lg:sticky lg:top-20">
-          <div className="rounded-xl border border-border/60 bg-card p-4">
-            <p className="text-xs text-muted-foreground font-medium mb-1">Analysed</p>
-            <p className="text-3xl font-bold tabular-nums leading-none">{analysedCount}</p>
-            {allMatches.length !== analysedCount && (
-              <p className="text-xs text-muted-foreground mt-1">{allMatches.length - analysedCount} pending</p>
-            )}
-          </div>
+        <aside className="lg:sticky lg:top-20">
+          {/* Stats: 2-col grid on mobile, stacked on desktop */}
+          <div className="grid grid-cols-2 gap-2 lg:flex lg:flex-col lg:gap-3">
+            <div className="rounded-xl border border-border/60 bg-card p-3 lg:p-4">
+              <p className="text-xs text-muted-foreground font-medium mb-0.5 lg:mb-1">Analysed</p>
+              <p className="text-2xl lg:text-3xl font-bold tabular-nums leading-none">{analysedCount}</p>
+              {allMatches.length !== analysedCount && (
+                <p className="text-xs text-muted-foreground mt-1">{allMatches.length - analysedCount} pending</p>
+              )}
+            </div>
 
-          {(wins > 0 || losses > 0) && (
-            <div className="rounded-xl border border-border/60 bg-card p-4">
-              <p className="text-xs text-muted-foreground font-medium mb-2.5">Record</p>
-              <div className="flex items-end gap-4">
-                <div>
-                  <p className="text-2xl font-bold text-emerald-500 tabular-nums leading-none">{wins}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">wins</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-rose-500 tabular-nums leading-none">{losses}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">losses</p>
+            {avgControlRate !== null && (
+              <div className="rounded-xl border border-border/60 bg-card p-3 lg:p-4">
+                <p className="text-xs text-muted-foreground font-medium mb-0.5 lg:mb-1">Avg control</p>
+                <p className="text-2xl lg:text-3xl font-bold tabular-nums leading-none">{avgControlRate}%</p>
+              </div>
+            )}
+
+            {totalMatTime > 0 && (
+              <div className="rounded-xl border border-border/60 bg-card p-3 lg:p-4">
+                <p className="text-xs text-muted-foreground font-medium mb-0.5 lg:mb-1">Mat time</p>
+                <p className="text-xl lg:text-2xl font-bold tabular-nums leading-none">{fmt(totalMatTime)}</p>
+              </div>
+            )}
+
+            {(wins > 0 || losses > 0) && (
+              <div className="rounded-xl border border-border/60 bg-card p-3 lg:p-4">
+                <p className="text-xs text-muted-foreground font-medium mb-1.5 lg:mb-2.5">Record</p>
+                <div className="flex items-end gap-3 lg:gap-4">
+                  <div>
+                    <p className="text-xl lg:text-2xl font-bold text-emerald-500 tabular-nums leading-none">{wins}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">wins</p>
+                  </div>
+                  <div>
+                    <p className="text-xl lg:text-2xl font-bold text-rose-500 tabular-nums leading-none">{losses}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">losses</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-
-          {avgControlRate !== null && (
-            <div className="rounded-xl border border-border/60 bg-card p-4">
-              <p className="text-xs text-muted-foreground font-medium mb-1">Avg control</p>
-              <p className="text-3xl font-bold tabular-nums leading-none">{avgControlRate}%</p>
-            </div>
-          )}
-
-          {totalMatTime > 0 && (
-            <div className="rounded-xl border border-border/60 bg-card p-4">
-              <p className="text-xs text-muted-foreground font-medium mb-1">Mat time</p>
-              <p className="text-2xl font-bold tabular-nums leading-none">{fmt(totalMatTime)}</p>
-            </div>
-          )}
+            )}
+          </div>
 
           {analysedCount > 0 && (
             <Link
               href="/player-card"
-              className="flex items-center justify-between px-4 py-2.5 rounded-xl border border-border/60 bg-card text-xs text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+              className="mt-2 lg:mt-0 flex items-center justify-between px-4 py-2.5 rounded-xl border border-border/60 bg-card text-xs text-muted-foreground hover:text-foreground hover:border-border transition-colors"
             >
               <span>Full stats</span>
               <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2 6h8M7 3l3 3-3 3"/></svg>
