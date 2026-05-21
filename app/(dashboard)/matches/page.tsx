@@ -16,10 +16,10 @@ export const dynamic = 'force-dynamic'
 const POSITION_MAP = Object.fromEntries(POSITIONS.map((p) => [p.id, p.name]))
 
 const STATUS_CHIP: Record<string, string> = {
-  pending:    'bg-zinc-800 text-zinc-400',
-  processing: 'bg-blue-950 text-blue-400 border border-blue-800/50',
+  pending:    'bg-muted text-muted-foreground border border-border',
+  processing: 'bg-muted text-muted-foreground border border-border',
   analysed:   'bg-muted text-muted-foreground border border-border',
-  failed:     'bg-rose-950 text-rose-400 border border-rose-800/50',
+  failed:     'bg-muted text-rose-400 border border-border',
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -157,15 +157,15 @@ export default async function MatchesPage() {
       {scanningVideos.length > 0 && (
         <div className="space-y-2">
           {scanningVideos.map((v) => (
-            <div key={v.id} className="rounded-xl border border-blue-900/40 bg-blue-950/10 p-4 flex items-center justify-between gap-4">
+            <div key={v.id} className="rounded-xl border border-border/60 bg-card p-4 flex items-center justify-between gap-4">
               <div className="min-w-0">
                 <p className="font-medium text-sm truncate">{v.originalFilename}</p>
                 <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse inline-block" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-foreground/40 animate-pulse inline-block" />
                   {v.sourceType === 'public_url' ? 'Scanning for matches…' : 'Analysing…'}
                 </p>
               </div>
-              <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-950 text-blue-400 border border-blue-800/50 flex-shrink-0">
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-muted text-muted-foreground border border-border flex-shrink-0">
                 Analysing
               </span>
             </div>
@@ -177,7 +177,7 @@ export default async function MatchesPage() {
       {failedVideos.length > 0 && (
         <div className="space-y-2">
           {failedVideos.map((v) => (
-            <div key={v.id} className="rounded-xl border border-rose-900/40 bg-rose-950/20 p-4 flex items-center justify-between gap-4">
+            <div key={v.id} className="rounded-xl border border-border/60 bg-card p-4 flex items-center justify-between gap-4">
               <div className="min-w-0">
                 <p className="font-medium text-sm truncate">{v.originalFilename}</p>
                 <p className="text-xs text-rose-400 mt-0.5">Analysis failed — remove or resubmit</p>
@@ -303,11 +303,7 @@ function MatchCard({
           </div>
 
           <div className="flex items-center gap-1.5 mt-2">
-            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-              match.sourceType === 'own_competition' || (match.context === 'competition' && !match.sourceType)
-                ? 'bg-emerald-950/50 text-emerald-400 border border-emerald-800/30'
-                : 'bg-muted text-muted-foreground'
-            }`}>{contextLabel}</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-muted text-muted-foreground">{contextLabel}</span>
             <span className="text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground font-medium">{formatLabel}</span>
             <span className="text-[10px] text-muted-foreground ml-auto">{dateStr}</span>
           </div>
@@ -383,7 +379,7 @@ function MatchCard({
             <p className="text-xs text-rose-400">Analysis failed. Try uploading again.</p>
           ) : (
             <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-foreground/40 animate-pulse" />
               <p className="text-xs text-muted-foreground">Analysing your footage…</p>
             </div>
           )}

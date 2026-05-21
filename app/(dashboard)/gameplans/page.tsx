@@ -270,7 +270,10 @@ export default async function GameplansPage() {
         return (
           <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-primary/70">Up next</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-primary/70 flex items-center gap-1">
+                <svg className="w-2.5 h-2.5 opacity-70" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 6l3 3 5-5"/></svg>
+                Up next
+              </p>
               {days !== null && (
                 <span className={`text-xs font-bold tabular-nums ${
                   days <= 3 ? 'text-rose-400' : days <= 14 ? 'text-amber-400' : 'text-primary/70'

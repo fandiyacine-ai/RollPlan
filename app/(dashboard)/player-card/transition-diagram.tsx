@@ -92,7 +92,7 @@ function NodeCircle({
           dominantBaseline="auto"
           fontSize={8.5}
           fontWeight="600"
-          fill="#a1a1aa"
+          fill="#52525b"
           style={{ fontFamily: 'system-ui, sans-serif' }}
         >
           {line}
@@ -148,13 +148,13 @@ function EdgeArrow({
         markerEnd={`url(#${markerId})`}
       />
       <g transform={`translate(${bx},${by})`}>
-        <rect x={-9} y={-7} width={18} height={13} rx={3} fill="#18181b" opacity={0.9} />
+        <rect x={-9} y={-7} width={18} height={13} rx={3} fill="#e4e4e7" opacity={0.95} />
         <text
           textAnchor="middle"
           dominantBaseline="middle"
           fontSize={8}
           fontWeight="700"
-          fill="#d4d4d8"
+          fill="#3f3f46"
           style={{ fontFamily: 'system-ui, sans-serif' }}
         >
           ×{count}

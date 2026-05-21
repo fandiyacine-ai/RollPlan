@@ -214,7 +214,10 @@ export default async function MatchDetailPage({
           {/* Position breakdown */}
           {sortedPositions.length > 0 && (
             <div className="space-y-3">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Time on Mat</h2>
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                <svg className="w-3 h-3 opacity-50" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="6" cy="6" r="4.5"/><path d="M6 3.5v2.5l1.5 1"/></svg>
+                Time on Mat
+              </h2>
               <div className="space-y-2.5">
                 {sortedPositions.map(([posId, stats]) => {
                   const barPct = (stats.total / maxPositionTime) * 100
@@ -255,7 +258,10 @@ export default async function MatchDetailPage({
           {/* Match Report */}
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Match Report</h2>
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                <svg className="w-3 h-3 opacity-50" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="1.5" width="8" height="9" rx="1"/><path d="M4 4.5h4M4 6.5h4M4 8.5h2"/></svg>
+                Match Report
+              </h2>
               <NarrateButton matchId={matchId} hasNarration={!!match.narration} />
             </div>
 
