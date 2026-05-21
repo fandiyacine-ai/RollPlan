@@ -84,6 +84,19 @@ async function upsertEvent(
       .limit(1)
   }
 
+  // Lookup 4: same federation + same date — catches name mismatches between seeded rows
+  // and scraped rows (e.g. "IBJJF World Championship 2026" vs "IBJJF World Jiu-Jitsu Championship 2026")
+  if (existing.length === 0 && parsedDate && (source === 'ibjjf' || source === 'ajp')) {
+    existing = await db
+      .select({ id: canonicalTournaments.id, smoothcompEventId: canonicalTournaments.smoothcompEventId })
+      .from(canonicalTournaments)
+      .where(and(
+        eq(canonicalTournaments.source, source),
+        eq(canonicalTournaments.eventDate, parsedDate),
+      ))
+      .limit(1)
+  }
+
   if (existing.length > 0) {
     const existingEventId = existing[0].smoothcompEventId
     // Upgrade synthetic placeholder IDs (ajp-*, ibjjf-*) to a real Smoothcomp numeric ID,
