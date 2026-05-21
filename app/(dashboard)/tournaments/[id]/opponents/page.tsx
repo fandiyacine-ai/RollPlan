@@ -55,7 +55,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
     : false
   const showPostEventBanner = eventDatePassed && !tournamentRow?.outcome
 
-  let opponents: { id: string; tournamentId: string; opponentLabel: string; playerCardId: string | null; seedingNotes: string | null; createdAt: Date; footageStatus: string; smoothcompAthleteId: string | null }[]
+  let opponents: { id: string; tournamentId: string; opponentLabel: string; playerCardId: string | null; seedingNotes: string | null; createdAt: Date; footageStatus: string; smoothcompAthleteId: string | null; userResult: string | null; userResultMethod: string | null }[]
   try {
     opponents = await db
       .select({
@@ -67,6 +67,8 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
         createdAt: tournamentOpponents.createdAt,
         footageStatus: tournamentOpponents.footageStatus,
         smoothcompAthleteId: tournamentOpponents.smoothcompAthleteId,
+        userResult: tournamentOpponents.userResult,
+        userResultMethod: tournamentOpponents.userResultMethod,
       })
       .from(tournamentOpponents)
       .where(eq(tournamentOpponents.tournamentId, tournamentId))
@@ -327,7 +329,8 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
           {opponents.map((opp) => (
             <OpponentAccordion
               key={opp.id}
-              opponent={{ ...opp, footageStatus: opp.footageStatus ?? 'manual' }}
+              opponent={{ ...opp, footageStatus: opp.footageStatus ?? 'manual', userResult: opp.userResult ?? null, userResultMethod: opp.userResultMethod ?? null }}
+              eventDatePassed={eventDatePassed}
               matches={(matchesByOpponent[opp.id] ?? []).map(m => ({
                 ...m, rowType: 'match' as const, format: m.format ?? null, context: m.context ?? null, label: undefined,
                 resultWinner: m.resultWinner ?? null, resultMethod: m.resultMethod ?? null, resultTechnique: m.resultTechnique ?? null,

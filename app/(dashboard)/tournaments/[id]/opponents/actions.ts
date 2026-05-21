@@ -192,8 +192,9 @@ export async function submitScoutUrls(tournamentId: string, opponentId: string, 
   revalidatePath(`/tournaments/${tournamentId}/opponents`)
 }
 
-// Scrape the tournament's Smoothcomp bracket and correct match resultWinner values
-// where the bracket result disagrees with what the LLM extracted.
+// Scrape the tournament's Smoothcomp bracket and populate the user's result
+// against each scouted opponent (stored on tournamentOpponents.userResult).
+// Only writes to userResult when it is currently null — never overwrites manual entries.
 export async function syncBracketResults(tournamentId: string): Promise<{ updated: number; error?: string }> {
   try {
     const tournament = await db.query.tournaments.findFirst({
@@ -209,16 +210,22 @@ export async function syncBracketResults(tournamentId: string): Promise<{ update
     if (!bracket.bracketIsPublished) return { updated: 0, error: 'Bracket is not published yet' }
 
     const opponents = await db.query.tournamentOpponents.findMany({
-      where: and(
-        eq(tournamentOpponents.tournamentId, tournamentId),
-        // Only opponents with a known Smoothcomp athlete ID can be cross-checked
-      ),
+      where: eq(tournamentOpponents.tournamentId, tournamentId),
     })
+
+    // Build a set of all scouted opponent names (lower-case) and smoothcomp IDs
+    // to filter out bracket matches that are between two scouted opponents
+    // (those matches don't involve the user — the user only fights one at a time)
+    const scoutedNames = new Set(opponents.map(o => o.opponentLabel.toLowerCase()))
+    const scoutedSmIds = new Set(opponents.map(o => o.smoothcompAthleteId).filter(Boolean) as string[])
 
     let updated = 0
 
     for (const opp of opponents) {
-      // Find all bracket matches involving this opponent, matched by smoothcompAthleteId or name
+      // Skip opponents that already have a manually-set result
+      if (opp.userResult) continue
+
+      // Find bracket matches involving this opponent
       const bracketMatches = bracket.matches.filter(m =>
         (opp.smoothcompAthleteId && (
           m.athlete1?.smoothcompAthleteId === opp.smoothcompAthleteId ||
@@ -230,57 +237,42 @@ export async function syncBracketResults(tournamentId: string): Promise<{ update
       )
 
       for (const bm of bracketMatches) {
-        if (!bm.winnerAthleteId && !bm.athlete1 && !bm.athlete2) continue
+        if (!bm.winnerAthleteId) continue
 
-        // Determine if this opponent (the scouted athlete) won or lost
         const oppIsAthlete1 = bm.athlete1?.smoothcompAthleteId === opp.smoothcompAthleteId ||
           bm.athlete1?.name.toLowerCase() === opp.opponentLabel.toLowerCase()
         const oppSmId = oppIsAthlete1 ? bm.athlete1?.smoothcompAthleteId : bm.athlete2?.smoothcompAthleteId
-        const oppName = oppIsAthlete1 ? bm.athlete1?.name : bm.athlete2?.name
 
-        // The other athlete in the bracket match is who our user competed against
-        const theirOpponentName = oppIsAthlete1 ? bm.athlete2?.name : bm.athlete1?.name
-        const theirOpponentSmId = oppIsAthlete1 ? bm.athlete2?.smoothcompAthleteId : bm.athlete1?.smoothcompAthleteId
+        // The other athlete in this bracket match
+        const otherAthlete = oppIsAthlete1 ? bm.athlete2 : bm.athlete1
+        if (!otherAthlete) continue
 
-        if (!theirOpponentName && !theirOpponentSmId) continue
+        // Skip if the other athlete is also one of the user's scouted opponents —
+        // that match was between two opponents, not between the user and an opponent.
+        const otherIsScoutedOpponent =
+          (otherAthlete.smoothcompAthleteId && scoutedSmIds.has(otherAthlete.smoothcompAthleteId)) ||
+          scoutedNames.has(otherAthlete.name.toLowerCase())
+        // Allow if the other athlete is the scouted opponent itself (shouldn't happen, guard only)
+        const otherIsThisOpponent =
+          (opp.smoothcompAthleteId && otherAthlete.smoothcompAthleteId === opp.smoothcompAthleteId) ||
+          otherAthlete.name.toLowerCase() === opp.opponentLabel.toLowerCase()
 
-        // Did the scouted opponent (from our user's perspective) win this bracket match?
-        const scoutedOpponentWon = bm.winnerAthleteId
-          ? bm.winnerAthleteId === oppSmId
-          : false
+        if (otherIsScoutedOpponent && !otherIsThisOpponent) continue
 
-        // From user's perspective: if the scouted opponent won → resultWinner = 'opponent'
-        const correctWinner = scoutedOpponentWon ? 'opponent' : 'user'
-        const correctMethod = bm.method ?? null
-        const correctTechnique = bm.technique ?? null
+        // Determine the user's result: if the scouted opponent won, the user lost (and vice versa)
+        const scoutedOpponentWon = bm.winnerAthleteId === oppSmId
+        const userResult = scoutedOpponentWon ? 'loss' : 'win'
+        const userResultMethod = bm.method ?? null
+        const userResultTechnique = bm.technique ?? null
 
-        // Find DB matches for this opponent where opponentLabel fuzzy-matches the bracket opponent
-        const opponentMatches = await db.query.matches.findMany({
-          where: eq(matches.tournamentOpponentId, opp.id),
-        })
+        await db.update(tournamentOpponents).set({
+          userResult,
+          ...(userResultMethod ? { userResultMethod } : {}),
+          ...(userResultTechnique ? { userResultTechnique } : {}),
+        }).where(eq(tournamentOpponents.id, opp.id))
 
-        for (const m of opponentMatches) {
-          if (m.status !== 'analysed') continue
-
-          // Only update if the match opponent label matches the bracket's other athlete
-          const matchOpponent = m.opponentLabel?.toLowerCase() ?? ''
-          const bracketOpponent = theirOpponentName?.toLowerCase() ?? ''
-          if (
-            bracketOpponent &&
-            !matchOpponent.includes(bracketOpponent) &&
-            !bracketOpponent.includes(matchOpponent)
-          ) continue
-
-          if (m.resultWinner === correctWinner && m.resultMethod === correctMethod) continue
-
-          await db.update(matches).set({
-            resultWinner: correctWinner,
-            ...(correctMethod ? { resultMethod: correctMethod } : {}),
-            ...(correctTechnique ? { resultTechnique: correctTechnique } : {}),
-          }).where(eq(matches.id, m.id))
-
-          updated++
-        }
+        updated++
+        break // one result per opponent
       }
     }
 
@@ -288,6 +280,25 @@ export async function syncBracketResults(tournamentId: string): Promise<{ update
     return { updated }
   } catch (err) {
     return { updated: 0, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export async function saveOpponentResult(
+  opponentId: string,
+  tournamentId: string,
+  userResult: 'win' | 'loss' | null,
+  userResultMethod: string | null = null,
+): Promise<{ error?: string }> {
+  try {
+    await db.update(tournamentOpponents).set({
+      userResult,
+      userResultMethod,
+      userResultTechnique: null,
+    }).where(eq(tournamentOpponents.id, opponentId))
+    revalidatePath(`/tournaments/${tournamentId}/opponents`)
+    return {}
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) }
   }
 }
 

@@ -48,5 +48,9 @@ export const tournamentOpponents = pgTable('tournament_opponents', {
   smoothcompProfileUrl: text('smoothcomp_profile_url'),
   smoothcompProfilePublic: text('smoothcomp_profile_public'), // 'yes' | 'no' | null = unknown
   footageStatus: text('footage_status').notNull().default('manual'),
+  // User's actual result against this opponent at the tournament
+  userResult: text('user_result'),         // 'win' | 'loss' | 'draw' | null
+  userResultMethod: text('user_result_method'), // 'submission' | 'points' | 'dq' | 'walkover' | null
+  userResultTechnique: text('user_result_technique'), // e.g. 'rear naked choke' | null
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })

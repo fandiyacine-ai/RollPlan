@@ -18,7 +18,7 @@ export function SyncBracketButton({ tournamentId }: { tournamentId: string }) {
       setMessage(result.error)
     } else {
       setState('done')
-      setMessage(result.updated === 0 ? 'All results already match the bracket.' : `${result.updated} result${result.updated !== 1 ? 's' : ''} corrected from bracket.`)
+      setMessage(result.updated === 0 ? 'No new results found in bracket.' : `${result.updated} result${result.updated !== 1 ? 's' : ''} synced from bracket.`)
       router.refresh()
     }
   }

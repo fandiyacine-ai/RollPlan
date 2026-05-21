@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { ScoutForm, DeleteOpponentButton, EditOpponentButton, RescanVideoButton } from './opponent-forms'
-import { importCommunityFootage } from './actions'
+import { importCommunityFootage, saveOpponentResult } from './actions'
 
 type FootageRow = {
   id: string
@@ -29,6 +29,8 @@ type Opponent = {
   opponentLabel: string
   seedingNotes: string | null
   footageStatus: string
+  userResult: string | null
+  userResultMethod: string | null
 }
 
 function ResultBadge({ winner, method, technique }: { winner: string; method: string | null; technique: string | null }) {
@@ -86,6 +88,125 @@ function rowTitle(m: FootageRow): string {
   return `${fmt} ${ctx}`
 }
 
+function OpponentResultWidget({
+  opponentId,
+  tournamentId,
+  userResult,
+  userResultMethod,
+}: {
+  opponentId: string
+  tournamentId: string
+  userResult: string | null
+  userResultMethod: string | null
+}) {
+  const [pending, setPending] = useState(false)
+  const [localResult, setLocalResult] = useState<string | null>(userResult)
+  const [localMethod, setLocalMethod] = useState<string | null>(userResultMethod)
+  const [showMethodPicker, setShowMethodPicker] = useState(false)
+  const [pendingResult, setPendingResult] = useState<'win' | 'loss' | null>(null)
+
+  const methods = [
+    { value: 'submission', label: 'Submission' },
+    { value: 'points', label: 'Points' },
+    { value: 'dq', label: 'DQ' },
+    { value: 'walkover', label: 'Walkover' },
+  ]
+
+  async function pick(result: 'win' | 'loss' | null, method: string | null = null) {
+    setPending(true)
+    await saveOpponentResult(opponentId, tournamentId, result, method)
+    setLocalResult(result)
+    setLocalMethod(method)
+    setShowMethodPicker(false)
+    setPendingResult(null)
+    setPending(false)
+  }
+
+  function handleResultClick(result: 'win' | 'loss') {
+    if (localResult === result) {
+      // Clear the result
+      pick(null, null)
+    } else {
+      setPendingResult(result)
+      setShowMethodPicker(true)
+    }
+  }
+
+  const resultLabel = localResult === 'win'
+    ? (localMethod === 'submission' ? 'W — Sub' : localMethod === 'points' ? 'W — Pts' : localMethod === 'dq' ? 'W — DQ' : localMethod === 'walkover' ? 'W — WO' : 'Win')
+    : localResult === 'loss'
+    ? (localMethod === 'submission' ? 'L — Sub' : localMethod === 'points' ? 'L — Pts' : localMethod === 'dq' ? 'L — DQ' : localMethod === 'walkover' ? 'L — WO' : 'Loss')
+    : null
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-xs text-muted-foreground">Your result:</span>
+      {localResult ? (
+        <>
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
+            localResult === 'win'
+              ? 'bg-emerald-950/60 text-emerald-400 border-emerald-800/30'
+              : 'bg-rose-950/60 text-rose-400 border-rose-800/30'
+          }`}>
+            {resultLabel}
+          </span>
+          <button
+            onClick={() => pick(null, null)}
+            disabled={pending}
+            className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors disabled:opacity-40"
+          >
+            clear
+          </button>
+        </>
+      ) : showMethodPicker ? (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs text-muted-foreground/70">How?</span>
+          {methods.map(m => (
+            <button
+              key={m.value}
+              onClick={() => pick(pendingResult!, m.value)}
+              disabled={pending}
+              className="text-[10px] px-2 py-0.5 rounded border border-border/60 text-muted-foreground hover:border-foreground/40 hover:text-foreground transition-colors disabled:opacity-40"
+            >
+              {m.label}
+            </button>
+          ))}
+          <button
+            onClick={() => pick(pendingResult!, null)}
+            disabled={pending}
+            className="text-[10px] px-2 py-0.5 rounded border border-border/60 text-muted-foreground hover:border-foreground/40 hover:text-foreground transition-colors disabled:opacity-40"
+          >
+            Skip
+          </button>
+          <button
+            onClick={() => { setShowMethodPicker(false); setPendingResult(null) }}
+            className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => handleResultClick('win')}
+            disabled={pending}
+            className="text-[10px] px-2 py-0.5 rounded border border-border/60 text-muted-foreground hover:border-emerald-600 hover:text-emerald-400 transition-colors disabled:opacity-40"
+          >
+            Won
+          </button>
+          <button
+            onClick={() => handleResultClick('loss')}
+            disabled={pending}
+            className="text-[10px] px-2 py-0.5 rounded border border-border/60 text-muted-foreground hover:border-rose-600 hover:text-rose-400 transition-colors disabled:opacity-40"
+          >
+            Lost
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 const CHUNK_LABEL_RE = /·\s*Part\s+(\d+)\/(\d+)$/
 
 function detectChunks(pendingVideos: FootageRow[]): { done: number; total: number } | null {
@@ -115,12 +236,14 @@ export function OpponentAccordion({
   pendingVideos,
   tournamentId,
   communityMatchCount = 0,
+  eventDatePassed = false,
 }: {
   opponent: Opponent
   matches: FootageRow[]
   pendingVideos: FootageRow[]
   tournamentId: string
   communityMatchCount?: number
+  eventDatePassed?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [importing, startImport] = useTransition()
@@ -200,7 +323,21 @@ export function OpponentAccordion({
         >
           {statusDot}
           <div className="min-w-0 flex-1">
-            <p className="font-semibold text-sm">{opponent.opponentLabel}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-semibold text-sm">{opponent.opponentLabel}</p>
+              {opponent.userResult && (
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${
+                  opponent.userResult === 'win'
+                    ? 'bg-emerald-950/60 text-emerald-400 border-emerald-800/30'
+                    : 'bg-rose-950/60 text-rose-400 border-rose-800/30'
+                }`}>
+                  {opponent.userResult === 'win'
+                    ? (opponent.userResultMethod === 'submission' ? 'W — Sub' : opponent.userResultMethod === 'points' ? 'W — Pts' : opponent.userResultMethod === 'dq' ? 'W — DQ' : opponent.userResultMethod === 'walkover' ? 'W — WO' : 'Win')
+                    : (opponent.userResultMethod === 'submission' ? 'L — Sub' : opponent.userResultMethod === 'points' ? 'L — Pts' : opponent.userResultMethod === 'dq' ? 'L — DQ' : opponent.userResultMethod === 'walkover' ? 'L — WO' : 'Loss')
+                  }
+                </span>
+              )}
+            </div>
             {opponent.seedingNotes && (
               <p className="text-xs text-muted-foreground truncate">{opponent.seedingNotes}</p>
             )}
@@ -312,6 +449,18 @@ export function OpponentAccordion({
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Post-event result row — always visible when event date has passed */}
+      {eventDatePassed && (
+        <div className={`px-4 py-3 flex items-center gap-3 ${allRows.length > 0 || open ? 'border-t border-border/40' : ''}`}>
+          <OpponentResultWidget
+            opponentId={opponent.id}
+            tournamentId={tournamentId}
+            userResult={opponent.userResult}
+            userResultMethod={opponent.userResultMethod}
+          />
         </div>
       )}
     </div>
