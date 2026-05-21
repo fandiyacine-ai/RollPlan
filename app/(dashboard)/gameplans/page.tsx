@@ -13,7 +13,14 @@ function daysUntil(dateStr: string | null): number | null {
   return Math.ceil((new Date(dateStr + 'T12:00:00').getTime() - Date.now()) / 86400000)
 }
 
-function ConfidenceDots({ level }: { level: 'low' | 'medium' | 'high' }) {
+function ConfidenceDots({ level }: { level: 'low' | 'medium' | 'high' | null }) {
+  if (!level) {
+    return (
+      <span className="text-[10px] text-muted-foreground/50 font-medium" title="No match data">
+        N/A
+      </span>
+    )
+  }
   const map = {
     high:   { dots: '●●●', color: 'text-emerald-400' },
     medium: { dots: '●●○', color: 'text-amber-400' },
@@ -52,8 +59,8 @@ function GameCard({
   prediction: MatchupPrediction | null
   matchCount: number
 }) {
-  const confidence: 'low' | 'medium' | 'high' = prediction?.confidence
-    ?? (matchCount >= 3 ? 'high' : matchCount >= 1 ? 'medium' : 'low')
+  const confidence: 'low' | 'medium' | 'high' | null = prediction?.confidence
+    ?? (matchCount >= 3 ? 'high' : matchCount >= 1 ? 'medium' : null)
 
   return (
     <Link
@@ -65,7 +72,7 @@ function GameCard({
         <p className="font-semibold text-sm leading-tight">{opponent.opponentLabel}</p>
         <div className="flex items-center gap-1.5 shrink-0">
           <ConfidenceDots level={confidence} />
-          <span className="text-[10px] text-muted-foreground capitalize">{confidence}</span>
+          {confidence && <span className="text-[10px] text-muted-foreground capitalize">{confidence}</span>}
         </div>
       </div>
 
