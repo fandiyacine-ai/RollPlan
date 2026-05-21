@@ -1,6 +1,6 @@
 import { db } from '@/lib/db'
 import { tournaments, tournamentOpponents, gameplans, matches } from '@/lib/db/schema'
-import { eq, desc, count } from 'drizzle-orm'
+import { eq, desc } from 'drizzle-orm'
 import Link from 'next/link'
 import { getOrCreateDbUserId } from '@/lib/db/get-user'
 import type { GameplanOutput } from '@/lib/ai/schemas/gameplan'
@@ -52,12 +52,14 @@ function GameCard({
   plan,
   prediction,
   matchCount,
+  matchSources,
 }: {
   opponent: { id: string; opponentLabel: string }
   tournamentId: string
   plan: GameplanOutput | null
   prediction: MatchupPrediction | null
   matchCount: number
+  matchSources: string[]
 }) {
   const confidence: 'low' | 'medium' | 'high' | null = prediction?.confidence
     ?? (matchCount >= 3 ? 'high' : matchCount >= 1 ? 'medium' : null)
@@ -134,14 +136,28 @@ function GameCard({
         </div>
       )}
 
-      {/* Data confidence footnote */}
-      <p className="text-[10px] text-muted-foreground/60 pt-0.5 border-t border-border/40">
-        {matchCount === 0
-          ? 'No footage — prediction based on style, not match data'
-          : matchCount === 1
-          ? '1 match analysed — limited data, may not be accurate'
-          : `${matchCount} matches analysed`}
-      </p>
+      {/* Source footage footnote */}
+      <div className="pt-0.5 border-t border-border/40 space-y-0.5">
+        {matchSources.length > 0 ? (
+          <>
+            <p className="text-[10px] text-muted-foreground/50 uppercase tracking-wide">Footage from</p>
+            {matchSources.slice(0, 2).map((src, i) => (
+              <p key={i} className="text-[10px] text-muted-foreground/70 truncate">{src}</p>
+            ))}
+            {matchSources.length > 2 && (
+              <p className="text-[10px] text-muted-foreground/50">+{matchSources.length - 2} more</p>
+            )}
+          </>
+        ) : (
+          <p className="text-[10px] text-muted-foreground/60">
+            {matchCount === 0
+              ? 'No footage — prediction based on style, not match data'
+              : matchCount === 1
+              ? '1 match analysed — limited data, may not be accurate'
+              : `${matchCount} matches analysed`}
+          </p>
+        )}
+      </div>
     </Link>
   )
 }
@@ -203,8 +219,8 @@ export default async function GameplansPage() {
             .where(eq(gameplans.opponentId, opp.id))
             .limit(1)
 
-          const [mc] = await db
-            .select({ total: count() })
+          const scoutedMatches = await db
+            .select({ eventName: matches.eventName, status: matches.status })
             .from(matches)
             .where(eq(matches.tournamentOpponentId, opp.id))
 
@@ -212,11 +228,16 @@ export default async function GameplansPage() {
             ? gp.structuredPlan as GameplanOutput
             : null
 
+          const matchSources = scoutedMatches
+            .filter(m => m.status === 'analysed')
+            .map(m => m.eventName ?? 'Competition footage')
+
           return {
             opponent: opp,
             plan,
             prediction: (gp?.prediction ?? null) as MatchupPrediction | null,
-            matchCount: Number(mc?.total ?? 0),
+            matchCount: scoutedMatches.length,
+            matchSources,
           }
         })
       )
@@ -341,7 +362,7 @@ export default async function GameplansPage() {
               return (
                 <>
                   <div className="grid grid-cols-1 gap-3">
-                    {withData.map(({ opponent, plan, prediction, matchCount }) => (
+                    {withData.map(({ opponent, plan, prediction, matchCount, matchSources }) => (
                       <GameCard
                         key={opponent.id}
                         opponent={opponent}
@@ -349,6 +370,7 @@ export default async function GameplansPage() {
                         plan={plan}
                         prediction={prediction}
                         matchCount={matchCount}
+                        matchSources={matchSources}
                       />
                     ))}
                   </div>

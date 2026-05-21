@@ -124,9 +124,14 @@ export default async function GameplanPage({
         <>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             <div className="min-w-0">
-              <h2 className="font-semibold">
-                {athleteName ? `${athleteName} vs. ${activeOpponent.opponentLabel}` : `vs. ${activeOpponent.opponentLabel}`}
-              </h2>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="font-semibold">
+                  {athleteName ? `${athleteName} vs. ${activeOpponent.opponentLabel}` : `vs. ${activeOpponent.opponentLabel}`}
+                </h2>
+                {plan && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary/20 text-primary border border-primary/30 leading-none tracking-wide">AI</span>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {scoutedCount} match{scoutedCount !== 1 ? 'es' : ''} scouted
                 {existingGameplan && plan ? ` · Generated ${existingGameplan.createdAt.toLocaleDateString()} (v${existingGameplan.version})` : ''}
@@ -249,9 +254,12 @@ function GeneratingState({ opponentLabel, athleteName }: { opponentLabel: string
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-semibold">
-            {athleteName ? `${athleteName} vs. ${opponentLabel}` : `vs. ${opponentLabel}`}
-          </h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="font-semibold">
+              {athleteName ? `${athleteName} vs. ${opponentLabel}` : `vs. ${opponentLabel}`}
+            </h2>
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary/20 text-primary border border-primary/30 leading-none tracking-wide">AI</span>
+          </div>
           <div className="flex items-center gap-2 mt-1">
             <span className="inline-flex h-2 w-2 rounded-full bg-primary animate-pulse" />
             <p className="text-xs text-muted-foreground">AI is building your gameplan…</p>
@@ -314,7 +322,6 @@ function GameplanDisplay({ plan }: { plan: GameplanOutput }) {
           <div className="flex items-center gap-2">
             <span className="text-base leading-none">⚔</span>
             <p className="text-xs font-bold uppercase tracking-widest text-foreground">Attack</p>
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-foreground text-background leading-none tracking-wide ml-auto">AI</span>
           </div>
           <p className="text-sm font-semibold text-foreground leading-snug">{plan.primary_chain.label}</p>
           <ol className="space-y-1.5">
