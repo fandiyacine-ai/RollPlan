@@ -60,10 +60,10 @@ export const scanUrl = inngest.createFunction(
     triggers: [{ event: 'url/submitted' }],
   },
   async ({ event, step }: {
-    event: { data: { videoId: string; userId?: string; athleteName: string; format: string; sourceType: string; eventName?: string; appearanceHint?: string; athleteImageBase64?: string; tournamentOpponentId?: string; skipScan?: boolean; startSeconds?: number; endSeconds?: number; chunkIndex?: number; chunkTotal?: number; chunkVideoIds?: string[]; matchesFoundSoFar?: number; consecutiveEmptyChunks?: number } }
+    event: { data: { videoId: string; userId?: string; athleteName: string; format: string; sourceType: string; eventName?: string; appearanceHint?: string; athleteImageBase64?: string; tournamentOpponentId?: string; skipScan?: boolean; startSeconds?: number; endSeconds?: number; chunkIndex?: number; chunkTotal?: number; chunkVideoIds?: string[]; matchesFoundSoFar?: number; consecutiveEmptyChunks?: number; ytTimestampHint?: number } }
     step: any
   }) => {
-    const { videoId, userId, athleteName, format, sourceType, eventName, appearanceHint, athleteImageBase64, tournamentOpponentId, skipScan, startSeconds, endSeconds, chunkIndex, chunkTotal, chunkVideoIds, matchesFoundSoFar, consecutiveEmptyChunks } = event.data
+    const { videoId, userId, athleteName, format, sourceType, eventName, appearanceHint, athleteImageBase64, tournamentOpponentId, skipScan, startSeconds, endSeconds, chunkIndex, chunkTotal, chunkVideoIds, matchesFoundSoFar, consecutiveEmptyChunks, ytTimestampHint } = event.data
 
     const CHUNK_SECS = 20 * 60  // 20-minute windows — ~60 frames at 0.05fps
     const NUM_CHUNKS = 20       // covers up to 6h40m (handles full competition day streams)
@@ -234,8 +234,11 @@ export const scanUrl = inngest.createFunction(
         const original = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
         if (!original) throw new Error('Original video not found')
 
-        // Respect YouTube &t= timestamp so chunks start from where the user pointed, not second 0
-        const ytOffset = parseYouTubeTimestamp(original.publicUrl ?? '')
+        // Use the timestamp hint passed from the submission (extracted before URL normalization strips &t).
+        // Fall back to parsing the stored URL for legacy events that pre-date this field.
+        const ytOffset = (ytTimestampHint ?? 0) > 0
+          ? ytTimestampHint!
+          : parseYouTubeTimestamp(original.publicUrl ?? '')
 
         const ids: string[] = []
         for (let i = 0; i < NUM_CHUNKS; i++) {

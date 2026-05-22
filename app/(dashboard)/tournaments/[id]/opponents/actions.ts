@@ -10,6 +10,23 @@ import { getOrCreateDbUserId } from '../../../../../lib/db/get-user'
 import { checkMonthlyLimit } from '../../../../../lib/db/usage'
 import { scrapeBracket, parseSmootcompBracketUrl, parseSmootcompEventUrl } from '../../../../../lib/smoothcomp/scraper'
 import { isYouTubeUrl, normalizeYouTubeUrl } from '../../../../../lib/gemini-video'
+
+function parseYouTubeTimestamp(url: string): number {
+  try {
+    const t = new URL(url).searchParams.get('t')
+    if (!t) return 0
+    const h = t.match(/(\d+)h/)
+    const m = t.match(/(\d+)m/)
+    const s = t.match(/(\d+)s/)
+    if (h || m || s) {
+      return (parseInt(h?.[1] ?? '0') || 0) * 3600
+           + (parseInt(m?.[1] ?? '0') || 0) * 60
+           + (parseInt(s?.[1] ?? '0') || 0)
+    }
+    const n = parseInt(t)
+    return isNaN(n) ? 0 : n
+  } catch { return 0 }
+}
 import { cloneVideoMatches } from '../../../../../lib/db/clone-analysis'
 
 export async function addOpponent(tournamentId: string, formData: FormData) {
@@ -117,6 +134,8 @@ export async function submitScoutUrls(tournamentId: string, opponentId: string, 
   for (const url of urls) {
     try { new URL(url) } catch { throw new Error(`Invalid URL: ${url}`) }
 
+    // Extract &t= timestamp BEFORE normalization strips it — used as chunk offset hint
+    const ytTimestampHint = isYouTubeUrl(url) ? parseYouTubeTimestamp(url) : 0
     const storedUrl = isYouTubeUrl(url) ? normalizeYouTubeUrl(url) : url
 
     // Prevent duplicate scans: skip if this URL is already queued or analysed for this opponent
@@ -178,6 +197,7 @@ export async function submitScoutUrls(tournamentId: string, opponentId: string, 
           sourceType: 'opponent',
           tournamentOpponentId: opponentId,
           appearanceHint,
+          ytTimestampHint: ytTimestampHint || undefined,
         },
       })
     } catch {
