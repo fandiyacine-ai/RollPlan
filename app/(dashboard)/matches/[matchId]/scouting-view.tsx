@@ -24,7 +24,7 @@ type TimelineItem =
 
 type PositionStat = { total: number; dominant: number; neutral: number; inferior: number }
 type ChatMessage = { role: 'user' | 'coach'; text: string }
-type TabId = 'brief' | 'timeline' | 'notes' | 'stats' | 'prediction'
+type TabId = 'brief' | 'timeline' | 'notes' | 'stats' | 'prediction' | 'ask'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -385,16 +385,21 @@ function PredictionTab({ insights, opponentName }: { insights: InsightRow[]; opp
 
 // ─── Embedded Chat ────────────────────────────────────────────────────────────
 
-function ChatInput({ matchId, currentTime }: { matchId: string; currentTime: number }) {
+const SUGGESTED_QUESTIONS = [
+  'What positions does this opponent favour?',
+  'Where are they most dangerous?',
+  'What patterns repeat across the match?',
+  'How do they react under pressure?',
+]
+
+function AskTab({ matchId, currentTime, opponentName }: { matchId: string; currentTime: number; opponentName: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [expanded, setExpanded] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
 
   const send = useCallback(async (text: string) => {
     if (!text.trim() || loading) return
-    setExpanded(true)
     setMessages(prev => [...prev, { role: 'user', text }])
     setLoading(true)
     try {
@@ -424,34 +429,54 @@ function ChatInput({ matchId, currentTime }: { matchId: string; currentTime: num
   }, [matchId, currentTime, loading])
 
   return (
-    <div className="border-t border-border/60 bg-card flex-shrink-0">
-      {/* Message history — expands upward when there are messages */}
-      {expanded && messages.length > 0 && (
-        <div className="overflow-y-auto max-h-48 space-y-2 p-3 border-b border-border/40">
-          {messages.map((m, i) => (
-            <div key={i} className={m.role === 'user' ? 'text-right' : 'text-left'}>
-              <span className={`inline-block text-sm px-3 py-1.5 rounded-xl max-w-[95%] text-left leading-snug ${
-                m.role === 'user' ? 'bg-foreground text-background' : 'bg-muted text-foreground'
-              }`}>
-                {m.text || (loading && m.role === 'coach' ? '…' : '')}
-              </span>
+    <div className="flex flex-col h-full">
+      {/* Messages / empty state */}
+      <div className="flex-1 overflow-y-auto min-h-0 p-4">
+        {messages.length === 0 ? (
+          <div className="space-y-4 pt-1">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-violet-400">
+                <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
+              </svg>
+              Ask anything about {opponentName}
             </div>
-          ))}
-          <div ref={endRef} />
-        </div>
-      )}
-      {/* Input bar */}
+            <div className="space-y-2">
+              {SUGGESTED_QUESTIONS.map(q => (
+                <button
+                  key={q}
+                  onClick={() => send(q)}
+                  className="w-full text-left text-xs px-3 py-2.5 rounded-lg border border-border/50 bg-muted/30 hover:bg-muted/60 hover:border-border transition-colors text-foreground/70 hover:text-foreground"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {messages.map((m, i) => (
+              <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
+                <span className={`inline-block text-sm px-3 py-2 rounded-xl max-w-[90%] leading-snug ${
+                  m.role === 'user' ? 'bg-foreground text-background' : 'bg-muted text-foreground'
+                }`}>
+                  {m.text || (loading && m.role === 'coach' ? '…' : '')}
+                </span>
+              </div>
+            ))}
+            <div ref={endRef} />
+          </div>
+        )}
+      </div>
+
+      {/* Input */}
       <form
         onSubmit={e => { e.preventDefault(); send(input); setInput('') }}
-        className="flex items-center gap-2 px-3 py-2.5"
+        className="flex items-center gap-2 px-3 py-2.5 border-t border-border/60 flex-shrink-0"
       >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-muted-foreground/40 flex-shrink-0">
-          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-        </svg>
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
-          placeholder="Ask about this opponent…"
+          placeholder={`Ask about ${opponentName}…`}
           className="flex-1 text-sm bg-transparent focus:outline-none placeholder:text-muted-foreground/40 min-w-0"
         />
         <button
@@ -468,12 +493,13 @@ function ChatInput({ matchId, currentTime }: { matchId: string; currentTime: num
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-const TABS: { id: TabId; label: string }[] = [
+const TABS: { id: TabId; label: string; ai?: boolean }[] = [
   { id: 'brief', label: 'Brief' },
   { id: 'timeline', label: 'Timeline' },
   { id: 'notes', label: 'Notes' },
   { id: 'stats', label: 'Stats' },
   { id: 'prediction', label: 'Prediction' },
+  { id: 'ask', label: 'Ask AI', ai: true },
 ]
 
 export function ScoutingView({
@@ -605,7 +631,7 @@ export function ScoutingView({
           <VideoBlock />
         </div>
 
-        {/* Right — tabbed panel + pinned chat */}
+        {/* Right — tabbed panel */}
         <div className="flex-1 flex flex-col overflow-hidden border border-border/60 rounded-xl bg-card">
           {/* Tab bar */}
           <div className="flex border-b border-border/60 flex-shrink-0 overflow-x-auto">
@@ -614,25 +640,36 @@ export function ScoutingView({
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors relative flex-shrink-0 ${
-                  activeTab === tab.id
-                    ? 'text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
+                  tab.ai
+                    ? activeTab === tab.id
+                      ? 'text-violet-400'
+                      : 'text-violet-500/60 hover:text-violet-400'
+                    : activeTab === tab.id
+                      ? 'text-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {tab.id === 'timeline' && timelineItems.length > 0
+                {tab.ai ? (
+                  <span className="flex items-center gap-1.5">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                      <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
+                    </svg>
+                    {tab.label}
+                  </span>
+                ) : tab.id === 'timeline' && timelineItems.length > 0
                   ? `${tab.label} (${timelineItems.length})`
                   : tab.id === 'notes' && insights.length > 0
                   ? `${tab.label} (${insights.length})`
                   : tab.label}
                 {activeTab === tab.id && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground rounded-t-full" />
+                  <span className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full ${tab.ai ? 'bg-violet-400' : 'bg-foreground'}`} />
                 )}
               </button>
             ))}
           </div>
 
-          {/* Tab content — scrollable */}
-          <div className="flex-1 overflow-y-auto min-h-0">
+          {/* Tab content */}
+          <div className={`flex-1 min-h-0 ${activeTab === 'ask' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'}`}>
             {activeTab === 'brief' && (
               <BriefTab insights={insights} />
             )}
@@ -657,10 +694,10 @@ export function ScoutingView({
             {activeTab === 'prediction' && (
               <PredictionTab insights={insights} opponentName={opponentName} />
             )}
+            {activeTab === 'ask' && (
+              <AskTab matchId={match.id} currentTime={currentTime} opponentName={opponentName} />
+            )}
           </div>
-
-          {/* Ask AI — pinned at bottom */}
-          <ChatInput matchId={match.id} currentTime={currentTime} />
         </div>
       </div>
 
@@ -679,25 +716,34 @@ export function ScoutingView({
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id === activeTab ? 'timeline' : tab.id)}
                 className={`px-3 py-2.5 text-xs font-medium whitespace-nowrap transition-colors relative flex-shrink-0 ${
-                  activeTab === tab.id ? 'text-foreground' : 'text-muted-foreground'
+                  tab.ai
+                    ? activeTab === tab.id ? 'text-violet-400' : 'text-violet-500/60 hover:text-violet-400'
+                    : activeTab === tab.id ? 'text-foreground' : 'text-muted-foreground'
                 }`}
               >
-                {tab.label}
+                {tab.ai ? (
+                  <span className="flex items-center gap-1">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
+                      <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
+                    </svg>
+                    {tab.label}
+                  </span>
+                ) : tab.label}
                 {activeTab === tab.id && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground rounded-t-full" />
+                  <span className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full ${tab.ai ? 'bg-violet-400' : 'bg-foreground'}`} />
                 )}
               </button>
             ))}
           </div>
-          <div className="flex-1 overflow-y-auto min-h-0">
+          <div className={`flex-1 min-h-0 ${activeTab === 'ask' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'}`}>
             {activeTab === 'timeline' && (
               <TimelineTab items={timelineItems} onSeek={seekTo} competitorLabel={match.competitorLabel} opponentLabel={match.opponentLabel} />
             )}
             {activeTab === 'notes' && <NotesTab insights={insights} />}
             {activeTab === 'stats' && <StatsTab sortedPositions={sortedPositions} maxPositionTime={maxPositionTime} positionNames={positionNames} />}
             {activeTab === 'prediction' && <PredictionTab insights={insights} opponentName={opponentName} />}
+            {activeTab === 'ask' && <AskTab matchId={match.id} currentTime={currentTime} opponentName={opponentName} />}
           </div>
-          <ChatInput matchId={match.id} currentTime={currentTime} />
         </div>
       </div>
 
