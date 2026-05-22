@@ -51,8 +51,13 @@ export async function POST(req: NextRequest) {
     ? segments.map(s => `${fmt(s.startSeconds)}-${fmt(s.endSeconds)}: ${s.positionId} (${s.userRole}, ${s.dominance})`).join('\n')
     : 'No position data recorded'
 
+  // Cross-reference each event with the concurrent position segment
   const eventTimeline = events.length > 0
-    ? events.map(e => `${fmt(e.timestampSeconds)}: ${e.eventTypeId} by ${e.actor} — ${e.outcome}${e.techniqueLabel ? ` (${e.techniqueLabel})` : ''}`).join('\n')
+    ? events.map(e => {
+        const concurrentSeg = segments.find(s => s.startSeconds <= e.timestampSeconds && s.endSeconds >= e.timestampSeconds)
+        const posCtx = concurrentSeg ? ` [from ${concurrentSeg.positionId}, ${concurrentSeg.dominance}]` : ''
+        return `${fmt(e.timestampSeconds)}: ${e.eventTypeId} by ${e.actor} — ${e.outcome}${e.techniqueLabel ? ` (${e.techniqueLabel})` : ''}${posCtx}`
+      }).join('\n')
     : 'No events recorded'
 
   const insightLines = matchInsights.length > 0
