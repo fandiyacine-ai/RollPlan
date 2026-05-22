@@ -561,9 +561,9 @@ export function MatchContent({
           ) : (
             <div className="relative">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground pb-3">
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0" />In Control</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0" />{competitorLabel ? `${competitorLabel} in control` : 'In Control'}</span>
                 <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-zinc-500 flex-shrink-0" />Neutral</span>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-rose-500 flex-shrink-0" />Under Pressure</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-rose-500 flex-shrink-0" />{competitorLabel ? `${competitorLabel} under pressure` : 'Under Pressure'}</span>
                 <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-400 flex-shrink-0" />{competitorLabel ?? 'Your'} action</span>
                 <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-orange-400 flex-shrink-0" />{opponentLabel ?? 'Opponent'} action</span>
               </div>
