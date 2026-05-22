@@ -8,6 +8,7 @@ import { MatchContent, type TimelineItem } from './match-content'
 import { NarrateButton } from './narrate-button'
 import { ShareButton } from './share-button'
 import { CorrectResultButton } from './correct-result-button'
+import { ScoutingView } from './scouting-view'
 import { POSITIONS } from '../../../../lib/taxonomy/positions'
 import { EVENT_TYPES } from '../../../../lib/taxonomy/events'
 
@@ -138,6 +139,32 @@ export default async function MatchDetailPage({
     : knownOpponent
     ? `vs. ${knownOpponent}`
     : `${match.format === 'no_gi' ? 'No-Gi' : 'Gi'} ${match.context === 'sparring' ? 'Sparring' : match.context === 'drilling' ? 'Drilling' : 'Competition'}`
+
+  // Scouting view: full-width two-panel layout for opponent footage
+  if (match.tournamentOpponentId && match.status === 'analysed') {
+    return (
+      <ScoutingView
+        match={{
+          id: match.id,
+          competitorLabel: match.competitorLabel,
+          opponentLabel: match.opponentLabel,
+          format: match.format,
+          context: match.context,
+          eventName: match.eventName,
+          resultWinner: match.resultWinner,
+          resultMethod: match.resultMethod,
+          resultTechnique: match.resultTechnique,
+        }}
+        videoUrl={video?.publicUrl ?? null}
+        insights={matchInsights}
+        timelineItems={timelineItems}
+        sortedPositions={sortedPositions}
+        maxPositionTime={maxPositionTime}
+        positionNames={POSITION_MAP}
+        backHref={backHref}
+      />
+    )
+  }
 
   return (
     <div className="space-y-6 max-w-3xl">
