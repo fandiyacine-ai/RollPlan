@@ -125,7 +125,7 @@ export function buildExtractMatchUserPrompt(params: {
   return `Analyse this BJJ match video.
 
 ${params.timestampRange
-    ? `This clip contains pre-match content. The match between ${params.competitorDescription}${params.opponentName ? ` and ${params.opponentName}` : ''} is expected to start at approximately ${formatTimestamp(params.timestampRange.startSeconds)}. Mark footage before this point as standing/neutral (pre-match setup). The outcome screen will appear AFTER the match ends — do NOT stop analysis before reaching it.`
+    ? `This clip may contain multiple matches. The match involving ${params.competitorDescription}${params.opponentName ? ` and ${params.opponentName}` : ''} is expected somewhere in the second half of the clip (after approximately ${formatTimestamp(params.timestampRange.startSeconds - 60)}). Do NOT anchor to the first match you see — search for the active scoreboard showing the target athletes' names before locking in. Mark footage before the match starts as standing/neutral.`
     : ''}
 Competitor to track: ${params.competitorDescription}
 ${params.opponentName

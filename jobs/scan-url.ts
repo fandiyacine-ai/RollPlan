@@ -360,8 +360,8 @@ export const scanUrl = inngest.createFunction(
               // POST_BUFFER: the outcome screen appears 0–120s AFTER the match ends. Without padding
               // the clip cuts off before the outcome screen, causing extraction to either miss the
               // result or latch onto an adjacent match's outcome screen.
-              const PRE_BUFFER = skipScan ? 0 : 120  // 2 min before detected match start
-              const POST_BUFFER = skipScan ? 0 : 240 // 4 min after detected match end
+              const PRE_BUFFER = skipScan ? 0 : 300  // 5 min — scan at 10s resolution can place "start" on a preview card 1-3 min before athletes actually step on the mat
+              const POST_BUFFER = skipScan ? 0 : 360 // 6 min — scan end_seconds often underestimated; outcome screen appears up to 2 min after match ends
 
               const chunkOffset = startSeconds ?? 0
               const scanMatchStart = skipScan ? chunkOffset : (chunkOffset + found.start_seconds)

@@ -175,7 +175,7 @@ export default async function MatchDetailPage({
                 href={`/tournaments/${tournamentOpponentRow.tournamentId}/gameplan?opponent=${tournamentOpponentRow.id}`}
                 className="text-xs text-primary hover:underline mt-1 inline-block"
               >
-                View Gameplan for {knownOpponent ?? 'Opponent'} →
+                View Gameplan for {tournamentOpponentRow.opponentLabel} →
               </Link>
             )}
           </div>
