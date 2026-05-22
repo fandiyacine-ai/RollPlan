@@ -17,7 +17,7 @@ import { buildScanSubmissionsSystemPrompt, buildScanSubmissionsUserPrompt, SCAN_
 import { EventReviewOutputSchema } from '../lib/ai/schemas/event-review'
 import { SubmissionScanOutputSchema } from '../lib/ai/schemas/submission-scan'
 import { getTechniqueVariantsForExtraction, getTechniqueVariantsForPositions, formatVariantsAsPromptBlock } from '../lib/ai/technique-retrieval'
-import { isYouTubeUrl } from '../lib/gemini-video'
+import { isYouTubeUrl, geminiVideoObject } from '../lib/gemini-video'
 
 const CONFUSION_PRONE = new Set([
   'closed_guard', 'back_control', 'mount', 'side_control',
@@ -53,14 +53,21 @@ export const analyzeVideo = inngest.createFunction(
 
     // Upload video to Gemini Files API (R2 videos) or pass YouTube URL directly.
     // YouTube URLs work natively with Gemini — no upload or cleanup needed.
-    const { geminiFileUri, isYouTube } = await step.run('upload-to-gemini', async () => {
+    // Also capture match time bounds so we can clip long tournament streams.
+    const { geminiFileUri, isYouTube, videoStartSeconds, videoEndSeconds } = await step.run('upload-to-gemini', async () => {
       const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
       if (!video?.publicUrl) throw new Error('Video has no public URL')
       if (isYouTubeUrl(video.publicUrl)) {
-        return { geminiFileUri: video.publicUrl, isYouTube: true }
+        const match = await db.query.matches.findFirst({ where: eq(matches.id, matchId) })
+        return {
+          geminiFileUri: video.publicUrl,
+          isYouTube: true,
+          videoStartSeconds: match?.matchStartSeconds ?? null,
+          videoEndSeconds: match?.matchEndSeconds ?? null,
+        }
       }
       const geminiFileUri = await uploadVideoToGemini(video.publicUrl, video.contentType)
-      return { geminiFileUri, isYouTube: false }
+      return { geminiFileUri, isYouTube: false, videoStartSeconds: null, videoEndSeconds: null }
     })
 
     const { matchUserId } = await step.run('extract-positions-events', async () => {
@@ -74,7 +81,7 @@ export const analyzeVideo = inngest.createFunction(
       await db.update(videos).set({ status: 'processing' }).where(eq(videos.id, videoId))
 
       let object: Awaited<ReturnType<typeof generateObject<typeof MatchExtractionOutputSchema>>>['object']
-      let usage: Awaited<ReturnType<typeof generateObject<typeof MatchExtractionOutputSchema>>>['usage']
+      let usage: { inputTokens: number; outputTokens: number }
 
       // Fetch general technique variants (positionId IS NULL) — format-filtered, cap 15
       const techniqueVariants = await getTechniqueVariantsForExtraction(match.format)
@@ -82,43 +89,67 @@ export const analyzeVideo = inngest.createFunction(
 
       const start = Date.now()
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const extractContent: any[] = []
+        if (isYouTube) {
+          // YouTube streams can be hours long — pass time bounds so Gemini only
+          // processes the match window (set by the smoothcomp scanner on original ingest)
+          const result = await geminiVideoObject(GEMINI_VIDEO_MODEL, {
+            system: buildExtractMatchSystemPrompt(techniquePromptBlock),
+            videoUrl: geminiFileUri,
+            videoOptions: {
+              startSeconds: videoStartSeconds ?? undefined,
+              endSeconds: videoEndSeconds ?? undefined,
+            },
+            userPrompt: buildExtractMatchUserPrompt({
+              competitorDescription: match.competitorLabel ?? 'the main competitor',
+              appearanceHint: appearanceHint || undefined,
+              format: match.format,
+              ruleset: match.ruleset,
+              durationSeconds: video.durationSeconds ?? undefined,
+            }),
+            schema: MatchExtractionOutputSchema,
+            referenceImageBase64: athleteImageBase64 || undefined,
+          })
+          object = result.object
+          usage = result.usage
+        } else {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const extractContent: any[] = []
 
-        // Technique reference images — visual anchors for submission detection
-        for (const variant of techniqueVariants) {
-          if (variant.referenceImageUrl) {
-            extractContent.push({ type: 'image', image: variant.referenceImageUrl })
-            extractContent.push({ type: 'text', text: `↑ TECHNIQUE REFERENCE: ${variant.name}. ${variant.visualCues.slice(0, 200)}` })
+          // Technique reference images — visual anchors for submission detection
+          for (const variant of techniqueVariants) {
+            if (variant.referenceImageUrl) {
+              extractContent.push({ type: 'image', image: variant.referenceImageUrl })
+              extractContent.push({ type: 'text', text: `↑ TECHNIQUE REFERENCE: ${variant.name}. ${variant.visualCues.slice(0, 200)}` })
+            }
           }
-        }
 
-        if (athleteImageBase64) {
-          extractContent.push({ type: 'image', image: `data:image/jpeg;base64,${athleteImageBase64}` })
-          extractContent.push({ type: 'text', text: '↑ IDENTITY REFERENCE FRAME. The red "⬅ YOU" box marks the ONLY athlete to label as "user" for the ENTIRE match. The other athlete is ALWAYS "opponent". Use this annotated frame as your identity anchor — do not swap these roles at any point.' })
-        }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        extractContent.push({ type: 'file', data: new URL(geminiFileUri) as any, mediaType: (isYouTube ? 'video/mp4' : video.contentType) as `${string}/${string}` })
-        extractContent.push({
-          type: 'text',
-          text: buildExtractMatchUserPrompt({
-            competitorDescription: match.competitorLabel ?? 'the main competitor',
-            appearanceHint: appearanceHint || undefined,
-            format: match.format,
-            ruleset: match.ruleset,
-            durationSeconds: video.durationSeconds ?? undefined,
-          }),
-        })
+          if (athleteImageBase64) {
+            extractContent.push({ type: 'image', image: `data:image/jpeg;base64,${athleteImageBase64}` })
+            extractContent.push({ type: 'text', text: '↑ IDENTITY REFERENCE FRAME. The red "⬅ YOU" box marks the ONLY athlete to label as "user" for the ENTIRE match. The other athlete is ALWAYS "opponent". Use this annotated frame as your identity anchor — do not swap these roles at any point.' })
+          }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          extractContent.push({ type: 'file', data: new URL(geminiFileUri) as any, mediaType: video.contentType as `${string}/${string}` })
+          extractContent.push({
+            type: 'text',
+            text: buildExtractMatchUserPrompt({
+              competitorDescription: match.competitorLabel ?? 'the main competitor',
+              appearanceHint: appearanceHint || undefined,
+              format: match.format,
+              ruleset: match.ruleset,
+              durationSeconds: video.durationSeconds ?? undefined,
+            }),
+          })
 
-        const result = await generateObject({
-          model: google(GEMINI_VIDEO_MODEL),
-          schema: MatchExtractionOutputSchema,
-          maxRetries: 0,
-          system: buildExtractMatchSystemPrompt(techniquePromptBlock),
-          messages: [{ role: 'user', content: extractContent }],
-        })
-        object = result.object
-        usage = result.usage
+          const result = await generateObject({
+            model: google(GEMINI_VIDEO_MODEL),
+            schema: MatchExtractionOutputSchema,
+            maxRetries: 0,
+            system: buildExtractMatchSystemPrompt(techniquePromptBlock),
+            messages: [{ role: 'user', content: extractContent }],
+          })
+          object = result.object
+          usage = { inputTokens: result.usage.inputTokens ?? 0, outputTokens: result.usage.outputTokens ?? 0 }
+        }
       } catch (err: unknown) {
         await markFailed(matchId, videoId)
         const msg = err instanceof Error ? err.message : String(err)
@@ -185,35 +216,52 @@ export const analyzeVideo = inngest.createFunction(
 
       const start = Date.now()
       let verifyObject: Awaited<ReturnType<typeof generateObject<typeof PositionVerificationSchema>>>['object']
-      let verifyUsage: Awaited<ReturnType<typeof generateObject<typeof PositionVerificationSchema>>>['usage']
+      let verifyUsage: { inputTokens: number; outputTokens: number }
+
+      const verifyPrompt = buildVerifyPositionsUserPrompt(
+        toVerify.map((s, i) => ({
+          index: i,
+          positionId: s.positionId,
+          userRole: s.userRole,
+          dominance: s.dominance,
+          startSeconds: s.startSeconds,
+          endSeconds: s.endSeconds,
+          confidence: s.confidence,
+        }))
+      )
 
       try {
-        const result = await generateObject({
-          model: google(GEMINI_VIDEO_MODEL),
-          schema: PositionVerificationSchema,
-          maxRetries: 0,
-          system: buildVerifyPositionsSystemPrompt(),
-          messages: [{
-            role: 'user',
-            content: [
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              { type: 'file', data: new URL(geminiFileUri) as any, mediaType: 'video/mp4' },
-              { type: 'text', text: buildVerifyPositionsUserPrompt(
-                toVerify.map((s, i) => ({
-                  index: i,
-                  positionId: s.positionId,
-                  userRole: s.userRole,
-                  dominance: s.dominance,
-                  startSeconds: s.startSeconds,
-                  endSeconds: s.endSeconds,
-                  confidence: s.confidence,
-                }))
-              )},
-            ],
-          }],
-        })
-        verifyObject = result.object
-        verifyUsage = result.usage
+        if (isYouTube) {
+          const result = await geminiVideoObject(GEMINI_VIDEO_MODEL, {
+            system: buildVerifyPositionsSystemPrompt(),
+            videoUrl: geminiFileUri,
+            videoOptions: {
+              startSeconds: videoStartSeconds ?? undefined,
+              endSeconds: videoEndSeconds ?? undefined,
+            },
+            userPrompt: verifyPrompt,
+            schema: PositionVerificationSchema,
+          })
+          verifyObject = result.object
+          verifyUsage = result.usage
+        } else {
+          const result = await generateObject({
+            model: google(GEMINI_VIDEO_MODEL),
+            schema: PositionVerificationSchema,
+            maxRetries: 0,
+            system: buildVerifyPositionsSystemPrompt(),
+            messages: [{
+              role: 'user',
+              content: [
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                { type: 'file', data: new URL(geminiFileUri) as any, mediaType: 'video/mp4' },
+                { type: 'text', text: verifyPrompt },
+              ],
+            }],
+          })
+          verifyObject = result.object
+          verifyUsage = { inputTokens: result.usage.inputTokens ?? 0, outputTokens: result.usage.outputTokens ?? 0 }
+        }
       } catch {
         // Verification is best-effort — don't fail the job
         return { corrections: 0, error: 'verification_failed' }
@@ -317,27 +365,42 @@ export const analyzeVideo = inngest.createFunction(
       // ── Gemini targeted re-scan of flagged windows ────────────────────────
       const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
       const scanStart = Date.now()
-      let scanResult: Awaited<ReturnType<typeof generateObject<typeof SubmissionScanOutputSchema>>>
+      let scanObject: Awaited<ReturnType<typeof geminiVideoObject<typeof SubmissionScanOutputSchema>>>['object']
+      let scanUsage: { inputTokens: number; outputTokens: number }
 
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const scanContent: any[] = [
-          { type: 'file', data: new URL(geminiFileUri) as any, mediaType: (isYouTube ? 'video/mp4' : (video?.contentType ?? 'video/mp4')) as `${string}/${string}` },
-          { type: 'text', text: buildScanSubmissionsUserPrompt(topWindows) },
-        ]
-
-        scanResult = await generateObject({
-          model: google(GEMINI_VIDEO_MODEL),
-          schema: SubmissionScanOutputSchema,
-          maxRetries: 0,
-          system: buildScanSubmissionsSystemPrompt(positionTechniqueBlock),
-          messages: [{ role: 'user', content: scanContent }],
-        })
+        if (isYouTube) {
+          const result = await geminiVideoObject(GEMINI_VIDEO_MODEL, {
+            system: buildScanSubmissionsSystemPrompt(positionTechniqueBlock),
+            videoUrl: geminiFileUri,
+            videoOptions: {
+              startSeconds: videoStartSeconds ?? undefined,
+              endSeconds: videoEndSeconds ?? undefined,
+            },
+            userPrompt: buildScanSubmissionsUserPrompt(topWindows),
+            schema: SubmissionScanOutputSchema,
+          })
+          scanObject = result.object
+          scanUsage = result.usage
+        } else {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const scanContent: any[] = [
+            { type: 'file', data: new URL(geminiFileUri) as any, mediaType: (video?.contentType ?? 'video/mp4') as `${string}/${string}` },
+            { type: 'text', text: buildScanSubmissionsUserPrompt(topWindows) },
+          ]
+          const result = await generateObject({
+            model: google(GEMINI_VIDEO_MODEL),
+            schema: SubmissionScanOutputSchema,
+            maxRetries: 0,
+            system: buildScanSubmissionsSystemPrompt(positionTechniqueBlock),
+            messages: [{ role: 'user', content: scanContent }],
+          })
+          scanObject = result.object
+          scanUsage = { inputTokens: result.usage.inputTokens ?? 0, outputTokens: result.usage.outputTokens ?? 0 }
+        }
       } catch {
         return { suspicious: suspicious.length, scanned: 0, error: 'scan_failed' }
       }
-
-      const { object: scanObject, usage: scanUsage } = scanResult
 
       await db.insert(aiCallLogs).values({
         userId: matchUserId ?? null,
