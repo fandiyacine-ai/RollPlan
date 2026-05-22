@@ -77,6 +77,8 @@ export default async function MatchesPage() {
       createdAt: matches.createdAt,
       videoPublicUrl: videos.publicUrl,
       sourceType: videos.sourceType,
+      kbUpgradedAt: matches.kbUpgradedAt,
+      kbUpgradeSeenAt: matches.kbUpgradeSeenAt,
     })
     .from(matches)
     .leftJoin(videos, eq(matches.videoId, videos.id))
@@ -299,6 +301,7 @@ export default async function MatchesPage() {
                         segments={matchSegs}
                         insightsList={matchInsightsList}
                         deleteButton={<DeleteMatchButton matchId={match.id} videoId={match.videoId ?? ''} />}
+                        upgraded={!!(match.kbUpgradedAt && (!match.kbUpgradeSeenAt || match.kbUpgradedAt > match.kbUpgradeSeenAt))}
                       />
                     </div>
                   </React.Fragment>
@@ -318,6 +321,7 @@ function MatchCard({
   segments,
   insightsList,
   deleteButton,
+  upgraded,
 }: {
   match: {
     id: string; videoId: string | null; status: string; format: string; context: string
@@ -328,6 +332,7 @@ function MatchCard({
   segments: { endSeconds: number; startSeconds: number; positionId: string; dominance: string }[]
   insightsList: { id: string; category: string; description: string; confidence: number }[]
   deleteButton: React.ReactNode
+  upgraded?: boolean
 }) {
   const isAnalysed = match.status === 'analysed'
   const title = matchTitle({ ...match, sourceType: match.sourceType })
@@ -400,6 +405,11 @@ function MatchCard({
               </div>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
+              {upgraded && (
+                <span className="text-[10px] font-semibold tracking-wide px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500 border border-amber-500/20">
+                  UPGRADED
+                </span>
+              )}
               {!isAnalysed && (
                 <span className={`text-xs font-medium ${
                   match.status === 'failed' ? 'text-rose-500' : 'text-muted-foreground'

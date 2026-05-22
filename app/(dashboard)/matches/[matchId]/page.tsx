@@ -10,6 +10,7 @@ import { ShareButton } from './share-button'
 import { CorrectResultButton } from './correct-result-button'
 import { ScoutingView } from './scouting-view'
 import { ReanalyzeButton } from './reanalyze-button'
+import { MarkUpgradeSeen } from './mark-upgrade-seen'
 import { POSITIONS } from '../../../../lib/taxonomy/positions'
 import { EVENT_TYPES } from '../../../../lib/taxonomy/events'
 import { auth } from '@clerk/nextjs/server'
@@ -242,6 +243,33 @@ export default async function MatchDetailPage({
           </div>
         </div>
       </div>
+
+      {/* KB upgrade banner — shown until user has seen it */}
+      {match.kbUpgradedAt && (!match.kbUpgradeSeenAt || match.kbUpgradedAt > match.kbUpgradeSeenAt) && (
+        <>
+          <MarkUpgradeSeen matchId={matchId} />
+          <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-4 py-3 flex items-start gap-3">
+            <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/>
+              <circle cx="8" cy="8" r="3"/>
+            </svg>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-amber-500">Analysis upgraded</p>
+              {match.kbChangelog && match.kbChangelog.length > 0 && (
+                <div className="mt-1.5 space-y-1">
+                  {match.kbChangelog.map((entry, i) => (
+                    <p key={i} className="text-xs text-muted-foreground">
+                      <span className="text-foreground/70">{new Date(entry.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+                      {' — '}+{entry.added} event{entry.added !== 1 ? 's' : ''} detected
+                      {entry.summary ? `: ${entry.summary}` : ''}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Processing state */}
       {(match.status === 'pending' || match.status === 'processing') && (

@@ -224,6 +224,7 @@ export const techniqueKbAgent = inngest.createFunction(
     concurrency: { limit: 1 },                           // never run two at once
   },
   async ({ step }: { step: any }) => {
+    const runStartedAt = new Date().toISOString()
 
     const result = await step.run('run-agent', async () => {
       const state = { searchCount: 0, queuedCount: 0, queuedUrls: new Set<string>() }
@@ -284,6 +285,17 @@ Be efficient — one good search per gap, queue 1–2 videos, move on. Don't ove
         summary: text,
       }
     })
+
+    // Fire the rescan job if anything was queued — it will wait 3h for ingest
+    // to complete, then upgrade all YouTube matches with the new variants.
+    if (result.videosQueued > 0) {
+      await step.run('fire-rescan-event', async () => {
+        await inngest.send({
+          name: 'technique/kb-upgraded',
+          data: { startedAt: runStartedAt, videosQueued: result.videosQueued },
+        })
+      })
+    }
 
     return result
   }

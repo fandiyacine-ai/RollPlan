@@ -41,6 +41,8 @@ function GameCard({
   prediction,
   matchCount,
   matchSources,
+  hasUpgrade,
+  lastUpgradedAt,
 }: {
   opponent: { id: string; opponentLabel: string }
   tournamentId: string
@@ -48,6 +50,8 @@ function GameCard({
   prediction: MatchupPrediction | null
   matchCount: number
   matchSources: string[]
+  hasUpgrade?: boolean
+  lastUpgradedAt?: Date | null
 }) {
   const confidence: 'low' | 'medium' | 'high' | null = prediction?.confidence
     ?? (matchCount >= 3 ? 'high' : matchCount >= 1 ? 'medium' : null)
@@ -59,8 +63,22 @@ function GameCard({
     >
       {/* Header bar */}
       <div className="px-4 pt-4 pb-3 border-b border-border/40 flex items-start justify-between gap-2">
-        <p className="font-semibold text-sm leading-tight">{opponent.opponentLabel}</p>
-        <ConfidenceDots level={confidence} />
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-sm leading-tight">{opponent.opponentLabel}</p>
+          {hasUpgrade && lastUpgradedAt && (
+            <p className="text-[10px] text-amber-500 mt-0.5">
+              Analysis upgraded · {lastUpgradedAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {hasUpgrade && (
+            <span className="text-[9px] font-bold tracking-wide px-1 py-0.5 rounded bg-amber-500/15 text-amber-500 border border-amber-500/20">
+              NEW
+            </span>
+          )}
+          <ConfidenceDots level={confidence} />
+        </div>
       </div>
 
       <div className="p-4 space-y-4">
@@ -191,7 +209,7 @@ export default async function GameplansPage() {
             .limit(1)
 
           const scoutedMatches = await db
-            .select({ eventName: matches.eventName, status: matches.status })
+            .select({ eventName: matches.eventName, status: matches.status, kbUpgradedAt: matches.kbUpgradedAt, kbUpgradeSeenAt: matches.kbUpgradeSeenAt })
             .from(matches)
             .where(eq(matches.tournamentOpponentId, opp.id))
 
@@ -203,12 +221,22 @@ export default async function GameplansPage() {
             .filter(m => m.status === 'analysed')
             .map(m => m.eventName ?? 'Competition footage')
 
+          const hasUpgrade = scoutedMatches.some(m =>
+            m.kbUpgradedAt && (!m.kbUpgradeSeenAt || m.kbUpgradedAt > m.kbUpgradeSeenAt)
+          )
+          const lastUpgradedAt = scoutedMatches
+            .map(m => m.kbUpgradedAt)
+            .filter(Boolean)
+            .sort((a, b) => b!.getTime() - a!.getTime())[0] ?? null
+
           return {
             opponent: opp,
             plan,
             prediction: (gp?.prediction ?? null) as MatchupPrediction | null,
             matchCount: scoutedMatches.length,
             matchSources,
+            hasUpgrade,
+            lastUpgradedAt,
           }
         })
       )
@@ -313,7 +341,7 @@ export default async function GameplansPage() {
                     return (
                       <>
                         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                          {withData.map(({ opponent, plan, prediction, matchCount, matchSources }) => (
+                          {withData.map(({ opponent, plan, prediction, matchCount, matchSources, hasUpgrade, lastUpgradedAt }) => (
                             <GameCard
                               key={opponent.id}
                               opponent={opponent}
@@ -322,6 +350,8 @@ export default async function GameplansPage() {
                               prediction={prediction}
                               matchCount={matchCount}
                               matchSources={matchSources}
+                              hasUpgrade={hasUpgrade}
+                              lastUpgradedAt={lastUpgradedAt}
                             />
                           ))}
                         </div>
