@@ -305,28 +305,51 @@ function PredictionTab({ insights, opponentName }: { insights: InsightRow[]; opp
 
   return (
     <div className="p-4 space-y-5">
-      {/* Can't predict without user footage */}
-      <div className="rounded-xl border border-dashed border-border/60 p-5 space-y-3 text-center">
-        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-muted-foreground">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
+      {/* Footage invite — recruitment opportunity */}
+      <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-5 space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-lg bg-amber-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-4.5 h-4.5 text-amber-400">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold leading-tight">
+              Your prediction could be sharper
+            </p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              We know {opponentName}'s tendencies inside out — but a real matchup prediction means comparing their game against <em>yours</em>. Right now we're only seeing half the picture.
+            </p>
+          </div>
         </div>
-        <div>
-          <p className="text-sm font-semibold">Prediction needs your footage</p>
-          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-            We know {opponentName}'s patterns — but to predict a match outcome we need to compare them against your game. Upload your own matches to unlock this.
+
+        <div className="space-y-2">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-amber-500/70">
+            Unlock with your footage
           </p>
+          {[
+            'Win probability based on your actual positions',
+            'Where their attacks meet your defence',
+            'Your submission entries vs. their guard patterns',
+          ].map((benefit, i) => (
+            <div key={i} className="flex items-start gap-2 text-xs text-foreground/70">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              {benefit}
+            </div>
+          ))}
         </div>
+
         <a
           href="/matches"
-          className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-border/60 hover:bg-muted transition-colors"
+          className="flex items-center justify-center gap-2 text-xs font-semibold px-4 py-2.5 rounded-lg bg-amber-500 text-zinc-950 hover:bg-amber-400 transition-colors w-full"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
             <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
           </svg>
-          Analyse my matches
+          Upload my footage
         </a>
       </div>
 
