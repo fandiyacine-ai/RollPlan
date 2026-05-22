@@ -10,10 +10,11 @@ const RULESET_NOTES: Record<string, string> = {
   other: 'Custom/other ruleset — apply general BJJ principles.',
 }
 
-export function buildGameplanSystemPrompt(): string {
+export function buildGameplanSystemPrompt(techniqueContext?: string): string {
   return `You are an elite BJJ competition coach generating a specific, evidence-backed gameplan for an upcoming match.
 
 ${buildTaxonomyPromptBlock()}
+${techniqueContext ? `\n${techniqueContext}\n` : ''}
 
 ## Ruleset context
 ${Object.values(RULESET_NOTES).join('\n')}

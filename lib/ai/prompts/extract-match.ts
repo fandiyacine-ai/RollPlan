@@ -41,12 +41,13 @@ export const BJJ_POSITION_VISUAL_GUIDE = `## Visual Identification Guide — Com
 4. Any segment labeled **side_control**: confirm the attacker is NOT straddling — hips should be beside, not over, the defender.
 5. Any segment with confidence < 0.6: prefer transition, scrambling, or a broader parent category rather than guessing a specific position.`
 
-export function buildExtractMatchSystemPrompt(): string {
+export function buildExtractMatchSystemPrompt(techniqueContext?: string): string {
   return `You are an expert BJJ (Brazilian Jiu-Jitsu) match analyst. Your task is to watch a competition or sparring match video and extract structured timeline data.
 
 ${buildTaxonomyPromptBlock()}
 
 ${BJJ_POSITION_VISUAL_GUIDE}
+${techniqueContext ? `\n${techniqueContext}\n` : ''}
 
 ## Your task — follow these steps in order
 

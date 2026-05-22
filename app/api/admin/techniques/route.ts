@@ -1,0 +1,69 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@clerk/nextjs/server'
+import { db } from '../../../../lib/db'
+import { techniqueVariants } from '../../../../lib/db/schema'
+import { eq } from 'drizzle-orm'
+import { inngest } from '../../../../lib/inngest'
+
+function isAdmin(clerkId: string | null) {
+  const adminId = process.env.ADMIN_CLERK_USER_ID
+  return !!adminId && clerkId === adminId
+}
+
+// GET /api/admin/techniques — list all variants
+export async function GET() {
+  const { userId } = await auth()
+  if (!isAdmin(userId)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const variants = await db.query.techniqueVariants.findMany({
+    orderBy: (t, { desc }) => [desc(t.createdAt)],
+  })
+  return NextResponse.json(variants)
+}
+
+// POST /api/admin/techniques — trigger ingest from YouTube URL
+export async function POST(req: NextRequest) {
+  const { userId } = await auth()
+  if (!isAdmin(userId)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const { youtubeUrl, techniqueHint, positionHint } = await req.json()
+  if (!youtubeUrl?.trim()) return NextResponse.json({ error: 'youtubeUrl required' }, { status: 400 })
+
+  await inngest.send({
+    name: 'technique/ingest-requested',
+    data: { youtubeUrl, techniqueHint, positionHint, requestedByUserId: userId! },
+  })
+
+  return NextResponse.json({ queued: true })
+}
+
+// PATCH /api/admin/techniques — update a variant (approve, reject, edit)
+export async function PATCH(req: NextRequest) {
+  const { userId } = await auth()
+  if (!isAdmin(userId)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const { id, ...updates } = await req.json()
+  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+
+  const allowed = ['status', 'name', 'visualCues', 'counters', 'adminNotes', 'format', 'positionId', 'eventId', 'referenceImageUrl']
+  const safe = Object.fromEntries(Object.entries(updates).filter(([k]) => allowed.includes(k)))
+
+  const [updated] = await db.update(techniqueVariants)
+    .set({ ...safe, updatedAt: new Date() })
+    .where(eq(techniqueVariants.id, id))
+    .returning()
+
+  return NextResponse.json(updated)
+}
+
+// DELETE /api/admin/techniques?id=... — delete a variant
+export async function DELETE(req: NextRequest) {
+  const { userId } = await auth()
+  if (!isAdmin(userId)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const id = req.nextUrl.searchParams.get('id')
+  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+
+  await db.delete(techniqueVariants).where(eq(techniqueVariants.id, id))
+  return NextResponse.json({ deleted: true })
+}

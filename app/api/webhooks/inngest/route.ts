@@ -8,10 +8,11 @@ import { smoothcompProcessBracket } from '../../../../jobs/smoothcomp-process-br
 import { smoothcompDiscoverFootage } from '../../../../jobs/smoothcomp-discover-footage'
 import { generateExecutionDebrief } from '../../../../jobs/generate-execution-debrief'
 import { syncTournamentCatalog } from '../../../../jobs/sync-tournament-catalog'
+import { ingestTechnique } from '../../../../jobs/ingest-technique'
 
 export const maxDuration = 300
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [analyzeVideo, generateGameplan, scanUrl, smoothcompMonitorBracket, smoothcompProcessBracket, smoothcompDiscoverFootage, generateExecutionDebrief, syncTournamentCatalog],
+  functions: [analyzeVideo, generateGameplan, scanUrl, smoothcompMonitorBracket, smoothcompProcessBracket, smoothcompDiscoverFootage, generateExecutionDebrief, syncTournamentCatalog, ingestTechnique],
 })

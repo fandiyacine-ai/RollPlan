@@ -9,6 +9,7 @@ import { MatchupPredictionSchema, MatchupPrediction } from '../lib/ai/schemas/pr
 import { buildGameplanSystemPrompt, buildGameplanUserPrompt, GENERATE_GAMEPLAN_PROMPT_VERSION } from '../lib/ai/prompts/generate-gameplan'
 import { buildPredictionSystemPrompt, buildPredictionUserPrompt, GENERATE_PREDICTION_PROMPT_VERSION } from '../lib/ai/prompts/generate-prediction'
 import { createNotification } from '../lib/db/notifications'
+import { getTechniqueVariantsByEvents, formatVariantsAsPromptBlock, formatVariantsAsCounterGuide } from '../lib/ai/technique-retrieval'
 
 type MatchStats = {
   matchCount: number
@@ -189,11 +190,23 @@ export const generateGameplan = inngest.createFunction(
 
     const { plan, usage, latencyMs } = await step.run('synthesise-gameplan', async () => {
       const start = Date.now()
+
+      // Fetch technique context for opponent's observed submissions + athlete's observed submissions
+      const opponentEventIds = gameplanData.opponentMatches.flatMap(m => m.events.map((e: { eventTypeId: string }) => e.eventTypeId))
+      const userEventIds = gameplanData.yourMatches.flatMap(m => m.events.map((e: { eventTypeId: string }) => e.eventTypeId))
+      const allEventIds = [...new Set([...opponentEventIds, ...userEventIds])]
+      const matchFormat = gameplanData.tournament.format as 'gi' | 'no_gi'
+      const techniqueVariants = await getTechniqueVariantsByEvents(allEventIds, matchFormat)
+      const techniqueContext = [
+        formatVariantsAsPromptBlock(techniqueVariants),
+        formatVariantsAsCounterGuide(techniqueVariants),
+      ].filter(Boolean).join('\n\n')
+
       const { object, usage } = await generateObject({
         model: anthropic(CLAUDE_SYNTHESIS_MODEL),
         schema: GameplanOutputSchema,
         maxRetries: 0,
-        system: buildGameplanSystemPrompt(),
+        system: buildGameplanSystemPrompt(techniqueContext),
         prompt: buildGameplanUserPrompt(gameplanData),
       })
       return { plan: object, usage, latencyMs: Date.now() - start }

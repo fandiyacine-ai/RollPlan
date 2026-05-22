@@ -16,6 +16,7 @@ import { buildReviewEventsSystemPrompt, buildReviewEventsUserPrompt, REVIEW_EVEN
 import { buildScanSubmissionsSystemPrompt, buildScanSubmissionsUserPrompt, SCAN_SUBMISSIONS_PROMPT_VERSION } from '../lib/ai/prompts/scan-submissions'
 import { EventReviewOutputSchema } from '../lib/ai/schemas/event-review'
 import { SubmissionScanOutputSchema } from '../lib/ai/schemas/submission-scan'
+import { getTechniqueVariantsForAnalysis, formatVariantsAsPromptBlock } from '../lib/ai/technique-retrieval'
 
 const CONFUSION_PRONE = new Set([
   'closed_guard', 'back_control', 'mount', 'side_control',
@@ -71,10 +72,23 @@ export const analyzeVideo = inngest.createFunction(
       let object: Awaited<ReturnType<typeof generateObject<typeof MatchExtractionOutputSchema>>>['object']
       let usage: Awaited<ReturnType<typeof generateObject<typeof MatchExtractionOutputSchema>>>['usage']
 
+      // Fetch active technique variants for this match format — inject as visual reference
+      const techniqueVariants = await getTechniqueVariantsForAnalysis(match.format)
+      const techniquePromptBlock = formatVariantsAsPromptBlock(techniqueVariants)
+
       const start = Date.now()
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const extractContent: any[] = []
+
+        // Technique reference images — visual anchors for submission detection
+        for (const variant of techniqueVariants) {
+          if (variant.referenceImageUrl) {
+            extractContent.push({ type: 'image', image: variant.referenceImageUrl })
+            extractContent.push({ type: 'text', text: `↑ TECHNIQUE REFERENCE: ${variant.name}. ${variant.visualCues.slice(0, 200)}` })
+          }
+        }
+
         if (athleteImageBase64) {
           extractContent.push({ type: 'image', image: `data:image/jpeg;base64,${athleteImageBase64}` })
           extractContent.push({ type: 'text', text: '↑ IDENTITY REFERENCE FRAME. The red "⬅ YOU" box marks the ONLY athlete to label as "user" for the ENTIRE match. The other athlete is ALWAYS "opponent". Use this annotated frame as your identity anchor — do not swap these roles at any point.' })
@@ -95,7 +109,7 @@ export const analyzeVideo = inngest.createFunction(
           model: google(GEMINI_VIDEO_MODEL),
           schema: MatchExtractionOutputSchema,
           maxRetries: 0,
-          system: buildExtractMatchSystemPrompt(),
+          system: buildExtractMatchSystemPrompt(techniquePromptBlock),
           messages: [{ role: 'user', content: extractContent }],
         })
         object = result.object

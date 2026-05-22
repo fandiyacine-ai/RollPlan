@@ -4,6 +4,7 @@ import { anthropic, CLAUDE_SYNTHESIS_MODEL } from '../../../lib/ai/clients'
 import { db } from '../../../lib/db'
 import { matches, videos, positionSegments, matchEvents, insights } from '../../../lib/db/schema'
 import { eq, asc } from 'drizzle-orm'
+import { getTechniqueVariantsByEvents, formatVariantsAsPromptBlock, formatVariantsAsCounterGuide } from '../../../lib/ai/technique-retrieval'
 
 export const maxDuration = 30
 
@@ -33,6 +34,13 @@ export async function POST(req: NextRequest) {
     db.select().from(insights).where(eq(insights.matchId, matchId)),
   ])
 
+  // Fetch technique knowledge relevant to this match's observed events
+  const observedEventIds = [...new Set(events.map(e => e.eventTypeId))]
+  const techniqueVariants = await getTechniqueVariantsByEvents(
+    observedEventIds,
+    match.format as 'gi' | 'no_gi'
+  )
+
   const nearbySegments = segments.filter(s =>
     s.startSeconds <= currentTimestampSeconds + 30 && s.endSeconds >= currentTimestampSeconds - 30
   )
@@ -58,7 +66,11 @@ export async function POST(req: NextRequest) {
     ? nearbyEvents.map(e => `${e.eventTypeId} by ${e.actor} — ${e.outcome}`).join(', ')
     : 'none'
 
+  const techniqueBlock = formatVariantsAsPromptBlock(techniqueVariants)
+  const counterBlock = formatVariantsAsCounterGuide(techniqueVariants)
+
   const system = `You are an expert BJJ coach reviewing match footage side-by-side with your athlete. You have access to the full match analysis.
+${techniqueBlock ? `\n${techniqueBlock}\n` : ''}${counterBlock ? `\n${counterBlock}\n` : ''}
 
 Match: ${match.format === 'no_gi' ? 'No-Gi' : 'Gi'} ${match.context}${match.eventName ? ` — ${match.eventName}` : ''}
 Athlete: ${match.competitorLabel ?? 'your athlete'} vs ${match.opponentLabel}
