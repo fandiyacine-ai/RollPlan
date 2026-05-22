@@ -624,7 +624,7 @@ export const scanUrl = inngest.createFunction(
               model: anthropic(CLAUDE_SYNTHESIS_MODEL),
               schema: InsightsOutputSchema,
               maxRetries: 0,
-              system: buildGenerateInsightsSystemPrompt(),
+              system: buildGenerateInsightsSystemPrompt(athleteName, found.opponent_name || 'opponent'),
               prompt: JSON.stringify(matchData),
             })
 

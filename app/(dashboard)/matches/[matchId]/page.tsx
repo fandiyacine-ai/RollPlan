@@ -316,6 +316,7 @@ export default async function MatchDetailPage({
             videoUrl={video?.publicUrl ?? null}
             matchInsights={matchInsights}
             timelineItems={timelineItems}
+            matchId={match.id}
             competitorLabel={match.tournamentOpponentId ? match.competitorLabel : null}
             opponentLabel={match.tournamentOpponentId ? match.opponentLabel : null}
             segments={segments.map((s) => ({
