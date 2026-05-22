@@ -17,6 +17,7 @@ import { buildScanSubmissionsSystemPrompt, buildScanSubmissionsUserPrompt, SCAN_
 import { EventReviewOutputSchema } from '../lib/ai/schemas/event-review'
 import { SubmissionScanOutputSchema } from '../lib/ai/schemas/submission-scan'
 import { getTechniqueVariantsForExtraction, getTechniqueVariantsForPositions, formatVariantsAsPromptBlock } from '../lib/ai/technique-retrieval'
+import { isYouTubeUrl } from '../lib/gemini-video'
 
 const CONFUSION_PRONE = new Set([
   'closed_guard', 'back_control', 'mount', 'side_control',
@@ -50,13 +51,16 @@ export const analyzeVideo = inngest.createFunction(
       return { thumbnailKey: null }
     })
 
-    // Upload video to Gemini Files API — streams from R2 to disk to Google,
-    // never loading the full file into Node.js heap
-    const { geminiFileUri } = await step.run('upload-to-gemini', async () => {
+    // Upload video to Gemini Files API (R2 videos) or pass YouTube URL directly.
+    // YouTube URLs work natively with Gemini — no upload or cleanup needed.
+    const { geminiFileUri, isYouTube } = await step.run('upload-to-gemini', async () => {
       const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
       if (!video?.publicUrl) throw new Error('Video has no public URL')
+      if (isYouTubeUrl(video.publicUrl)) {
+        return { geminiFileUri: video.publicUrl, isYouTube: true }
+      }
       const geminiFileUri = await uploadVideoToGemini(video.publicUrl, video.contentType)
-      return { geminiFileUri }
+      return { geminiFileUri, isYouTube: false }
     })
 
     const { matchUserId } = await step.run('extract-positions-events', async () => {
@@ -93,7 +97,8 @@ export const analyzeVideo = inngest.createFunction(
           extractContent.push({ type: 'image', image: `data:image/jpeg;base64,${athleteImageBase64}` })
           extractContent.push({ type: 'text', text: '↑ IDENTITY REFERENCE FRAME. The red "⬅ YOU" box marks the ONLY athlete to label as "user" for the ENTIRE match. The other athlete is ALWAYS "opponent". Use this annotated frame as your identity anchor — do not swap these roles at any point.' })
         }
-        extractContent.push({ type: 'file', data: new URL(geminiFileUri), mediaType: video.contentType as `${string}/${string}` })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        extractContent.push({ type: 'file', data: new URL(geminiFileUri) as any, mediaType: (isYouTube ? 'video/mp4' : video.contentType) as `${string}/${string}` })
         extractContent.push({
           type: 'text',
           text: buildExtractMatchUserPrompt({
@@ -191,7 +196,8 @@ export const analyzeVideo = inngest.createFunction(
           messages: [{
             role: 'user',
             content: [
-              { type: 'file', data: new URL(geminiFileUri), mediaType: 'video/mp4' },
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              { type: 'file', data: new URL(geminiFileUri) as any, mediaType: 'video/mp4' },
               { type: 'text', text: buildVerifyPositionsUserPrompt(
                 toVerify.map((s, i) => ({
                   index: i,
@@ -316,7 +322,7 @@ export const analyzeVideo = inngest.createFunction(
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const scanContent: any[] = [
-          { type: 'file', data: new URL(geminiFileUri), mediaType: (video?.contentType ?? 'video/mp4') as `${string}/${string}` },
+          { type: 'file', data: new URL(geminiFileUri) as any, mediaType: (isYouTube ? 'video/mp4' : (video?.contentType ?? 'video/mp4')) as `${string}/${string}` },
           { type: 'text', text: buildScanSubmissionsUserPrompt(topWindows) },
         ]
 
@@ -457,7 +463,7 @@ export const analyzeVideo = inngest.createFunction(
     })
 
     await step.run('cleanup-gemini-file', async () => {
-      await deleteGeminiFile(geminiFileUri)
+      if (!isYouTube) await deleteGeminiFile(geminiFileUri)
     })
   }
 )
