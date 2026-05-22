@@ -12,6 +12,10 @@ import { InsightsOutputSchema } from '../lib/ai/schemas/insights'
 import { buildExtractMatchSystemPrompt, buildExtractMatchUserPrompt, EXTRACT_MATCH_PROMPT_VERSION } from '../lib/ai/prompts/extract-match'
 import { buildVerifyPositionsSystemPrompt, buildVerifyPositionsUserPrompt, VERIFY_POSITIONS_PROMPT_VERSION } from '../lib/ai/prompts/verify-positions'
 import { buildGenerateInsightsSystemPrompt, GENERATE_INSIGHTS_PROMPT_VERSION } from '../lib/ai/prompts/generate-insights'
+import { buildReviewEventsSystemPrompt, buildReviewEventsUserPrompt, REVIEW_EVENTS_PROMPT_VERSION } from '../lib/ai/prompts/review-events'
+import { buildScanSubmissionsSystemPrompt, buildScanSubmissionsUserPrompt, SCAN_SUBMISSIONS_PROMPT_VERSION } from '../lib/ai/prompts/scan-submissions'
+import { EventReviewOutputSchema } from '../lib/ai/schemas/event-review'
+import { SubmissionScanOutputSchema } from '../lib/ai/schemas/submission-scan'
 
 const CONFUSION_PRONE = new Set([
   'closed_guard', 'back_control', 'mount', 'side_control',
@@ -222,6 +226,125 @@ export const analyzeVideo = inngest.createFunction(
       })
 
       return { corrections, reviewed: toVerify.length }
+    })
+
+    // ── Level 2 review: Claude flags gaps → Gemini re-scans ──────────────────
+    await step.run('review-events-claude', async () => {
+      const [allSegments, allEvents] = await Promise.all([
+        db.query.positionSegments.findMany({ where: eq(positionSegments.matchId, matchId) }),
+        db.query.matchEvents.findMany({ where: eq(matchEvents.matchId, matchId) }),
+      ])
+
+      const start = Date.now()
+      let reviewResult: Awaited<ReturnType<typeof generateObject<typeof EventReviewOutputSchema>>>
+
+      try {
+        reviewResult = await generateObject({
+          model: anthropic(CLAUDE_SYNTHESIS_MODEL),
+          schema: EventReviewOutputSchema,
+          maxRetries: 0,
+          system: buildReviewEventsSystemPrompt(),
+          prompt: buildReviewEventsUserPrompt({
+            segments: allSegments.map(s => ({
+              start_seconds: s.startSeconds,
+              end_seconds: s.endSeconds,
+              position_id: s.positionId,
+              user_role: s.userRole,
+              dominance: s.dominance,
+            })),
+            events: allEvents.map(e => ({
+              timestamp_seconds: e.timestampSeconds,
+              event_type_id: e.eventTypeId,
+              actor: e.actor,
+              outcome: e.outcome,
+            })),
+          }),
+        })
+      } catch {
+        return { suspicious: 0, error: 'review_failed' }
+      }
+
+      const { object, usage } = reviewResult
+      const suspicious = object.suspicious_windows
+
+      await db.insert(aiCallLogs).values({
+        userId: matchUserId ?? null,
+        jobId: matchId,
+        model: CLAUDE_SYNTHESIS_MODEL,
+        promptVersion: REVIEW_EVENTS_PROMPT_VERSION,
+        tokensIn: usage.inputTokens ?? 0,
+        tokensOut: usage.outputTokens ?? 0,
+        costUsdEstimate: estimateCostUsd(CLAUDE_SYNTHESIS_MODEL, usage.inputTokens ?? 0, usage.outputTokens ?? 0),
+        latencyMs: Date.now() - start,
+        status: 'success',
+      })
+
+      if (suspicious.length === 0) return { suspicious: 0 }
+
+      // ── Gemini targeted re-scan of flagged windows ────────────────────────
+      const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
+      const scanStart = Date.now()
+      let scanResult: Awaited<ReturnType<typeof generateObject<typeof SubmissionScanOutputSchema>>>
+
+      try {
+        scanResult = await generateObject({
+          model: google(GEMINI_VIDEO_MODEL),
+          schema: SubmissionScanOutputSchema,
+          maxRetries: 0,
+          system: buildScanSubmissionsSystemPrompt(),
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'file', data: new URL(geminiFileUri), mediaType: (video?.contentType ?? 'video/mp4') as `${string}/${string}` },
+              { type: 'text', text: buildScanSubmissionsUserPrompt(suspicious) },
+            ],
+          }],
+        })
+      } catch {
+        return { suspicious: suspicious.length, scanned: 0, error: 'scan_failed' }
+      }
+
+      const { object: scanObject, usage: scanUsage } = scanResult
+
+      await db.insert(aiCallLogs).values({
+        userId: matchUserId ?? null,
+        jobId: matchId,
+        model: GEMINI_VIDEO_MODEL,
+        promptVersion: SCAN_SUBMISSIONS_PROMPT_VERSION,
+        tokensIn: scanUsage.inputTokens ?? 0,
+        tokensOut: scanUsage.outputTokens ?? 0,
+        costUsdEstimate: estimateCostUsd(GEMINI_VIDEO_MODEL, scanUsage.inputTokens ?? 0, scanUsage.outputTokens ?? 0),
+        latencyMs: Date.now() - scanStart,
+        status: 'success',
+      })
+
+      if (scanObject.events.length === 0) return { suspicious: suspicious.length, added: 0 }
+
+      // Deduplicate against existing events (skip if same type within ±10s)
+      const existingEvents = await db.query.matchEvents.findMany({ where: eq(matchEvents.matchId, matchId) })
+      const newEvents = scanObject.events.filter(ev =>
+        ev.confidence >= 0.65 &&
+        !existingEvents.some(ex =>
+          ex.eventTypeId === ev.event_type_id &&
+          Math.abs(ex.timestampSeconds - ev.timestamp_seconds) <= 10
+        )
+      )
+
+      if (newEvents.length > 0) {
+        await db.insert(matchEvents).values(
+          newEvents.map(ev => ({
+            matchId,
+            timestampSeconds: ev.timestamp_seconds,
+            eventTypeId: ev.event_type_id,
+            actor: ev.actor,
+            outcome: ev.outcome ?? 'ongoing',
+            techniqueLabel: ev.technique_label ?? null,
+            confidence: ev.confidence,
+          }))
+        )
+      }
+
+      return { suspicious: suspicious.length, scanned: scanObject.events.length, added: newEvents.length }
     })
 
     await step.run('generate-insights', async () => {

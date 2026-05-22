@@ -1,6 +1,6 @@
 import { buildTaxonomyPromptBlock } from '../../taxonomy'
 
-export const EXTRACT_MATCH_PROMPT_VERSION = 'v6'
+export const EXTRACT_MATCH_PROMPT_VERSION = 'v7'
 
 export const BJJ_POSITION_VISUAL_GUIDE = `## Visual Identification Guide — Commonly Confused Positions
 
@@ -78,11 +78,34 @@ From the outcome screen found in Step 1, populate match_result: winner ("user" o
 
 ### Step 4 — Identify events
 
-Identify discrete events (submission attempts, sweeps, passes, takedowns, escapes, etc.).
+Identify discrete events: submission attempts, sweeps, guard passes, takedowns, escapes, back takes, guard pulls, etc.
+
+**Submission attempt detection — fire on the SETUP, not just the tap:**
+
+Record a submission event as soon as you observe the isolating grip or positional threat — even if the opponent escapes within 1–2 seconds. A failed attempt is still a real event; use outcome="escaped".
+
+Visual signals for each type:
+- **armbar**: top or bottom athlete isolates ONE opponent arm across their centreline — one hand gripping the wrist, other arm or body controlling the elbow. They may lean back or extend. Key moment: the moment the arm is pulled away from the opponent's body and aligned with the attacker's hips. Record even if the opponent bridges out immediately.
+- **triangle**: athlete's legs close in a figure-four around the opponent's head and one arm — one leg crossing behind the neck, the other locking behind the first knee. Record when the leg crosses behind the head/neck.
+- **kimura**: figure-four double grip on the opponent's wrist with the elbow bent — same-side hand grips attacker's own wrist behind the opponent's wrist. Record when the double grip is established.
+- **omoplata**: athlete's leg wraps over the opponent's shoulder/tricep from guard, threatening the shoulder. Record when the leg locks across the shoulder.
+- **rear_naked_choke**: from back_control, attacker slides forearm under the opponent's chin toward the opposite shoulder. Record when the forearm crosses the throat.
+- **guillotine**: arm wraps under the opponent's chin from a front headlock. Record when the arm encircles the neck.
+- **heel_hook / kneebar / leg_lock_other**: any leg entanglement with a joint at risk.
+
+**Mount cycling — special rule:**
+If you observe mount being taken and lost 3 or more times within a 2-minute window (rapid cycling), the top athlete is almost certainly making repeated submission attempts from mount (most commonly armbar). For each mount window in that sequence, look specifically at what the top athlete's hands are doing with the opponent's arm. If you can see any arm isolation — even briefly — record an armbar event with outcome="escaped".
 
 ### Step 5 — Self-review
 
-Apply the self-review checklist above before finalising your output. Output ONLY valid JSON matching the required schema. No prose outside the JSON.
+Apply the self-review checklist above before finalising your output. Then apply these event-specific checks:
+
+**Event self-review:**
+1. If you recorded 3 or more mount_taken events: verify that at least one submission attempt event exists within that window. If the top athlete's hands moved toward the opponent's arm at any point, record the armbar attempt.
+2. If the match ended by submission (method="submission"): confirm there is a corresponding successful submission event near the end of the match. If missing, add it.
+3. If back_control was held for 15+ seconds total: confirm at least one choke attempt is recorded. If not, re-examine those back_control segments.
+
+Output ONLY valid JSON matching the required schema. No prose outside the JSON.
 
 ## Rules
 - NEVER use position or event type IDs not in the taxonomy above.
