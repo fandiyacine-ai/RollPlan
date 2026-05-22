@@ -91,7 +91,9 @@ export default async function GameplanPage({
   const prediction = existingGameplan?.prediction as MatchupPrediction | null ?? null
 
   const isGenerating = existingGameplan?.status === 'generating'
-  const plan = (!isGenerating && existingGameplan?.structuredPlan && Object.keys(existingGameplan.structuredPlan as object).length > 0)
+  // Show the existing committed plan even while regenerating — if Inngest drops the job the
+  // UI doesn't lock up, and users can still read their gameplan while the update runs.
+  const plan = (existingGameplan?.structuredPlan && Object.keys(existingGameplan.structuredPlan as object).length > 0)
     ? existingGameplan.structuredPlan as GameplanOutput
     : null
 
@@ -111,7 +113,10 @@ export default async function GameplanPage({
 
       {scoutedCount === 0 ? (
         <NoFootageState tournamentId={tournamentId} opponentLabel={activeOpponent.opponentLabel} />
-      ) : isGenerating ? (
+      ) : isGenerating && !plan ? (
+        // First-time generation only — no prior plan to fall back on, show skeleton.
+        // Re-generation shows the existing plan with a "Regenerating…" badge instead,
+        // so a stuck Inngest job never locks the UI.
         <GeneratingState opponentLabel={activeOpponent.opponentLabel} athleteName={athleteName} />
       ) : (
         <>
@@ -140,9 +145,15 @@ export default async function GameplanPage({
                 {plan && (
                   <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-foreground/[0.06] text-foreground/60 border border-border/40">AI</span>
                 )}
+                {isGenerating && plan && (
+                  <span className="flex items-center gap-1 text-[9px] font-medium px-1.5 py-0.5 rounded bg-amber-950/40 text-amber-400 border border-amber-800/30">
+                    <span className="inline-flex h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+                    Regenerating…
+                  </span>
+                )}
                 <p className="text-xs text-muted-foreground">
                   {scoutedCount} match{scoutedCount !== 1 ? 'es' : ''} scouted
-                  {existingGameplan && plan ? ` · v${existingGameplan.version} · ${existingGameplan.createdAt.toLocaleDateString()}` : ''}
+                  {existingGameplan && plan && !isGenerating ? ` · v${existingGameplan.version} · ${existingGameplan.createdAt.toLocaleDateString()}` : ''}
                 </p>
               </div>
               {scoutedMatches.some(m => m.status === 'analysed' && m.resultWinner) && (

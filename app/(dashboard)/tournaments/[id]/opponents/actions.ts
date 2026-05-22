@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { db } from '../../../../../lib/db'
-import { tournaments, tournamentOpponents, videos, matches } from '../../../../../lib/db/schema'
+import { tournaments, tournamentOpponents, videos, matches, gameplans } from '../../../../../lib/db/schema'
 import { eq, and, inArray, like, sql, ne, notInArray } from 'drizzle-orm'
 import { cloneOpponentMatches } from '../../../../../lib/db/clone-analysis'
 import { inngest } from '../../../../../lib/inngest'
@@ -304,6 +304,9 @@ export async function saveOpponentResult(
 
 export async function deleteOpponent(opponentId: string, tournamentId: string): Promise<{ error?: string }> {
   try {
+    // gameplans.opponentId has no onDelete clause — delete it first or the FK blocks the delete.
+    // planExecutions cascade from gameplans, so they're cleaned up automatically.
+    await db.delete(gameplans).where(eq(gameplans.opponentId, opponentId))
     await db.delete(tournamentOpponents).where(eq(tournamentOpponents.id, opponentId))
     revalidatePath(`/tournaments/${tournamentId}/opponents`)
     return {}
