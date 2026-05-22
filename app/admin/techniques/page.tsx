@@ -33,6 +33,8 @@ export default function AdminTechniquesPage() {
   const [ingestPosition, setIngestPosition] = useState('')
   const [ingesting, setIngesting] = useState(false)
   const [ingestMsg, setIngestMsg] = useState('')
+  const [agentRunning, setAgentRunning] = useState(false)
+  const [agentMsg, setAgentMsg] = useState('')
   const [editing, setEditing] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState<Partial<Variant>>({})
   const [saving, setSaving] = useState(false)
@@ -47,6 +49,25 @@ export default function AdminTechniquesPage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  const runAgent = async () => {
+    setAgentRunning(true)
+    setAgentMsg('')
+    try {
+      const res = await fetch('/api/admin/techniques', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'run-kb-agent' }),
+      })
+      if (res.ok) {
+        setAgentMsg('✓ Agent started — it will search YouTube, evaluate videos, and fill gaps automatically. Check back in 10–15 min.')
+      } else {
+        setAgentMsg('✗ Failed to start agent')
+      }
+    } finally {
+      setAgentRunning(false)
+    }
+  }
 
   const ingest = async () => {
     if (!ingestUrl.trim()) return
@@ -106,25 +127,22 @@ export default function AdminTechniquesPage() {
         <p className="text-sm text-zinc-400 mt-1">Manage BJJ technique variants that power match analysis, AI chat, and gameplan generation.</p>
       </div>
 
-      {/* How it works */}
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-4 text-sm">
-        <p className="font-semibold text-zinc-200">How it works</p>
-        <ol className="list-decimal list-inside space-y-2 text-zinc-400">
-          <li><span className="text-zinc-200">Paste a YouTube URL</span> of an instructional video (2–10 min, narrated, clear camera angle). Good sources: Danaher series, Bernardo Faria, Craig Jones, Kit Dale.</li>
-          <li>Add a hint like <span className="font-mono text-zinc-300">"armbar from mount"</span> and the starting position <span className="font-mono text-zinc-300">"mount"</span>. This helps Gemini focus on the right technique if the video covers multiple.</li>
-          <li>Click <span className="text-zinc-200">Extract from video</span>. Gemini will watch the video, listen to the coach's narration, and generate a visual detection description (1–2 min).</li>
-          <li>A <span className="text-amber-400">draft</span> record appears below. Review it — check that visual_cues accurately describe what to look for in a competition video. Edit if needed.</li>
-          <li>Click <span className="text-emerald-400">Approve</span> to set status to <span className="text-emerald-400">active</span>. Active records are automatically injected into every new match analysis, coach chat, and gameplan for the relevant format.</li>
-        </ol>
-        <div className="rounded-lg border border-zinc-700 bg-zinc-800/50 p-3 space-y-1 text-xs text-zinc-400">
-          <p className="font-semibold text-zinc-300">What to look for when reviewing visual_cues:</p>
-          <ul className="list-disc list-inside space-y-1">
-            <li>Is the description specific enough? "isolates the arm" is too vague. "Pulls the arm across their centreline, securing the elbow with their hip" is good.</li>
-            <li>Does it describe what the SETUP looks like — not just the finish? The AI needs to detect attempts, not just taps.</li>
-            <li>Does it describe the FROM position correctly? Armbar from mount vs from guard are completely different movements.</li>
-            <li>Is the counters field useful? It should say what to do defensively — "bridge before elbow crosses centre" not "defend the armbar".</li>
-          </ul>
+      {/* Agent */}
+      <div className="rounded-xl border border-zinc-700 bg-zinc-900 p-5 space-y-3">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="font-semibold text-zinc-200">Autonomous agent</p>
+            <p className="text-xs text-zinc-500 mt-1">Claude searches YouTube, evaluates instructionals, and fills coverage gaps automatically. Runs daily at 3am UTC or on demand. High-quality extractions auto-approve.</p>
+          </div>
+          <button
+            onClick={runAgent}
+            disabled={agentRunning}
+            className="flex-shrink-0 px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white rounded-lg text-sm font-semibold transition-colors"
+          >
+            {agentRunning ? 'Starting…' : 'Run now'}
+          </button>
         </div>
+        {agentMsg && <p className="text-xs text-zinc-400">{agentMsg}</p>}
       </div>
 
       {/* Ingest form */}

@@ -21,12 +21,20 @@ export async function GET() {
   return NextResponse.json(variants)
 }
 
-// POST /api/admin/techniques — trigger ingest from YouTube URL
+// POST /api/admin/techniques — trigger ingest from YouTube URL, or run the KB agent
 export async function POST(req: NextRequest) {
   const { userId } = await auth()
   if (!isAdmin(userId)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { youtubeUrl, techniqueHint, positionHint } = await req.json()
+  const body = await req.json()
+
+  // KB agent manual trigger
+  if (body.action === 'run-kb-agent') {
+    await inngest.send({ name: 'technique/kb-agent.run', data: {} })
+    return NextResponse.json({ queued: true, agent: true })
+  }
+
+  const { youtubeUrl, techniqueHint, positionHint } = body
   if (!youtubeUrl?.trim()) return NextResponse.json({ error: 'youtubeUrl required' }, { status: 400 })
 
   await inngest.send({

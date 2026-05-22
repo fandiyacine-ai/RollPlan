@@ -9,10 +9,11 @@ import { smoothcompDiscoverFootage } from '../../../../jobs/smoothcomp-discover-
 import { generateExecutionDebrief } from '../../../../jobs/generate-execution-debrief'
 import { syncTournamentCatalog } from '../../../../jobs/sync-tournament-catalog'
 import { ingestTechnique } from '../../../../jobs/ingest-technique'
+import { techniqueKbAgent } from '../../../../jobs/technique-kb-agent'
 
 export const maxDuration = 300
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [analyzeVideo, generateGameplan, scanUrl, smoothcompMonitorBracket, smoothcompProcessBracket, smoothcompDiscoverFootage, generateExecutionDebrief, syncTournamentCatalog, ingestTechnique],
+  functions: [analyzeVideo, generateGameplan, scanUrl, smoothcompMonitorBracket, smoothcompProcessBracket, smoothcompDiscoverFootage, generateExecutionDebrief, syncTournamentCatalog, ingestTechnique, techniqueKbAgent],
 })
