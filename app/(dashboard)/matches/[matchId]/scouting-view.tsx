@@ -300,93 +300,57 @@ function StatsTab({ sortedPositions, maxPositionTime, positionNames }: {
 // ─── Tab: Prediction ─────────────────────────────────────────────────────────
 
 function PredictionTab({ insights, opponentName }: { insights: InsightRow[]; opponentName: string }) {
-  const strengths = insights.filter(i => i.category === 'strength')
-  const mistakes = insights.filter(i => i.category === 'mistake')
-  const opportunities = insights.filter(i => i.category === 'opportunity')
   const patterns = insights.filter(i => i.category === 'pattern')
-
-  // Heuristic win probability: opponent mistakes boost your chances, opponent strengths reduce them
-  const weakScore =
-    mistakes.filter(i => i.severity === 'critical').length * 3 +
-    mistakes.filter(i => i.severity === 'moderate').length * 2 +
-    mistakes.filter(i => i.severity === 'minor').length
-  const strongScore =
-    strengths.filter(i => i.severity === 'critical').length * 3 +
-    strengths.filter(i => i.severity === 'moderate').length * 2 +
-    strengths.filter(i => i.severity === 'minor').length
-  const adjustment = Math.min(25, Math.max(-25, (weakScore - strongScore) * 4))
-  const winProb = Math.max(25, Math.min(75, 50 + adjustment))
-  const probLabel = winProb >= 60 ? 'Favourable' : winProb <= 40 ? 'Challenging' : 'Even match'
-  const probColor = winProb >= 60 ? 'text-emerald-400' : winProb <= 40 ? 'text-rose-400' : 'text-zinc-400'
-  const barColor = winProb >= 60 ? 'bg-emerald-500' : winProb <= 40 ? 'bg-rose-500' : 'bg-zinc-500'
-
-  if (insights.length === 0) {
-    return (
-      <p className="p-4 text-sm text-muted-foreground">Complete analysis required to generate prediction.</p>
-    )
-  }
+  const strengths = insights.filter(i => i.category === 'strength')
 
   return (
     <div className="p-4 space-y-5">
-      {/* Win probability */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Estimated odds</span>
-          <span className={`text-sm font-bold ${probColor}`}>{winProb}% — {probLabel}</span>
+      {/* Can't predict without user footage */}
+      <div className="rounded-xl border border-dashed border-border/60 p-5 space-y-3 text-center">
+        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-muted-foreground">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
         </div>
-        <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-          <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${winProb}%` }} />
+        <div>
+          <p className="text-sm font-semibold">Prediction needs your footage</p>
+          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+            We know {opponentName}'s patterns — but to predict a match outcome we need to compare them against your game. Upload your own matches to unlock this.
+          </p>
         </div>
-        <p className="text-[11px] text-muted-foreground/50">Based on {insights.length} observed patterns. AI estimate only.</p>
+        <a
+          href="/matches"
+          className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-border/60 hover:bg-muted transition-colors"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          Analyse my matches
+        </a>
       </div>
 
-      {/* Win conditions */}
-      {opportunities.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-500 flex items-center gap-1.5">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-            </svg>
-            How to win
-          </p>
-          {opportunities.slice(0, 3).map(o => (
-            <div key={o.id} className="text-sm text-foreground/80 leading-snug pl-5 border-l border-emerald-500/30">
-              {o.description}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Threats */}
+      {/* What we do know about the opponent */}
       {strengths.length > 0 && (
         <div className="space-y-2">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-rose-400 flex items-center gap-1.5">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
-              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-            </svg>
-            Watch out for
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+            What {opponentName} does well
           </p>
           {strengths.slice(0, 3).map(s => (
-            <div key={s.id} className="text-sm text-foreground/80 leading-snug pl-5 border-l border-rose-500/30">
+            <div key={s.id} className="text-sm text-foreground/80 leading-snug pl-4 border-l border-border/60">
               {s.description}
             </div>
           ))}
         </div>
       )}
 
-      {/* Patterns */}
       {patterns.length > 0 && (
         <div className="space-y-2">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-1.5">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
-              <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/>
-              <polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/>
-            </svg>
-            Tendencies
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+            Observed tendencies
           </p>
           {patterns.slice(0, 3).map(p => (
-            <div key={p.id} className="text-sm text-foreground/80 leading-snug pl-5 border-l border-zinc-500/30">
+            <div key={p.id} className="text-sm text-foreground/80 leading-snug pl-4 border-l border-border/60">
               {p.description}
             </div>
           ))}
