@@ -558,36 +558,6 @@ export function ScoutingView({
       ? match.opponentLabel
       : 'Unknown Opponent'
 
-  const VideoBlock = () => (
-    <div className="rounded-xl overflow-hidden bg-black border border-border/60 flex-shrink-0">
-      {ytId ? (
-        <div className="aspect-video">
-          <iframe
-            ref={iframeRef}
-            src={`https://www.youtube.com/embed/${ytId}?enablejsapi=1`}
-            className="w-full h-full"
-            allow="autoplay; encrypted-media"
-            allowFullScreen
-          />
-        </div>
-      ) : videoUrl ? (
-        <video
-          ref={videoRef}
-          src={videoUrl}
-          controls
-          playsInline
-          className="w-full max-h-[42vh] object-contain"
-          preload="metadata"
-          onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime ?? 0)}
-        />
-      ) : (
-        <div className="aspect-video flex items-center justify-center text-sm text-muted-foreground">
-          No video available
-        </div>
-      )}
-    </div>
-  )
-
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
 
@@ -626,9 +596,35 @@ export function ScoutingView({
       {/* ── Desktop: two-panel ── */}
       <div className="hidden md:flex flex-1 overflow-hidden gap-4 pt-4">
 
-        {/* Left — video only (stats are in the Stats tab) */}
+        {/* Left — video (inlined to avoid remount on tab switch) */}
         <div className="flex flex-col w-[48%] flex-shrink-0 gap-3 overflow-hidden">
-          <VideoBlock />
+          <div className="rounded-xl overflow-hidden bg-black border border-border/60 flex-shrink-0">
+            {ytId ? (
+              <div className="aspect-video">
+                <iframe
+                  ref={iframeRef}
+                  src={`https://www.youtube.com/embed/${ytId}?enablejsapi=1`}
+                  className="w-full h-full"
+                  allow="autoplay; encrypted-media"
+                  allowFullScreen
+                />
+              </div>
+            ) : videoUrl ? (
+              <video
+                ref={videoRef}
+                src={videoUrl}
+                controls
+                playsInline
+                className="w-full max-h-[42vh] object-contain"
+                preload="metadata"
+                onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime ?? 0)}
+              />
+            ) : (
+              <div className="aspect-video flex items-center justify-center text-sm text-muted-foreground">
+                No video available
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right — tabbed panel */}
@@ -668,35 +664,29 @@ export function ScoutingView({
             ))}
           </div>
 
-          {/* Tab content */}
+          {/* Tab content — AskTab stays mounted to preserve chat state and active fetches */}
           <div className={`flex-1 min-h-0 ${activeTab === 'ask' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'}`}>
-            {activeTab === 'brief' && (
-              <BriefTab insights={insights} />
-            )}
-            {activeTab === 'timeline' && (
+            <div className={activeTab === 'brief' ? '' : 'hidden'}><BriefTab insights={insights} /></div>
+            <div className={activeTab === 'timeline' ? '' : 'hidden'}>
               <TimelineTab
                 items={timelineItems}
                 onSeek={seekTo}
                 competitorLabel={match.competitorLabel}
                 opponentLabel={match.opponentLabel}
               />
-            )}
-            {activeTab === 'notes' && (
-              <NotesTab insights={insights} />
-            )}
-            {activeTab === 'stats' && (
+            </div>
+            <div className={activeTab === 'notes' ? '' : 'hidden'}><NotesTab insights={insights} /></div>
+            <div className={activeTab === 'stats' ? '' : 'hidden'}>
               <StatsTab
                 sortedPositions={sortedPositions}
                 maxPositionTime={maxPositionTime}
                 positionNames={positionNames}
               />
-            )}
-            {activeTab === 'prediction' && (
-              <PredictionTab insights={insights} opponentName={opponentName} />
-            )}
-            {activeTab === 'ask' && (
+            </div>
+            <div className={activeTab === 'prediction' ? '' : 'hidden'}><PredictionTab insights={insights} opponentName={opponentName} /></div>
+            <div className={`${activeTab === 'ask' ? 'flex flex-col h-full' : 'hidden'}`}>
               <AskTab matchId={match.id} currentTime={currentTime} opponentName={opponentName} />
-            )}
+            </div>
           </div>
         </div>
       </div>
@@ -736,13 +726,15 @@ export function ScoutingView({
             ))}
           </div>
           <div className={`flex-1 min-h-0 ${activeTab === 'ask' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'}`}>
-            {activeTab === 'timeline' && (
+            <div className={activeTab === 'timeline' ? '' : 'hidden'}>
               <TimelineTab items={timelineItems} onSeek={seekTo} competitorLabel={match.competitorLabel} opponentLabel={match.opponentLabel} />
-            )}
-            {activeTab === 'notes' && <NotesTab insights={insights} />}
-            {activeTab === 'stats' && <StatsTab sortedPositions={sortedPositions} maxPositionTime={maxPositionTime} positionNames={positionNames} />}
-            {activeTab === 'prediction' && <PredictionTab insights={insights} opponentName={opponentName} />}
-            {activeTab === 'ask' && <AskTab matchId={match.id} currentTime={currentTime} opponentName={opponentName} />}
+            </div>
+            <div className={activeTab === 'notes' ? '' : 'hidden'}><NotesTab insights={insights} /></div>
+            <div className={activeTab === 'stats' ? '' : 'hidden'}><StatsTab sortedPositions={sortedPositions} maxPositionTime={maxPositionTime} positionNames={positionNames} /></div>
+            <div className={activeTab === 'prediction' ? '' : 'hidden'}><PredictionTab insights={insights} opponentName={opponentName} /></div>
+            <div className={`${activeTab === 'ask' ? 'flex flex-col h-full' : 'hidden'}`}>
+              <AskTab matchId={match.id} currentTime={currentTime} opponentName={opponentName} />
+            </div>
           </div>
         </div>
       </div>
