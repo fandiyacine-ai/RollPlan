@@ -275,8 +275,28 @@ export const scanUrl = inngest.createFunction(
 
     const foundMatches: FoundMatch[] = scanStepResult
 
+    // Gemini sometimes returns timestamps in MM.SS decimal format rather than pure seconds
+    // (e.g. 38.32 means 38 min 32 sec = 2312s, not 38.32s). This happens when Gemini reads
+    // the competition scoreboard clock and reports it as a floating-point "minute.second" value.
+    // Detect by raw match duration < 60: a real BJJ match cannot last less than a minute,
+    // so a sub-60-unit duration is an unambiguous signal the unit is minutes, not seconds.
+    function mmssToSecs(t: number): number {
+      const m = Math.floor(t)
+      const s = Math.round((t % 1) * 100)
+      return m * 60 + s
+    }
+
     for (let i = 0; i < foundMatches.length; i++) {
       const found = { ...foundMatches[i] }
+
+      // Convert MM.SS → pure seconds before any further timestamp arithmetic
+      if (!found.is_walkover && (found.end_seconds - found.start_seconds) < 60) {
+        found.start_seconds = mmssToSecs(found.start_seconds)
+        found.end_seconds = mmssToSecs(found.end_seconds)
+        if (found.outcome_screen_seconds !== undefined) {
+          found.outcome_screen_seconds = mmssToSecs(found.outcome_screen_seconds)
+        }
+      }
 
       // Validate match window duration. If the scan returned a window shorter than 90s
       // (and it's not a walkover), the model likely grabbed a scoreboard overlay moment
