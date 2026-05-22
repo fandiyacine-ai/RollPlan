@@ -69,6 +69,16 @@ export const scanUrl = inngest.createFunction(
 
       await db.update(videos).set({ status: 'processing' }).where(eq(videos.id, videoId))
 
+      // When scanning for a specific tournament opponent, look up their label so the scan
+      // prompt can require BOTH names on the same scoreboard and outcome screen.
+      let expectedOpponentName: string | undefined
+      if (tournamentOpponentId) {
+        const opp = await db.query.tournamentOpponents.findFirst({
+          where: eq(tournamentOpponents.id, tournamentOpponentId),
+        })
+        expectedOpponentName = opp?.opponentLabel ?? undefined
+      }
+
       // YouTube full-video passes go straight to chunked scanning — no initial sparse scan.
       // A 0.05fps sweep of a 3h stream is too thin to reliably find all matches; it often
       // catches only 1 of N (or a scoreboard animation), then extracts wrong footage and
@@ -92,7 +102,7 @@ export const scanUrl = inngest.createFunction(
               ...(startSeconds !== undefined ? { startSeconds } : {}),
               ...(endSeconds !== undefined ? { endSeconds } : {}),
             },
-            userPrompt: buildScanUrlUserPrompt(athleteName, appearanceHint),
+            userPrompt: buildScanUrlUserPrompt(athleteName, appearanceHint, expectedOpponentName),
             schema: UrlScanOutputSchema,
             // Thinking helps the model reason about multi-match streams — distinguishing
             // which outcome screen belongs to which match before committing to boundaries.
@@ -110,7 +120,7 @@ export const scanUrl = inngest.createFunction(
               role: 'user',
               content: [
                 videoFilePart(video.publicUrl, video.contentType),
-                { type: 'text', text: buildScanUrlUserPrompt(athleteName, appearanceHint) },
+                { type: 'text', text: buildScanUrlUserPrompt(athleteName, appearanceHint, expectedOpponentName) },
               ],
             }],
           })
@@ -199,6 +209,26 @@ export const scanUrl = inngest.createFunction(
           if (parentId) await db.update(videos).set({ status: 'failed', failureReason: msg }).where(eq(videos.id, parentId))
         }
         throw err
+      }
+
+      // Post-scan validation: when we expect a specific opponent, filter out any match
+      // whose found opponent_name doesn't fuzzy-match the expected name. This catches the
+      // case where Gemini grabs an outcome screen from an adjacent match on the same mat
+      // and mistakenly attributes it to the tracked athlete.
+      if (expectedOpponentName && scanResult.matches.length > 0) {
+        const normName = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase()
+        const normExpected = normName(expectedOpponentName)
+        const expectedParts = normExpected.split(/\s+/).filter(p => p.length >= 4)
+        const filtered = scanResult.matches.filter(m => {
+          if (!m.opponent_name || normName(m.opponent_name) === 'UNKNOWN') return false
+          const oppNorm = normName(m.opponent_name)
+          // Accept if any significant word (≥4 chars) from either side appears in the other
+          return expectedParts.some(part => oppNorm.includes(part)) ||
+            oppNorm.split(/\s+/).filter(p => p.length >= 4).some(part => normExpected.includes(part))
+        })
+        if (filtered.length < scanResult.matches.length) {
+          scanResult = { ...scanResult, matches: filtered, athlete_found: filtered.length > 0 }
+        }
       }
 
       if (!scanResult.athlete_found || scanResult.matches.length === 0) {

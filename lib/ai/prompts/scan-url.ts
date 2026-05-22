@@ -1,4 +1,4 @@
-export const SCAN_URL_PROMPT_VERSION = 'v8'
+export const SCAN_URL_PROMPT_VERSION = 'v9'
 
 export function buildScanUrlSystemPrompt(): string {
   return `You are an expert BJJ tournament stream analyst. Your task is to watch a competition recording and find all matches involving a specific athlete.
@@ -92,8 +92,17 @@ You must transcribe the opponent's name **exactly as it appears on screen**, cha
 - Include round/bracket info if visible (e.g. "Semi-final", "Gold medal match").`
 }
 
-export function buildScanUrlUserPrompt(athleteName: string, appearanceHint?: string): string {
+export function buildScanUrlUserPrompt(athleteName: string, appearanceHint?: string, opponentName?: string): string {
   const hint = appearanceHint ? `\n\nAdditional context: ${appearanceHint}` : ''
+
+  if (opponentName) {
+    return `Find the BJJ match where ${athleteName} faces ${opponentName}.
+
+Scan the video for an ACTIVE MATCH SCOREBOARD that shows BOTH "${athleteName}" AND "${opponentName}" (or a close variation) at the same time — with a live countdown timer and score visible. That is the only valid source for this match.
+
+CRITICAL — outcome screen validation: The outcome screen (winner announcement) for this match MUST reference "${opponentName}" as the competing athlete. If an outcome screen shows completely different athlete names, it belongs to a different match on the same mat — do NOT assign it to this match. Competition streams record many back-to-back matches; each outcome screen belongs only to the match whose two athletes are shown on it.${hint}`
+  }
+
   return `Find all BJJ matches involving: ${athleteName}
 
 Scan the full video for on-screen text overlays showing this athlete's name on an ACTIVE MATCH SCOREBOARD (with a live timer and two athletes competing). Do NOT report matches from bracket trees, schedule graphics, or category listings — only from live scoreboards.${hint}`
