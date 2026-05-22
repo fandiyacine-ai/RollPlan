@@ -400,21 +400,9 @@ export const scanUrl = inngest.createFunction(
                 referenceImageBase64: athleteImageBase64 || undefined,
                 thinkingBudget: 4096,
               })
-              // Shift timestamps back to absolute stream position.
-              // clipStart is the true absolute start of the clip in the full video, so adding it
-              // to Gemini's clip-relative timestamps gives correct absolute positions.
-              extractObject = clipStart === 0 ? result.object : {
-                ...result.object,
-                positions: result.object.positions.map(p => ({
-                  ...p,
-                  start_seconds: p.start_seconds + clipStart,
-                  end_seconds: p.end_seconds + clipStart,
-                })),
-                events: result.object.events.map(e => ({
-                  ...e,
-                  timestamp_seconds: e.timestamp_seconds + clipStart,
-                })),
-              }
+              // Gemini returns timestamps absolute from the video origin (not relative to startOffset),
+              // so no shift is needed — use the result directly.
+              extractObject = result.object
               extractUsage = result.usage
             } else {
               const result = await generateObject({
