@@ -15,7 +15,8 @@ function fmt(seconds: number): string {
 }
 
 export async function POST(req: NextRequest) {
-  const { matchId, message, currentTimestampSeconds = 0, frameDataUrl } = await req.json()
+  const { matchId, message, currentTimestampSeconds = 0, frameDataUrl, mode } = await req.json()
+  const isScouting = mode === 'scouting'
 
   if (!matchId || !message?.trim()) {
     return new Response(JSON.stringify({ error: 'matchId and message are required' }), { status: 400 })
@@ -69,7 +70,35 @@ export async function POST(req: NextRequest) {
   const techniqueBlock = formatVariantsAsPromptBlock(techniqueVariants)
   const counterBlock = formatVariantsAsCounterGuide(techniqueVariants)
 
-  const system = `You are an expert BJJ coach reviewing match footage side-by-side with your athlete. You have access to the full match analysis.
+  const opponent = match.opponentLabel ?? 'the opponent'
+  const system = isScouting
+    ? `You are an expert BJJ scout helping an athlete prepare for a match against ${opponent}. You have analysed ${opponent}'s footage and have the full breakdown below. Answer every question from the perspective of someone preparing to FACE this opponent — not coaching ${opponent} themselves.
+${techniqueBlock ? `\n${techniqueBlock}\n` : ''}${counterBlock ? `\n${counterBlock}\n` : ''}
+
+Scout report for: ${opponent}
+Match footage: ${match.format === 'no_gi' ? 'No-Gi' : 'Gi'}${match.eventName ? ` — ${match.eventName}` : ''}
+
+${opponent}'s position timeline:
+${segmentTimeline}
+
+${opponent}'s key events:
+${eventTimeline}
+
+Pre-analysed scouting insights:
+${insightLines}
+
+Currently watching: ${fmt(currentTimestampSeconds)}
+${opponent}'s position at this moment: ${currentPosition}
+${opponent}'s events at this moment: ${currentEvents}
+
+Scouting guidelines:
+- Always refer to the opponent by name (${opponent}), never "you"
+- Frame everything as preparation advice: "watch for…", "when ${opponent} does X, counter with…"
+- Reference specific timestamps from the data above
+- 2-4 sentences max unless the question genuinely needs more
+- Be tactical — give the athlete something actionable to use on the mat
+- Respond in the same language as the question`
+    : `You are an expert BJJ coach reviewing match footage side-by-side with your athlete. You have access to the full match analysis.
 ${techniqueBlock ? `\n${techniqueBlock}\n` : ''}${counterBlock ? `\n${counterBlock}\n` : ''}
 
 Match: ${match.format === 'no_gi' ? 'No-Gi' : 'Gi'} ${match.context}${match.eventName ? ` — ${match.eventName}` : ''}

@@ -406,7 +406,7 @@ function AskTab({ matchId, currentTime, opponentName }: { matchId: string; curre
       const res = await fetch('/api/coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ matchId, message: text, currentTimestampSeconds: currentTime }),
+        body: JSON.stringify({ matchId, message: text, currentTimestampSeconds: currentTime, mode: 'scouting' }),
       })
       if (!res.ok || !res.body) {
         setMessages(prev => [...prev, { role: 'coach', text: 'Something went wrong. Try again.' }])
