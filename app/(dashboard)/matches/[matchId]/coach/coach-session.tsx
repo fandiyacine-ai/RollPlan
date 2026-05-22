@@ -273,11 +273,11 @@ export default function CoachSession({
         </div>
       </div>
 
-      {/* Body: video left, chat right */}
+      {/* Body: sticky video left, scrollable timeline + chat right */}
       <div className="flex flex-1 overflow-hidden gap-4 pt-3">
 
-        {/* Left — video + timeline */}
-        <div className="flex flex-col w-[55%] flex-shrink-0 overflow-hidden">
+        {/* Left — video + scrubber + HUD (never scrolls) */}
+        <div className="flex flex-col w-[48%] flex-shrink-0 overflow-hidden">
           {videoUrl ? (
             <>
               {isYouTube && youtubeId ? (
@@ -351,13 +351,13 @@ export default function CoachSession({
               </div>
 
               {/* Current position HUD */}
-              <div className="flex items-center gap-2 mt-3 mb-2 flex-shrink-0 min-h-[32px]">
+              <div className="flex items-center gap-2 mt-3 flex-shrink-0 min-h-[32px]">
                 <span className="font-mono text-sm font-bold tabular-nums text-muted-foreground w-10 flex-shrink-0">{fmt(currentTime)}</span>
                 {currentSegment ? (
                   <>
                     <span className="font-semibold text-sm truncate flex-1">{POSITION_MAP[currentSegment.positionId] ?? currentSegment.positionId.replace(/_/g, ' ')}</span>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold bg-blue-100 text-blue-700`}>
+                      <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-blue-100 text-blue-700">
                         {match.competitorLabel ?? 'YOU'} · {currentSegment.userRole}
                       </span>
                       <span className="text-muted-foreground text-xs">vs</span>
@@ -374,128 +374,132 @@ export default function CoachSession({
                   <span className="text-xs text-muted-foreground">Transition / no segment</span>
                 )}
               </div>
-
-              {/* Timeline list */}
-              {timeline.length > 0 && (
-                <div className="flex-1 overflow-y-auto rounded-lg border divide-y text-xs">
-                  {timeline.map((item, i) => {
-                    const isActive = item.type === 'segment'
-                      ? item.time <= currentTime && (timeline[i + 1]?.time ?? Infinity) > currentTime
-                      : Math.abs(item.time - currentTime) < 2
-                    const dot = item.type === 'segment'
-                      ? item.dominance === 'dominant' ? 'bg-green-400'
-                        : item.dominance === 'inferior' ? 'bg-red-400' : 'bg-gray-300'
-                      : item.actor === 'user' ? 'bg-blue-500' : 'bg-orange-500'
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => seekTo(item.time)}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-muted/60 ${isActive ? 'bg-muted' : ''}`}
-                      >
-                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dot}`} />
-                        <span className="font-mono text-muted-foreground w-10 flex-shrink-0 tabular-nums">{fmt(item.time)}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 font-semibold tracking-wide ${
-                          item.type === 'segment' ? 'bg-violet-100 text-violet-700' : 'bg-amber-100 text-amber-700'
-                        }`}>{item.type === 'segment' ? 'POS' : 'EVT'}</span>
-                        <span className="capitalize font-medium truncate">{item.label}</span>
-                        <span className="text-muted-foreground ml-auto flex-shrink-0 capitalize text-[11px]">{item.sub}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
             </>
           ) : (
             <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">No video available</div>
           )}
         </div>
 
-        {/* Right — chat */}
-        <div className="flex flex-col flex-1 overflow-hidden">
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-            {messages.length === 0 && (
-              <p className="text-sm text-muted-foreground pt-4">
-                {videoUrl ? 'Pause at any frame — ask the AI exactly what happened.' : 'Ask the AI about this match.'}
-              </p>
-            )}
-            {messages.map((msg, i) => (
-              <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                {msg.role === 'coach' && (
-                  <div className="w-6 h-6 rounded-full bg-foreground text-background flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5">AI</div>
-                )}
-                <div className={`rounded-2xl px-3.5 py-2 text-sm max-w-[85%] leading-relaxed ${msg.role === 'user' ? 'bg-foreground text-background rounded-tr-sm' : 'bg-muted rounded-tl-sm'}`}>
-                  {msg.role === 'user' && msg.frameDataUrl && (
-                    <img src={msg.frameDataUrl} alt="frame" className="rounded-lg mb-2 max-w-full opacity-90" />
-                  )}
-                  {msg.text || <span className="opacity-40">thinking…</span>}
-                </div>
-              </div>
-            ))}
-            {isListening && liveTranscript && (
-              <div className="flex justify-end">
-                <div className="rounded-2xl rounded-tr-sm px-3.5 py-2 text-sm max-w-[85%] bg-foreground/10 italic text-muted-foreground">
-                  {liveTranscript}
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
+        {/* Right — scrollable timeline + AI chat */}
+        <div className="flex flex-col flex-1 overflow-hidden gap-3">
 
-          {/* Controls */}
-          <div className="border-t pt-3 mt-2 space-y-2 flex-shrink-0">
-            {ttsError && <p className="text-xs text-red-500">{ttsError}</p>}
-            {videoUrl && (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" className={isYouTube ? 'opacity-30' : 'opacity-70'}><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
-                {isYouTube
-                  ? <span className="opacity-50">Frame capture unavailable for YouTube videos</span>
-                  : <span>Frame sent with each question</span>
-                }
-              </div>
-            )}
+          {/* Timeline: scrollable, takes majority of right panel height */}
+          {timeline.length > 0 && (
+            <div className="flex-[3] overflow-y-auto rounded-lg border divide-y text-xs min-h-0">
+              {timeline.map((item, i) => {
+                const isActive = item.type === 'segment'
+                  ? item.time <= currentTime && (timeline[i + 1]?.time ?? Infinity) > currentTime
+                  : Math.abs(item.time - currentTime) < 2
+                const dot = item.type === 'segment'
+                  ? item.dominance === 'dominant' ? 'bg-green-400'
+                    : item.dominance === 'inferior' ? 'bg-red-400' : 'bg-gray-300'
+                  : item.actor === 'user' ? 'bg-blue-500' : 'bg-orange-500'
+                return (
+                  <button
+                    key={i}
+                    onClick={() => seekTo(item.time)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-muted/60 ${isActive ? 'bg-muted' : ''}`}
+                  >
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dot}`} />
+                    <span className="font-mono text-muted-foreground w-10 flex-shrink-0 tabular-nums">{fmt(item.time)}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 font-semibold tracking-wide ${
+                      item.type === 'segment' ? 'bg-violet-100 text-violet-700' : 'bg-amber-100 text-amber-700'
+                    }`}>{item.type === 'segment' ? 'POS' : 'EVT'}</span>
+                    <span className="capitalize font-medium truncate">{item.label}</span>
+                    <span className="text-muted-foreground ml-auto flex-shrink-0 capitalize text-[11px]">{item.sub}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
 
-            <p className="text-[10px] text-muted-foreground/50 leading-relaxed">
-              Questions and video frames are sent to Google Gemini AI. Your video is stored securely and you can delete it at any time.
-            </p>
-
-            {speechSupported && (
-              <div className="flex items-center gap-3">
-                <button
-                  onPointerDown={startListening}
-                  onPointerUp={stopListening}
-                  onPointerLeave={stopListening}
-                  disabled={isLoading || isSpeaking}
-                  className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 transition-all select-none ${
-                    isListening ? 'bg-red-500 text-white scale-110 shadow-lg'
-                    : isLoading || isSpeaking ? 'bg-muted text-muted-foreground cursor-not-allowed'
-                    : 'bg-foreground text-background hover:opacity-90'
-                  }`}
-                >
-                  {isLoading
-                    ? <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-                    : isSpeaking
-                    ? <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
-                    : <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg>
-                  }
-                </button>
-                <p className="text-xs text-muted-foreground">
-                  {isListening ? 'Listening — release to send' : isLoading ? 'Thinking…' : isSpeaking ? 'Coach is speaking…' : 'Hold to talk'}
+          {/* AI Chat: fixed bottom portion */}
+          <div className={`flex flex-col overflow-hidden min-h-0 rounded-lg border ${timeline.length > 0 ? 'flex-[2]' : 'flex-1'}`}>
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto space-y-3 p-3">
+              {messages.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  {videoUrl ? 'Pause at any frame — ask the AI exactly what happened.' : 'Ask the AI about this match.'}
                 </p>
-              </div>
-            )}
+              )}
+              {messages.map((msg, i) => (
+                <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  {msg.role === 'coach' && (
+                    <div className="w-6 h-6 rounded-full bg-foreground text-background flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5">AI</div>
+                  )}
+                  <div className={`rounded-2xl px-3.5 py-2 text-sm max-w-[85%] leading-relaxed ${msg.role === 'user' ? 'bg-foreground text-background rounded-tr-sm' : 'bg-muted rounded-tl-sm'}`}>
+                    {msg.role === 'user' && msg.frameDataUrl && (
+                      <img src={msg.frameDataUrl} alt="frame" className="rounded-lg mb-2 max-w-full opacity-90" />
+                    )}
+                    {msg.text || <span className="opacity-40">thinking…</span>}
+                  </div>
+                </div>
+              ))}
+              {isListening && liveTranscript && (
+                <div className="flex justify-end">
+                  <div className="rounded-2xl rounded-tr-sm px-3.5 py-2 text-sm max-w-[85%] bg-foreground/10 italic text-muted-foreground">
+                    {liveTranscript}
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
 
-            <form onSubmit={handleTextSubmit} className="flex gap-2">
-              <input type="text" value={textInput} onChange={e => setTextInput(e.target.value)}
-                placeholder={speechSupported ? 'Or type a question…' : 'Ask your coach…'}
-                className="flex-1 rounded-full border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                disabled={isLoading} />
-              <button type="submit" disabled={!textInput.trim() || isLoading}
-                className="px-4 py-2 rounded-full bg-foreground text-background text-sm disabled:opacity-40 hover:opacity-90 transition-opacity">
-                Send
-              </button>
-            </form>
+            {/* Controls */}
+            <div className="border-t px-3 pt-2.5 pb-3 space-y-2 flex-shrink-0">
+              {ttsError && <p className="text-xs text-red-500">{ttsError}</p>}
+              {videoUrl && (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={isYouTube ? 'opacity-30' : 'opacity-70'}>
+                    <path d="M15 10l-4 4L7 10"/><rect x="3" y="3" width="18" height="18" rx="2"/>
+                  </svg>
+                  {isYouTube
+                    ? <span className="opacity-50">Frame capture unavailable for YouTube videos</span>
+                    : <span>Frame sent with each question</span>
+                  }
+                </div>
+              )}
+              <p className="text-[10px] text-muted-foreground/50 leading-relaxed">
+                Questions and video frames are sent to Google Gemini AI. Your video is stored securely and you can delete it at any time.
+              </p>
+              {speechSupported && (
+                <div className="flex items-center gap-3">
+                  <button
+                    onPointerDown={startListening}
+                    onPointerUp={stopListening}
+                    onPointerLeave={stopListening}
+                    disabled={isLoading || isSpeaking}
+                    className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 transition-all select-none ${
+                      isListening ? 'bg-red-500 text-white scale-110 shadow-lg'
+                      : isLoading || isSpeaking ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                      : 'bg-foreground text-background hover:opacity-90'
+                    }`}
+                  >
+                    {isLoading
+                      ? <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                      : isSpeaking
+                      ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg>
+                      : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
+                    }
+                  </button>
+                  <p className="text-xs text-muted-foreground">
+                    {isListening ? 'Listening — release to send' : isLoading ? 'Thinking…' : isSpeaking ? 'Coach is speaking…' : 'Hold to talk'}
+                  </p>
+                </div>
+              )}
+              <form onSubmit={handleTextSubmit} className="flex gap-2">
+                <input type="text" value={textInput} onChange={e => setTextInput(e.target.value)}
+                  placeholder={speechSupported ? 'Or type a question…' : 'Ask your coach…'}
+                  className="flex-1 rounded-full border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  disabled={isLoading} />
+                <button type="submit" disabled={!textInput.trim() || isLoading}
+                  className="px-4 py-2 rounded-full bg-foreground text-background text-sm disabled:opacity-40 hover:opacity-90 transition-opacity">
+                  Send
+                </button>
+              </form>
+            </div>
           </div>
+
         </div>
       </div>
     </div>
