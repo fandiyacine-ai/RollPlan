@@ -60,6 +60,41 @@ const RULESET_OPTIONS = [
   { value: 'other', label: 'Other' },
 ]
 
+// Label, placeholder, and hint for the bracket URL field vary by federation.
+// The DB column is always smoothcompUrl — Smoothcomp auto-import works for any
+// Smoothcomp-hosted event regardless of ruleset.
+const BRACKET_URL_CONFIG: Record<string, { label: string; placeholder: string; hint: string }> = {
+  ibjjf: {
+    label: 'IBJJF Bracket URL',
+    placeholder: 'ibjjf.com/tournaments/...',
+    hint: 'Link to your IBJJF bracket. Smoothcomp-hosted IBJJF events will auto-import opponents when the bracket is published.',
+  },
+  ajp: {
+    label: 'AJP Tour Bracket URL',
+    placeholder: 'ajptour.com/en/event/...',
+    hint: 'Link to your AJP event page. Smoothcomp-hosted AJP events will auto-import opponents when the bracket is published.',
+  },
+  adcc: {
+    label: 'Event URL',
+    placeholder: 'adcombat.com/...',
+    hint: 'Optional link to your event page for reference.',
+  },
+  ebi: {
+    label: 'Event URL',
+    placeholder: 'flograppling.com/...',
+    hint: 'Optional link to your event page for reference.',
+  },
+  other: {
+    label: 'Smoothcomp URL',
+    placeholder: 'smoothcomp.com/en/event/29941/…',
+    hint: "Paste any URL from your event on Smoothcomp. Once the bracket is published we'll auto-import your opponents.",
+  },
+}
+
+function getBracketUrlConfig(ruleset: string) {
+  return BRACKET_URL_CONFIG[ruleset] ?? BRACKET_URL_CONFIG.other
+}
+
 // ── Event catalog picker ──────────────────────────────────────────────────────
 
 function EventCatalogPicker({ onSelect }: { onSelect: (e: CatalogEntry) => void }) {
@@ -290,18 +325,23 @@ export function CreateTournamentForm() {
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Smoothcomp Bracket URL <span className="text-muted-foreground/50 font-normal">(optional)</span></label>
-                <Input
-                  name="smoothcompUrl"
-                  type="url"
-                  defaultValue={prefilled?.smoothcompUrl ?? ''}
-                  placeholder="smoothcomp.com/en/event/29941/…"
-                />
-                <p className="text-xs text-muted-foreground/60">
-                  Paste any URL from your event on Smoothcomp. Once the bracket is published we&apos;ll auto-import your opponents.
-                </p>
-              </div>
+              {(() => {
+                const urlCfg = getBracketUrlConfig(ruleset)
+                return (
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      {urlCfg.label} <span className="text-muted-foreground/50 font-normal">(optional)</span>
+                    </label>
+                    <Input
+                      name="smoothcompUrl"
+                      type="url"
+                      defaultValue={prefilled?.smoothcompUrl ?? ''}
+                      placeholder={urlCfg.placeholder}
+                    />
+                    <p className="text-xs text-muted-foreground/60">{urlCfg.hint}</p>
+                  </div>
+                )
+              })()}
 
               {error && <p className="text-sm text-destructive">{error}</p>}
             </form>
@@ -430,10 +470,18 @@ export function EditTournamentButton({ tournament }: { tournament: TournamentDat
             />
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Smoothcomp URL <span className="text-muted-foreground/50 font-normal">(optional)</span></label>
-            <Input name="smoothcompUrl" type="url" defaultValue={tournament.smoothcompUrl ?? ''} placeholder="smoothcomp.com/en/event/…" />
-          </div>
+          {(() => {
+            const urlCfg = getBracketUrlConfig(ruleset)
+            return (
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">
+                  {urlCfg.label} <span className="text-muted-foreground/50 font-normal">(optional)</span>
+                </label>
+                <Input name="smoothcompUrl" type="url" defaultValue={tournament.smoothcompUrl ?? ''} placeholder={urlCfg.placeholder} />
+                <p className="text-xs text-muted-foreground/60">{urlCfg.hint}</p>
+              </div>
+            )
+          })()}
 
           {error && <p className="text-sm text-destructive">{error}</p>}
         </form>
