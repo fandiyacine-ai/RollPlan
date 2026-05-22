@@ -80,8 +80,8 @@ export async function geminiVideoObject<T extends z.ZodTypeAny>(
   if (videoOptions) {
     const vm: Record<string, unknown> = {}
     if (videoOptions.fps !== undefined) vm.fps = videoOptions.fps
-    if (videoOptions.startSeconds !== undefined) vm.startOffset = `${videoOptions.startSeconds}s`
-    if (videoOptions.endSeconds !== undefined) vm.endOffset = `${videoOptions.endSeconds}s`
+    if (videoOptions.startSeconds !== undefined) vm.startOffset = `${Math.floor(videoOptions.startSeconds)}s`
+    if (videoOptions.endSeconds !== undefined) vm.endOffset = `${Math.floor(videoOptions.endSeconds)}s`
     if (Object.keys(vm).length > 0) filePart.videoMetadata = vm
   }
 
