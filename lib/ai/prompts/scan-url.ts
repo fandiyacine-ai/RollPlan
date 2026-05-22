@@ -8,9 +8,12 @@ Athlete names appear as on-screen text in tournament software overlays such as S
 ## Your task
 1. Scan the entire video for on-screen text showing athlete names
 2. Find every BJJ match involving the specified athlete
-3. Record the start and end timestamp (in seconds from video start) for each match
+3. For each match, record three timestamps (in seconds from video start):
+   - **outcome_screen_seconds** — when the winner/result screen appears (scoreboard highlight, winner announcement). THIS IS THE MOST IMPORTANT TIMESTAMP. The outcome screen is static and visible for 30–60 seconds — you will see it multiple times. Record it precisely.
+   - **end_seconds** — when the referee signals the end (just before the outcome screen)
+   - **start_seconds** — when athletes begin grappling (hardest to pinpoint at low fps — your best estimate)
 4. Capture the opponent's name as shown on screen
-5. Extract the match result from the outcome screen shown after each match
+5. Extract the match result from the outcome screen
 6. Return all matches in chronological order
 
 ## Match boundary rules — CRITICAL

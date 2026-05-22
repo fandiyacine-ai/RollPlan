@@ -352,27 +352,31 @@ export const scanUrl = inngest.createFunction(
           try {
             if (isYT) {
               // Trim the YouTube video to a padded window around this match. Gemini reports timestamps
-              // relative to the clip start, so we shift back to absolute after.
+              // Anchor the extraction clip to the OUTCOME SCREEN, not the match start.
               //
-              // PRE_BUFFER: the 0.1fps scan has ~10s resolution — padding before the detected match
-              // start absorbs boundary errors so the clip always begins before the match does.
+              // The outcome screen (winner announcement) is a static 30-60s event that Gemini
+              // reliably detects at 0.1fps. The match START is a single frame that the sparse
+              // scan routinely misses or confuses with a "next match" preview card.
               //
-              // POST_BUFFER: the outcome screen appears 0–120s AFTER the match ends. Without padding
-              // the clip cuts off before the outcome screen, causing extraction to either miss the
-              // result or latch onto an adjacent match's outcome screen.
-              const PRE_BUFFER = skipScan ? 0 : 300  // 5 min — scan at 10s resolution can place "start" on a preview card 1-3 min before athletes actually step on the mat
-              const POST_BUFFER = skipScan ? 0 : 360 // 6 min — scan end_seconds often underestimated; outcome screen appears up to 2 min after match ends
+              // Strategy: clip = [outcome_screen - MAX_MATCH_DURATION, outcome_screen + 120s]
+              // This guarantees the full match is in the clip regardless of how imprecise
+              // start_seconds was. The extraction model is then told to anchor from the outcome
+              // screen at the END of the clip and work backwards.
+              const MAX_MATCH_DURATION = 10 * 60 // 10 min — covers any AJP/IBJJF match
+              const OUTCOME_TAIL = 120            // 2 min after outcome screen
 
               const chunkOffset = startSeconds ?? 0
-              const scanMatchStart = skipScan ? chunkOffset : (chunkOffset + found.start_seconds)
-              const scanMatchEnd = skipScan ? (endSeconds ?? chunkOffset + 999999) : (chunkOffset + found.end_seconds)
 
-              const clipStart = Math.max(0, scanMatchStart - PRE_BUFFER)
-              const clipEnd = skipScan ? (endSeconds ?? undefined) : (scanMatchEnd + POST_BUFFER)
+              // Use outcome_screen_seconds as the primary anchor; fall back to end_seconds
+              const outcomeAbsolute = skipScan
+                ? (endSeconds ?? chunkOffset + 999999)
+                : chunkOffset + (found.outcome_screen_seconds ?? found.end_seconds)
 
-              // How far into the padded clip the match is expected to start
-              const matchOffsetInClip = scanMatchStart - clipStart
-              const matchDuration = found.end_seconds - found.start_seconds
+              const clipStart = Math.max(0, outcomeAbsolute - MAX_MATCH_DURATION)
+              const clipEnd = skipScan ? (endSeconds ?? undefined) : outcomeAbsolute + OUTCOME_TAIL
+
+              // Where in the clip the outcome screen is expected (for the extraction prompt hint)
+              const outcomeOffsetInClip = outcomeAbsolute - clipStart
 
               const videoOptions = {
                 fps: 1.0,
@@ -389,14 +393,11 @@ export const scanUrl = inngest.createFunction(
                   appearanceHint: appearanceHint || undefined,
                   format: format as 'gi' | 'no_gi',
                   ruleset: 'ibjjf',
-                  // Tell extraction where within the padded clip the match is expected to start.
-                  // End is the padded clip end so extraction sees the full outcome screen.
-                  timestampRange: skipScan ? undefined : { startSeconds: matchOffsetInClip, endSeconds: matchOffsetInClip + matchDuration },
+                  // Tell extraction where the outcome screen is — model works backwards from there
+                  outcomeScreenSeconds: skipScan ? undefined : outcomeOffsetInClip,
                 }),
                 schema: MatchExtractionOutputSchema,
                 referenceImageBase64: athleteImageBase64 || undefined,
-                // Higher thinking budget for extraction — the model must simultaneously track
-                // athlete identity, position labels, and result anchoring across 6-10 minutes of footage.
                 thinkingBudget: 4096,
               })
               // Shift timestamps back to absolute stream position.
@@ -433,7 +434,7 @@ export const scanUrl = inngest.createFunction(
                         appearanceHint: appearanceHint || undefined,
                         format: format as 'gi' | 'no_gi',
                         ruleset: 'ibjjf',
-                        timestampRange: { startSeconds: found.start_seconds, endSeconds: found.end_seconds },
+                        outcomeScreenSeconds: found.outcome_screen_seconds ?? found.end_seconds,
                       }),
                     },
                   ],

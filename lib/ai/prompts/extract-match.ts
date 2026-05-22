@@ -120,12 +120,12 @@ export function buildExtractMatchUserPrompt(params: {
   format: 'gi' | 'no_gi'
   ruleset: string
   durationSeconds?: number
-  timestampRange?: { startSeconds: number; endSeconds: number }
+  outcomeScreenSeconds?: number
 }): string {
   return `Analyse this BJJ match video.
 
-${params.timestampRange
-    ? `This clip may contain multiple matches. The match involving ${params.competitorDescription}${params.opponentName ? ` and ${params.opponentName}` : ''} is expected somewhere in the second half of the clip (after approximately ${formatTimestamp(params.timestampRange.startSeconds - 60)}). Do NOT anchor to the first match you see — search for the active scoreboard showing the target athletes' names before locking in. Mark footage before the match starts as standing/neutral.`
+${params.outcomeScreenSeconds !== undefined
+    ? `OUTCOME SCREEN ANCHOR: The winner/result screen for the match between ${params.competitorDescription}${params.opponentName ? ` and ${params.opponentName}` : ''} appears at approximately ${formatTimestamp(params.outcomeScreenSeconds)} in this clip. This is your primary anchor — find it first, confirm it shows these athletes, then work BACKWARDS to find where their match started. Do NOT analyse any match that ends before this outcome screen.`
     : ''}
 Competitor to track: ${params.competitorDescription}
 ${params.opponentName

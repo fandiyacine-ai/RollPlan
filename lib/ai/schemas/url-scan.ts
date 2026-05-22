@@ -9,6 +9,7 @@ export const MatchResultSchema = z.object({
 export const FoundMatchSchema = z.object({
   start_seconds: z.number().min(0).describe('Moment athletes begin grappling — NOT the name overlay, NOT the winner screen'),
   end_seconds: z.number().min(0).describe('Moment referee signals end — before any winner announcement graphic'),
+  outcome_screen_seconds: z.number().min(0).describe('Timestamp when the winner/result screen appears — the scoreboard highlight or winner announcement graphic shown AFTER the match ends. This is the most important timestamp — report it precisely.'),
   opponent_name: z.string(),
   round_or_bracket: z.string().optional().describe('e.g. "Semi-final", "Gold medal match"'),
   is_walkover: z.boolean().optional().describe('true if no match was actually fought — opponent did not show up, match awarded without grappling'),
