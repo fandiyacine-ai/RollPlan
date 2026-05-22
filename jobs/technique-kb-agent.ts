@@ -28,11 +28,18 @@ const MIN_ACTIVE_VARIANTS = 2     // target coverage per event/position combo
 
 // Trusted channel keywords — Claude uses this list to evaluate results
 const TRUSTED_CHANNELS = [
-  'danaher', 'bernardo faria', 'lachlan giles', 'craig jones',
-  'gordon ryan', 'marcelo garcia', 'keenan cornelius', 'chewjitsu',
-  'stephan kesting', 'bjj fanatics', 'firas zahabi', 'ryan hall',
-  'garry tonon', 'mikey musumeci', 'priit mihkelson', 'geo martinez',
-  'knight jiu jitsu', 'john danaher',
+  // Leg lock / no-gi specialists
+  'danaher', 'john danaher', 'gordon ryan', 'craig jones', 'lachlan giles',
+  'garry tonon', 'mikey musumeci', 'nicky ryan', 'andrew wiltse',
+  // Gi / all-round
+  'bernardo faria', 'marcelo garcia', 'keenan cornelius', 'ryan hall',
+  'tom deblass', 'lucas leite', 'travis stevens', 'pedro sauer',
+  // Content creators / instructors
+  'chewjitsu', 'stephan kesting', 'bjj fanatics', 'firas zahabi',
+  'priit mihkelson', 'geo martinez', 'knight jiu jitsu',
+  'invisible jiu jitsu', 'grapplearts', 'the grappling academy',
+  // Advanced system specialists
+  'eddie bravo', 'rubber guard', 'oliver taza', 'kyle boehm',
 ]
 
 // ── YouTube Data API search ───────────────────────────────────────────────────
@@ -102,7 +109,22 @@ function buildTools(state: { searchCount: number; queuedCount: number; queuedUrl
 
         // Build gap list from the submission events that matter most
         const submissionEvents = EVENT_TYPES.filter(e => e.parent === 'submission')
-        const keyPositions = ['mount', 'closed_guard', 'back_control', 'side_control', 'half_guard', 'turtle', 'ashi_garami', 'fifty_fifty', 'single_leg_x', 'butterfly_guard', 'de_la_riva', 'open_guard', 'standing']
+        const keyPositions = [
+          // ── Top positions ───────────────────────────────────────────────────
+          'mount', 'side_control', 'back_control', 'north_south', 'knee_on_belly',
+          // ── Guard family ────────────────────────────────────────────────────
+          'closed_guard', 'half_guard', 'deep_half', 'butterfly_guard',
+          'open_guard', 'rubber_guard',
+          // ── Modern guard systems ────────────────────────────────────────────
+          'de_la_riva', 'reverse_de_la_riva', 'x_guard', 'single_leg_x',
+          'spider_guard', 'lasso_guard', 'worm_guard', 'k_guard',
+          // ── Leg entanglement ────────────────────────────────────────────────
+          'ashi_garami', 'inside_sankaku', 'fifty_fifty',
+          // ── Turtle / back-taking / advanced ─────────────────────────────────
+          'turtle', 'truck', 'crucifix',
+          // ── Standing ────────────────────────────────────────────────────────
+          'standing',
+        ]
 
         const gaps: Array<{ eventId: string; eventName: string; positionId: string | null; positionName: string; currentCount: number }> = []
 
@@ -246,12 +268,20 @@ The library stores technique variants — visual descriptions of how specific su
 3. Continue until all gaps are addressed or the search budget runs out
 4. Call finish with a summary
 
+## Technique coverage — all belt levels
+The library must cover white through black belt techniques. Priority order:
+1. Core submissions (armbar, triangle, kimura, guillotine, heel hook, RNC)
+2. Intermediate (darce, anaconda, north-south choke, toe hold, calf slicer, kneebar, omoplata)
+3. Advanced no-gi (inside sankaku entries, outside heel hook, truck/twister, K-guard, wrist lock, bicep slicer, von flue)
+4. Advanced gi (baseball bat choke, clock choke, paper cutter choke, ezekiel choke, worm guard attacks)
+5. System-specific (rubber guard triangle/omoplata, crucifix submissions, deep half kimura)
+
 ## What makes a good instructional video
 - Expert coach narrating the technique step by step
 - Single focused technique (not "10 submissions from guard")
 - Medium length (5–15 min) — enough detail without being a full course
 - Clear camera angle showing the mechanics
-- Trusted channels (Danaher, Bernardo Faria, Lachlan Giles, Chewjitsu, Stephan Kesting, Gordon Ryan, etc.)
+- Trusted channels: Danaher, Gordon Ryan, Lachlan Giles, Craig Jones, Garry Tonon, Mikey Musumeci, Andrew Wiltse, Nicky Ryan, Bernardo Faria, Marcelo Garcia, Keenan Cornelius, Ryan Hall, Tom DeBlass, Lucas Leite, Chewjitsu, Stephan Kesting, Priit Mihkelson, BJJ Fanatics, etc.
 
 ## What to avoid
 - YouTube Shorts or videos under 3 minutes
