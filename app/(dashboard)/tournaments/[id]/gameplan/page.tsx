@@ -195,7 +195,10 @@ export default async function GameplanPage({
 
           {plan ? (
             <>
-              <GameplanDisplay plan={plan} />
+              <GameplanDisplay
+                plan={plan}
+                drillRefs={(existingGameplan?.evidence as { drill_refs?: DrillRef[] } | null)?.drill_refs}
+              />
               {/* Mobile: rating + print after content, not before */}
               {existingGameplan && plan && (
                 <div className="flex sm:hidden items-center gap-2">
@@ -380,7 +383,41 @@ function MatchCard({ card }: { card: GameplanOutput['match_card'] }) {
   )
 }
 
-function GameplanDisplay({ plan }: { plan: GameplanOutput }) {
+type DrillRef = { id: string; name: string; eventId: string; positionId: string | null; sourceUrl: string; sourceLabel: string }
+
+function DrillLibrary({ drillRefs }: { drillRefs: DrillRef[] }) {
+  if (drillRefs.length === 0) return null
+  return (
+    <Section title="Drill Library">
+      <div className="rounded-xl border border-border/60 bg-card overflow-hidden divide-y divide-border/40">
+        {drillRefs.map((ref) => (
+          <a
+            key={ref.id}
+            href={ref.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 px-4 py-3 hover:bg-foreground/[0.04] transition-colors group"
+          >
+            <svg className="w-4 h-4 text-rose-500 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+            </svg>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold truncate">{ref.sourceLabel || ref.name}</p>
+              <p className="text-[10px] text-muted-foreground/40 font-mono">
+                {ref.eventId}{ref.positionId ? ` · ${ref.positionId}` : ''}
+              </p>
+            </div>
+            <svg className="w-3 h-3 text-muted-foreground/25 flex-shrink-0 group-hover:text-muted-foreground/60 transition-colors" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 10L10 2M5 2h5v5" />
+            </svg>
+          </a>
+        ))}
+      </div>
+    </Section>
+  )
+}
+
+function GameplanDisplay({ plan, drillRefs }: { plan: GameplanOutput; drillRefs?: DrillRef[] }) {
   return (
     <div className="space-y-3">
       {/* Match-day card — only on gameplans generated with v2+ prompt */}
@@ -520,6 +557,9 @@ function GameplanDisplay({ plan }: { plan: GameplanOutput }) {
           )}
         </div>
       </Section>
+
+      {/* Drill Library */}
+      {drillRefs && <DrillLibrary drillRefs={drillRefs} />}
     </div>
   )
 }

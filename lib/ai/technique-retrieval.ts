@@ -11,6 +11,8 @@ export type TechniqueVariant = {
   visualCues: string
   counters: string | null
   referenceImageUrl: string | null
+  sourceUrl: string | null
+  sourceLabel: string | null
 }
 
 const FORMAT_FILTER = (format: 'gi' | 'no_gi') =>
@@ -19,6 +21,7 @@ const FORMAT_FILTER = (format: 'gi' | 'no_gi') =>
 const COLS = {
   id: true, eventId: true, positionId: true, name: true, format: true,
   visualCues: true, counters: true, referenceImageUrl: true,
+  sourceUrl: true, sourceLabel: true,
 } as const
 
 // ─── Extraction (first Gemini pass) ──────────────────────────────────────────

@@ -188,7 +188,7 @@ export const generateGameplan = inngest.createFunction(
       }
     }) as Parameters<typeof buildGameplanUserPrompt>[0]
 
-    const { plan, usage, latencyMs } = await step.run('synthesise-gameplan', async () => {
+    const { plan, usage, latencyMs, drillRefs } = await step.run('synthesise-gameplan', async () => {
       const start = Date.now()
 
       // Fetch technique context for opponent's observed submissions + athlete's observed submissions
@@ -209,8 +209,22 @@ export const generateGameplan = inngest.createFunction(
         system: buildGameplanSystemPrompt(techniqueContext),
         prompt: buildGameplanUserPrompt(gameplanData),
       })
-      return { plan: object, usage, latencyMs: Date.now() - start }
-    }) as { plan: GameplanOutput; usage: { inputTokens: number; outputTokens: number }; latencyMs: number }
+
+      // Collect drill refs — technique variants with source videos, deduplicated by sourceUrl
+      const seenUrls = new Set<string>()
+      const drillRefs = techniqueVariants
+        .filter(v => v.sourceUrl && !seenUrls.has(v.sourceUrl) && seenUrls.add(v.sourceUrl))
+        .map(v => ({
+          id: v.id,
+          name: v.name,
+          eventId: v.eventId,
+          positionId: v.positionId ?? null,
+          sourceUrl: v.sourceUrl!,
+          sourceLabel: v.sourceLabel ?? v.name,
+        }))
+
+      return { plan: object, usage, latencyMs: Date.now() - start, drillRefs }
+    }) as { plan: GameplanOutput; usage: { inputTokens: number; outputTokens: number }; latencyMs: number; drillRefs: Array<{ id: string; name: string; eventId: string; positionId: string | null; sourceUrl: string; sourceLabel: string }> }
 
     await step.run('store-gameplan', async () => {
       const existingGameplan = await db.query.gameplans.findFirst({
@@ -220,6 +234,7 @@ export const generateGameplan = inngest.createFunction(
       const evidence = {
         user_match_ids: gameplanData.yourMatches.map(m => m.id),
         opponent_match_ids: gameplanData.opponentMatches.map(m => m.id),
+        drill_refs: drillRefs,
       }
 
       if (existingGameplan) {
