@@ -16,7 +16,7 @@ import { buildReviewEventsSystemPrompt, buildReviewEventsUserPrompt, REVIEW_EVEN
 import { buildScanSubmissionsSystemPrompt, buildScanSubmissionsUserPrompt, SCAN_SUBMISSIONS_PROMPT_VERSION } from '../lib/ai/prompts/scan-submissions'
 import { EventReviewOutputSchema } from '../lib/ai/schemas/event-review'
 import { SubmissionScanOutputSchema } from '../lib/ai/schemas/submission-scan'
-import { getTechniqueVariantsForAnalysis, formatVariantsAsPromptBlock } from '../lib/ai/technique-retrieval'
+import { getTechniqueVariantsForExtraction, getTechniqueVariantsForPositions, formatVariantsAsPromptBlock } from '../lib/ai/technique-retrieval'
 
 const CONFUSION_PRONE = new Set([
   'closed_guard', 'back_control', 'mount', 'side_control',
@@ -72,8 +72,8 @@ export const analyzeVideo = inngest.createFunction(
       let object: Awaited<ReturnType<typeof generateObject<typeof MatchExtractionOutputSchema>>>['object']
       let usage: Awaited<ReturnType<typeof generateObject<typeof MatchExtractionOutputSchema>>>['usage']
 
-      // Fetch active technique variants for this match format — inject as visual reference
-      const techniqueVariants = await getTechniqueVariantsForAnalysis(match.format)
+      // Fetch general technique variants (positionId IS NULL) — format-filtered, cap 15
+      const techniqueVariants = await getTechniqueVariantsForExtraction(match.format)
       const techniquePromptBlock = formatVariantsAsPromptBlock(techniqueVariants)
 
       const start = Date.now()
@@ -295,24 +295,37 @@ export const analyzeVideo = inngest.createFunction(
 
       if (suspicious.length === 0) return { suspicious: 0 }
 
+      // Cap to top-3 highest-priority windows to control Gemini cost (high before medium)
+      const topWindows = suspicious
+        .sort((a, b) => (a.priority === 'high' ? -1 : 1) - (b.priority === 'high' ? -1 : 1))
+        .slice(0, 3)
+
+      // Fetch position-specific technique variants now that we know which positions appeared
+      const positionIds = allSegments.map(s => s.positionId)
+      const match2 = await db.query.matches.findFirst({ where: eq(matches.id, matchId) })
+      const positionVariants = match2
+        ? await getTechniqueVariantsForPositions(positionIds, match2.format)
+        : []
+      const positionTechniqueBlock = formatVariantsAsPromptBlock(positionVariants)
+
       // ── Gemini targeted re-scan of flagged windows ────────────────────────
       const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
       const scanStart = Date.now()
       let scanResult: Awaited<ReturnType<typeof generateObject<typeof SubmissionScanOutputSchema>>>
 
       try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const scanContent: any[] = [
+          { type: 'file', data: new URL(geminiFileUri), mediaType: (video?.contentType ?? 'video/mp4') as `${string}/${string}` },
+          { type: 'text', text: buildScanSubmissionsUserPrompt(topWindows) },
+        ]
+
         scanResult = await generateObject({
           model: google(GEMINI_VIDEO_MODEL),
           schema: SubmissionScanOutputSchema,
           maxRetries: 0,
-          system: buildScanSubmissionsSystemPrompt(),
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'file', data: new URL(geminiFileUri), mediaType: (video?.contentType ?? 'video/mp4') as `${string}/${string}` },
-              { type: 'text', text: buildScanSubmissionsUserPrompt(suspicious) },
-            ],
-          }],
+          system: buildScanSubmissionsSystemPrompt(positionTechniqueBlock),
+          messages: [{ role: 'user', content: scanContent }],
         })
       } catch {
         return { suspicious: suspicious.length, scanned: 0, error: 'scan_failed' }
@@ -332,7 +345,7 @@ export const analyzeVideo = inngest.createFunction(
         status: 'success',
       })
 
-      if (scanObject.events.length === 0) return { suspicious: suspicious.length, added: 0 }
+      if (scanObject.events.length === 0) return { suspicious: suspicious.length, scanned: 0, added: 0 }
 
       // Deduplicate against existing events (skip if same type within ±10s)
       const existingEvents = await db.query.matchEvents.findMany({ where: eq(matchEvents.matchId, matchId) })

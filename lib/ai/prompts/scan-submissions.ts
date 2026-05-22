@@ -6,8 +6,12 @@ function fmt(s: number): string {
   return `${m}:${String(sec).padStart(2, '0')}`
 }
 
-export function buildScanSubmissionsSystemPrompt(): string {
-  return `You are an expert BJJ video analyst performing a targeted re-scan for missed submission attempts.
+export function buildScanSubmissionsSystemPrompt(techniqueContext?: string): string {
+  const techniqueSection = techniqueContext
+    ? `\n\n${techniqueContext}\n\nUse the technique library above as additional visual reference when identifying submissions in the flagged windows.`
+    : ''
+
+  return `You are an expert BJJ video analyst performing a targeted re-scan for missed submission attempts.${techniqueSection}
 
 You will be given specific time windows to examine. For each window, focus ONLY on that time range and look for submission setups — grips, isolations, and positional threats that put a joint or airway at risk.
 
