@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '../../../../../lib/db'
 import { tournaments, tournamentOpponents, videos, matches, gameplans } from '../../../../../lib/db/schema'
-import { eq, and, inArray, like, sql, ne, notInArray } from 'drizzle-orm'
+import { eq, and, inArray, like, sql, ne, notInArray, isNotNull } from 'drizzle-orm'
 import { cloneOpponentMatches } from '../../../../../lib/db/clone-analysis'
 import { inngest } from '../../../../../lib/inngest'
 import { getOrCreateDbUserId } from '../../../../../lib/db/get-user'
@@ -132,7 +132,9 @@ export async function submitScoutUrls(tournamentId: string, opponentId: string, 
     // clone the results silently — no Gemini call needed.
     if (isYouTubeUrl(storedUrl)) {
       const priorVideo = await db.query.videos.findFirst({
-        where: (v) => and(eq(v.publicUrl, storedUrl), eq(v.status, 'analysed')),
+        // Exclude orphaned videos (tournamentOpponentId = null) — these are from deleted opponents
+        // and their analysis results may be stale or wrong. Only clone from active opponent videos.
+        where: (v) => and(eq(v.publicUrl, storedUrl), eq(v.status, 'analysed'), isNotNull(v.tournamentOpponentId)),
       })
       if (priorVideo) {
         // Create a stub video record owned by this user
@@ -307,6 +309,12 @@ export async function deleteOpponent(opponentId: string, tournamentId: string): 
     // gameplans.opponentId has no onDelete clause — delete it first or the FK blocks the delete.
     // planExecutions cascade from gameplans, so they're cleaned up automatically.
     await db.delete(gameplans).where(eq(gameplans.opponentId, opponentId))
+    // Videos and their matches must be explicitly deleted: videos.tournamentOpponentId is
+    // onDelete:'set null', so the opponent delete would orphan them instead of removing them.
+    // Orphaned 'analysed' videos poison the cross-user YouTube dedup cache — the same URL
+    // submitted for a re-added opponent would silently clone wrong results with no Inngest run.
+    // matches.videoId is onDelete:'cascade', so deleting videos also removes their matches.
+    await db.delete(videos).where(eq(videos.tournamentOpponentId, opponentId))
     await db.delete(tournamentOpponents).where(eq(tournamentOpponents.id, opponentId))
     revalidatePath(`/tournaments/${tournamentId}/opponents`)
     return {}
