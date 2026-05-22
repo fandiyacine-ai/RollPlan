@@ -69,18 +69,12 @@ export const scanUrl = inngest.createFunction(
 
       await db.update(videos).set({ status: 'processing' }).where(eq(videos.id, videoId))
 
-      // YouTube full-video: use OCR frame scan instead of Gemini.
-      // FFmpeg extracts 1 frame/30s, Tesseract reads scoreboard text to find the athlete.
-      // Deterministic, cheap, no LLM token costs, and no chunking needed.
+      // YouTube full-video passes go straight to chunked scanning — no initial sparse scan.
+      // A 0.05fps sweep of a 3h stream is too thin to reliably find all matches; it often
+      // catches only 1 of N (or a scoreboard animation), then extracts wrong footage and
+      // misses the rest entirely. Chunked 0.1fps 20-min windows are the reliable path.
       if (isYouTubeUrl(video.publicUrl) && chunkIndex === undefined) {
-        const ocrMatches = await ocrScanYouTube(video.publicUrl, athleteName)
-        if (ocrMatches.length === 0) {
-          const reason = `"${athleteName}" was not found in this video — name was not visible on any scoreboard.`
-          await db.update(videos).set({ status: 'failed', failureReason: reason }).where(eq(videos.id, videoId))
-          throw new NonRetriableError(reason)
-        }
-        await db.update(videos).set({ status: 'processing' }).where(eq(videos.id, videoId))
-        return ocrMatches
+        return null
       }
 
       const start = Date.now()
