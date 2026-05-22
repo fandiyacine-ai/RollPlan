@@ -362,7 +362,7 @@ export const scanUrl = inngest.createFunction(
               // This guarantees the full match is in the clip regardless of how imprecise
               // start_seconds was. The extraction model is then told to anchor from the outcome
               // screen at the END of the clip and work backwards.
-              const MAX_MATCH_DURATION = 10 * 60 // 10 min — covers any AJP/IBJJF match
+              const MAX_MATCH_DURATION = 8 * 60  // 8 min — covers most AJP/IBJJF matches while keeping frame count manageable
               const OUTCOME_TAIL = 120            // 2 min after outcome screen
 
               const chunkOffset = startSeconds ?? 0
@@ -379,7 +379,7 @@ export const scanUrl = inngest.createFunction(
               const outcomeOffsetInClip = outcomeAbsolute - clipStart
 
               const videoOptions = {
-                fps: 1.0,
+                fps: 0.5, // 0.5fps gives 1 frame/2s — sufficient for BJJ position analysis, halves token usage vs 1fps
                 ...(clipStart > 0 ? { startSeconds: clipStart } : {}),
                 ...(clipEnd !== undefined ? { endSeconds: clipEnd } : {}),
               }
@@ -433,6 +433,11 @@ export const scanUrl = inngest.createFunction(
             }
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err)
+            // Token limit in extraction — mark failed immediately (retrying won't help, clip is already as small as we can make it)
+            if (msg.includes('input token count exceeds') || msg.includes('maximum number of tokens allowed')) {
+              await db.update(matches).set({ status: 'failed' }).where(eq(matches.id, matchId))
+              throw new NonRetriableError('Extraction clip exceeded Gemini token limit — match skipped.')
+            }
             // Transient errors — leave status as 'processing' so UI doesn't flash 'failed'
             // during a retry, and use RetryAfterError so we don't hammer the API immediately.
             if (
