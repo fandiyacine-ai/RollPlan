@@ -23,7 +23,7 @@ import { EVENT_TYPES } from '../lib/taxonomy/events'
 import { POSITIONS } from '../lib/taxonomy/positions'
 
 const MAX_SEARCHES_PER_RUN = 40   // YouTube API budget: 100 units/search, 10k/day free
-const MAX_VIDEOS_QUEUED = 60      // cap total ingest jobs triggered per run
+const MAX_VIDEOS_QUEUED = 120     // cap total ingest jobs triggered per run
 const MIN_ACTIVE_VARIANTS = 2     // target coverage per event/position combo
 
 // Trusted channel keywords — Claude uses this list to evaluate results
@@ -232,7 +232,7 @@ export const techniqueKbAgent = inngest.createFunction(
 
       const { text, usage, steps } = await generateText({
         model: anthropic(CLAUDE_SYNTHESIS_MODEL),
-        stopWhen: stepCountIs(60),  // enough for ~20 gaps × 2 searches + overhead
+        stopWhen: stepCountIs(120), // enough for ~40 gaps × 2 searches + overhead
         system: `You are an autonomous BJJ technique library curator. Your job is to fill gaps in a technique knowledge base that powers match analysis and gameplans for competitive BJJ athletes.
 
 The library stores technique variants — visual descriptions of how specific submissions look on camera, used to help AI detect them in competition footage.
