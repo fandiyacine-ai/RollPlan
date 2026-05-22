@@ -2,6 +2,7 @@ import { spawnSync } from 'child_process'
 import { mkdtempSync, readdirSync, rmSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
+import ytdl from '@distube/ytdl-core'
 import type { FoundMatch } from '../ai/schemas/url-scan'
 
 // Strip diacritics and normalize to uppercase ASCII for fuzzy matching
@@ -78,16 +79,14 @@ function clusterMatches(hits: Hit[], athleteName: string): FoundMatch[] {
  * Requires system packages: yt-dlp, ffmpeg, tesseract (added via nixpacks.toml)
  */
 export async function ocrScanYouTube(youtubeUrl: string, athleteName: string): Promise<FoundMatch[]> {
-  // Step 1: get lowest-quality direct stream URL (smaller download = faster scan)
-  const ytResult = spawnSync(
-    'yt-dlp',
-    ['-f', 'worstvideo[ext=mp4]+worstaudio[ext=m4a]/worst[ext=mp4]/worst', '--get-url', youtubeUrl],
-    { encoding: 'utf8', timeout: 45_000 }
-  )
-  if ((ytResult.status !== 0 && ytResult.status !== null) || !ytResult.stdout?.trim()) {
-    throw new Error(`yt-dlp failed (exit ${ytResult.status}): ${(ytResult.stderr || '').slice(0, 300)}`)
-  }
-  const directUrl = ytResult.stdout.trim().split('\n')[0]
+  // Step 1: get lowest-quality direct stream URL via ytdl-core (no binary dependency)
+  const info = await ytdl.getInfo(youtubeUrl)
+  const format = ytdl.chooseFormat(info.formats, {
+    quality: 'lowestvideo',
+    filter: f => !!f.url && (f.container === 'mp4' || f.container === 'webm'),
+  })
+  if (!format?.url) throw new Error('Could not get direct stream URL from YouTube')
+  const directUrl = format.url
 
   // Step 2: extract 1 frame per 30s as JPEG into a temp dir
   const tmpDir = mkdtempSync(join(tmpdir(), 'rp-ocr-'))
