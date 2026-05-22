@@ -11,6 +11,7 @@ import { MatchExtractionOutputSchema, type MatchExtractionOutput } from '../lib/
 import { PositionVerificationSchema } from '../lib/ai/schemas/position-verification'
 import { InsightsOutputSchema } from '../lib/ai/schemas/insights'
 import { buildScanUrlSystemPrompt, buildScanUrlUserPrompt, SCAN_URL_PROMPT_VERSION } from '../lib/ai/prompts/scan-url'
+import { ocrScanYouTube } from '../lib/scan/frame-ocr'
 import { createNotification } from '../lib/db/notifications'
 import { buildExtractMatchSystemPrompt, buildExtractMatchUserPrompt, EXTRACT_MATCH_PROMPT_VERSION } from '../lib/ai/prompts/extract-match'
 import { buildVerifyPositionsSystemPrompt, buildVerifyPositionsUserPrompt, VERIFY_POSITIONS_PROMPT_VERSION } from '../lib/ai/prompts/verify-positions'
@@ -68,12 +69,18 @@ export const scanUrl = inngest.createFunction(
 
       await db.update(videos).set({ status: 'processing' }).where(eq(videos.id, videoId))
 
-      // YouTube full-video passes go straight to chunked scanning — no initial sparse scan.
-      // A 0.05fps sweep of a 3h stream is too thin to reliably find all matches; it often
-      // catches only 1 of N (or a scoreboard animation), then extracts wrong footage and
-      // misses the rest entirely. Chunked 0.1fps 20-min windows are the reliable path.
+      // YouTube full-video: use OCR frame scan instead of Gemini.
+      // FFmpeg extracts 1 frame/30s, Tesseract reads scoreboard text to find the athlete.
+      // Deterministic, cheap, no LLM token costs, and no chunking needed.
       if (isYouTubeUrl(video.publicUrl) && chunkIndex === undefined) {
-        return null
+        const ocrMatches = await ocrScanYouTube(video.publicUrl, athleteName)
+        if (ocrMatches.length === 0) {
+          const reason = `"${athleteName}" was not found in this video — name was not visible on any scoreboard.`
+          await db.update(videos).set({ status: 'failed', failureReason: reason }).where(eq(videos.id, videoId))
+          throw new NonRetriableError(reason)
+        }
+        await db.update(videos).set({ status: 'processing' }).where(eq(videos.id, videoId))
+        return ocrMatches
       }
 
       const start = Date.now()
