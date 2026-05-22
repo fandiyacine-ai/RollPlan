@@ -225,8 +225,11 @@ export const analyzeVideo = inngest.createFunction(
     })
 
     await step.run('generate-insights', async () => {
-      const segments = await db.query.positionSegments.findMany({ where: eq(positionSegments.matchId, matchId) })
-      const events = await db.query.matchEvents.findMany({ where: eq(matchEvents.matchId, matchId) })
+      const [matchRow, segments, events] = await Promise.all([
+        db.query.matches.findFirst({ where: eq(matches.id, matchId) }),
+        db.query.positionSegments.findMany({ where: eq(positionSegments.matchId, matchId) }),
+        db.query.matchEvents.findMany({ where: eq(matchEvents.matchId, matchId) }),
+      ])
 
       const matchData = {
         segments: segments.map((s) => ({
@@ -257,7 +260,7 @@ export const analyzeVideo = inngest.createFunction(
           model: anthropic(CLAUDE_SYNTHESIS_MODEL),
           schema: InsightsOutputSchema,
           maxRetries: 0,
-          system: buildGenerateInsightsSystemPrompt(),
+          system: buildGenerateInsightsSystemPrompt(matchRow?.competitorLabel ?? 'athlete', matchRow?.opponentLabel ?? 'opponent'),
           prompt: JSON.stringify(matchData),
         })
       } catch (err: unknown) {
