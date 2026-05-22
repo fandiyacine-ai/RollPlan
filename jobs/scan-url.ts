@@ -17,6 +17,14 @@ import { buildExtractMatchSystemPrompt, buildExtractMatchUserPrompt, EXTRACT_MAT
 import { buildVerifyPositionsSystemPrompt, buildVerifyPositionsUserPrompt, VERIFY_POSITIONS_PROMPT_VERSION } from '../lib/ai/prompts/verify-positions'
 import { buildGenerateInsightsSystemPrompt, GENERATE_INSIGHTS_PROMPT_VERSION } from '../lib/ai/prompts/generate-insights'
 
+// Gemini returns timestamps in MM.SS decimal format (e.g. 38.32 = 38 min 32 sec = 2312s).
+// Used for both scan results and extraction segment timestamps.
+function mmssToSecs(t: number): number {
+  const m = Math.floor(t)
+  const s = Math.round((t % 1) * 100)
+  return m * 60 + s
+}
+
 const CONFUSION_PRONE = new Set([
   'closed_guard', 'back_control', 'mount', 'side_control',
   'turtle', 'north_south', 'half_guard', 'butterfly_guard', 'knee_on_belly',
@@ -275,17 +283,6 @@ export const scanUrl = inngest.createFunction(
 
     const foundMatches: FoundMatch[] = scanStepResult
 
-    // Gemini sometimes returns timestamps in MM.SS decimal format rather than pure seconds
-    // (e.g. 38.32 means 38 min 32 sec = 2312s, not 38.32s). This happens when Gemini reads
-    // the competition scoreboard clock and reports it as a floating-point "minute.second" value.
-    // Detect by raw match duration < 60: a real BJJ match cannot last less than a minute,
-    // so a sub-60-unit duration is an unambiguous signal the unit is minutes, not seconds.
-    function mmssToSecs(t: number): number {
-      const m = Math.floor(t)
-      const s = Math.round((t % 1) * 100)
-      return m * 60 + s
-    }
-
     for (let i = 0; i < foundMatches.length; i++) {
       const found = { ...foundMatches[i] }
 
@@ -489,12 +486,22 @@ export const scanUrl = inngest.createFunction(
             return { matchId, status: 'analysed' }
           }
 
+          // Extraction may also return timestamps in MM.SS decimal format.
+          // Detect using the same span heuristic: if the total range of segment
+          // timestamps is < 60 units, the unit is minutes not seconds.
+          const posSpan = extractObject.positions.length > 0
+            ? Math.max(...extractObject.positions.map(p => p.end_seconds))
+              - Math.min(...extractObject.positions.map(p => p.start_seconds))
+            : 999
+          const extractNeedsMMSS = isYT && posSpan < 60
+          const toSecs = extractNeedsMMSS ? mmssToSecs : (t: number) => t
+
           await db.transaction(async (tx) => {
             await tx.insert(positionSegments).values(
               extractObject.positions.map((p) => ({
                 matchId,
-                startSeconds: p.start_seconds,
-                endSeconds: p.end_seconds,
+                startSeconds: toSecs(p.start_seconds),
+                endSeconds: toSecs(p.end_seconds),
                 positionId: p.position_id,
                 userRole: p.user_role,
                 dominance: p.dominance,
@@ -507,7 +514,7 @@ export const scanUrl = inngest.createFunction(
               await tx.insert(matchEvents).values(
                 extractObject.events.map((e) => ({
                   matchId,
-                  timestampSeconds: e.timestamp_seconds,
+                  timestampSeconds: toSecs(e.timestamp_seconds),
                   eventTypeId: e.event_type_id,
                   actor: e.actor,
                   outcome: e.outcome,
