@@ -67,6 +67,10 @@ export const ingestTechnique = inngest.createFunction(
     })
 
     const variantId = await step.run('create-draft-record', async () => {
+      // Auto-approve when Gemini is confident: high source quality + substantial visual cues
+      const autoApprove = object.source_quality === 'high' && object.visual_cues.length >= 200
+      const status = autoApprove ? 'active' : 'draft'
+
       const [record] = await db.insert(techniqueVariants).values({
         eventId: object.event_id,
         positionId: object.position_id ?? null,
@@ -77,24 +81,25 @@ export const ingestTechnique = inngest.createFunction(
         sourceUrl: youtubeUrl,
         sourceLabel: techniqueHint ?? object.name,
         extractedByModel: GEMINI_VIDEO_MODEL,
-        status: 'draft',
+        status,
         adminNotes: [
+          autoApprove ? 'Auto-approved (high quality)' : '',
           object.extraction_notes ?? '',
           `Source quality: ${object.source_quality}`,
           object.key_moment_seconds != null ? `Key moment: ${Math.floor(object.key_moment_seconds / 60)}:${String(Math.floor(object.key_moment_seconds % 60)).padStart(2, '0')}` : '',
         ].filter(Boolean).join(' | ') || null,
       }).returning({ id: techniqueVariants.id })
 
-      return record.id
+      return { id: record.id, status }
     })
 
     return {
-      variantId,
+      variantId: variantId.id,
       name: object.name,
       eventId: object.event_id,
       positionId: object.position_id,
       sourceQuality: object.source_quality,
-      status: 'draft',
+      status: variantId.status,
     }
   }
 )
