@@ -94,6 +94,7 @@ export default async function MatchDetailPage({
   const positionStats: Record<string, { total: number; dominant: number; neutral: number; inferior: number }> = {}
   for (const seg of segments) {
     const dur = seg.endSeconds - seg.startSeconds
+    if (dur <= 0) continue
     if (!positionStats[seg.positionId]) {
       positionStats[seg.positionId] = { total: 0, dominant: 0, neutral: 0, inferior: 0 }
     }

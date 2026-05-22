@@ -577,36 +577,9 @@ export function ScoutingView({
       {/* ── Desktop: two-panel ── */}
       <div className="hidden md:flex flex-1 overflow-hidden gap-4 pt-4">
 
-        {/* Left — video + compact position bars */}
+        {/* Left — video only (stats are in the Stats tab) */}
         <div className="flex flex-col w-[48%] flex-shrink-0 gap-3 overflow-hidden">
           <VideoBlock />
-          {sortedPositions.length > 0 && (
-            <div className="rounded-xl border border-border/60 p-3 space-y-2 flex-shrink-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Time on Mat</p>
-              {sortedPositions.slice(0, 5).map(([posId, stats]) => {
-                const name = positionNames[posId] ?? posId
-                const barPct = (stats.total / maxPositionTime) * 100
-                const domPct = (stats.dominant / stats.total) * 100
-                const infPct = (stats.inferior / stats.total) * 100
-                const neuPct = Math.max(0, 100 - domPct - infPct)
-                return (
-                  <div key={posId}>
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-xs font-medium">{name}</span>
-                      <span className="text-[11px] text-muted-foreground tabular-nums">{fmtTime(stats.total)}</span>
-                    </div>
-                    <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                      <div className="h-full flex rounded-full overflow-hidden" style={{ width: `${barPct}%` }}>
-                        <div className="bg-emerald-500" style={{ width: `${domPct}%` }} />
-                        <div className="bg-zinc-600" style={{ width: `${neuPct}%` }} />
-                        <div className="bg-rose-400" style={{ width: `${infPct}%` }} />
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
         </div>
 
         {/* Right — tabbed panel + pinned chat */}
