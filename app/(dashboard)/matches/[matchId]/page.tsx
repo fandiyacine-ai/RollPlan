@@ -9,8 +9,10 @@ import { NarrateButton } from './narrate-button'
 import { ShareButton } from './share-button'
 import { CorrectResultButton } from './correct-result-button'
 import { ScoutingView } from './scouting-view'
+import { ReanalyzeButton } from './reanalyze-button'
 import { POSITIONS } from '../../../../lib/taxonomy/positions'
 import { EVENT_TYPES } from '../../../../lib/taxonomy/events'
+import { auth } from '@clerk/nextjs/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,6 +62,11 @@ function formatTime(seconds: number): string {
   return s > 0 ? `${m}m ${s}s` : `${m}m`
 }
 
+function isAdmin(clerkId: string | null | undefined) {
+  const adminId = process.env.ADMIN_CLERK_USER_ID
+  return !!adminId && clerkId === adminId
+}
+
 export default async function MatchDetailPage({
   params,
   searchParams,
@@ -69,6 +76,7 @@ export default async function MatchDetailPage({
 }) {
   const { matchId } = await params
   const { back } = await searchParams
+  const { userId: clerkUserId } = await auth()
 
   const backHref = back ?? '/matches'
   const backLabel = back?.includes('/tournaments') ? '← Scout Opponent' : '← My Matches'
@@ -144,26 +152,34 @@ export default async function MatchDetailPage({
   // Scouting view: full-width two-panel layout for opponent footage
   if (match.tournamentOpponentId && match.status === 'analysed') {
     return (
-      <ScoutingView
-        match={{
-          id: match.id,
-          competitorLabel: match.competitorLabel,
-          opponentLabel: match.opponentLabel,
-          format: match.format,
-          context: match.context,
-          eventName: match.eventName,
-          resultWinner: match.resultWinner,
-          resultMethod: match.resultMethod,
-          resultTechnique: match.resultTechnique,
-        }}
-        videoUrl={video?.publicUrl ?? null}
-        insights={matchInsights}
-        timelineItems={timelineItems}
-        sortedPositions={sortedPositions}
-        maxPositionTime={maxPositionTime}
-        positionNames={POSITION_MAP}
-        backHref={backHref}
-      />
+      <>
+        <ScoutingView
+          match={{
+            id: match.id,
+            competitorLabel: match.competitorLabel,
+            opponentLabel: match.opponentLabel,
+            format: match.format,
+            context: match.context,
+            eventName: match.eventName,
+            resultWinner: match.resultWinner,
+            resultMethod: match.resultMethod,
+            resultTechnique: match.resultTechnique,
+          }}
+          videoUrl={video?.publicUrl ?? null}
+          insights={matchInsights}
+          timelineItems={timelineItems}
+          sortedPositions={sortedPositions}
+          maxPositionTime={maxPositionTime}
+          positionNames={POSITION_MAP}
+          backHref={backHref}
+        />
+        {isAdmin(clerkUserId) && (
+          <div className="fixed bottom-4 right-4 z-50 bg-zinc-900/95 backdrop-blur border border-zinc-700 rounded-lg px-3 py-2 flex items-center gap-2 text-[10px]">
+            <span className="text-zinc-500">Admin</span>
+            <ReanalyzeButton matchId={matchId} />
+          </div>
+        )}
+      </>
     )
   }
 
@@ -338,6 +354,14 @@ export default async function MatchDetailPage({
               </div>
             )}
           </div>
+
+          {/* Admin: re-run full pipeline */}
+          {isAdmin(clerkUserId) && (
+            <div className="flex items-center gap-2 text-[10px] text-zinc-600">
+              <span>Admin:</span>
+              <ReanalyzeButton matchId={matchId} />
+            </div>
+          )}
 
           {/* Video + Timeline + Coaching Notes */}
           <MatchContent
