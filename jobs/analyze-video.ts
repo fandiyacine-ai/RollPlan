@@ -41,7 +41,9 @@ export const analyzeVideo = inngest.createFunction(
     await step.run('validate-video', async () => {
       const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
       if (!video) throw new Error(`Video ${videoId} not found`)
-      if (video.durationSeconds && video.durationSeconds > 900) {
+      // Skip duration check for YouTube URLs — they're full tournament streams and will
+      // be bounded to the match window via startOffset/endOffset in later steps.
+      if (!isYouTubeUrl(video.publicUrl ?? '') && video.durationSeconds && video.durationSeconds > 900) {
         await markFailed(matchId, videoId)
         throw new NonRetriableError('Video exceeds 15-minute limit. Please upload a single match clip.')
       }
@@ -91,7 +93,13 @@ export const analyzeVideo = inngest.createFunction(
       try {
         if (isYouTube) {
           // YouTube streams can be hours long — pass time bounds so Gemini only
-          // processes the match window (set by the smoothcomp scanner on original ingest)
+          // processes the match window (set by the smoothcomp scanner on original ingest).
+          // Gemini returns timestamps relative to startOffset (0-based), so we add
+          // videoStartSeconds back when storing to get absolute stream positions.
+          const matchDurationSeconds =
+            videoStartSeconds != null && videoEndSeconds != null
+              ? videoEndSeconds - videoStartSeconds
+              : undefined
           const result = await geminiVideoObject(GEMINI_VIDEO_MODEL, {
             system: buildExtractMatchSystemPrompt(techniquePromptBlock),
             videoUrl: geminiFileUri,
@@ -104,7 +112,7 @@ export const analyzeVideo = inngest.createFunction(
               appearanceHint: appearanceHint || undefined,
               format: match.format,
               ruleset: match.ruleset,
-              durationSeconds: video.durationSeconds ?? undefined,
+              durationSeconds: matchDurationSeconds,
             }),
             schema: MatchExtractionOutputSchema,
             referenceImageBase64: athleteImageBase64 || undefined,
@@ -165,12 +173,16 @@ export const analyzeVideo = inngest.createFunction(
         throw new NonRetriableError('Video does not appear to contain a BJJ match. Please upload match footage.')
       }
 
+      // Gemini returns timestamps relative to startOffset (0-based from clip start).
+      // Add the stream offset so all stored timestamps are absolute within the video.
+      const tsOffset = isYouTube ? (videoStartSeconds ?? 0) : 0
+
       await db.transaction(async (tx) => {
         await tx.insert(positionSegments).values(
           object.positions.map((p) => ({
             matchId,
-            startSeconds: p.start_seconds,
-            endSeconds: p.end_seconds,
+            startSeconds: p.start_seconds + tsOffset,
+            endSeconds: p.end_seconds + tsOffset,
             positionId: p.position_id,
             userRole: p.user_role,
             dominance: p.dominance,
@@ -183,7 +195,7 @@ export const analyzeVideo = inngest.createFunction(
           await tx.insert(matchEvents).values(
             object.events.map((e) => ({
               matchId,
-              timestampSeconds: e.timestamp_seconds,
+              timestampSeconds: e.timestamp_seconds + tsOffset,
               eventTypeId: e.event_type_id,
               actor: e.actor,
               outcome: e.outcome,
@@ -427,10 +439,11 @@ export const analyzeVideo = inngest.createFunction(
       )
 
       if (newEvents.length > 0) {
+        const scanTsOffset = isYouTube ? (videoStartSeconds ?? 0) : 0
         await db.insert(matchEvents).values(
           newEvents.map(ev => ({
             matchId,
-            timestampSeconds: ev.timestamp_seconds,
+            timestampSeconds: ev.timestamp_seconds + scanTsOffset,
             eventTypeId: ev.event_type_id,
             actor: ev.actor,
             outcome: ev.outcome ?? 'ongoing',
