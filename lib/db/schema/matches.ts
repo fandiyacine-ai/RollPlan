@@ -33,5 +33,9 @@ export const matches = pgTable('matches', {
   resultWinner: text('result_winner'),    // 'user' | 'opponent' — from outcome screen
   resultMethod: text('result_method'),    // 'submission' | 'points' | 'dq' | 'unknown'
   resultTechnique: text('result_technique'), // e.g. 'rear naked choke'
+  // Absolute video positions (seconds) of the scan-detected match boundaries — for auditability
+  // and to validate that frame-by-frame timestamps fall within the expected window.
+  matchStartSeconds: integer('match_start_seconds'),
+  matchEndSeconds: integer('match_end_seconds'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })

@@ -93,6 +93,9 @@ export const scanUrl = inngest.createFunction(
             },
             userPrompt: buildScanUrlUserPrompt(athleteName, appearanceHint),
             schema: UrlScanOutputSchema,
+            // Thinking helps the model reason about multi-match streams — distinguishing
+            // which outcome screen belongs to which match before committing to boundaries.
+            thinkingBudget: 2048,
           })
           scanResult = result.object
           scanUsage = result.usage
@@ -302,6 +305,7 @@ export const scanUrl = inngest.createFunction(
         }
 
         const result = found.match_result
+        const chunkOffsetForBounds = startSeconds ?? 0
         const [match] = await db.insert(matches).values({
           videoId,
           userId: userId ?? null,
@@ -313,6 +317,9 @@ export const scanUrl = inngest.createFunction(
           eventName: eventName ?? null,
           userNotes: found.round_or_bracket ?? null,
           tournamentOpponentId: tournamentOpponentId ?? null,
+          // Scan-detected match boundaries in absolute video seconds (auditable, used to validate timestamps)
+          matchStartSeconds: skipScan ? (startSeconds ?? 0) : Math.round(chunkOffsetForBounds + found.start_seconds),
+          matchEndSeconds: skipScan ? (endSeconds ?? null) : Math.round(chunkOffsetForBounds + found.end_seconds),
           // Walkovers are complete immediately — no extraction needed
           status: found.is_walkover ? 'analysed' : 'processing',
           resultWinner: result ? (result.winner_is_tracked_athlete ? 'user' : 'opponent') : null,
@@ -344,17 +351,29 @@ export const scanUrl = inngest.createFunction(
 
           try {
             if (isYT) {
-              // Trim the YouTube video to just this match window. Gemini reports timestamps
+              // Trim the YouTube video to a padded window around this match. Gemini reports timestamps
               // relative to the clip start, so we shift back to absolute after.
-              // For chunk jobs, startSeconds is the chunk's offset into the video —
-              // found.start/end_seconds are relative to the chunk start, so we add the offset
-              // to get the absolute position in the full video.
+              //
+              // PRE_BUFFER: the 0.1fps scan has ~10s resolution — padding before the detected match
+              // start absorbs boundary errors so the clip always begins before the match does.
+              //
+              // POST_BUFFER: the outcome screen appears 0–120s AFTER the match ends. Without padding
+              // the clip cuts off before the outcome screen, causing extraction to either miss the
+              // result or latch onto an adjacent match's outcome screen.
+              const PRE_BUFFER = skipScan ? 0 : 120  // 2 min before detected match start
+              const POST_BUFFER = skipScan ? 0 : 240 // 4 min after detected match end
+
               const chunkOffset = startSeconds ?? 0
-              // For skipScan, use startSeconds directly as clip start (user pointed to match timestamp).
-              // For chunk jobs, add chunk offset to the scan-reported match start.
-              const clipStart = skipScan ? chunkOffset : (chunkOffset + found.start_seconds)
-              const clipEnd = skipScan ? (endSeconds ?? undefined) : (chunkOffset + found.end_seconds)
+              const scanMatchStart = skipScan ? chunkOffset : (chunkOffset + found.start_seconds)
+              const scanMatchEnd = skipScan ? (endSeconds ?? chunkOffset + 999999) : (chunkOffset + found.end_seconds)
+
+              const clipStart = Math.max(0, scanMatchStart - PRE_BUFFER)
+              const clipEnd = skipScan ? (endSeconds ?? undefined) : (scanMatchEnd + POST_BUFFER)
+
+              // How far into the padded clip the match is expected to start
+              const matchOffsetInClip = scanMatchStart - clipStart
               const matchDuration = found.end_seconds - found.start_seconds
+
               const videoOptions = {
                 fps: 1.0,
                 ...(clipStart > 0 ? { startSeconds: clipStart } : {}),
@@ -366,15 +385,23 @@ export const scanUrl = inngest.createFunction(
                 videoOptions,
                 userPrompt: buildExtractMatchUserPrompt({
                   competitorDescription: athleteName,
+                  opponentName: found.opponent_name || undefined,
                   appearanceHint: appearanceHint || undefined,
                   format: format as 'gi' | 'no_gi',
                   ruleset: 'ibjjf',
-                  timestampRange: skipScan ? undefined : { startSeconds: 0, endSeconds: matchDuration },
+                  // Tell extraction where within the padded clip the match is expected to start.
+                  // End is the padded clip end so extraction sees the full outcome screen.
+                  timestampRange: skipScan ? undefined : { startSeconds: matchOffsetInClip, endSeconds: matchOffsetInClip + matchDuration },
                 }),
                 schema: MatchExtractionOutputSchema,
                 referenceImageBase64: athleteImageBase64 || undefined,
+                // Higher thinking budget for extraction — the model must simultaneously track
+                // athlete identity, position labels, and result anchoring across 6-10 minutes of footage.
+                thinkingBudget: 4096,
               })
-              // Shift timestamps back to absolute stream position whenever we trimmed the clip
+              // Shift timestamps back to absolute stream position.
+              // clipStart is the true absolute start of the clip in the full video, so adding it
+              // to Gemini's clip-relative timestamps gives correct absolute positions.
               extractObject = clipStart === 0 ? result.object : {
                 ...result.object,
                 positions: result.object.positions.map(p => ({
@@ -402,6 +429,7 @@ export const scanUrl = inngest.createFunction(
                       type: 'text',
                       text: buildExtractMatchUserPrompt({
                         competitorDescription: athleteName,
+                        opponentName: found.opponent_name || undefined,
                         appearanceHint: appearanceHint || undefined,
                         format: format as 'gi' | 'no_gi',
                         ruleset: 'ibjjf',

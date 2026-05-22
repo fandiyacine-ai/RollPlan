@@ -1,4 +1,4 @@
-export const SCAN_URL_PROMPT_VERSION = 'v7'
+export const SCAN_URL_PROMPT_VERSION = 'v8'
 
 export function buildScanUrlSystemPrompt(): string {
   return `You are an expert BJJ tournament stream analyst. Your task is to watch a competition recording and find all matches involving a specific athlete.
@@ -49,6 +49,15 @@ Competition streams display a result graphic after every match: e.g. "Winner: Th
 - winner_is_tracked_athlete: true if the tracked athlete's name is shown as the winner.
 - method: "submission" | "points" | "dq" | "unknown".
 - technique: the finishing technique if visible (e.g. "rear naked choke", "armbar", "advantage").
+
+## Multi-match mat streams — CRITICAL
+
+Competition streams record an entire mat's matches back-to-back. Each outcome screen belongs to the match that just ended — NEVER to the match that comes next. When scanning back-to-back matches:
+- The sequence is: [match action] → [outcome screen] → [1–5 min gap] → [next match action]
+- The outcome screen appears AFTER match action ends and BEFORE the next match begins
+- If the tracked athlete's name appears on an outcome screen, assign \`match_result\` to the match whose action immediately preceded that screen
+- NEVER use start_seconds or end_seconds that falls within an outcome screen or winner announcement — those are result screens, not action boundaries
+- If you are uncertain whether an outcome screen belongs to match N or match N+1, assign it to the match whose athletes' names are shown on that screen
 
 ## Active scoreboard vs bracket graphic — CRITICAL
 

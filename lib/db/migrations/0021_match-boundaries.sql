@@ -1,0 +1,2 @@
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS match_start_seconds INTEGER;
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS match_end_seconds INTEGER;

@@ -65,9 +65,13 @@ export async function geminiVideoObject<T extends z.ZodTypeAny>(
     userPrompt: string
     schema: T
     referenceImageBase64?: string
+    // Budget in tokens for internal chain-of-thought reasoning before JSON output.
+    // 0 = disabled (default). Gemini 2.5 Flash max is 24576. Higher values improve
+    // reasoning on complex multi-match streams; set 0 for simple/fast tasks.
+    thinkingBudget?: number
   }
 ): Promise<{ object: z.infer<T>; usage: { inputTokens: number; outputTokens: number } }> {
-  const { system, videoUrl, videoOptions, userPrompt, schema, referenceImageBase64 } = params
+  const { system, videoUrl, videoOptions, userPrompt, schema, referenceImageBase64, thinkingBudget = 0 } = params
 
   const filePart: Record<string, unknown> = {
     fileData: { mimeType: 'video/mp4', fileUri: cleanYouTubeUrl(videoUrl) },
@@ -95,6 +99,10 @@ export async function geminiVideoObject<T extends z.ZodTypeAny>(
     generationConfig: {
       responseMimeType: 'application/json',
       responseSchema: buildGeminiSchema(schema),
+      // Gemini 2.5 Flash supports internal chain-of-thought before outputting JSON.
+      // A non-zero budget gives the model time to reason about complex multi-match
+      // streams before committing to boundaries and outcome assignments.
+      ...(thinkingBudget > 0 ? { thinkingConfig: { thinkingBudget } } : {}),
     },
   }
 

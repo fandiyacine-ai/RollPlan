@@ -306,9 +306,75 @@ function GeneratingState({ opponentLabel, athleteName }: { opponentLabel: string
   )
 }
 
+function MatchCard({ card }: { card: GameplanOutput['match_card'] }) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+      {/* Header */}
+      <div className="px-5 py-3 border-b border-border/60 flex items-center gap-2">
+        <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+        <p className="text-xs font-medium text-muted-foreground">Match day</p>
+      </div>
+
+      <div className="p-5 space-y-4">
+        {/* Headline */}
+        <p className="text-base font-semibold leading-snug">{card.headline}</p>
+
+        {/* Attack chain — arrows between steps */}
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-widest">Attack</p>
+          {/* Mobile: vertical */}
+          <div className="flex flex-col gap-1 sm:hidden">
+            {card.attack_chain.map((step, i) => (
+              <div key={i} className="flex gap-2 items-center">
+                {i > 0 && <svg className="w-3 h-3 text-muted-foreground/25 flex-shrink-0 -rotate-90" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2 6h8M7 3l3 3-3 3"/></svg>}
+                {i === 0 && <div className="w-3 flex-shrink-0" />}
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-foreground/[0.06] border border-border/40">{step}</span>
+              </div>
+            ))}
+          </div>
+          {/* Desktop: horizontal */}
+          <div className="hidden sm:flex flex-wrap items-center gap-1.5">
+            {card.attack_chain.map((step, i, arr) => (
+              <span key={i} className="flex items-center gap-1.5">
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-foreground/[0.06] border border-border/40">{step}</span>
+                {i < arr.length - 1 && (
+                  <svg className="w-3 h-3 text-muted-foreground/25 flex-shrink-0" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2 6h8M7 3l3 3-3 3"/></svg>
+                )}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Open with + Watch out — 2 col */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <p className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-widest">Open with</p>
+            <p className="text-xs font-semibold leading-snug">{card.open_with}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-[10px] font-medium text-rose-500/70 uppercase tracking-widest">Watch out</p>
+            <p className="text-xs font-semibold leading-snug text-rose-400">{card.watch_out}</p>
+          </div>
+        </div>
+
+        {/* If losing */}
+        {card.if_losing_points && (
+          <div className="flex gap-2.5 items-center pt-3 border-t border-border/40">
+            <span className="text-[10px] font-medium text-muted-foreground/50 whitespace-nowrap flex-shrink-0">If losing</span>
+            <p className="text-xs font-medium text-foreground/70 leading-snug">{card.if_losing_points}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function GameplanDisplay({ plan }: { plan: GameplanOutput }) {
   return (
     <div className="space-y-3">
+      {/* Match-day card — only on gameplans generated with v2+ prompt */}
+      {plan.match_card && <MatchCard card={plan.match_card} />}
+
       {/* Row 1: Attack chain (wider) + Danger (narrower) */}
       <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-3">
         {/* Attack chain */}

@@ -1,6 +1,17 @@
 import { z } from 'zod'
 
 export const GameplanOutputSchema = z.object({
+  // ── Match-day card ───────────────────────────────────────────────────────────
+  // Ultra-compact view. Every field must be readable in under 2 seconds — no sentences.
+  match_card: z.object({
+    headline: z.string().describe('One-sentence plan: the essential matchup story, e.g. "Drag to back, suffocate, RNC"'),
+    open_with: z.string().describe('First action when the match starts — max 7 words, imperative, e.g. "Pull butterfly, control sleeve immediately"'),
+    attack_chain: z.array(z.string()).min(2).max(4).describe('Primary sequence — each step max 5 words, e.g. ["Hip bump sweep", "Take the back", "RNC"]'),
+    watch_out: z.string().describe('The single biggest threat from this opponent — max 8 words, e.g. "Guard pass to knee slice pressure"'),
+    if_losing_points: z.string().describe('What to do if behind on points with < 2 min remaining — max 8 words'),
+  }).describe('Compact match-day card — displayed above the full gameplan for quick reference on the mat'),
+
+  // ── Full gameplan ────────────────────────────────────────────────────────────
   summary: z.string().describe('2–3 sentence tactical overview of this specific matchup'),
   format_notes: z.string().describe('Ruleset/format-specific considerations, e.g. heel hooks legal, advantages count'),
 

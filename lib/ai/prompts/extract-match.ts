@@ -1,6 +1,6 @@
 import { buildTaxonomyPromptBlock } from '../../taxonomy'
 
-export const EXTRACT_MATCH_PROMPT_VERSION = 'v4'
+export const EXTRACT_MATCH_PROMPT_VERSION = 'v5'
 
 export const BJJ_POSITION_VISUAL_GUIDE = `## Visual Identification Guide — Commonly Confused Positions
 
@@ -52,15 +52,21 @@ ${BJJ_POSITION_VISUAL_GUIDE}
 
 ### Step 1 — Anchor identity from the outcome screen (do this FIRST)
 
-Scan to the end of the clip and find the outcome screen: the scoreboard highlight, winner announcement, or result graphic that shows which athlete won.
+Scan the clip and find the outcome screen for THIS match: the scoreboard highlight, winner announcement, or result graphic that shows which athlete won.
 
+**CRITICAL — Multi-match streams**: Competition streams record back-to-back matches on the same mat. This clip may contain outcome screens for OTHER matches (adjacent matches on the same mat). You must use ONLY the outcome screen that belongs to the match you are analysing:
+- The correct outcome screen will show the names of the TWO athletes in THIS match (the tracked competitor AND their opponent, if their name was provided).
+- If you see an outcome screen with completely different athlete names, it belongs to another match — skip it.
+- The correct outcome screen will appear immediately after the match action ends (referee separation or submission tap), NOT before the athletes step on the mat.
+
+Once you find the correct outcome screen:
 - Read the winner's name from that screen exactly as shown.
 - Find which physical athlete on the mat corresponds to that name (they are being raised, celebrated, or highlighted).
 - That physical athlete is **"user"** if their name matches the tracked competitor you were given. Otherwise they are **"opponent"**.
 - Lock in which body/appearance corresponds to "user" and which to "opponent". You will not change this assignment for any reason.
 - Record this in competitor_identifier: e.g. "User anchored from outcome screen — DARIO MIKEL highlighted as winner, wearing blue gi on left side at end."
 
-If no outcome screen is visible, fall back to the provided appearance description and any reference image to identify the user.
+If no outcome screen is visible for this match, fall back to the provided appearance description and any reference image to identify the user.
 
 ### Step 2 — Analyse positions and events
 
@@ -109,6 +115,7 @@ function formatTimestamp(seconds: number): string {
 
 export function buildExtractMatchUserPrompt(params: {
   competitorDescription: string
+  opponentName?: string
   appearanceHint?: string
   format: 'gi' | 'no_gi'
   ruleset: string
@@ -118,9 +125,13 @@ export function buildExtractMatchUserPrompt(params: {
   return `Analyse this BJJ match video.
 
 ${params.timestampRange
-    ? `Focus only on the match segment from ${formatTimestamp(params.timestampRange.startSeconds)} to ${formatTimestamp(params.timestampRange.endSeconds)}. Ignore all footage outside this range.`
+    ? `This clip contains pre-match content. The match between ${params.competitorDescription}${params.opponentName ? ` and ${params.opponentName}` : ''} is expected to start at approximately ${formatTimestamp(params.timestampRange.startSeconds)}. Mark footage before this point as standing/neutral (pre-match setup). The outcome screen will appear AFTER the match ends — do NOT stop analysis before reaching it.`
     : ''}
 Competitor to track: ${params.competitorDescription}
+${params.opponentName
+    ? `Opponent: ${params.opponentName}
+The outcome screen for THIS match will show one of these two names as winner. If you see an outcome screen with completely different athlete names, it belongs to an adjacent match on the same mat — find the one that references ${params.competitorDescription} or ${params.opponentName}.`
+    : ''}
 ${params.appearanceHint ? `CRITICAL — Visual identification (apply for the ENTIRE match):\n${params.appearanceHint}\nIf a reference photo was provided above, that photo shows the user — match their exact appearance. Use these constraints as the deciding factor whenever the two athletes look similar or swap positions. Do NOT swap who is "user" and who is "opponent" at any point.` : ''}
 Format: ${params.format === 'gi' ? 'Gi' : 'No-Gi'}
 Ruleset: ${params.ruleset.toUpperCase()}
