@@ -14,6 +14,7 @@ export const FoundMatchSchema = z.object({
   round_or_bracket: z.string().optional().describe('e.g. "Semi-final", "Gold medal match"'),
   is_walkover: z.boolean().optional().describe('true if no match was actually fought — opponent did not show up, match awarded without grappling'),
   match_result: MatchResultSchema.optional().describe('Result extracted from the winner/outcome screen shown after the match'),
+  user_side: z.enum(['left', 'right']).optional().describe('Which side of the scoreboard the tracked athlete appears on (left or right). In AJP/Smoothcomp scoreboards, the left-side name starts on the LEFT of the mat, and vice versa. Read this directly from the active scoreboard.'),
 })
 
 export const UrlScanOutputSchema = z.object({

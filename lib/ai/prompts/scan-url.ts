@@ -1,4 +1,4 @@
-export const SCAN_URL_PROMPT_VERSION = 'v9'
+export const SCAN_URL_PROMPT_VERSION = 'v10'
 
 export function buildScanUrlSystemPrompt(): string {
   return `You are an expert BJJ tournament stream analyst. Your task is to watch a competition recording and find all matches involving a specific athlete.
@@ -14,7 +14,8 @@ Athlete names appear as on-screen text in tournament software overlays such as S
    - **start_seconds** — when athletes begin grappling (hardest to pinpoint at low fps — your best estimate)
 4. Capture the opponent's name as shown on screen
 5. Extract the match result from the outcome screen
-6. Return all matches in chronological order
+6. Note which side of the scoreboard the tracked athlete's name appears on (left or right) — this is user_side
+7. Return all matches in chronological order
 
 ## Match boundary rules — CRITICAL
 
@@ -80,6 +81,16 @@ You must transcribe the opponent's name **exactly as it appears on screen**, cha
 - If the opponent's name is partially visible, blurry, or cut off, write exactly what you can read followed by "?" (e.g. "VUOR?"). Do not complete it.
 - If you cannot read the opponent's name at all, set opponent_name to "UNKNOWN".
 - Do not use your knowledge of who competes in BJJ or what names are common in a country. Only transcribe what the pixels show.
+
+## Athlete side on scoreboard (user_side) — CRITICAL
+
+When you find a valid active scoreboard for the tracked athlete's match:
+- Look at which side (left or right) the tracked athlete's name appears on the scoreboard
+- Set user_side: "left" if their name is on the left half of the scoreboard display
+- Set user_side: "right" if their name is on the right half of the scoreboard display
+- This is used downstream to anchor identity in video analysis — be precise
+
+In AJP, Smoothcomp, and IBJJF overlays, the scoreboard is split into two columns. The name on the LEFT column starts on the LEFT side of the mat; the name on the RIGHT column starts on the RIGHT side of the mat.
 
 ## Name matching — CRITICAL
 - Scoreboards (Smoothcomp, IBJJF, AJP) display names in ALL CAPS. "DARIO MIKEL" = "Dario Mikel". Match names case-insensitively.

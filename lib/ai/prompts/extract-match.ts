@@ -1,6 +1,6 @@
 import { buildTaxonomyPromptBlock } from '../../taxonomy'
 
-export const EXTRACT_MATCH_PROMPT_VERSION = 'v5'
+export const EXTRACT_MATCH_PROMPT_VERSION = 'v6'
 
 export const BJJ_POSITION_VISUAL_GUIDE = `## Visual Identification Guide — Commonly Confused Positions
 
@@ -121,11 +121,15 @@ export function buildExtractMatchUserPrompt(params: {
   ruleset: string
   durationSeconds?: number
   outcomeScreenSeconds?: number
+  userSide?: 'left' | 'right'
 }): string {
   return `Analyse this BJJ match video.
 
 ${params.outcomeScreenSeconds !== undefined
     ? `OUTCOME SCREEN ANCHOR: The winner/result screen for the match between ${params.competitorDescription}${params.opponentName ? ` and ${params.opponentName}` : ''} appears at approximately ${formatTimestamp(params.outcomeScreenSeconds)} in this clip. This is your primary anchor — find it first, confirm it shows these athletes, then work BACKWARDS to find where their match started. Do NOT analyse any match that ends before this outcome screen.`
+    : ''}
+${params.userSide !== undefined
+    ? `SPATIAL IDENTITY ANCHOR — CRITICAL: ${params.competitorDescription} appears on the ${params.userSide.toUpperCase()} side of the scoreboard. In AJP/Smoothcomp/IBJJF competitions, the athlete on the left of the scoreboard ALWAYS starts on the LEFT side of the mat at the opening handshake/referee call. Therefore, use the first few seconds of match action (when both athletes are still standing at their starting positions) to lock in which physical person is "${params.competitorDescription}" (user) — they will be on the ${params.userSide.toUpperCase()} side of the frame. Athletes naturally move around the mat during the match, so do NOT apply this left/right rule mid-match. Use it only to establish identity at match start, then track that specific person for the full duration. Verify your identity assignment against the outcome screen.`
     : ''}
 Competitor to track: ${params.competitorDescription}
 ${params.opponentName

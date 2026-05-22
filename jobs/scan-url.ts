@@ -411,6 +411,7 @@ export const scanUrl = inngest.createFunction(
                   ruleset: 'ibjjf',
                   // Tell extraction where the outcome screen is — model works backwards from there
                   outcomeScreenSeconds: skipScan ? undefined : outcomeOffsetInClip,
+                  userSide: found.user_side ?? undefined,
                 }),
                 schema: MatchExtractionOutputSchema,
                 referenceImageBase64: athleteImageBase64 || undefined,
@@ -438,6 +439,7 @@ export const scanUrl = inngest.createFunction(
                         format: format as 'gi' | 'no_gi',
                         ruleset: 'ibjjf',
                         outcomeScreenSeconds: found.outcome_screen_seconds ?? found.end_seconds,
+                        userSide: found.user_side ?? undefined,
                       }),
                     },
                   ],
