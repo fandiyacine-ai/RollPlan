@@ -317,9 +317,9 @@ export const scanUrl = inngest.createFunction(
           eventName: eventName ?? null,
           userNotes: found.round_or_bracket ?? null,
           tournamentOpponentId: tournamentOpponentId ?? null,
-          // Scan timestamps are absolute from video origin — store directly, no chunk offset needed.
-          matchStartSeconds: skipScan ? (startSeconds ?? 0) : Math.round(found.start_seconds),
-          matchEndSeconds: skipScan ? (endSeconds ?? null) : Math.round(found.end_seconds),
+          // Scan timestamps are relative to the chunk's startSeconds — add chunkOffset to get absolute.
+          matchStartSeconds: skipScan ? (startSeconds ?? 0) : Math.round(chunkOffsetForBounds + found.start_seconds),
+          matchEndSeconds: skipScan ? (endSeconds ?? null) : Math.round(chunkOffsetForBounds + found.end_seconds),
           // Walkovers are complete immediately — no extraction needed
           status: found.is_walkover ? 'analysed' : 'processing',
           resultWinner: result ? (result.winner_is_tracked_athlete ? 'user' : 'opponent') : null,
@@ -365,11 +365,12 @@ export const scanUrl = inngest.createFunction(
               const MAX_MATCH_DURATION = 8 * 60  // 8 min — covers most AJP/IBJJF matches while keeping frame count manageable
               const OUTCOME_TAIL = 120            // 2 min after outcome screen
 
-              // Scan timestamps are absolute from video origin — use directly, no chunk offset needed.
+              // Scan timestamps are relative to the chunk's startSeconds — add chunkOffset to get absolute.
               // Use outcome_screen_seconds as the primary anchor; fall back to end_seconds
+              const chunkOffset = startSeconds ?? 0
               const outcomeAbsolute = skipScan
-                ? (endSeconds ?? 999999)
-                : (found.outcome_screen_seconds ?? found.end_seconds)
+                ? (endSeconds ?? chunkOffset + 999999)
+                : chunkOffset + (found.outcome_screen_seconds ?? found.end_seconds)
 
               const clipStart = Math.max(0, outcomeAbsolute - MAX_MATCH_DURATION)
               const clipEnd = skipScan ? (endSeconds ?? undefined) : outcomeAbsolute + OUTCOME_TAIL
@@ -399,8 +400,7 @@ export const scanUrl = inngest.createFunction(
                 referenceImageBase64: athleteImageBase64 || undefined,
                 thinkingBudget: 4096,
               })
-              // Gemini returns timestamps absolute from the video origin (not relative to startOffset),
-              // so no shift is needed — use the result directly.
+              // Extraction timestamps are absolute from video origin — no shift needed.
               extractObject = result.object
               extractUsage = result.usage
             } else {
