@@ -9,7 +9,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog'
@@ -113,9 +112,7 @@ export function ImportBracketDialog({ tournamentId, hasBracketUrl = true }: { to
 
   return (
     <Dialog open={open} onOpenChange={handleOpen}>
-      <DialogTrigger>
-        <Button variant="outline" size="sm">Import from bracket</Button>
-      </DialogTrigger>
+      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>Import from bracket</Button>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Import opponents from bracket</DialogTitle>

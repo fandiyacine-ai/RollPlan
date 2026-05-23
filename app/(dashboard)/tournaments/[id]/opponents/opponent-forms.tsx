@@ -10,7 +10,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog'
@@ -179,19 +178,18 @@ export function EditOpponentButton({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setPending(false); setError(null) } }}>
-      <DialogTrigger onClick={e => e.stopPropagation()}>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Edit opponent"
-          className="text-muted-foreground hover:text-foreground"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-          </svg>
-        </Button>
-      </DialogTrigger>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Edit opponent"
+        className="text-muted-foreground hover:text-foreground"
+        onClick={(e) => { e.stopPropagation(); setOpen(true) }}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      </Button>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit Opponent</DialogTitle>
@@ -288,9 +286,7 @@ export function AddOpponentForm({ tournamentId }: { tournamentId: string }) {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogTrigger>
-        <Button size="sm">+ Add Opponent</Button>
-      </DialogTrigger>
+      <Button size="sm" onClick={() => setOpen(true)}>+ Add Opponent</Button>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add Opponent</DialogTitle>
@@ -493,9 +489,7 @@ export function ScoutForm({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogTrigger>
-        <Button variant="outline" size="xs">{hasMatches ? '+ Add footage' : 'Scout footage'}</Button>
-      </DialogTrigger>
+      <Button variant="outline" size="xs" onClick={() => setOpen(true)}>{hasMatches ? '+ Add footage' : 'Scout footage'}</Button>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Scout {opponentName}</DialogTitle>

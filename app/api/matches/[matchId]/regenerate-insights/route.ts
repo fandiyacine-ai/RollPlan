@@ -45,7 +45,8 @@ export async function POST(
     maxRetries: 0,
     system: buildGenerateInsightsSystemPrompt(
       match.competitorLabel ?? 'athlete',
-      match.opponentLabel ?? 'opponent'
+      match.opponentLabel ?? 'opponent',
+      !!(match.tournamentOpponentId),
     ),
     prompt: JSON.stringify(matchData),
   })

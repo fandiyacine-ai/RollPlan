@@ -50,8 +50,10 @@ function computeMatchStats(
     .slice(0, 3)
     .map(([id]) => id)
 
-  const subWinActor = perspective === 'user' ? 'user' : 'opponent'
-  const subLossActor = perspective === 'user' ? 'opponent' : 'user'
+  // The person being analysed is always stored as actor='user' / resultWinner='user' in the DB,
+  // regardless of whether they are the coached athlete or the scouted opponent.
+  const subWinActor = 'user'
+  const subLossActor = 'opponent'
 
   const submissionWins = events.filter(e => e.actor === subWinActor && e.eventTypeId.includes('submission') && e.outcome === 'success').length
   const submissionLosses = events.filter(e => e.actor === subLossActor && e.eventTypeId.includes('submission') && e.outcome === 'success').length
@@ -64,8 +66,7 @@ function computeMatchStats(
   const commonSubmissions = Object.entries(techCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t]) => t)
 
   const matchesWithResult = matchRows.filter(m => m.resultWinner)
-  const winnerKey = perspective === 'user' ? 'user' : 'opponent'
-  const wins = matchesWithResult.filter(m => m.resultWinner === winnerKey).length
+  const wins = matchesWithResult.filter(m => m.resultWinner === 'user').length
   const winRate = matchesWithResult.length > 0 ? wins / matchesWithResult.length : 0.5
 
   return {

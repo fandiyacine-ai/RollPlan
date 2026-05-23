@@ -4,6 +4,7 @@ import { useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { CorrectResultButton } from './correct-result-button'
 import { ShareButton } from './share-button'
+import { EVENT_TYPES } from '../../../../lib/taxonomy/events'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -257,42 +258,242 @@ function NotesTab({ insights }: { insights: InsightRow[] }) {
 
 // ─── Tab: Stats ───────────────────────────────────────────────────────────────
 
-function StatsTab({ sortedPositions, maxPositionTime, positionNames }: {
+const SUBMISSION_PARENT_IDS = new Set([
+  'armbar','kimura','omoplata','wrist_lock','bicep_slicer','joint_lock_other',
+  'triangle','rear_naked_choke','guillotine','darce','anaconda_choke',
+  'north_south_choke','ezekiel_choke','von_flue_choke','twister',
+  'baseball_bat_choke','clock_choke','paper_cutter_choke','choke_other',
+  'heel_hook','kneebar','toe_hold','calf_slicer','leg_lock_other',
+])
+
+type SubAttempt = { technique: string; actor: string; outcome: string | null; position: string | null }
+type SubGroup = { technique: string; attempts: SubAttempt[] }
+
+function StatArcGauge({ pct, pressurePct }: { pct: number; pressurePct: number }) {
+  const cx = 56, cy = 56
+  const R = 44, r2 = 34
+  const C1 = 2 * Math.PI * R
+  const C2 = 2 * Math.PI * r2
+  const fill1 = (C1 * pct / 100).toFixed(2)
+  const gap1 = (C1 * (1 - pct / 100)).toFixed(2)
+  const fill2 = (C2 * pressurePct / 100).toFixed(2)
+  const gap2 = (C2 * (1 - pressurePct / 100)).toFixed(2)
+  const gaugeColor = pct >= 55 ? '#4ade80' : pct < 38 ? '#f87171' : '#818cf8'
+  return (
+    <svg width={112} height={112} viewBox="0 0 112 112" className="flex-shrink-0">
+      <circle cx={cx} cy={cy} r={R} fill="none" stroke={gaugeColor} strokeWidth={16} opacity={0.07} />
+      <circle cx={cx} cy={cy} r={R} fill="none" stroke="currentColor" strokeWidth={6} className="text-muted/30" />
+      <circle cx={cx} cy={cy} r={R} fill="none" stroke={gaugeColor} strokeWidth={6}
+        strokeDasharray={`${fill1} ${gap1}`} strokeLinecap="round"
+        transform={`rotate(-90 ${cx} ${cy})`} />
+      <circle cx={cx} cy={cy} r={r2} fill="none" stroke="currentColor" strokeWidth={4} className="text-muted/20" />
+      <circle cx={cx} cy={cy} r={r2} fill="none" stroke="#f87171" strokeWidth={4}
+        strokeDasharray={`${fill2} ${gap2}`} strokeLinecap="round"
+        transform={`rotate(-90 ${cx} ${cy})`} />
+      <text x={cx} y={52} textAnchor="middle" fontSize={20} fontWeight={900} fill={gaugeColor}
+        style={{ fontFamily: 'system-ui, sans-serif' }}>{pct}%</text>
+      <text x={cx} y={63} textAnchor="middle" fontSize={6.5} fill="currentColor" opacity={0.35}
+        style={{ fontFamily: 'system-ui, sans-serif' }}>control</text>
+      {pressurePct > 0 && (
+        <text x={cx} y={73} textAnchor="middle" fontSize={6} fill="#f87171" opacity={0.6}
+          style={{ fontFamily: 'system-ui, sans-serif' }}>{pressurePct}% pressure</text>
+      )}
+    </svg>
+  )
+}
+
+function StatsTab({ sortedPositions, maxPositionTime, positionNames, timelineItems, scoutedName }: {
   sortedPositions: [string, PositionStat][]
   maxPositionTime: number
   positionNames: Record<string, string>
+  timelineItems: TimelineItem[]
+  scoutedName?: string
 }) {
+  // ── Submission attempts ─────────────────────────────────────────────────────
+  const SUB_REGEX = /armbar|kimura|omoplata|triangle|choke|heel.?hook|kneebar|toe.?hold|calf.?slic|guillotine|d'arce|darce|anaconda|twister|wrist|bicep|rnc|rear.?naked/i
+  const isSubmission = (eventName: string, techniqueLabel: string | null) =>
+    SUBMISSION_PARENT_IDS.has(eventName.toLowerCase().replace(/\s+/g, '_')) ||
+    SUB_REGEX.test(eventName) ||
+    (techniqueLabel !== null && (SUBMISSION_PARENT_IDS.has(techniqueLabel.toLowerCase().replace(/\s+/g, '_')) || SUB_REGEX.test(techniqueLabel)))
+
+  const normalizeTechnique = (eventName: string, techniqueLabel: string | null): string => {
+    const raw = techniqueLabel ?? eventName
+    // Map raw → canonical display name from taxonomy when possible
+    const normalized = raw.toLowerCase().replace(/\s+/g, '_')
+    const match = EVENT_TYPES.find(e => e.id === normalized || e.aliases?.some(a => a.toLowerCase().replace(/\s+/g, '_') === normalized))
+    return match?.name ?? (raw.charAt(0).toUpperCase() + raw.slice(1))
+  }
+
+  const posSegs = timelineItems.filter((i): i is Extract<TimelineItem, { type: 'position' }> => i.type === 'position')
+  const posAtTime = (t: number): string | null => {
+    const seg = posSegs.find(s => s.time <= t && s.time + s.durationSeconds >= t)
+    return seg?.positionName ?? null
+  }
+
+  const subAttempts: SubAttempt[] = timelineItems
+    .filter((item): item is Extract<TimelineItem, { type: 'event' }> => item.type === 'event')
+    .filter(item => isSubmission(item.eventName, item.techniqueLabel))
+    .map(item => ({ technique: normalizeTechnique(item.eventName, item.techniqueLabel), actor: item.actor, outcome: item.outcome, position: posAtTime(item.time) }))
+
+  const subByTechnique = new Map<string, SubAttempt[]>()
+  for (const a of subAttempts) {
+    const key = a.technique
+    if (!subByTechnique.has(key)) subByTechnique.set(key, [])
+    subByTechnique.get(key)!.push(a)
+  }
+  const subGroups: SubGroup[] = Array.from(subByTechnique.entries())
+    .map(([technique, attempts]) => ({ technique, attempts }))
+    .sort((a, b) => b.attempts.length - a.attempts.length)
+
+  // ── Positional events ───────────────────────────────────────────────────────
+  const positionalEvents = timelineItems
+    .filter((item): item is Extract<TimelineItem, { type: 'event' }> => item.type === 'event')
+    .filter(item => !isSubmission(item.eventName, item.techniqueLabel))
+
+  const sweepCount    = positionalEvents.filter(e => /sweep/i.test(e.eventName)).length
+  const passCount     = positionalEvents.filter(e => /pass/i.test(e.eventName)).length
+  const takedownCount = positionalEvents.filter(e => /takedown/i.test(e.eventName)).length
+
+  const allTimes = timelineItems.map(i => i.time)
+  const matchDuration = allTimes.length > 1 ? Math.max(...allTimes) - Math.min(...allTimes) : 0
+
+  // ── Control stats ───────────────────────────────────────────────────────────
+  const totalTime     = sortedPositions.reduce((sum, [, s]) => sum + s.total, 0)
+  const totalDominant = sortedPositions.reduce((sum, [, s]) => sum + s.dominant, 0)
+  const totalInferior = sortedPositions.reduce((sum, [, s]) => sum + s.inferior, 0)
+  const controlPct    = totalTime > 0 ? Math.round(totalDominant / totalTime * 100) : 0
+  const pressurePct   = totalTime > 0 ? Math.round(totalInferior / totalTime * 100) : 0
+
+  // ── Arsenal / Exposed ───────────────────────────────────────────────────────
+  const posStats = sortedPositions
+    .map(([id, s]) => ({
+      name: positionNames[id] ?? id,
+      dominantPct: s.total > 0 ? s.dominant / s.total : 0,
+      inferiorPct: s.total > 0 ? s.inferior / s.total : 0,
+      total: s.total,
+    }))
+    .filter(p => p.total > 0)
+
+  const strongPositions = posStats.filter(p => p.dominantPct > 0).sort((a, b) => b.dominantPct - a.dominantPct).slice(0, 3)
+  const weakPositions   = posStats.filter(p => p.inferiorPct > 0).sort((a, b) => b.inferiorPct - a.inferiorPct).slice(0, 3)
+
+  const quickStats = [
+    ...(matchDuration > 0 ? [{ label: 'Time', value: fmtTime(matchDuration) }] : []),
+    { label: 'Subs', value: String(subAttempts.length) },
+    ...(sweepCount > 0    ? [{ label: 'Sweeps',  value: String(sweepCount)    }] : []),
+    ...(passCount > 0     ? [{ label: 'Passes',  value: String(passCount)     }] : []),
+    ...(takedownCount > 0 ? [{ label: 'Takedown', value: String(takedownCount) }] : []),
+  ]
+
   return (
-    <div className="p-4 space-y-4">
-      <div className="space-y-3">
-        {sortedPositions.map(([posId, stats]) => {
-          const name = positionNames[posId] ?? posId
-          const barPct = (stats.total / maxPositionTime) * 100
-          const domPct = (stats.dominant / stats.total) * 100
-          const infPct = (stats.inferior / stats.total) * 100
-          const neuPct = Math.max(0, 100 - domPct - infPct)
-          return (
-            <div key={posId}>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-medium">{name}</span>
-                <span className="text-xs text-muted-foreground tabular-nums">{fmtTime(stats.total)}</span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                <div className="h-full flex rounded-full overflow-hidden" style={{ width: `${barPct}%` }}>
-                  <div className="bg-emerald-500" style={{ width: `${domPct}%` }} />
-                  <div className="bg-zinc-600" style={{ width: `${neuPct}%` }} />
-                  <div className="bg-rose-400" style={{ width: `${infPct}%` }} />
+    <div className="px-4 py-3 space-y-3">
+
+      {/* ── Row 1: gauge + quick stat chips ── */}
+      <div className="flex items-center gap-3">
+        <StatArcGauge pct={controlPct} pressurePct={pressurePct} />
+        <div className="flex flex-wrap gap-2 flex-1">
+          {quickStats.map(stat => (
+            <div key={stat.label} className="rounded-lg border border-border/40 bg-muted/30 px-3 py-1.5 min-w-[60px]">
+              <div className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60 leading-none mb-0.5">{stat.label}</div>
+              <div className="text-sm font-bold tabular-nums text-foreground leading-tight">{stat.value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Row 2: Arsenal / Exposed ── */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-2.5">
+          <div className="text-[8px] font-bold uppercase tracking-widest text-emerald-500 mb-2">Arsenal</div>
+          {strongPositions.length > 0 ? strongPositions.map(pos => {
+            const pct = Math.round(pos.dominantPct * 100)
+            return (
+              <div key={pos.name} className="mb-1.5">
+                <div className="flex justify-between items-baseline mb-0.5 gap-1">
+                  <span className="text-[10px] text-foreground/80 font-medium truncate">{pos.name}</span>
+                  <span className="text-[10px] text-emerald-500 font-bold flex-shrink-0">{pct}%</span>
+                </div>
+                <div className="h-1 w-full rounded-full bg-muted/40 overflow-hidden">
+                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
                 </div>
               </div>
-            </div>
-          )
-        })}
+            )
+          }) : <p className="text-[10px] text-muted-foreground/40 italic">None yet</p>}
+        </div>
+
+        <div className="rounded-lg border border-rose-500/20 bg-rose-500/5 p-2.5">
+          <div className="text-[8px] font-bold uppercase tracking-widest text-rose-500 mb-2">Exposed</div>
+          {weakPositions.length > 0 ? weakPositions.map(pos => {
+            const pct = Math.round(pos.inferiorPct * 100)
+            return (
+              <div key={pos.name} className="mb-1.5">
+                <div className="flex justify-between items-baseline mb-0.5 gap-1">
+                  <span className="text-[10px] text-foreground/80 font-medium truncate">{pos.name}</span>
+                  <span className="text-[10px] text-rose-500 font-bold flex-shrink-0">{pct}%</span>
+                </div>
+                <div className="h-1 w-full rounded-full bg-muted/40 overflow-hidden">
+                  <div className="h-full bg-rose-500 rounded-full" style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            )
+          }) : <p className="text-[10px] text-muted-foreground/40 italic">None yet</p>}
+        </div>
       </div>
-      <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1">
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" />In Control</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-zinc-600 inline-block" />Neutral</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-rose-400 inline-block" />Under Pressure</span>
-      </div>
+
+      {/* ── Row 3: Submission attempts ── */}
+      {subGroups.length > 0 && (
+        <div>
+          <p className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-2">Submission Attempts</p>
+          <div className="space-y-1.5">
+            {subGroups.map(({ technique, attempts }) => {
+              const oppAttempts  = attempts.filter(a => a.actor !== 'user')
+              const userAttempts = attempts.filter(a => a.actor === 'user')
+              const isOppThreat  = oppAttempts.length > 0
+              return (
+                <div key={technique} className={`rounded-lg border px-3 py-2 ${isOppThreat ? 'border-amber-500/20 bg-amber-500/5' : 'border-border/40 bg-muted/20'}`}>
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <span className="text-xs font-semibold text-foreground/90">{technique}</span>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isOppThreat ? 'bg-amber-500/15 text-amber-500' : 'bg-muted text-muted-foreground'}`}>
+                      {attempts.length}×
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {oppAttempts.length > 0 && (
+                      <div className="flex items-start gap-2">
+                        <span className="text-[9px] text-amber-500/70 font-medium w-12 flex-shrink-0 pt-0.5">Opp</span>
+                        <div className="flex flex-wrap gap-1">
+                          {oppAttempts.map((a, i) => (
+                            <span key={i} title={[a.outcome ?? 'attempted', a.position].filter(Boolean).join(' · ')}
+                              className="inline-flex items-center gap-0.5">
+                              <span className={`w-2.5 h-2.5 rounded-full border flex-shrink-0 ${a.outcome === 'successful' ? 'bg-amber-500 border-amber-500' : 'bg-transparent border-amber-500/50'}`} />
+                              {a.position && <span className="text-[8px] text-amber-500/50 leading-none">{a.position}</span>}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {userAttempts.length > 0 && (
+                      <div className="flex items-start gap-2">
+                        <span className="text-[9px] text-muted-foreground/60 font-medium w-12 flex-shrink-0 pt-0.5">{scoutedName ?? 'You'}</span>
+                        <div className="flex flex-wrap gap-1">
+                          {userAttempts.map((a, i) => (
+                            <span key={i} title={[a.outcome ?? 'attempted', a.position].filter(Boolean).join(' · ')}
+                              className="inline-flex items-center gap-0.5">
+                              <span className={`w-2.5 h-2.5 rounded-full border flex-shrink-0 ${a.outcome === 'successful' ? 'bg-violet-400 border-violet-400' : 'bg-transparent border-violet-400/50'}`} />
+                              {a.position && <span className="text-[8px] text-muted-foreground/40 leading-none">{a.position}</span>}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
@@ -681,6 +882,8 @@ export function ScoutingView({
                 sortedPositions={sortedPositions}
                 maxPositionTime={maxPositionTime}
                 positionNames={positionNames}
+                timelineItems={timelineItems}
+                scoutedName={match.opponentLabel?.split(' ')[0] ?? undefined}
               />
             </div>
             <div className={activeTab === 'prediction' ? '' : 'hidden'}><PredictionTab insights={insights} opponentName={opponentName} /></div>
@@ -730,7 +933,7 @@ export function ScoutingView({
               <TimelineTab items={timelineItems} onSeek={seekTo} competitorLabel={match.competitorLabel} opponentLabel={match.opponentLabel} />
             </div>
             <div className={activeTab === 'notes' ? '' : 'hidden'}><NotesTab insights={insights} /></div>
-            <div className={activeTab === 'stats' ? '' : 'hidden'}><StatsTab sortedPositions={sortedPositions} maxPositionTime={maxPositionTime} positionNames={positionNames} /></div>
+            <div className={activeTab === 'stats' ? '' : 'hidden'}><StatsTab sortedPositions={sortedPositions} maxPositionTime={maxPositionTime} positionNames={positionNames} timelineItems={timelineItems} scoutedName={match.opponentLabel?.split(' ')[0] ?? undefined} /></div>
             <div className={activeTab === 'prediction' ? '' : 'hidden'}><PredictionTab insights={insights} opponentName={opponentName} /></div>
             <div className={`${activeTab === 'ask' ? 'flex flex-col h-full' : 'hidden'}`}>
               <AskTab matchId={match.id} currentTime={currentTime} opponentName={opponentName} />
