@@ -385,32 +385,68 @@ function MatchCard({ card }: { card: GameplanOutput['match_card'] }) {
 
 type DrillRef = { id: string; name: string; eventId: string; positionId: string | null; sourceUrl: string; sourceLabel: string }
 
+function toTitleCase(s: string) {
+  return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+const YT_ICON = (
+  <svg className="w-3.5 h-3.5 text-rose-500 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+  </svg>
+)
+
 function DrillLibrary({ drillRefs }: { drillRefs: DrillRef[] }) {
   if (drillRefs.length === 0) return null
+
+  // Group: submission (eventId) → variant (name) → links
+  const bySubmission = new Map<string, Map<string, DrillRef[]>>()
+  for (const ref of drillRefs) {
+    if (!bySubmission.has(ref.eventId)) bySubmission.set(ref.eventId, new Map())
+    const byVariant = bySubmission.get(ref.eventId)!
+    if (!byVariant.has(ref.name)) byVariant.set(ref.name, [])
+    byVariant.get(ref.name)!.push(ref)
+  }
+
   return (
     <Section title="Drill Library">
-      <div className="rounded-xl border border-border/60 bg-card overflow-hidden divide-y divide-border/40">
-        {drillRefs.map((ref) => (
-          <a
-            key={ref.id}
-            href={ref.sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 px-4 py-3 hover:bg-foreground/[0.04] transition-colors group"
-          >
-            <svg className="w-4 h-4 text-rose-500 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-            </svg>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold truncate">{ref.sourceLabel || ref.name}</p>
-              <p className="text-[10px] text-muted-foreground/40 font-mono">
-                {ref.eventId}{ref.positionId ? ` · ${ref.positionId}` : ''}
-              </p>
+      <div className="space-y-3">
+        {Array.from(bySubmission.entries()).map(([eventId, byVariant]) => (
+          <div key={eventId} className="rounded-xl border border-border/60 bg-card overflow-hidden">
+            {/* Submission header */}
+            <div className="px-4 py-2.5 border-b border-border/60 bg-muted/30">
+              <p className="text-xs font-bold uppercase tracking-wider text-foreground/80">{toTitleCase(eventId)}</p>
             </div>
-            <svg className="w-3 h-3 text-muted-foreground/25 flex-shrink-0 group-hover:text-muted-foreground/60 transition-colors" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M2 10L10 2M5 2h5v5" />
-            </svg>
-          </a>
+
+            {/* Variants */}
+            <div className="divide-y divide-border/30">
+              {Array.from(byVariant.entries()).map(([variantName, links]) => (
+                <div key={variantName} className="px-4 py-3">
+                  {/* Variant label */}
+                  <p className="text-[11px] font-semibold text-muted-foreground mb-2">{variantName}</p>
+                  {/* Links */}
+                  <div className="space-y-1.5">
+                    {links.map(ref => (
+                      <a
+                        key={ref.id}
+                        href={ref.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 group"
+                      >
+                        {YT_ICON}
+                        <span className="text-xs text-foreground/70 group-hover:text-foreground transition-colors truncate">
+                          {ref.sourceLabel || 'Tutorial'}
+                        </span>
+                        <svg className="w-2.5 h-2.5 text-muted-foreground/25 flex-shrink-0 group-hover:text-muted-foreground/60 transition-colors ml-auto" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M2 10L10 2M5 2h5v5" />
+                        </svg>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
     </Section>
