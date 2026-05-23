@@ -40,7 +40,7 @@ export default async function TournamentLayout({
           ← Tournaments
         </Link>
         <div className="flex items-center gap-2.5">
-          <h1 className="text-2xl font-black tracking-tight uppercase">{tournament.name}</h1>
+          <h1 className="text-2xl font-black tracking-tight uppercase truncate">{tournament.name}</h1>
           <EditTournamentButton tournament={{
             id: tournament.id,
             name: tournament.name,

@@ -123,8 +123,29 @@ function BriefTab({ insights, large = false }: { insights: InsightRow[]; large?:
     )
   }
 
+  const tldr = (text: string | undefined) => {
+    if (!text) return null
+    const words = text.split(/\s+/)
+    return words.slice(0, 5).join(' ') + (words.length > 5 ? '…' : '')
+  }
+
   return (
     <div className="divide-y divide-border/40">
+      {/* TL;DR chip row — mobile only, for at-a-glance arena reading */}
+      {large && (attack || danger || pattern) && (
+        <div className="flex flex-wrap gap-1.5 px-4 pt-3 pb-2">
+          {tldr(attack?.description) && (
+            <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 leading-none">
+              ↗ {tldr(attack?.description)}
+            </span>
+          )}
+          {tldr(danger?.description) && (
+            <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 leading-none">
+              ⚠ {tldr(danger?.description)}
+            </span>
+          )}
+        </div>
+      )}
       {rows.map(row => (
         <div key={row.label} className={`flex gap-3 px-4 py-4 items-start ${row.rowBorder}`}>
           <div className="flex items-center gap-1.5 w-20 flex-shrink-0 pt-0.5">
@@ -404,7 +425,8 @@ function StatsTab({ sortedPositions, maxPositionTime, positionNames, timelineIte
       {/* ── Row 2: Arsenal / Exposed ── */}
       <div className="grid grid-cols-2 gap-2">
         <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-2.5">
-          <div className="text-[8px] font-bold uppercase tracking-widest text-emerald-500 mb-2">Arsenal</div>
+          <div className="text-[8px] font-bold uppercase tracking-widest text-emerald-500 mb-0.5">Arsenal</div>
+          <div className="text-[9px] text-emerald-500/50 mb-2">positions in control</div>
           {strongPositions.length > 0 ? strongPositions.map(pos => {
             const pct = Math.round(pos.dominantPct * 100)
             return (
@@ -422,7 +444,8 @@ function StatsTab({ sortedPositions, maxPositionTime, positionNames, timelineIte
         </div>
 
         <div className="rounded-lg border border-rose-500/20 bg-rose-500/5 p-2.5">
-          <div className="text-[8px] font-bold uppercase tracking-widest text-rose-500 mb-2">Exposed</div>
+          <div className="text-[8px] font-bold uppercase tracking-widest text-rose-500 mb-0.5">Exposed</div>
+          <div className="text-[9px] text-rose-500/50 mb-2">positions under pressure</div>
           {weakPositions.length > 0 ? weakPositions.map(pos => {
             const pct = Math.round(pos.inferiorPct * 100)
             return (

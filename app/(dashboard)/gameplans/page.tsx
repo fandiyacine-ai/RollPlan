@@ -58,7 +58,7 @@ function GameCard({
 
   return (
     <Link
-      href={`/tournaments/${tournamentId}/gameplan?opponent=${opponent.id}`}
+      href={`/tournaments/${tournamentId}/gameplan?opponent=${opponent.id}&back=/gameplans`}
       className="block bg-card border border-border/60 rounded-xl overflow-hidden hover:border-border transition-colors group"
     >
       {/* Header bar */}

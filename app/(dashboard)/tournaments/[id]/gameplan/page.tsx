@@ -20,10 +20,10 @@ export default async function GameplanPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ opponent?: string }>
+  searchParams: Promise<{ opponent?: string; back?: string }>
 }) {
   const { id: tournamentId } = await params
-  const { opponent: selectedOpponentId } = await searchParams
+  const { opponent: selectedOpponentId, back: backHref } = await searchParams
 
   const clerkUser = await currentUser().catch(() => null)
   const athleteName = clerkUser?.firstName ?? clerkUser?.username ?? null
@@ -100,6 +100,13 @@ export default async function GameplanPage({
   return (
     <div className="space-y-5">
       {isGenerating && <AutoRefresh intervalMs={5000} />}
+
+      {/* Back to My Gameplans — when navigating from /gameplans */}
+      {backHref === '/gameplans' && (
+        <Link href="/gameplans" className="text-xs text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1">
+          ← My Gameplans
+        </Link>
+      )}
 
       {/* Opponent selector */}
       {opponents.length > 1 && (
@@ -408,7 +415,7 @@ function DrillLibrary({ drillRefs }: { drillRefs: DrillRef[] }) {
   }
 
   return (
-    <Section title="Drill Library">
+    <Section title="Drill Library" mobileCollapsed>
       <div className="space-y-3">
         {Array.from(bySubmission.entries()).map(([eventId, byVariant]) => (
           <div key={eventId} className="rounded-xl border border-border/60 bg-card overflow-hidden">
@@ -425,23 +432,32 @@ function DrillLibrary({ drillRefs }: { drillRefs: DrillRef[] }) {
                   <p className="text-[11px] font-semibold text-muted-foreground mb-2">{variantName}</p>
                   {/* Links */}
                   <div className="space-y-1.5">
-                    {links.map(ref => (
-                      <a
-                        key={ref.id}
-                        href={ref.sourceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 group"
-                      >
-                        {YT_ICON}
-                        <span className="text-xs text-foreground/70 group-hover:text-foreground transition-colors truncate">
-                          {ref.sourceLabel || 'Tutorial'}
-                        </span>
-                        <svg className="w-2.5 h-2.5 text-muted-foreground/25 flex-shrink-0 group-hover:text-muted-foreground/60 transition-colors ml-auto" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M2 10L10 2M5 2h5v5" />
-                        </svg>
-                      </a>
-                    ))}
+                    {links.map((ref, li) => {
+                      // sourceLabel may be a search query or an instructor name
+                      // Show instructor name if it differs from the variant name, otherwise generic label
+                      const labelNorm = ref.sourceLabel?.toLowerCase().replace(/\s+/g, ' ').trim()
+                      const variantNorm = variantName.toLowerCase().replace(/\s+/g, ' ').trim()
+                      const displayLabel = ref.sourceLabel && labelNorm !== variantNorm
+                        ? ref.sourceLabel
+                        : `Watch tutorial ${li + 1 > 1 ? `#${li + 1}` : ''}`.trim()
+                      return (
+                        <a
+                          key={ref.id}
+                          href={ref.sourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 group"
+                        >
+                          {YT_ICON}
+                          <span className="text-xs text-foreground/70 group-hover:text-foreground transition-colors truncate">
+                            {displayLabel}
+                          </span>
+                          <svg className="w-2.5 h-2.5 text-muted-foreground/25 flex-shrink-0 group-hover:text-muted-foreground/60 transition-colors ml-auto" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M2 10L10 2M5 2h5v5" />
+                          </svg>
+                        </a>
+                      )
+                    })}
                   </div>
                 </div>
               ))}
@@ -542,18 +558,17 @@ function GameplanDisplay({ plan, drillRefs }: { plan: GameplanOutput; drillRefs?
 
       {/* Ruleset */}
       {plan.format_notes && (
-        <div className="rounded-xl border border-border/60 bg-card p-4 flex gap-3 items-start">
-          <div className="w-1 self-stretch rounded-full bg-amber-500/40 flex-shrink-0" />
-          <div>
-            <p className="text-xs font-medium text-muted-foreground">Ruleset</p>
-            <p className="text-xs text-foreground mt-1 leading-relaxed">{plan.format_notes}</p>
+        <CollapsibleCard title="Ruleset">
+          <div className="p-4 flex gap-3 items-start">
+            <div className="w-1 self-stretch rounded-full bg-amber-500/40 flex-shrink-0" />
+            <p className="text-xs text-foreground leading-relaxed">{plan.format_notes}</p>
           </div>
-        </div>
+        </CollapsibleCard>
       )}
 
       {/* Backup Plans */}
       {plan.secondary_options.length > 0 && (
-        <Section title="Backup Plans">
+        <Section title="Backup Plans" mobileCollapsed>
           <div className="grid gap-2 sm:grid-cols-2">
             {plan.secondary_options.map((opt, i) => (
               <div key={i} className="rounded-xl border border-border/60 bg-card p-4 space-y-1.5">
@@ -566,7 +581,7 @@ function GameplanDisplay({ plan, drillRefs }: { plan: GameplanOutput; drillRefs?
       )}
 
       {/* Opponent Intel */}
-      <Section title="Opponent Intel">
+      <Section title="Opponent Intel" mobileCollapsed>
         <div className="space-y-2">
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="rounded-xl border border-border/40 bg-card p-4 space-y-1.5">
@@ -600,12 +615,62 @@ function GameplanDisplay({ plan, drillRefs }: { plan: GameplanOutput; drillRefs?
   )
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+const CHEVRON = (
+  <svg className="w-3 h-3 text-muted-foreground/40 flex-shrink-0" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2 4l4 4 4-4"/></svg>
+)
+
+// Wraps an inline card (border + bg-card) to make it collapsible on mobile
+function CollapsibleCard({ title, titleColor = 'text-muted-foreground', children }: {
+  title: string
+  titleColor?: string
+  children: React.ReactNode
+}) {
   return (
-    <div className="space-y-2.5">
-      <h3 className="text-xs font-medium text-muted-foreground px-0.5">{title}</h3>
-      {children}
-    </div>
+    <>
+      {/* Desktop: always open */}
+      <div className="hidden sm:block rounded-xl border border-border/60 bg-card overflow-hidden">
+        <div className="px-5 py-3 border-b border-border/60">
+          <p className={`text-xs font-medium ${titleColor}`}>{title}</p>
+        </div>
+        {children}
+      </div>
+      {/* Mobile: collapsible */}
+      <details className="sm:hidden rounded-xl border border-border/60 bg-card overflow-hidden">
+        <summary className="list-none cursor-pointer flex items-center justify-between px-5 py-3 border-b border-border/60 select-none [&::-webkit-details-marker]:hidden">
+          <p className={`text-xs font-medium ${titleColor}`}>{title}</p>
+          {CHEVRON}
+        </summary>
+        {children}
+      </details>
+    </>
+  )
+}
+
+function Section({ title, children, mobileCollapsed = false }: { title: string; children: React.ReactNode; mobileCollapsed?: boolean }) {
+  if (!mobileCollapsed) {
+    return (
+      <div className="space-y-2.5">
+        <h3 className="text-xs font-medium text-muted-foreground px-0.5">{title}</h3>
+        {children}
+      </div>
+    )
+  }
+  return (
+    <>
+      {/* Desktop: always open */}
+      <div className="hidden sm:block space-y-2.5">
+        <h3 className="text-xs font-medium text-muted-foreground px-0.5">{title}</h3>
+        {children}
+      </div>
+      {/* Mobile: collapsible via native <details> */}
+      <details className="sm:hidden">
+        <summary className="list-none cursor-pointer flex items-center justify-between px-0.5 py-1 select-none [&::-webkit-details-marker]:hidden">
+          <h3 className="text-xs font-medium text-muted-foreground">{title}</h3>
+          {CHEVRON}
+        </summary>
+        <div className="mt-2 space-y-2.5">{children}</div>
+      </details>
+    </>
   )
 }
 
@@ -625,7 +690,7 @@ function PredictionCard({ prediction }: { prediction: MatchupPrediction }) {
   const style = VERDICT_STYLES[prediction.verdict] ?? VERDICT_STYLES.neutral
 
   return (
-    <Section title="Matchup Prediction">
+    <Section title="Matchup Prediction" mobileCollapsed>
       <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
         {/* Big probability header */}
         <div className="px-5 py-5 border-b border-border/60">
