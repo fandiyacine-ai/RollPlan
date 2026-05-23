@@ -4,3 +4,6 @@ node_modules/
 .env.local
 *.env
 tsconfig.tsbuildinfo
+
+# Browser screenshots from UX review sessions
+.screenshots/
