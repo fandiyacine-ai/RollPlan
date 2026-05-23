@@ -760,7 +760,7 @@ export function ScoutingView({
       : 'Unknown Opponent'
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)]">
+    <div className="flex flex-col h-[calc(100svh-5rem)]">
 
       {/* ── Header ── */}
       <div className="flex items-start justify-between pb-3 border-b flex-shrink-0 gap-4">
@@ -896,13 +896,13 @@ export function ScoutingView({
 
       {/* ── Mobile: brief first, rest tabbed ── */}
       <div className="md:hidden flex-1 overflow-hidden flex flex-col pt-4 gap-3">
-        {/* Brief always visible above tabs */}
-        <div className="flex-shrink-0 rounded-xl border border-border/60 bg-card overflow-hidden">
+        {/* Brief — capped so tab panel always gets ≥50% of remaining space */}
+        <div className="flex-shrink-0 rounded-xl border border-border/60 bg-card max-h-[42vh] overflow-y-auto">
           <BriefTab insights={insights} large />
         </div>
 
         {/* Tabs for the rest */}
-        <div className="flex-1 flex flex-col overflow-hidden border border-border/60 rounded-xl bg-card">
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden border border-border/60 rounded-xl bg-card">
           <div className="flex border-b border-border/60 flex-shrink-0 overflow-x-auto">
             {TABS.filter(t => t.id !== 'brief').map(tab => (
               <button
