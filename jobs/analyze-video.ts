@@ -492,7 +492,7 @@ export const analyzeVideo = inngest.createFunction(
           model: anthropic(CLAUDE_SYNTHESIS_MODEL),
           schema: InsightsOutputSchema,
           maxRetries: 0,
-          system: buildGenerateInsightsSystemPrompt(matchRow?.competitorLabel ?? 'athlete', matchRow?.opponentLabel ?? 'opponent'),
+          system: buildGenerateInsightsSystemPrompt(matchRow?.competitorLabel ?? 'athlete', matchRow?.opponentLabel ?? 'opponent', !!(matchRow?.tournamentOpponentId)),
           prompt: JSON.stringify(matchData),
         })
       } catch (err: unknown) {
