@@ -18,7 +18,7 @@ const NAV = [
 const TAB_NAV = [
   {
     href: '/player-card',
-    label: 'Stats',
+    label: 'My Stats',
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/><path d="M12 8v4l3 3"/>
@@ -27,7 +27,7 @@ const TAB_NAV = [
   },
   {
     href: '/matches',
-    label: 'Matches',
+    label: 'My Matches',
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
         <path d="M15 10l-4 4L7 10"/><rect x="3" y="3" width="18" height="18" rx="2"/>
