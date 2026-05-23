@@ -133,7 +133,7 @@ export default async function MatchDetailPage({
       type: 'event' as const,
       time: e.timestampSeconds,
       actor: e.actor,
-      eventName: EVENT_MAP[e.eventTypeId] ?? e.eventTypeId,
+      eventName: EVENT_MAP[e.eventTypeId] ?? e.techniqueLabel ?? e.eventTypeId,
       techniqueLabel: e.techniqueLabel,
       outcome: e.outcome,
     })),

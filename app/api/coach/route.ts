@@ -5,6 +5,9 @@ import { db } from '../../../lib/db'
 import { matches, videos, positionSegments, matchEvents, insights } from '../../../lib/db/schema'
 import { eq, asc } from 'drizzle-orm'
 import { getTechniqueVariantsByEvents, formatVariantsAsPromptBlock, formatVariantsAsCounterGuide } from '../../../lib/ai/technique-retrieval'
+import { EVENT_TYPES } from '../../../lib/taxonomy/events'
+
+const EVENT_MAP = Object.fromEntries(EVENT_TYPES.map(e => [e.id, e.name]))
 
 export const maxDuration = 30
 
@@ -56,7 +59,8 @@ export async function POST(req: NextRequest) {
     ? events.map(e => {
         const concurrentSeg = segments.find(s => s.startSeconds <= e.timestampSeconds && s.endSeconds >= e.timestampSeconds)
         const posCtx = concurrentSeg ? ` [from ${concurrentSeg.positionId}, ${concurrentSeg.dominance}]` : ''
-        return `${fmt(e.timestampSeconds)}: ${e.eventTypeId} by ${e.actor} — ${e.outcome}${e.techniqueLabel ? ` (${e.techniqueLabel})` : ''}${posCtx}`
+        const label = EVENT_MAP[e.eventTypeId] ?? e.techniqueLabel ?? e.eventTypeId
+        return `${fmt(e.timestampSeconds)}: ${label} by ${e.actor} — ${e.outcome}${e.techniqueLabel && e.techniqueLabel !== label ? ` (${e.techniqueLabel})` : ''}${posCtx}`
       }).join('\n')
     : 'No events recorded'
 
@@ -69,7 +73,7 @@ export async function POST(req: NextRequest) {
     : 'transition / unclear'
 
   const currentEvents = nearbyEvents.length > 0
-    ? nearbyEvents.map(e => `${e.eventTypeId} by ${e.actor} — ${e.outcome}`).join(', ')
+    ? nearbyEvents.map(e => `${EVENT_MAP[e.eventTypeId] ?? e.techniqueLabel ?? e.eventTypeId} by ${e.actor} — ${e.outcome}`).join(', ')
     : 'none'
 
   const techniqueBlock = formatVariantsAsPromptBlock(techniqueVariants)
