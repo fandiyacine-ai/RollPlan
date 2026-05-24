@@ -29,6 +29,13 @@
       "when": 1779476720220,
       "tag": "0003_wide_rictor",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1779624205620,
+      "tag": "0004_athlete_competition_history",
+      "breakpoints": true
     }
   ]
 }

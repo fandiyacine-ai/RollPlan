@@ -33,6 +33,14 @@ type Opponent = {
   userResultMethod: string | null
 }
 
+type CompetitionHistoryRow = {
+  id: string
+  eventName: string
+  eventDate: string | null
+  placement: string | null
+  federation: string
+}
+
 function ResultBadge({ winner, method, technique }: { winner: string; method: string | null; technique: string | null }) {
   const isWin = winner === 'user'
   const label = method === 'walkover'
@@ -207,6 +215,54 @@ function OpponentResultWidget({
   )
 }
 
+function placementIcon(placement: string | null): string {
+  if (!placement) return ''
+  const p = placement.toLowerCase()
+  if (p.includes('1st') || p.includes('gold') || p === '1') return '🥇'
+  if (p.includes('2nd') || p.includes('silver') || p === '2') return '🥈'
+  if (p.includes('3rd') || p.includes('bronze') || p === '3') return '🥉'
+  return ''
+}
+
+function CompetitionHistoryPanel({ history }: { history: CompetitionHistoryRow[] }) {
+  if (history.length === 0) return null
+
+  // Sort most recent first
+  const sorted = [...history].sort((a, b) => {
+    if (!a.eventDate && !b.eventDate) return 0
+    if (!a.eventDate) return 1
+    if (!b.eventDate) return -1
+    return b.eventDate.localeCompare(a.eventDate)
+  })
+
+  return (
+    <div className="px-4 py-3 border-t border-border/30 space-y-1.5">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 mb-2">Competition History</p>
+      {sorted.slice(0, 5).map((row) => {
+        const icon = placementIcon(row.placement)
+        const dateStr = row.eventDate
+          ? new Date(row.eventDate + 'T12:00:00').toLocaleDateString('en', { month: 'short', year: 'numeric' })
+          : null
+        return (
+          <div key={row.id} className="flex items-center gap-2 min-w-0">
+            <span className="w-4 text-center flex-shrink-0 text-sm leading-none">{icon || '·'}</span>
+            <span className="text-xs text-foreground/80 truncate flex-1">{row.eventName}</span>
+            {row.placement && !icon && (
+              <span className="text-[10px] text-muted-foreground/60 flex-shrink-0">{row.placement}</span>
+            )}
+            {dateStr && (
+              <span className="text-[10px] text-muted-foreground/40 flex-shrink-0">{dateStr}</span>
+            )}
+          </div>
+        )
+      })}
+      {sorted.length > 5 && (
+        <p className="text-[10px] text-muted-foreground/40 pl-6">+{sorted.length - 5} more events</p>
+      )}
+    </div>
+  )
+}
+
 const CHUNK_LABEL_RE = /·\s*Part\s+(\d+)\/(\d+)$/
 
 function detectChunks(pendingVideos: FootageRow[]): { done: number; total: number } | null {
@@ -237,6 +293,7 @@ export function OpponentAccordion({
   tournamentId,
   communityMatchCount = 0,
   eventDatePassed = false,
+  competitionHistory = [],
 }: {
   opponent: Opponent
   matches: FootageRow[]
@@ -244,6 +301,7 @@ export function OpponentAccordion({
   tournamentId: string
   communityMatchCount?: number
   eventDatePassed?: boolean
+  competitionHistory?: CompetitionHistoryRow[]
 }) {
   const [open, setOpen] = useState(false)
   const [importing, startImport] = useTransition()
@@ -451,6 +509,9 @@ export function OpponentAccordion({
           })}
         </div>
       )}
+
+      {/* Competition history — visible when history exists, regardless of footage status */}
+      <CompetitionHistoryPanel history={competitionHistory} />
 
       {/* Post-event result row — always visible when event date has passed */}
       {eventDatePassed && (

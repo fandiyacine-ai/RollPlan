@@ -53,11 +53,27 @@ export async function addOpponent(tournamentId: string, formData: FormData) {
     }
   }
 
-  await db.insert(tournamentOpponents).values({
+  const [inserted] = await db.insert(tournamentOpponents).values({
     tournamentId,
     opponentLabel: name,
     seedingNotes: (formData.get('notes') as string)?.trim() || null,
-  })
+  }).returning({ id: tournamentOpponents.id })
+
+  // Fire multi-federation intel search for any manually added opponent
+  if (inserted) {
+    try {
+      const userId = await getOrCreateDbUserId()
+      await inngest.send({
+        name: 'opponent-intel/build.run',
+        data: {
+          opponentId: inserted.id,
+          athleteName: name,
+          tournamentId,
+          userId,
+        },
+      })
+    } catch { /* Inngest not configured — opponent created, intel won't auto-run */ }
+  }
 
   revalidatePath(`/tournaments/${tournamentId}/opponents`)
 }

@@ -11,10 +11,12 @@ import { syncTournamentCatalog } from '../../../../jobs/sync-tournament-catalog'
 import { ingestTechnique } from '../../../../jobs/ingest-technique'
 import { techniqueKbAgent } from '../../../../jobs/technique-kb-agent'
 import { rescanMatchesWithKb } from '../../../../jobs/rescan-matches-kb'
+import { backfillAthleteIntel } from '../../../../jobs/backfill-athlete-intel'
+import { buildOpponentIntel } from '../../../../jobs/build-opponent-intel'
 
 export const maxDuration = 300
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [analyzeVideo, generateGameplan, scanUrl, smoothcompMonitorBracket, smoothcompProcessBracket, smoothcompDiscoverFootage, generateExecutionDebrief, syncTournamentCatalog, ingestTechnique, techniqueKbAgent, rescanMatchesWithKb],
+  functions: [analyzeVideo, generateGameplan, scanUrl, smoothcompMonitorBracket, smoothcompProcessBracket, smoothcompDiscoverFootage, generateExecutionDebrief, syncTournamentCatalog, ingestTechnique, techniqueKbAgent, rescanMatchesWithKb, backfillAthleteIntel, buildOpponentIntel],
 })

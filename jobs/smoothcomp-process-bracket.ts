@@ -28,6 +28,9 @@ export const smoothcompProcessBracket = inngest.createFunction(
       }
     }> = []
 
+    // Track all upserted opponent IDs for the intel step
+    const allOpponents: Array<{ opponentId: string; athleteName: string }> = []
+
     for (const athlete of bracketData.athletes) {
       const { id: opponentId, needsDiscover } = await step.run(
         `upsert-opponent-${athlete.smoothcompAthleteId}`,
@@ -65,6 +68,8 @@ export const smoothcompProcessBracket = inngest.createFunction(
         }
       )
 
+      allOpponents.push({ opponentId, athleteName: athlete.name })
+
       if (!needsDiscover) continue
 
       discoverPayloads.push({
@@ -82,6 +87,16 @@ export const smoothcompProcessBracket = inngest.createFunction(
 
     if (discoverPayloads.length > 0) {
       await step.sendEvent('send-discover-events', discoverPayloads)
+    }
+
+    // Fire multi-federation intel (IBJJF + AJP) for every opponent in this bracket
+    const intelPayloads = allOpponents.map(o => ({
+      name: 'opponent-intel/build.run' as const,
+      data: { opponentId: o.opponentId, athleteName: o.athleteName, tournamentId, userId },
+    }))
+
+    if (intelPayloads.length > 0) {
+      await step.sendEvent('send-intel-events', intelPayloads)
     }
   }
 )

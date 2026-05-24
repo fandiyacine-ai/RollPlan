@@ -1,5 +1,5 @@
 import { db } from '../../../../../lib/db'
-import { tournaments, tournamentOpponents, matches, videos, gameplans } from '../../../../../lib/db/schema'
+import { tournaments, tournamentOpponents, matches, videos, gameplans, athleteCompetitionHistory } from '../../../../../lib/db/schema'
 import { eq, inArray, isNull, and, notLike, like, sql } from 'drizzle-orm'
 import { AddOpponentForm } from './opponent-forms'
 import { OpponentAccordion } from './opponent-accordion'
@@ -191,6 +191,36 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
     return acc
   }, {})
 
+  // Competition history for all opponents — shown even with no footage
+  const competitionHistoryByOpponent: Record<string, { id: string; eventName: string; eventDate: string | null; placement: string | null; federation: string }[]> = {}
+  if (opponentIds.length > 0) {
+    const historyRows = await db
+      .select({
+        id: athleteCompetitionHistory.id,
+        tournamentOpponentId: athleteCompetitionHistory.tournamentOpponentId,
+        eventName: athleteCompetitionHistory.eventName,
+        eventDate: athleteCompetitionHistory.eventDate,
+        placement: athleteCompetitionHistory.placement,
+        federation: athleteCompetitionHistory.federation,
+      })
+      .from(athleteCompetitionHistory)
+      .where(inArray(athleteCompetitionHistory.tournamentOpponentId, opponentIds))
+      .orderBy(athleteCompetitionHistory.eventDate)
+      .catch(() => [])
+
+    for (const row of historyRows) {
+      if (!row.tournamentOpponentId) continue
+      competitionHistoryByOpponent[row.tournamentOpponentId] ??= []
+      competitionHistoryByOpponent[row.tournamentOpponentId].push({
+        id: row.id,
+        eventName: row.eventName,
+        eventDate: row.eventDate ?? null,
+        placement: row.placement ?? null,
+        federation: row.federation,
+      })
+    }
+  }
+
   const hasActiveScans = allMatches.some(m => m.status === 'processing' || m.status === 'pending' || m.status === 'uploaded')
     || allPendingVideos.some(v => v.status === 'processing' || v.status === 'pending' || v.status === 'uploaded')
     || opponents.some(o => o.footageStatus === 'pending' || o.footageStatus === 'auto_queued')
@@ -330,6 +360,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
             <OpponentAccordion
               key={opp.id}
               opponent={{ ...opp, footageStatus: opp.footageStatus ?? 'manual', userResult: opp.userResult ?? null, userResultMethod: opp.userResultMethod ?? null }}
+              competitionHistory={competitionHistoryByOpponent[opp.id] ?? []}
               eventDatePassed={eventDatePassed}
               matches={(matchesByOpponent[opp.id] ?? []).map(m => ({
                 ...m, rowType: 'match' as const, format: m.format ?? null, context: m.context ?? null, label: undefined,

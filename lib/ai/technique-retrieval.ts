@@ -1,6 +1,6 @@
 import { db } from '../db'
 import { techniqueVariants } from '../db/schema'
-import { eq, and, or, inArray, isNull } from 'drizzle-orm'
+import { eq, and, or, inArray, isNull, not } from 'drizzle-orm'
 
 export type TechniqueVariant = {
   id: string
@@ -25,30 +25,42 @@ const COLS = {
 } as const
 
 // ─── Extraction (first Gemini pass) ──────────────────────────────────────────
-// Only general variants (positionId IS NULL) — truly universal, format-filtered.
-// Cap: 15. These are the "always send" flashcards regardless of what positions appear.
-// Position-specific variants are reserved for the targeted rescan (Phase 2).
-const EXTRACTION_CAP = 15
+// All active variants (general + position-specific), format-filtered.
+// General variants (positionId IS NULL) appear first so they anchor the model's
+// pattern recognition before position-specific details follow.
+// Cap raised to 25 — KB is now large enough that capping too low starves Gemini.
+const EXTRACTION_CAP = 25
 
 export async function getTechniqueVariantsForExtraction(
   format: 'gi' | 'no_gi'
 ): Promise<TechniqueVariant[]> {
-  const rows = await db.query.techniqueVariants.findMany({
+  // Fetch general variants first (positionId IS NULL), then position-specific
+  const general = await db.query.techniqueVariants.findMany({
     where: and(
       eq(techniqueVariants.status, 'active'),
       FORMAT_FILTER(format),
-      isNull(techniqueVariants.positionId)   // general only — no position-specific yet
+      isNull(techniqueVariants.positionId)
     ),
     columns: COLS,
     limit: EXTRACTION_CAP,
   })
-  return rows
+  const specific = await db.query.techniqueVariants.findMany({
+    where: and(
+      eq(techniqueVariants.status, 'active'),
+      FORMAT_FILTER(format),
+      not(isNull(techniqueVariants.positionId))
+    ),
+    columns: COLS,
+    limit: EXTRACTION_CAP - general.length,
+  })
+  return [...general, ...specific]
 }
 
 // ─── Targeted rescan (Phase 2 — after positions are known) ───────────────────
-// Fetch variants whose positionId matches positions that ACTUALLY APPEARED in
-// this match. Cap: 20. Called after the first extraction gives us the segment list.
-const RESCAN_CAP = 20
+// Fetch variants for positions that ACTUALLY APPEARED in this match, plus general
+// variants (positionId IS NULL) so the model always has universal context.
+// Cap raised to 30 — KB is now large enough to warrant deeper injection.
+const RESCAN_CAP = 30
 
 export async function getTechniqueVariantsForPositions(
   positionIds: string[],   // positions extracted from the match
@@ -56,14 +68,13 @@ export async function getTechniqueVariantsForPositions(
 ): Promise<TechniqueVariant[]> {
   if (positionIds.length === 0) return []
 
-  // Deduplicate positions and limit to the most relevant ones
   const uniquePositions = [...new Set(positionIds)]
 
   const rows = await db.query.techniqueVariants.findMany({
     where: and(
       eq(techniqueVariants.status, 'active'),
       FORMAT_FILTER(format),
-      inArray(techniqueVariants.positionId, uniquePositions)
+      or(isNull(techniqueVariants.positionId), inArray(techniqueVariants.positionId, uniquePositions))
     ),
     columns: COLS,
     limit: RESCAN_CAP,
@@ -74,7 +85,7 @@ export async function getTechniqueVariantsForPositions(
 // ─── Chat + gameplans (event-ID based) ───────────────────────────────────────
 // Fetch variants for specific technique IDs that were observed in the match.
 // Used after analysis when we know what events occurred.
-const CHAT_CAP = 20
+const CHAT_CAP = 25
 
 export async function getTechniqueVariantsByEvents(
   eventIds: string[],

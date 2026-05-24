@@ -2,7 +2,8 @@
 
 import { db } from '@/lib/db'
 import { canonicalTournaments, tournaments } from '@/lib/db/schema'
-import { and, asc, eq, gte, ilike, isNull, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, ilike, isNull, or, sql } from 'drizzle-orm'
+import { getOrCreateDbUserId } from '@/lib/db/get-user'
 
 export type CatalogEntry = {
   id: string
@@ -127,17 +128,63 @@ export async function searchCatalogAction(query: string, userLocale?: string): P
       .orderBy(asc(canonicalTournaments.eventDate))
       .limit(100)
 
+    // Also include the current user's manually entered tournaments (no canonical link).
+    // These never appear in canonicalTournaments so would otherwise be invisible.
+    let manualRows: CatalogEntry[] = []
+    try {
+      const userId = await getOrCreateDbUserId()
+      const manualTokenFilters = tokens.map(t => ilike(tournaments.name, `%${t}%`))
+      const manual = await db
+        .select({
+          id: tournaments.id,
+          name: tournaments.name,
+          eventDate: tournaments.eventDate,
+          ruleset: tournaments.ruleset,
+          smoothcompUrl: tournaments.smoothcompUrl,
+        })
+        .from(tournaments)
+        .where(
+          and(
+            eq(tournaments.userId, userId),
+            isNull(tournaments.canonicalTournamentId),
+            manualTokenFilters.length > 0 ? and(...manualTokenFilters) : undefined,
+          )
+        )
+        .orderBy(desc(tournaments.createdAt))
+        .limit(20)
+
+      manualRows = manual.map(r => ({
+        id: r.id,
+        name: r.name,
+        eventDate: r.eventDate ?? null,
+        location: null,
+        ruleset: r.ruleset,
+        source: 'manual',
+        smoothcompUrl: r.smoothcompUrl ?? null,
+        userCount: 1,
+      }))
+    } catch {
+      // Not authenticated or DB error — skip manual results
+    }
+
     const userCountry = userLocale ? localeToCountry(userLocale) : null
+
+    // Deduplicate: if a manual entry's name exactly matches a canonical entry, skip it
+    const canonicalNames = new Set((rows as CatalogEntry[]).map(r => r.name.toLowerCase()))
+    const dedupedManual = manualRows.filter(r => !canonicalNames.has(r.name.toLowerCase()))
+
+    // Manual entries first (most personally relevant), then catalog
+    const combined = [...dedupedManual, ...(rows as CatalogEntry[])]
 
     // When searching (has query tokens), keep date order — the user knows what they want.
     // When browsing (no query), sort by proximity then date.
     if (!userCountry || tokens.length > 0) {
-      return (rows as CatalogEntry[]).slice(0, 20)
+      return combined.slice(0, 20)
     }
 
-    const scored = (rows as CatalogEntry[]).map(row => ({
+    const scored = combined.map(row => ({
       row,
-      score: proximityScore(countryFromLocation(row.location), userCountry),
+      score: row.source === 'manual' ? -1 : proximityScore(countryFromLocation(row.location), userCountry),
       date: row.eventDate ?? '9999-99-99',
     }))
 

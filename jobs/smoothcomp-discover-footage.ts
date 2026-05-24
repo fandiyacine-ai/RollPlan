@@ -1,6 +1,6 @@
 import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
-import { videos, tournamentOpponents, tournaments } from '../lib/db/schema'
+import { videos, tournamentOpponents, tournaments, athleteCompetitionHistory } from '../lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { scrapeAthleteProfile } from '../lib/smoothcomp/scraper'
 
@@ -48,6 +48,26 @@ export const smoothcompDiscoverFootage = inngest.createFunction(
       })
       return
     }
+
+    // Persist ALL past competitions as intel — regardless of whether footage exists.
+    // This is the athlete's competition history and is valuable even with no video.
+    await step.run('store-competition-history', async () => {
+      for (const comp of profile.pastCompetitions) {
+        await db
+          .insert(athleteCompetitionHistory)
+          .values({
+            smoothcompAthleteId: athleteId,
+            tournamentOpponentId: opponentId,
+            federation: 'smoothcomp',
+            eventName: comp.eventName,
+            eventId: comp.eventId,
+            eventUrl: comp.eventUrl,
+            eventDate: comp.date ?? null,
+            placement: comp.placement ?? null,
+          })
+          .onConflictDoNothing()
+      }
+    })
 
     const competitionsWithFootage = profile.pastCompetitions.filter((c: { youtubeUrl: string | null }) => c.youtubeUrl)
 
