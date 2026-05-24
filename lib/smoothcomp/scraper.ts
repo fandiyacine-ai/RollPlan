@@ -1,4 +1,7 @@
-import { chromium, type Browser, type Page } from 'playwright'
+import { chromium as playwrightChromium, type Browser, type Page } from 'playwright'
+// playwright-extra + stealth plugin for Cloudflare-protected pages (athlete profiles)
+import { chromium as stealthChromium } from 'playwright-extra'
+import StealthPlugin from 'puppeteer-extra-plugin-stealth'
 import type {
   ScBracketResult,
   ScAthleteRef,
@@ -9,12 +12,16 @@ import type {
 } from './types'
 
 const SC_BASE = 'https://smoothcomp.com'
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta'
 
 // Wait for Firebase-loaded content by checking that the loading spinner is gone
 // and at least one real content element is present
 async function waitForFirebase(page: Page, selector: string, timeout = 15000) {
   await page.waitForSelector(selector, { timeout })
 }
+
+// Suppress unused warning — waitForFirebase is kept for future use
+void waitForFirebase
 
 const BROWSER_ARGS = [
   '--no-sandbox',
@@ -27,7 +34,7 @@ const BROWSER_ARGS = [
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 
 async function launchBrowser(): Promise<Browser> {
-  return chromium.launch({ headless: true, args: BROWSER_ARGS })
+  return playwrightChromium.launch({ headless: true, args: BROWSER_ARGS })
 }
 
 // Standard page for event/bracket/stream pages (no Cloudflare)
@@ -40,11 +47,17 @@ async function newPage(browser: Browser) {
   return ctx.newPage()
 }
 
-// Stealth page for profile pages (Cloudflare-protected)
+// Stealth browser: uses playwright-extra + stealth plugin to pass Cloudflare's
+// bot detection (Managed Challenge) on profile pages.
+async function launchStealthBrowser(): Promise<Browser> {
+  stealthChromium.use(StealthPlugin())
+  return stealthChromium.launch({ headless: true, args: BROWSER_ARGS }) as Promise<Browser>
+}
+
 async function newStealthPage(browser: Browser) {
   const ctx = await browser.newContext({
     userAgent: USER_AGENT,
-    viewport: { width: 1280, height: 800 },
+    viewport: { width: 1280, height: 900 },
     locale: 'en-US',
     extraHTTPHeaders: {
       'Accept-Language': 'en-US,en;q=0.9',
@@ -53,13 +66,56 @@ async function newStealthPage(browser: Browser) {
       'Sec-Fetch-Mode': 'navigate',
     },
   })
-  const page = await ctx.newPage()
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, 'webdriver', { get: () => undefined })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(window as any).chrome = { runtime: {} }
-  })
-  return page
+  return ctx.newPage()
+}
+
+// Use Gemini vision to extract competition history from a screenshot of the profile page.
+// More robust than DOM parsing: handles Firebase lazy-loaded content and layout changes.
+async function extractCompetitionsFromScreenshot(
+  screenshotBuffer: Buffer,
+): Promise<Array<{ eventName: string; eventId: string; eventUrl: string; date: string | null; placement: string | null }>> {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) return []
+
+  const base64Image = screenshotBuffer.toString('base64')
+  const prompt = `This is a screenshot of an athlete profile page on Smoothcomp or AJP Tour showing their competition history.
+
+Extract all competition events visible. For each event return:
+- eventName: the full event/tournament name
+- eventId: the numeric ID from the URL if visible (e.g. from /event/12345), or empty string
+- eventUrl: the full URL if visible, or empty string
+- date: the event date in YYYY-MM-DD format if visible, or null
+- placement: the placement/result if visible (e.g. "1st", "2nd", "gold", "silver"), or null
+
+Return JSON: { "competitions": [ { "eventName": "...", "eventId": "...", "eventUrl": "...", "date": "...", "placement": "..." } ] }
+Only return valid JSON, no markdown fences.`
+
+  try {
+    const resp = await fetch(
+      `${GEMINI_BASE}/models/gemini-2.0-flash-001:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { inlineData: { mimeType: 'image/png', data: base64Image } },
+              { text: prompt },
+            ],
+          }],
+          generationConfig: { temperature: 0, responseMimeType: 'application/json' },
+        }),
+        signal: AbortSignal.timeout(30000),
+      }
+    )
+    if (!resp.ok) return []
+    const data = await resp.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+    const parsed = JSON.parse(text) as { competitions?: Array<{ eventName: string; eventId: string; eventUrl: string; date: string | null; placement: string | null }> }
+    return parsed.competitions ?? []
+  } catch {
+    return []
+  }
 }
 
 // Extract event ID and bracket ID from a Smoothcomp bracket URL
@@ -225,50 +281,67 @@ export async function scrapeAthleteProfile(profileUrl: string): Promise<ScAthlet
   if (!athleteIdMatch) return null
   const athleteId = athleteIdMatch[1]
 
-  const browser = await launchBrowser()
+  // Use stealth browser to bypass Cloudflare Managed Challenge on profile pages
+  const browser = await launchStealthBrowser()
   try {
     const page = await newStealthPage(browser)
-    await page.goto(profileUrl, { waitUntil: 'load', timeout: 30000 })
-    // Give Firebase time to render the profile and competition history
-    await page.waitForTimeout(5000)
+    await page.goto(profileUrl, { waitUntil: 'load', timeout: 40000 })
+    // Give Firebase and any CF challenge time to resolve
+    await page.waitForTimeout(6000)
 
-    const profileData = await page.evaluate(() => {
-      const bodyText = document.body.textContent?.toLowerCase() ?? ''
-      // Cloudflare challenge means we can't determine public/private — treat as blocked
-      const isCloudflareChallenge = bodyText.includes('security verification') || bodyText.includes('checking your browser') || bodyText.includes('ddos-guard')
-      const isPrivate = isCloudflareChallenge || (
-        bodyText.includes('private profile') ||
-        bodyText.includes('profile is private') ||
-        bodyText.includes('hidden profile') ||
-        document.querySelector('[class*="private"]') !== null
-      )
+    // Take a full-page screenshot for vision-based extraction (robust against layout changes)
+    const screenshot = await page.screenshot({ fullPage: true, type: 'png' }).catch(() => null)
 
-      // Name: look for the largest visible text that isn't nav/footer
-      // Smoothcomp renders athlete name in a heading inside the profile card
-      let name = ''
-      const headings = Array.from(document.querySelectorAll('h1, h2, h3'))
-      for (const h of headings) {
+    const bodyText = await page.evaluate(() => document.body.textContent?.toLowerCase() ?? '')
+    const isCloudflareChallenge =
+      bodyText.includes('just a moment') ||
+      bodyText.includes('security verification') ||
+      bodyText.includes('checking your browser') ||
+      bodyText.includes('ddos-guard')
+
+    if (isCloudflareChallenge) {
+      // Stealth couldn't bypass CF — mark as blocked, retry will be scheduled
+      return { athleteId, name: '', isPublic: false, pastCompetitions: [], photoUrl: null }
+    }
+
+    const isPrivate =
+      bodyText.includes('private profile') ||
+      bodyText.includes('profile is private') ||
+      bodyText.includes('hidden profile') ||
+      (await page.$('[class*="private"]').catch(() => null)) !== null
+
+    if (isPrivate) {
+      return { athleteId, name: '', isPublic: false, pastCompetitions: [], photoUrl: null }
+    }
+
+    // Extract athlete name from DOM
+    const name = await page.evaluate(() => {
+      for (const h of Array.from(document.querySelectorAll('h1, h2, h3'))) {
         const t = h.textContent?.trim() ?? ''
-        // Skip nav items (short) and site name
         if (t.length > 3 && t.length < 60 && !t.toLowerCase().includes('smoothcomp') && !t.toLowerCase().includes('log in')) {
-          name = t
-          break
+          return t
         }
       }
+      return ''
+    })
 
-      // Profile photo
-      let photoUrl: string | null = null
-      const imgs = Array.from(document.querySelectorAll('img'))
-      for (const img of imgs) {
-        const src = img.src
-        if (src.includes('profile') || src.includes('avatar') || src.includes('user') || src.includes('pictures/p/')) {
-          photoUrl = src
-          break
-        }
+    const photoUrl = await page.evaluate(() => {
+      for (const img of Array.from(document.querySelectorAll('img'))) {
+        const src = (img as HTMLImageElement).src
+        if (src.includes('profile') || src.includes('avatar') || src.includes('pictures/p/')) return src
       }
+      return null
+    })
 
-      // Past competitions: links to /event/ pages on the profile
-      const comps: Array<{ eventName: string; eventId: string; eventUrl: string; date: string | null; placement: string | null }> = []
+    // Strategy 1: vision-based extraction via Gemini (handles Firebase lazy-loaded content)
+    let comps: Array<{ eventName: string; eventId: string; eventUrl: string; date: string | null; placement: string | null }> = []
+    if (screenshot) {
+      comps = await extractCompetitionsFromScreenshot(screenshot)
+    }
+
+    // Strategy 2: DOM link extraction as supplement (catches event links missed by vision)
+    const domComps = await page.evaluate(() => {
+      const results: Array<{ eventName: string; eventId: string; eventUrl: string; date: string | null; placement: string | null }> = []
       const seen = new Set<string>()
       document.querySelectorAll('a[href*="/event/"]').forEach(el => {
         const href = (el as HTMLAnchorElement).href
@@ -283,32 +356,28 @@ export async function scrapeAthleteProfile(profileUrl: string): Promise<ScAthlet
         const ctx = parent?.textContent ?? ''
         const dateM = ctx.match(/\d{4}-\d{2}-\d{2}|\d{1,2}[.\/ ]\w+[.\/ ]\d{4}/)
         const placM = ctx.match(/\b(1st|2nd|3rd|\d+th|gold|silver|bronze)\b/i)
-        comps.push({ eventName, eventId, eventUrl: href, date: dateM?.[0] ?? null, placement: placM?.[0] ?? null })
+        results.push({ eventName, eventId, eventUrl: href, date: dateM?.[0] ?? null, placement: placM?.[0] ?? null })
       })
-
-      return { isPrivate, name, photoUrl, comps }
+      return results
     })
 
-    if (profileData.isPrivate) {
-      return { athleteId, name: '', isPublic: false, pastCompetitions: [], photoUrl: null }
+    // Merge: DOM-found event IDs take precedence (have real URLs), vision fills in the rest
+    const seenIds = new Set(domComps.map(c => c.eventId))
+    for (const c of comps) {
+      if (!c.eventId || seenIds.has(c.eventId)) continue
+      seenIds.add(c.eventId)
+      domComps.push(c)
     }
-
-    const comps = profileData.comps
+    const mergedComps = domComps.length > 0 ? domComps : comps
 
     // For each past competition, try to find a YouTube recording
     const pastCompetitions: ScPastCompetition[] = []
-    for (const comp of comps.slice(0, 5)) { // limit to last 5 events
+    for (const comp of mergedComps.slice(0, 5)) {
       const youtubeUrl = await findEventYouTubeStream(comp.eventId).catch(() => null)
       pastCompetitions.push({ ...comp, youtubeUrl })
     }
 
-    return {
-      athleteId,
-      name: profileData.name,
-      isPublic: true,
-      pastCompetitions,
-      photoUrl: profileData.photoUrl,
-    }
+    return { athleteId, name, isPublic: true, pastCompetitions, photoUrl }
   } finally {
     await browser.close()
   }
