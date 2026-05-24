@@ -39,6 +39,8 @@ type CompetitionHistoryRow = {
   eventDate: string | null
   placement: string | null
   federation: string
+  wins: number | null
+  losses: number | null
 }
 
 function ResultBadge({ winner, method, technique }: { winner: string; method: string | null; technique: string | null }) {
@@ -243,12 +245,20 @@ function CompetitionHistoryPanel({ history }: { history: CompetitionHistoryRow[]
         const dateStr = row.eventDate
           ? new Date(row.eventDate + 'T12:00:00').toLocaleDateString('en', { month: 'short', year: 'numeric' })
           : null
+        const hasWL = row.wins !== null || row.losses !== null
         return (
           <div key={row.id} className="flex items-center gap-2 min-w-0">
             <span className="w-4 text-center flex-shrink-0 text-sm leading-none">{icon || '·'}</span>
             <span className="text-xs text-foreground/80 truncate flex-1">{row.eventName}</span>
             {row.placement && !icon && (
               <span className="text-[10px] text-muted-foreground/60 flex-shrink-0">{row.placement}</span>
+            )}
+            {hasWL && (
+              <span className="text-[10px] font-mono flex-shrink-0 text-muted-foreground/50">
+                <span className="text-emerald-400/70">{row.wins ?? 0}W</span>
+                <span className="mx-0.5">/</span>
+                <span className="text-rose-400/70">{row.losses ?? 0}L</span>
+              </span>
             )}
             {dateStr && (
               <span className="text-[10px] text-muted-foreground/40 flex-shrink-0">{dateStr}</span>

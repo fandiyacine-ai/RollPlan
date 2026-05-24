@@ -49,55 +49,119 @@ function ordinal(n: number | null): string | null {
   return `${n}th`
 }
 
-// Brave Search → extract AJP event IDs from result URLs → POST participants → get user_id
-async function findAjpAthleteIdByName(name: string): Promise<string | null> {
-  const apiKey = process.env.BRAVE_API_KEY
-  if (!apiKey) return null
-
-  // Step 1: Brave search for AJP event pages featuring this athlete
-  const query = encodeURIComponent(`"${name}" site:ajptour.com`)
-  const resp = await fetch(
-    `https://api.search.brave.com/res/v1/web/search?q=${query}&count=10`,
-    {
-      headers: {
-        'X-Subscription-Token': apiKey,
-        Accept: 'application/json',
-      },
-      signal: AbortSignal.timeout(15000),
-    }
-  )
-  if (!resp.ok) return null
-
-  const data = await resp.json() as {
-    web?: { results?: Array<{ url: string; description: string; extra_snippets?: string[] }> }
+// Extract AJP profile ID from any URL found in search results
+function extractAjpProfileId(urls: string[]): string | null {
+  for (const url of urls) {
+    const m = url.match(/ajptour\.com\/[a-z]{0,5}\/profile\/(\d+)/)
+    if (m) return m[1]
   }
-  const results = data.web?.results ?? []
+  return null
+}
 
-  // Extract AJP event IDs from result URLs
-  const eventIds = [...new Set(
-    results
-      .map(r => r.url.match(/ajptour\.com\/[a-z]{0,10}\/?event\/(\d+)/)?.[1])
-      .filter((id): id is string => !!id)
-  )]
+// Use Gemini with Google Search grounding to find a profile URL.
+// Gemini grounds its answer with real Google search results; the grounding chunks
+// include redirect URLs we can follow to get the actual profile page URL.
+async function geminiGroundedSearch(query: string, domain: string): Promise<string[]> {
+  const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+  if (!apiKey) return []
+  try {
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: query }] }],
+          tools: [{ google_search: {} }],
+        }),
+        signal: AbortSignal.timeout(20000),
+      }
+    )
+    if (!resp.ok) return []
+    const data = await resp.json() as {
+      candidates?: Array<{
+        groundingMetadata?: { groundingChunks?: Array<{ web?: { uri?: string; title?: string } }> }
+      }>
+    }
+    const chunks = data.candidates?.[0]?.groundingMetadata?.groundingChunks ?? []
+    const redirectUrls = chunks
+      .map(c => c.web?.uri)
+      .filter((u): u is string => !!u && u.includes('grounding-api-redirect'))
 
-  if (eventIds.length === 0) return null
+    // Follow each redirect to get the real URL
+    const realUrls: string[] = []
+    for (const redirectUrl of redirectUrls) {
+      try {
+        const r = await fetch(redirectUrl, {
+          method: 'HEAD',
+          redirect: 'manual',
+          signal: AbortSignal.timeout(8000),
+        })
+        const location = r.headers.get('location')
+        if (location && location.includes(domain)) realUrls.push(location)
+      } catch { continue }
+    }
+    return realUrls
+  } catch { return [] }
+}
 
-  // Step 2: For each found event, POST to participants and search by name
+// Multi-engine search for AJP athlete profile — Brave → Gemini+Google Search grounding
+// Profile URL gives the athlete ID directly; event URL triggers participants POST fallback.
+async function findAjpAthleteIdByName(name: string): Promise<string | null> {
+  // 1. Brave Search API (JSON, no bot issues — but AJP not always indexed)
+  const apiKey = process.env.BRAVE_API_KEY
+  if (apiKey) {
+    for (const query of [`"${name}" site:ajptour.com`, `${name} site:ajptour.com`, `"${name}" ajptour.com`]) {
+      try {
+        const resp = await fetch(
+          `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=10`,
+          { headers: { 'X-Subscription-Token': apiKey, Accept: 'application/json' }, signal: AbortSignal.timeout(12000) }
+        )
+        if (!resp.ok) continue
+        const data = await resp.json() as { web?: { results?: Array<{ url: string }> } }
+        const urls = (data.web?.results ?? []).map(r => r.url)
+        if (urls.length > 0) {
+          const id = extractAjpProfileId(urls)
+          if (id) return id
+          const eventIds = [...new Set(urls.map(u => u.match(/ajptour\.com\/[a-z]{0,10}\/?event\/(\d+)/)?.[1]).filter(Boolean) as string[])]
+          if (eventIds.length > 0) {
+            const found = await findIdFromEventParticipants(eventIds, name)
+            if (found) return found
+          }
+        }
+      } catch { continue }
+    }
+  }
+
+  // 2. Gemini + Google Search grounding (real Google results, no bot-blocking)
+  const geminiUrls = await geminiGroundedSearch(
+    `Find the AJP ajptour.com profile URL for BJJ athlete "${name}". Return only the profile URL.`,
+    'ajptour.com'
+  )
+  if (geminiUrls.length > 0) {
+    const id = extractAjpProfileId(geminiUrls)
+    if (id) return id
+    const eventIds = [...new Set(geminiUrls.map(u => u.match(/ajptour\.com\/[a-z]{0,10}\/?event\/(\d+)/)?.[1]).filter(Boolean) as string[])]
+    if (eventIds.length > 0) {
+      const found = await findIdFromEventParticipants(eventIds, name)
+      if (found) return found
+    }
+  }
+
+  return null
+}
+
+async function findIdFromEventParticipants(eventIds: string[], name: string): Promise<string | null> {
   const nameLower = name.toLowerCase()
   for (const eventId of eventIds.slice(0, 5)) {
     try {
       const pResp = await fetch(`https://ajptour.com/en/event/${eventId}/participants`, {
         method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          'User-Agent': 'Mozilla/5.0',
-        },
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' },
         body: '{}',
         signal: AbortSignal.timeout(15000),
       })
       if (!pResp.ok) continue
-
       const data = await pResp.json() as { participants: Array<{ registrations: Array<{ user_id: number; firstname: string; lastname: string }> }> }
       for (const participant of data.participants ?? []) {
         for (const reg of participant.registrations ?? []) {
@@ -109,33 +173,61 @@ async function findAjpAthleteIdByName(name: string): Promise<string | null> {
       }
     } catch { continue }
   }
-
   return null
 }
 
-// Brave Search → find Smoothcomp federation subdomains + athlete IDs from event participants
+// Extract smoothcomp profile entries from a list of raw URLs
+function extractSmoothcompProfiles(urls: string[]): Array<{ baseUrl: string; athleteId: string }> {
+  const seen = new Set<string>()
+  const profiles: Array<{ baseUrl: string; athleteId: string }> = []
+  for (const url of urls) {
+    const m = url.match(/^(https?:\/\/(?:[a-z0-9-]+\.)?smoothcomp\.com)\/[a-z]{0,5}\/profile\/(\d+)/)
+    if (m && !seen.has(m[1])) { seen.add(m[1]); profiles.push({ baseUrl: m[1], athleteId: m[2] }) }
+  }
+  return profiles
+}
+
+// Multi-engine search for Smoothcomp profiles — Brave → Google → DuckDuckGo
 // Returns one entry per unique subdomain (e.g. avasports.smoothcomp.com, smoothcomp.com)
 async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: string; athleteId: string }>> {
+  // Collect all candidate URLs across engines, then process together
+  let candidateUrls: string[] = []
+
+  // 1. Brave
   const apiKey = process.env.BRAVE_API_KEY
-  if (!apiKey) return []
-
-  const query = encodeURIComponent(`"${name}" site:smoothcomp.com`)
-  const resp = await fetch(
-    `https://api.search.brave.com/res/v1/web/search?q=${query}&count=10`,
-    {
-      headers: { 'X-Subscription-Token': apiKey, Accept: 'application/json' },
-      signal: AbortSignal.timeout(15000),
+  if (apiKey) {
+    for (const query of [`"${name}" site:smoothcomp.com`, `${name} site:smoothcomp.com`, `"${name}" smoothcomp.com`]) {
+      try {
+        const resp = await fetch(
+          `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=10`,
+          { headers: { 'X-Subscription-Token': apiKey, Accept: 'application/json' }, signal: AbortSignal.timeout(12000) }
+        )
+        if (!resp.ok) continue
+        const data = await resp.json() as { web?: { results?: Array<{ url: string }> } }
+        const urls = (data.web?.results ?? []).map(r => r.url)
+        if (urls.length > 0) { candidateUrls = urls; break }
+      } catch { continue }
     }
-  )
-  if (!resp.ok) return []
+  }
 
-  const data = await resp.json() as { web?: { results?: Array<{ url: string }> } }
-  const results = data.web?.results ?? []
+  // 2. Gemini + Google Search grounding
+  if (candidateUrls.length === 0) {
+    candidateUrls = await geminiGroundedSearch(
+      `Find smoothcomp.com profile URLs for BJJ athlete "${name}". Return the profile URLs.`,
+      'smoothcomp.com'
+    )
+  }
 
-  // Extract unique {baseUrl, eventId} pairs — one per subdomain
+  if (candidateUrls.length === 0) return []
+
+  // Prefer direct profile URLs
+  const directProfiles = extractSmoothcompProfiles(candidateUrls)
+  if (directProfiles.length > 0) return directProfiles
+
+  // Fall back: extract unique {baseUrl, eventId} pairs — one per subdomain
   const seen = new Map<string, string>() // baseUrl → first eventId found
-  for (const r of results) {
-    const m = r.url.match(/^(https?:\/\/(?:[a-z0-9-]+\.)?smoothcomp\.com)\/[^/]+\/event\/(\d+)/)
+  for (const url of candidateUrls) {
+    const m = url.match(/^(https?:\/\/(?:[a-z0-9-]+\.)?smoothcomp\.com)\/[^/]+\/event\/(\d+)/)
     if (m && !seen.has(m[1])) seen.set(m[1], m[2])
   }
 
@@ -370,6 +462,7 @@ export const buildOpponentIntel = inngest.createFunction(
     // --- IBJJF via BJJ Metrics (open JSON API, no auth, no Playwright) ---
     // POST /search_ibjjf_matches_names → exact name
     // POST /get_ibjjf_matches → full match history per tournament
+    // GET  /fighter/{slug}           → HTML table with actual placement numbers (1, 2, 3)
     const ibjjfResult = await step.run('fetch-ibjjf-history', async () => {
       // Step 1: find exact name
       const searchResp = await fetch('https://bjjmetrics.com/search_ibjjf_matches_names', {
@@ -383,6 +476,7 @@ export const buildOpponentIntel = inngest.createFunction(
       if (!searchData.success || !searchData.names?.length) return { inserted: 0, found: false }
 
       const exactName = searchData.names[0].name
+      const fighterSlug = exactName.toLowerCase().replace(/\s+/g, '-')
 
       // Step 2: fetch all matches for that athlete
       const matchesResp = await fetch('https://bjjmetrics.com/get_ibjjf_matches', {
@@ -403,6 +497,37 @@ export const buildOpponentIntel = inngest.createFunction(
         }>
       }
       if (!matchesData.success || !matchesData.matches?.length) return { inserted: 0, found: true }
+
+      // Step 3: fetch fighter profile page for actual placement numbers
+      // The HTML table has: competition | division | place | team
+      const placementMap = new Map<string, string | null>()
+      try {
+        const profileResp = await fetch(`https://bjjmetrics.com/fighter/${fighterSlug}`, {
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+          signal: AbortSignal.timeout(20000),
+        })
+        if (profileResp.ok) {
+          const html = await profileResp.text()
+          const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi
+          let rowMatch: RegExpExecArray | null
+          while ((rowMatch = rowRegex.exec(html)) !== null) {
+            const tdRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi
+            const tdValues: string[] = []
+            let tdMatch: RegExpExecArray | null
+            while ((tdMatch = tdRegex.exec(rowMatch[1])) !== null) {
+              tdValues.push(tdMatch[1].replace(/<[^>]+>/g, '').trim())
+            }
+            if (tdValues.length >= 3) {
+              const [competition, division, place] = tdValues
+              const placeNum = parseInt(place)
+              if (!isNaN(placeNum) && competition && division) {
+                const key = `${competition}||${division}`
+                if (!placementMap.has(key)) placementMap.set(key, ordinal(placeNum))
+              }
+            }
+          }
+        }
+      } catch { /* profile page optional — fall back to wins/losses heuristic */ }
 
       // Group matches by tournament+division to compute wins/losses per event
       const groupKey = (m: { tournament_name: string; division: string }) =>
@@ -426,20 +551,24 @@ export const buildOpponentIntel = inngest.createFunction(
         }
       }
 
-      const athleteKey = athleteId ?? exactName.toLowerCase().replace(/\s+/g, '-')
+      const athleteKey = athleteId ?? fighterSlug
       const rows: Array<typeof athleteCompetitionHistory.$inferInsert> = []
 
-      for (const [, g] of groups) {
+      for (const [key, g] of groups) {
         const slug = `${g.tournament}-${g.division}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 60)
+        // Use profile page placement if found; fall back to: 1st if undefeated, else null
+        const placement = placementMap.has(key)
+          ? placementMap.get(key) ?? null
+          : g.losses === 0 ? '1st' : null
         rows.push({
           smoothcompAthleteId: athleteKey,
           tournamentOpponentId: opponentId,
           federation: 'ibjjf',
           eventName: `${g.tournament} — ${g.division}`,
           eventId: `ibjjf-${slug}`,
-          eventUrl: `https://bjjmetrics.com/fighter/${exactName.toLowerCase().replace(/\s+/g, '-')}`,
+          eventUrl: `https://bjjmetrics.com/fighter/${fighterSlug}`,
           eventDate: g.date,
-          placement: g.losses === 0 ? '1st' : null,
+          placement,
           wins: g.wins,
           losses: g.losses,
           submissionWins: null,

@@ -192,7 +192,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
   }, {})
 
   // Competition history for all opponents — shown even with no footage
-  const competitionHistoryByOpponent: Record<string, { id: string; eventName: string; eventDate: string | null; placement: string | null; federation: string }[]> = {}
+  const competitionHistoryByOpponent: Record<string, { id: string; eventName: string; eventDate: string | null; placement: string | null; federation: string; wins: number | null; losses: number | null }[]> = {}
   if (opponentIds.length > 0) {
     const historyRows = await db
       .select({
@@ -202,6 +202,8 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
         eventDate: athleteCompetitionHistory.eventDate,
         placement: athleteCompetitionHistory.placement,
         federation: athleteCompetitionHistory.federation,
+        wins: athleteCompetitionHistory.wins,
+        losses: athleteCompetitionHistory.losses,
       })
       .from(athleteCompetitionHistory)
       .where(inArray(athleteCompetitionHistory.tournamentOpponentId, opponentIds))
@@ -217,13 +219,21 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
         eventDate: row.eventDate ?? null,
         placement: row.placement ?? null,
         federation: row.federation,
+        wins: row.wins ?? null,
+        losses: row.losses ?? null,
       })
     }
   }
 
+  const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000)
   const hasActiveScans = allMatches.some(m => m.status === 'processing' || m.status === 'pending' || m.status === 'uploaded')
     || allPendingVideos.some(v => v.status === 'processing' || v.status === 'pending' || v.status === 'uploaded')
     || opponents.some(o => o.footageStatus === 'pending' || o.footageStatus === 'auto_queued')
+    // Keep polling while a recently-added opponent has no competition history yet (scout job in flight)
+    || opponents.some(o =>
+        new Date(o.createdAt) > tenMinutesAgo &&
+        (competitionHistoryByOpponent[o.id] ?? []).length === 0
+      )
 
   // Opponents with no footage and no active scans — need user action
   const opponentsNeedingFootage = opponents.filter(o => {
