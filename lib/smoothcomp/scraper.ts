@@ -383,6 +383,104 @@ export async function scrapeAthleteProfile(profileUrl: string): Promise<ScAthlet
   }
 }
 
+export type IntelCompetition = {
+  eventName: string
+  eventId: string
+  eventUrl: string
+  date: string | null
+  placement: string | null
+}
+
+// Stealth + vision profile scrape for the scout agent.
+// Returns all competitions (no YouTube check, no 5-event limit).
+// Used by scout-opponent-agent, not by the footage discovery pipeline.
+export async function scrapeProfileForIntel(profileUrl: string): Promise<{
+  isPublic: boolean
+  athleteId: string
+  name: string
+  competitions: IntelCompetition[]
+}> {
+  const athleteIdMatch = profileUrl.match(/\/profile\/(\d+)/)
+  const athleteId = athleteIdMatch?.[1] ?? ''
+
+  const browser = await launchStealthBrowser()
+  try {
+    const page = await newStealthPage(browser)
+    await page.goto(profileUrl, { waitUntil: 'load', timeout: 40000 })
+    await page.waitForTimeout(6000)
+
+    const screenshot = await page.screenshot({ fullPage: true, type: 'png' }).catch(() => null)
+
+    const bodyText = await page.evaluate(() => document.body.textContent?.toLowerCase() ?? '')
+    const isCloudflareChallenge =
+      bodyText.includes('just a moment') ||
+      bodyText.includes('security verification') ||
+      bodyText.includes('checking your browser')
+
+    if (isCloudflareChallenge) {
+      return { isPublic: false, athleteId, name: '', competitions: [] }
+    }
+
+    const isPrivate =
+      bodyText.includes('private profile') ||
+      bodyText.includes('profile is private')
+
+    if (isPrivate) {
+      return { isPublic: false, athleteId, name: '', competitions: [] }
+    }
+
+    const name = await page.evaluate(() => {
+      for (const h of Array.from(document.querySelectorAll('h1, h2, h3'))) {
+        const t = h.textContent?.trim() ?? ''
+        if (t.length > 3 && t.length < 60 && !t.toLowerCase().includes('smoothcomp') && !t.toLowerCase().includes('ajp tour') && !t.toLowerCase().includes('log in')) {
+          return t
+        }
+      }
+      return ''
+    })
+
+    // DOM-based extraction
+    const domComps: IntelCompetition[] = await page.evaluate(() => {
+      const results: Array<{ eventName: string; eventId: string; eventUrl: string; date: string | null; placement: string | null }> = []
+      const seen = new Set<string>()
+      document.querySelectorAll('a[href*="/event/"]').forEach(el => {
+        const href = (el as HTMLAnchorElement).href
+        const m = href.match(/\/event\/(\d+)/)
+        if (!m) return
+        const eventId = m[1]
+        if (seen.has(eventId)) return
+        seen.add(eventId)
+        const eventName = (el.textContent?.trim() ?? '')
+        if (eventName.length < 2) return
+        const row = el.closest('tr, li, [class*="competition"], [class*="result"], [class*="event"]')
+        const ctx = row?.textContent ?? ''
+        const dateM = ctx.match(/\d{4}-\d{2}-\d{2}|\d{1,2}[.\/ ]\w+[.\/ ]\d{4}/)
+        const placM = ctx.match(/\b(1st|2nd|3rd|\d+th|gold|silver|bronze)\b/i)
+        results.push({ eventName, eventId, eventUrl: href, date: dateM?.[0] ?? null, placement: placM?.[0] ?? null })
+      })
+      return results
+    })
+
+    // Vision-based extraction as supplement
+    let visionComps: IntelCompetition[] = []
+    if (screenshot) {
+      visionComps = await extractCompetitionsFromScreenshot(screenshot)
+    }
+
+    // Merge DOM (primary) + vision (supplement)
+    const seenIds = new Set(domComps.map(c => c.eventId))
+    for (const c of visionComps) {
+      if (!c.eventId || seenIds.has(c.eventId)) continue
+      seenIds.add(c.eventId)
+      domComps.push(c)
+    }
+
+    return { isPublic: true, athleteId, name, competitions: domComps.length > 0 ? domComps : visionComps }
+  } finally {
+    await browser.close()
+  }
+}
+
 // Scrape the livestreams/streams tab of an event to find YouTube URLs with mat labels
 export async function scrapeEventStreams(eventId: string): Promise<ScEventStreams> {
   const browser = await launchBrowser()
