@@ -58,6 +58,21 @@ function extractAjpProfileId(urls: string[]): string | null {
   return null
 }
 
+// Verify an AJP profile ID actually belongs to the expected athlete by checking the profile page
+async function verifyAjpProfile(athleteId: string, expectedName: string): Promise<boolean> {
+  try {
+    const resp = await fetch(`https://ajptour.com/en/profile/${athleteId}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'text/html' },
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!resp.ok) return false
+    const html = await resp.text()
+    // Check if any part of the expected name appears in the page
+    const nameParts = expectedName.toLowerCase().split(/\s+/)
+    return nameParts.some(part => part.length > 2 && html.toLowerCase().includes(part))
+  } catch { return false }
+}
+
 // Use Gemini with Google Search grounding to find a profile URL.
 // Gemini grounds its answer with real Google search results; the grounding chunks
 // include redirect URLs we can follow to get the actual profile page URL.
@@ -139,8 +154,14 @@ async function findAjpAthleteIdByName(name: string): Promise<string | null> {
     'ajptour.com'
   )
   if (geminiUrls.length > 0) {
-    const id = extractAjpProfileId(geminiUrls)
-    if (id) return id
+    // Verify each profile ID actually belongs to this athlete before using it
+    for (const url of geminiUrls) {
+      const m = url.match(/ajptour\.com\/[a-z]{0,5}\/profile\/(\d+)/)
+      if (m) {
+        const verified = await verifyAjpProfile(m[1], name)
+        if (verified) return m[1]
+      }
+    }
     const eventIds = [...new Set(geminiUrls.map(u => u.match(/ajptour\.com\/[a-z]{0,10}\/?event\/(\d+)/)?.[1]).filter(Boolean) as string[])]
     if (eventIds.length > 0) {
       const found = await findIdFromEventParticipants(eventIds, name)
