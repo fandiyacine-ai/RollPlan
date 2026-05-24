@@ -4,7 +4,7 @@ import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
 import { tournamentOpponents, athleteCompetitionHistory, aiCallLogs } from '../lib/db/schema'
 import { eq } from 'drizzle-orm'
-import { anthropic, CLAUDE_SYNTHESIS_MODEL, estimateCostUsd } from '../lib/ai/clients'
+import { google, GEMINI_VIDEO_MODEL, estimateCostUsd } from '../lib/ai/clients'
 import { searchIbjjfAthleteByName, scrapeIbjjfAthleteHistory } from '../lib/ibjjf/scraper'
 import { scrapeProfileForIntel } from '../lib/smoothcomp/scraper'
 
@@ -162,7 +162,7 @@ export const buildOpponentIntel = inngest.createFunction(
         : '\nNo profile URL linked yet — you must find one.'
 
       const { text, usage, steps } = await generateText({
-        model: anthropic(CLAUDE_SYNTHESIS_MODEL),
+        model: google(GEMINI_VIDEO_MODEL),
         stopWhen: stepCountIs(20),
         system: `You are a BJJ competition intelligence agent. Your job is to find an athlete's full competition history across all major BJJ federations and store it to a database.
 
@@ -192,10 +192,10 @@ Find and store their competition history. Start with the known profile if availa
 
       const tokensIn = usage.inputTokens ?? 0
       const tokensOut = usage.outputTokens ?? 0
-      const costUsdEstimate = estimateCostUsd(CLAUDE_SYNTHESIS_MODEL, tokensIn, tokensOut)
+      const costUsdEstimate = estimateCostUsd(GEMINI_VIDEO_MODEL, tokensIn, tokensOut)
 
       await db.insert(aiCallLogs).values({
-        model: CLAUDE_SYNTHESIS_MODEL,
+        model: GEMINI_VIDEO_MODEL,
         promptVersion: 'scout-opponent-agent-v1',
         tokensIn,
         tokensOut,
