@@ -69,27 +69,11 @@ async function newStealthPage(browser: Browser) {
   return ctx.newPage()
 }
 
-// Use Gemini vision to extract competition history from a screenshot of the profile page.
-// More robust than DOM parsing: handles Firebase lazy-loaded content and layout changes.
-async function extractCompetitionsFromScreenshot(
-  screenshotBuffer: Buffer,
-): Promise<Array<{ eventName: string; eventId: string; eventUrl: string; date: string | null; placement: string | null }>> {
+type GeminiCompetition = { eventName: string; eventId: string; eventUrl: string; date: string | null; placement: string | null }
+
+async function callGeminiExtract(parts: Array<Record<string, unknown>>): Promise<GeminiCompetition[]> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) return []
-
-  const base64Image = screenshotBuffer.toString('base64')
-  const prompt = `This is a screenshot of an athlete profile page on Smoothcomp or AJP Tour showing their competition history.
-
-Extract all competition events visible. For each event return:
-- eventName: the full event/tournament name
-- eventId: the numeric ID from the URL if visible (e.g. from /event/12345), or empty string
-- eventUrl: the full URL if visible, or empty string
-- date: the event date in YYYY-MM-DD format if visible, or null
-- placement: the placement/result if visible (e.g. "1st", "2nd", "gold", "silver"), or null
-
-Return JSON: { "competitions": [ { "eventName": "...", "eventId": "...", "eventUrl": "...", "date": "...", "placement": "..." } ] }
-Only return valid JSON, no markdown fences.`
-
   try {
     const resp = await fetch(
       `${GEMINI_BASE}/models/gemini-2.0-flash-001:generateContent?key=${apiKey}`,
@@ -97,12 +81,7 @@ Only return valid JSON, no markdown fences.`
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{
-            parts: [
-              { inlineData: { mimeType: 'image/png', data: base64Image } },
-              { text: prompt },
-            ],
-          }],
+          contents: [{ parts }],
           generationConfig: { temperature: 0, responseMimeType: 'application/json' },
         }),
         signal: AbortSignal.timeout(30000),
@@ -111,10 +90,74 @@ Only return valid JSON, no markdown fences.`
     if (!resp.ok) return []
     const data = await resp.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> }
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
-    const parsed = JSON.parse(text) as { competitions?: Array<{ eventName: string; eventId: string; eventUrl: string; date: string | null; placement: string | null }> }
+    const parsed = JSON.parse(text) as { competitions?: GeminiCompetition[] }
     return parsed.competitions ?? []
   } catch {
     return []
+  }
+}
+
+const EXTRACT_PROMPT = `Extract all competition events listed on this athlete profile page (Smoothcomp / AJP Tour).
+For each event return:
+- eventName: full tournament name
+- eventId: numeric ID from any /event/12345 URL (just the number, or empty string)
+- eventUrl: full event URL if visible, or empty string
+- date: YYYY-MM-DD if visible, or null
+- placement: result if visible ("1st", "gold", etc.), or null
+Return JSON: { "competitions": [...] }. Only valid JSON, no markdown.`
+
+// Extract from a screenshot (fallback when ZenRows not configured)
+async function extractCompetitionsFromScreenshot(screenshotBuffer: Buffer): Promise<GeminiCompetition[]> {
+  return callGeminiExtract([
+    { inlineData: { mimeType: 'image/png', data: screenshotBuffer.toString('base64') } },
+    { text: EXTRACT_PROMPT },
+  ])
+}
+
+// Extract from rendered HTML (used with ZenRows)
+async function extractCompetitionsFromHtml(html: string): Promise<GeminiCompetition[]> {
+  const truncated = html.length > 80000 ? html.slice(0, 80000) : html
+  return callGeminiExtract([{ text: `${EXTRACT_PROMPT}\n\nHTML:\n${truncated}` }])
+}
+
+// ZenRows: bypasses Cloudflare Managed Challenge using residential IPs.
+// Renders the page with a real browser, returns HTML.
+async function scrapeViaZenRows(profileUrl: string): Promise<{
+  isPublic: boolean; name: string; competitions: IntelCompetition[]
+} | null> {
+  const key = process.env.ZENROWS_API_KEY
+  if (!key) return null
+
+  try {
+    const params = new URLSearchParams({
+      apikey: key,
+      url: profileUrl,
+      js_render: 'true',
+      wait: '5000',
+    })
+    const resp = await fetch(`https://api.zenrows.com/v1/?${params}`, {
+      signal: AbortSignal.timeout(60000),
+    })
+    if (!resp.ok) return null
+
+    const html = await resp.text()
+    const lower = html.toLowerCase()
+    if (lower.includes('just a moment') || lower.includes('checking your browser')) {
+      return { isPublic: false, name: '', competitions: [] }
+    }
+    if (lower.includes('private profile') || lower.includes('profile is private')) {
+      return { isPublic: false, name: '', competitions: [] }
+    }
+
+    const competitions = await extractCompetitionsFromHtml(html)
+
+    // Simple name extraction from h1/h2/h3
+    const nameMatch = html.match(/<h[123][^>]*>([^<]{3,60})<\/h[123]>/i)
+    const name = nameMatch?.[1]?.replace(/<[^>]+>/g, '').trim() ?? ''
+
+    return { isPublic: true, name, competitions }
+  } catch {
+    return null
   }
 }
 
@@ -403,6 +446,13 @@ export async function scrapeProfileForIntel(profileUrl: string): Promise<{
   const athleteIdMatch = profileUrl.match(/\/profile\/(\d+)/)
   const athleteId = athleteIdMatch?.[1] ?? ''
 
+  // ZenRows: residential proxy bypasses Cloudflare. Use when ZENROWS_API_KEY is set.
+  const zenrows = await scrapeViaZenRows(profileUrl)
+  if (zenrows !== null) {
+    return { isPublic: zenrows.isPublic, athleteId, name: zenrows.name, competitions: zenrows.competitions }
+  }
+
+  // Fallback: stealth browser (works for non-Cloudflare pages)
   const browser = await launchStealthBrowser()
   try {
     const page = await newStealthPage(browser)
