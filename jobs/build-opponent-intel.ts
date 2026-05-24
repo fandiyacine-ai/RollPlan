@@ -58,23 +58,41 @@ function extractAjpProfileId(urls: string[]): string | null {
   return null
 }
 
-// Verify an AJP profile ID is a BJJ athlete (not wrestling/MMA) by checking first events page.
-// A profile with wrestling divisions (GRÉCO, LIBRE, GRECO) is clearly wrong.
-const BJJ_TERMS = /\b(gi|no[- ]gi|jiu[- ]jitsu|bjj|grappling|submission)\b/i
-const NON_BJJ_TERMS = /\b(gr[eé]co|libre|freestyle|wrestling|lutte|judo|sambo|mma|kickbox)\b/i
-
-async function verifyAjpProfileIsBjj(athleteId: string): Promise<boolean> {
+// Verify an AJP profile ID belongs to the expected athlete by:
+// 1. Confirming events exist
+// 2. Looking up the athlete's name from their first event's participants list
+async function verifyAjpProfileName(athleteId: string, expectedName: string): Promise<boolean> {
   try {
     const page = await fetchAjpEventsPage(athleteId, 1)
     if (!page.data?.length) return false
-    const divisions = page.data
-      .flatMap(ev => ev.registrations.map(r => r.group ?? ''))
-      .filter(Boolean)
-    if (divisions.length === 0) return false
-    const hasBjj = divisions.some(d => BJJ_TERMS.test(d))
-    const hasNonBjj = divisions.some(d => NON_BJJ_TERMS.test(d))
-    // Accept if any BJJ division found and no clearly non-BJJ divisions
-    return hasBjj && !hasNonBjj
+
+    // Find first event with matches or published registrations
+    const firstEvent = page.data.find(ev => !ev.upcomingEvent)
+    if (!firstEvent) return false
+
+    const eventId = String(firstEvent.info.id)
+    const pResp = await fetch(`https://ajptour.com/en/event/${eventId}/participants`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' },
+      body: '{}',
+      signal: AbortSignal.timeout(15000),
+    })
+    if (!pResp.ok) return false
+
+    const pData = await pResp.json() as { participants: Array<{ registrations: Array<{ user_id: number; firstname: string; lastname: string }> }> }
+    const expectedLower = expectedName.toLowerCase()
+    const nameParts = expectedLower.split(/\s+/).filter(p => p.length > 1)
+
+    for (const participant of pData.participants ?? []) {
+      for (const reg of participant.registrations ?? []) {
+        if (String(reg.user_id) !== athleteId) continue
+        const fullName = `${reg.firstname} ${reg.lastname}`.toLowerCase()
+        // At least half the name parts must match
+        const matchCount = nameParts.filter(p => fullName.includes(p)).length
+        if (matchCount >= Math.ceil(nameParts.length / 2)) return true
+      }
+    }
+    return false
   } catch { return false }
 }
 
@@ -143,7 +161,7 @@ async function findAjpAthleteIdByName(name: string): Promise<string | null> {
         if (urls.length > 0) {
           for (const url of urls) {
             const m = url.match(/ajptour\.com\/[a-z]{0,5}\/profile\/(\d+)/)
-            if (m && await verifyAjpProfileIsBjj(m[1])) return m[1]
+            if (m && await verifyAjpProfileName(m[1], name)) return m[1]
           }
           const eventIds = [...new Set(urls.map(u => u.match(/ajptour\.com\/[a-z]{0,10}\/?event\/(\d+)/)?.[1]).filter(Boolean) as string[])]
           if (eventIds.length > 0) {
@@ -161,12 +179,12 @@ async function findAjpAthleteIdByName(name: string): Promise<string | null> {
     'ajptour.com'
   )
   if (geminiUrls.length > 0) {
-    // Verify each profile is actually a BJJ athlete (rejects wrestling profiles)
+    // Verify each profile belongs to this athlete by name via participants API
     for (const url of geminiUrls) {
       const m = url.match(/ajptour\.com\/[a-z]{0,5}\/profile\/(\d+)/)
       if (m) {
-        const isBjj = await verifyAjpProfileIsBjj(m[1])
-        if (isBjj) return m[1]
+        const isRight = await verifyAjpProfileName(m[1], name)
+        if (isRight) return m[1]
       }
     }
     const eventIds = [...new Set(geminiUrls.map(u => u.match(/ajptour\.com\/[a-z]{0,10}\/?event\/(\d+)/)?.[1]).filter(Boolean) as string[])]
