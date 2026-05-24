@@ -135,7 +135,7 @@ async function findAjpAthleteIdByName(name: string): Promise<string | null> {
 
   // 2. Gemini + Google Search grounding (real Google results, no bot-blocking)
   const geminiUrls = await geminiGroundedSearch(
-    `Find the AJP ajptour.com profile URL for BJJ athlete "${name}". Return only the profile URL.`,
+    `Search for the exact ajptour.com profile page of BJJ athlete named "${name}". I need the direct URL like https://ajptour.com/en/profile/NUMBERS. Only return URLs that contain the athlete's exact name.`,
     'ajptour.com'
   )
   if (geminiUrls.length > 0) {
@@ -264,7 +264,12 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
 
 async function fetchSmoothcompEventsPage(baseUrl: string, athleteId: string, page: number): Promise<AjpEventsPage> {
   const resp = await fetch(`${baseUrl}/en/profile/${athleteId}/events?page=${page}`, {
-    headers: { Accept: 'application/json, text/plain, */*', 'User-Agent': 'Mozilla/5.0' },
+    headers: {
+      Accept: 'application/json, text/plain, */*',
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      Referer: `${baseUrl}/en/profile/${athleteId}`,
+      Origin: baseUrl,
+    },
     signal: AbortSignal.timeout(15000),
   })
   if (!resp.ok) throw new Error(`Smoothcomp events API ${resp.status} for ${baseUrl} athlete ${athleteId}`)
@@ -278,6 +283,8 @@ async function fetchAjpEventsPage(athleteId: string, page: number): Promise<AjpE
       headers: {
         Accept: 'application/json, text/plain, */*',
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        Referer: `https://ajptour.com/en/profile/${athleteId}`,
+        Origin: 'https://ajptour.com',
       },
       signal: AbortSignal.timeout(15000),
     }
