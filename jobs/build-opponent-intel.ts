@@ -7,6 +7,12 @@ import { searchIbjjfAthleteByName, scrapeIbjjfAthleteHistory } from '../lib/ibjj
 // AJP/Smoothcomp exposes a public JSON API for athlete event history — no auth, no proxy needed.
 // GET https://ajptour.com/en/profile/{athleteId}/events?page={n}
 // Returns paginated competition history with match-level detail.
+//
+// For manually-added opponents without an athlete ID, we:
+// 1. Google search "{name} BJJ site:ajptour.com" to find AJP event URLs
+// 2. Extract event IDs from those URLs
+// 3. POST /en/event/{id}/participants (no auth needed) to find the athlete by name → get user_id
+// 4. Use user_id as smoothcompAthleteId going forward
 
 type AjpMatch = {
   match: { id: number; state: string; video_exists: boolean }
@@ -42,6 +48,70 @@ function ordinal(n: number | null): string | null {
   if (n === 2) return '2nd'
   if (n === 3) return '3rd'
   return `${n}th`
+}
+
+// Brave Search → extract AJP event IDs from result URLs → POST participants → get user_id
+async function findAjpAthleteIdByName(name: string): Promise<string | null> {
+  const apiKey = process.env.BRAVE_API_KEY
+  if (!apiKey) return null
+
+  // Step 1: Brave search for AJP event pages featuring this athlete
+  const query = encodeURIComponent(`"${name}" site:ajptour.com`)
+  const resp = await fetch(
+    `https://api.search.brave.com/res/v1/web/search?q=${query}&count=10`,
+    {
+      headers: {
+        'X-Subscription-Token': apiKey,
+        Accept: 'application/json',
+      },
+      signal: AbortSignal.timeout(15000),
+    }
+  )
+  if (!resp.ok) return null
+
+  const data = await resp.json() as {
+    web?: { results?: Array<{ url: string; description: string; extra_snippets?: string[] }> }
+  }
+  const results = data.web?.results ?? []
+
+  // Extract AJP event IDs from result URLs
+  const eventIds = [...new Set(
+    results
+      .map(r => r.url.match(/ajptour\.com\/[a-z]{0,10}\/?event\/(\d+)/)?.[1])
+      .filter((id): id is string => !!id)
+  )]
+
+  if (eventIds.length === 0) return null
+
+  // Step 2: For each found event, POST to participants and search by name
+  const nameLower = name.toLowerCase()
+  for (const eventId of eventIds.slice(0, 5)) {
+    try {
+      const pResp = await fetch(`https://ajptour.com/en/event/${eventId}/participants`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0',
+        },
+        body: '{}',
+        signal: AbortSignal.timeout(15000),
+      })
+      if (!pResp.ok) continue
+
+      const data = await pResp.json() as { participants: Array<{ registrations: Array<{ user_id: number; firstname: string; lastname: string }> }> }
+      for (const participant of data.participants ?? []) {
+        for (const reg of participant.registrations ?? []) {
+          const fullName = `${reg.firstname} ${reg.lastname}`.toLowerCase()
+          if (fullName.includes(nameLower) || nameLower.includes(fullName.split(' ')[0])) {
+            return String(reg.user_id)
+          }
+        }
+      }
+    } catch { continue }
+  }
+
+  return null
 }
 
 async function fetchAjpEventsPage(athleteId: string, page: number): Promise<AjpEventsPage> {
@@ -87,9 +157,23 @@ export const buildOpponentIntel = inngest.createFunction(
       })
     )
 
-    const athleteId = opponent?.smoothcompAthleteId
+    let athleteId = opponent?.smoothcompAthleteId ?? null
     let ajpInserted = 0
     let ibjjfInserted = 0
+
+    // If no athlete ID yet (manually-added opponent), try to find them via Google + participants API
+    if (!athleteId) {
+      const found = await step.run('find-ajp-id-by-name', async () => {
+        const id = await findAjpAthleteIdByName(athleteName)
+        if (id) {
+          await db.update(tournamentOpponents)
+            .set({ smoothcompAthleteId: id, smoothcompProfileUrl: `https://ajptour.com/en/profile/${id}` })
+            .where(eq(tournamentOpponents.id, opponentId))
+        }
+        return { id }
+      })
+      if (found.id) athleteId = found.id
+    }
 
     // --- AJP / Smoothcomp ---
     if (athleteId) {
