@@ -113,6 +113,72 @@ async function findAjpAthleteIdByName(name: string): Promise<string | null> {
   return null
 }
 
+// Brave Search → find Smoothcomp federation subdomains + athlete IDs from event participants
+// Returns one entry per unique subdomain (e.g. avasports.smoothcomp.com, smoothcomp.com)
+async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: string; athleteId: string }>> {
+  const apiKey = process.env.BRAVE_API_KEY
+  if (!apiKey) return []
+
+  const query = encodeURIComponent(`"${name}" site:smoothcomp.com`)
+  const resp = await fetch(
+    `https://api.search.brave.com/res/v1/web/search?q=${query}&count=10`,
+    {
+      headers: { 'X-Subscription-Token': apiKey, Accept: 'application/json' },
+      signal: AbortSignal.timeout(15000),
+    }
+  )
+  if (!resp.ok) return []
+
+  const data = await resp.json() as { web?: { results?: Array<{ url: string }> } }
+  const results = data.web?.results ?? []
+
+  // Extract unique {baseUrl, eventId} pairs — one per subdomain
+  const seen = new Map<string, string>() // baseUrl → first eventId found
+  for (const r of results) {
+    const m = r.url.match(/^(https?:\/\/(?:[a-z0-9-]+\.)?smoothcomp\.com)\/[^/]+\/event\/(\d+)/)
+    if (m && !seen.has(m[1])) seen.set(m[1], m[2])
+  }
+
+  if (seen.size === 0) return []
+
+  const nameLower = name.toLowerCase()
+  const profiles: Array<{ baseUrl: string; athleteId: string }> = []
+
+  for (const [baseUrl, eventId] of seen) {
+    try {
+      const pResp = await fetch(`${baseUrl}/en/event/${eventId}/participants`, {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' },
+        body: '{}',
+        signal: AbortSignal.timeout(15000),
+      })
+      if (!pResp.ok) continue
+      const pData = await pResp.json() as { participants: Array<{ registrations: Array<{ user_id: number; firstname: string; lastname: string }> }> }
+      for (const participant of pData.participants ?? []) {
+        for (const reg of participant.registrations ?? []) {
+          const fullName = `${reg.firstname} ${reg.lastname}`.toLowerCase()
+          if (fullName.includes(nameLower) || nameLower.includes(fullName.split(' ')[0])) {
+            profiles.push({ baseUrl, athleteId: String(reg.user_id) })
+            break
+          }
+        }
+        if (profiles.find(p => p.baseUrl === baseUrl)) break
+      }
+    } catch { continue }
+  }
+
+  return profiles
+}
+
+async function fetchSmoothcompEventsPage(baseUrl: string, athleteId: string, page: number): Promise<AjpEventsPage> {
+  const resp = await fetch(`${baseUrl}/en/profile/${athleteId}/events?page=${page}`, {
+    headers: { Accept: 'application/json, text/plain, */*', 'User-Agent': 'Mozilla/5.0' },
+    signal: AbortSignal.timeout(15000),
+  })
+  if (!resp.ok) throw new Error(`Smoothcomp events API ${resp.status} for ${baseUrl} athlete ${athleteId}`)
+  return resp.json() as Promise<AjpEventsPage>
+}
+
 async function fetchAjpEventsPage(athleteId: string, page: number): Promise<AjpEventsPage> {
   const resp = await fetch(
     `https://ajptour.com/en/profile/${athleteId}/events?page=${page}`,
@@ -236,6 +302,71 @@ export const buildOpponentIntel = inngest.createFunction(
       ajpInserted = ajpResult.inserted
     }
 
+    // --- Smoothcomp (non-AJP federation events) ---
+    // Same API as AJP but on smoothcomp.com subdomains (e.g. avasports.smoothcomp.com)
+    // Each federation subdomain has its own athlete IDs — find them via Brave search + participants POST
+    let smoothcompInserted = 0
+    const smoothcompResult = await step.run('fetch-smoothcomp-history', async () => {
+      const profiles = await findSmoothcompProfiles(athleteName)
+      if (profiles.length === 0) return { inserted: 0 }
+
+      const rows: Array<typeof athleteCompetitionHistory.$inferInsert> = []
+      const athleteKey = athleteId ?? athleteName.toLowerCase().replace(/\s+/g, '-')
+
+      for (const { baseUrl, athleteId: scAthleteId } of profiles) {
+        // Derive a short federation label from the subdomain (e.g. "avasports")
+        const subdomainLabel = new URL(baseUrl).hostname.replace('.smoothcomp.com', '').replace('smoothcomp.com', 'smoothcomp')
+
+        const firstPage = await fetchSmoothcompEventsPage(baseUrl, scAthleteId, 1)
+        const allEvents: AjpEvent[] = [...firstPage.data]
+        for (let p = 2; p <= firstPage.last_page; p++) {
+          const page = await fetchSmoothcompEventsPage(baseUrl, scAthleteId, p)
+          allEvents.push(...page.data)
+        }
+
+        for (const ev of allEvents) {
+          if (ev.upcomingEvent) continue
+          const eventUrl = `${baseUrl}/en/event/${ev.info.id}`
+          const eventDate = ev.info.event_start ? new Date(ev.info.event_start).toISOString().slice(0, 10) : null
+
+          for (const reg of ev.registrations) {
+            if (!reg.published && reg.matches.length === 0) continue
+            const wins = reg.matches.filter(m => m.is_winner).length
+            const losses = reg.matches.filter(m => !m.is_winner).length
+            const submissionWins = reg.matches.filter(m => m.is_winner && m.outcome.toLowerCase().includes('submission')).length
+            const submissionLosses = reg.matches.filter(m => !m.is_winner && m.outcome.toLowerCase().includes('submission')).length
+
+            rows.push({
+              smoothcompAthleteId: athleteKey,
+              tournamentOpponentId: opponentId,
+              federation: 'smoothcomp',
+              eventName: `${ev.info.title} — ${reg.group}`,
+              eventId: `sc-${subdomainLabel}-${ev.info.id}-${reg.id}`,
+              eventUrl,
+              eventDate,
+              placement: ordinal(reg.placement),
+              wins,
+              losses,
+              submissionWins,
+              pointsWins: wins - submissionWins,
+              submissionLosses,
+            })
+          }
+        }
+      }
+
+      if (rows.length === 0) return { inserted: 0 }
+
+      const result = await db
+        .insert(athleteCompetitionHistory)
+        .values(rows)
+        .onConflictDoNothing()
+        .returning({ id: athleteCompetitionHistory.id })
+
+      return { inserted: result.length, total: rows.length }
+    })
+    smoothcompInserted = smoothcompResult.inserted
+
     // --- IBJJF via BJJ Metrics (open JSON API, no auth, no Playwright) ---
     // POST /search_ibjjf_matches_names → exact name
     // POST /get_ibjjf_matches → full match history per tournament
@@ -330,9 +461,10 @@ export const buildOpponentIntel = inngest.createFunction(
 
     ibjjfInserted = ibjjfResult.inserted
 
-    const total = ajpInserted + ibjjfInserted
+    const total = ajpInserted + smoothcompInserted + ibjjfInserted
     return {
       ajpInserted,
+      smoothcompInserted,
       ibjjfInserted,
       total,
       athleteId: athleteId ?? null,
