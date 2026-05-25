@@ -536,6 +536,11 @@ export function OpponentAccordion({
                 <span className="text-[11px] font-mono text-amber-400/80">{opponent.ibjjfBestResult}</span>
               </span>
             )
+          ) : opponent.ibjjfProfileUrl ? (
+            <a href={opponent.ibjjfProfileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 opacity-50 hover:opacity-75 transition-opacity" title="View IBJJF profile">
+              <PlatformBadge label="IBJJF" />
+              <span className="text-[11px] font-mono text-muted-foreground">Profile</span>
+            </a>
           ) : (
             <span className="flex items-center gap-1.5 opacity-30">
               <PlatformBadge label="IBJJF" />

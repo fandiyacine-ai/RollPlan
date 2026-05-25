@@ -60,16 +60,20 @@ function extractAjpProfileId(urls: string[]): string | null {
 // Verify an AJP profile ID belongs to the expected athlete by:
 // 1. Confirming events exist
 // 2. Looking up the athlete's name from their first event's participants list
-async function verifyAjpProfileName(athleteId: string, expectedName: string): Promise<boolean> {
+async function verifyAjpProfileName(athleteId: string, expectedName: string, fallbackEventIds: string[] = []): Promise<boolean> {
   try {
-    const page = await fetchAjpEventsPage(athleteId, 1)
-    if (!page.data?.length) return false
+    let eventId: string | null = null
+    try {
+      const page = await fetchAjpEventsPage(athleteId, 1)
+      if (!page.data?.length) return false
+      const firstEvent = page.data.find(ev => !ev.upcomingEvent)
+      if (firstEvent) eventId = String(firstEvent.info.id)
+    } catch {
+      // 403 on profile events API — use caller-supplied event IDs as fallback
+      eventId = fallbackEventIds[0] ?? null
+    }
+    if (!eventId) return false
 
-    // Find first event with matches or published registrations
-    const firstEvent = page.data.find(ev => !ev.upcomingEvent)
-    if (!firstEvent) return false
-
-    const eventId = String(firstEvent.info.id)
     const pResp = await fetch(`https://ajptour.com/en/event/${eventId}/participants`, {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' },
@@ -164,13 +168,13 @@ async function findAjpAthleteIdByName(name: string): Promise<string | null> {
         }
       } catch { continue }
     }
+    const braveEventIds = [...new Set(allAjpUrls.map(u => u.match(/ajptour\.com\/[a-z]{0,10}\/?event\/(\d+)/)?.[1]).filter(Boolean) as string[])]
     for (const url of allAjpUrls) {
       const m = url.match(/ajptour\.com\/[a-z]{0,5}\/profile\/(\d+)/)
-      if (m && await verifyAjpProfileName(m[1], name)) return m[1]
+      if (m && await verifyAjpProfileName(m[1], name, braveEventIds)) return m[1]
     }
-    const eventIds = [...new Set(allAjpUrls.map(u => u.match(/ajptour\.com\/[a-z]{0,10}\/?event\/(\d+)/)?.[1]).filter(Boolean) as string[])]
-    if (eventIds.length > 0) {
-      const found = await findIdFromEventParticipants(eventIds, name)
+    if (braveEventIds.length > 0) {
+      const found = await findIdFromEventParticipants(braveEventIds, name)
       if (found) return found
     }
   }
@@ -181,17 +185,16 @@ async function findAjpAthleteIdByName(name: string): Promise<string | null> {
     'ajptour.com'
   )
   if (geminiUrls.length > 0) {
-    // Verify each profile belongs to this athlete by name via participants API
+    const geminiEventIds = [...new Set(geminiUrls.map(u => u.match(/ajptour\.com\/[a-z]{0,10}\/?event\/(\d+)/)?.[1]).filter(Boolean) as string[])]
     for (const url of geminiUrls) {
       const m = url.match(/ajptour\.com\/[a-z]{0,5}\/profile\/(\d+)/)
       if (m) {
-        const isRight = await verifyAjpProfileName(m[1], name)
+        const isRight = await verifyAjpProfileName(m[1], name, geminiEventIds)
         if (isRight) return m[1]
       }
     }
-    const eventIds = [...new Set(geminiUrls.map(u => u.match(/ajptour\.com\/[a-z]{0,10}\/?event\/(\d+)/)?.[1]).filter(Boolean) as string[])]
-    if (eventIds.length > 0) {
-      const found = await findIdFromEventParticipants(eventIds, name)
+    if (geminiEventIds.length > 0) {
+      const found = await findIdFromEventParticipants(geminiEventIds, name)
       if (found) return found
     }
   }
@@ -427,10 +430,11 @@ export const buildOpponentIntel = inngest.createFunction(
 
     let athleteId = opponent?.smoothcompAthleteId ?? null
 
-    // If no athlete ID yet (manually-added opponent), try to find them via Google + participants API.
-    // Search AJP first; if not found there, fall back to Smoothcomp (same underlying platform,
-    // shared athlete registry — the ID works on both ajptour.com and smoothcomp.com).
-    if (!athleteId) {
+    // If no athlete ID yet, or if the stored ID only points to smoothcomp.com (meaning the prior run
+    // fell back to Smoothcomp without finding the AJP profile), re-run the AJP search.
+    // This lets a re-triggered intel run upgrade a smoothcomp-only hit to an AJP profile.
+    const storedUrlIsAjp = opponent?.smoothcompProfileUrl?.includes('ajptour.com') ?? false
+    if (!athleteId || !storedUrlIsAjp) {
       const found = await step.run('find-ajp-id-by-name', async () => {
         const ajpId = await findAjpAthleteIdByName(athleteName)
         if (ajpId) {
