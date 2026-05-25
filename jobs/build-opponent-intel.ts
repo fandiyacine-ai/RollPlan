@@ -563,7 +563,13 @@ export const buildOpponentIntel = inngest.createFunction(
         if (profiles.length === 0) {
           profiles = await findSmoothcompProfiles(athleteName)
         }
-        if (profiles.length === 0) return { wins: 0, losses: 0 }
+        if (profiles.length === 0) {
+          // No verified profile — clear any stale data written by a previous run with looser checks
+          await db.update(tournamentOpponents)
+            .set({ smoothcompWins: null, smoothcompLosses: null, smoothcompFedUrl: null })
+            .where(eq(tournamentOpponents.id, opponentId))
+          return { wins: 0, losses: 0 }
+        }
 
         let wins = 0, losses = 0
         for (const { baseUrl, athleteId: scAthleteId } of profiles) {
@@ -636,43 +642,40 @@ export const buildOpponentIntel = inngest.createFunction(
         }
       } catch { /* non-fatal */ }
 
-      // jiujitsu.net: best medal result
+      // jiujitsu.net: medals via /api/athlete/{slug} (search endpoint returns HTML as of May 2026)
+      // Try slug variants: full name, then first+last only (drops middle name)
       try {
-        const jjSearchResp = await fetch(
-          `https://jiujitsu.net/api/search?q=${encodeURIComponent(athleteName)}`,
-          { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(12000) }
-        )
-        if (jjSearchResp.ok) {
-          const jjSearch = await jjSearchResp.json() as Array<{ slug: string; name: string; id: string }>
-          const PLACE_LABEL: Record<number, string> = { 1: 'Gold', 2: 'Silver', 3: 'Bronze' }
-          for (const athlete of jjSearch.slice(0, 3)) {
-            const athleteResp = await fetch(
-              `https://jiujitsu.net/api/athlete/${athlete.slug}`,
-              { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(12000) }
-            )
-            if (!athleteResp.ok) continue
-            const athleteData = await athleteResp.json() as {
-              name?: string
-              medals?: Array<{ place: number; event_name: string; year?: number; date?: string }>
-            }
-            // Verify name matches (middle names are optional)
-            const foundName = (athleteData.name ?? '').toLowerCase()
-            const nameParts = athleteName.toLowerCase().split(/\s+/).filter(p => p.length > 1)
-            const matchCount = nameParts.filter(p => foundName.includes(p)).length
-            if (matchCount < nameMatchThreshold(nameParts)) continue
-
-            const medals = athleteData.medals ?? []
-            if (!medals.length) break
-
-            // Store all medals sorted by place (Gold first), pipe-separated
-            const sorted = [...medals].sort((a, b) => a.place - b.place)
-            dbUpdate.ibjjfBestResult = sorted.map(m => {
-              const label = PLACE_LABEL[m.place] ?? `${m.place}th`
-              const year = m.year ?? (m.date ? new Date(m.date).getFullYear() : null)
-              return year ? `${label} – ${m.event_name} ${year}` : `${label} – ${m.event_name}`
-            }).join('|')
-            break
+        const PLACE_LABEL: Record<number, string> = { 1: 'Gold', 2: 'Silver', 3: 'Bronze' }
+        const nameParts = athleteName.trim().split(/\s+/)
+        const slugVariants = [
+          athleteName.toLowerCase().replace(/\s+/g, '-'),
+          ...(nameParts.length > 2 ? [`${nameParts[0]}-${nameParts[nameParts.length - 1]}`.toLowerCase()] : []),
+        ]
+        for (const slug of slugVariants) {
+          const athleteResp = await fetch(
+            `https://jiujitsu.net/api/athlete/${slug}?gi=true&all_medals=false`,
+            { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(12000) }
+          )
+          if (!athleteResp.ok) continue
+          const body = await athleteResp.json() as {
+            athlete?: { name?: string }
+            medals?: Array<{ place: number; event_name: string; happened_at?: string }>
           }
+          const foundName = (body.athlete?.name ?? '').toLowerCase()
+          const namePartsLower = athleteName.toLowerCase().split(/\s+/).filter(p => p.length > 1)
+          const matchCount = namePartsLower.filter(p => foundName.includes(p)).length
+          if (matchCount < nameMatchThreshold(namePartsLower)) continue
+
+          const medals = body.medals ?? []
+          if (!medals.length) break
+
+          const sorted = [...medals].sort((a, b) => a.place - b.place)
+          dbUpdate.ibjjfBestResult = sorted.map(m => {
+            const label = PLACE_LABEL[m.place] ?? `${m.place}th`
+            const year = m.happened_at ? new Date(m.happened_at).getFullYear() : null
+            return year ? `${label} – ${m.event_name} ${year}` : `${label} – ${m.event_name}`
+          }).join('|')
+          break
         }
       } catch { /* non-fatal */ }
 
