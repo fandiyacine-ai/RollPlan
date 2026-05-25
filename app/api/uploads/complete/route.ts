@@ -5,7 +5,7 @@ import { getPublicVideoUrl } from '../../../../lib/storage/r2'
 import { inngest } from '../../../../lib/inngest'
 import { getOrCreateDbUserId } from '../../../../lib/db/get-user'
 import { checkMonthlyLimit } from '../../../../lib/db/usage'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 
 export const maxDuration = 30
 
@@ -17,12 +17,6 @@ export async function POST(req: NextRequest) {
 
     const userId = await getOrCreateDbUserId()
     const publicUrl = await getPublicVideoUrl(path)
-    await db.update(videos).set({
-      publicUrl,
-      status: 'uploaded',
-      ...(durationSeconds ? { durationSeconds } : {}),
-      ...(tournamentOpponentId ? { tournamentOpponentId } : {}),
-    }).where(eq(videos.id, videoId))
 
     if (scanMode === 'scan') {
       if (!athleteName) return NextResponse.json({ error: 'athleteName required for scan mode' }, { status: 400 })
@@ -33,6 +27,12 @@ export async function POST(req: NextRequest) {
           error: `You've used all ${usage.limit} free analyses for this month. Upgrade to continue.`,
         }, { status: 402 })
       }
+      await db.update(videos).set({
+        publicUrl,
+        status: 'uploaded',
+        ...(durationSeconds ? { durationSeconds } : {}),
+        ...(tournamentOpponentId ? { tournamentOpponentId } : {}),
+      }).where(and(eq(videos.id, videoId), eq(videos.userId, userId)))
       try {
         await inngest.send({
           name: 'url/submitted',
@@ -60,6 +60,12 @@ export async function POST(req: NextRequest) {
         error: `You've used all ${usage2.limit} free analyses for this month. Upgrade to continue.`,
       }, { status: 402 })
     }
+    await db.update(videos).set({
+      publicUrl,
+      status: 'uploaded',
+      ...(durationSeconds ? { durationSeconds } : {}),
+      ...(tournamentOpponentId ? { tournamentOpponentId } : {}),
+    }).where(and(eq(videos.id, videoId), eq(videos.userId, userId)))
 
     const context = sourceType === 'own_sparring' ? 'sparring' : 'competition'
     const [match] = await db.insert(matches).values({
