@@ -524,11 +524,7 @@ export const buildOpponentIntel = inngest.createFunction(
                 matches?: Array<{ winner_name: string; loser_name: string }>
               }
               if (matchesData.success && matchesData.matches?.length) {
-                const wins = matchesData.matches.filter(m => m.winner_name === exactName).length
-                const losses = matchesData.matches.filter(m => m.loser_name === exactName).length
                 const fighterSlug = exactName.toLowerCase().replace(/\s+/g, '-')
-                dbUpdate.ibjjfWins = wins
-                dbUpdate.ibjjfLosses = losses
                 dbUpdate.ibjjfProfileUrl = `https://bjjmetrics.com/fighter/${fighterSlug}`
               }
             }
@@ -569,8 +565,8 @@ export const buildOpponentIntel = inngest.createFunction(
             const placeLabel = PLACE_LABEL[best.place] ?? `${best.place}th`
             const year = best.year ?? (best.date ? new Date(best.date).getFullYear() : null)
             dbUpdate.ibjjfBestResult = year
-              ? `${placeLabel} – ${best.event_name} ${year}`
-              : `${placeLabel} – ${best.event_name}`
+              ? `${placeLabel} Medal – ${best.event_name} ${year}`
+              : `${placeLabel} Medal – ${best.event_name}`
             break
           }
         }

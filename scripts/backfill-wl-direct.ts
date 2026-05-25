@@ -84,7 +84,7 @@ async function computeSmWL(athleteId: string): Promise<{ wins: number; losses: n
 
 const ATHLETES = [
   { name: 'Nihate Pahati',        ajpId: '285643',  scId: '1313442',  ibjjfBestResult: null },
-  { name: 'Yacine Fandi',         ajpId: '139720',  scId: null,        ibjjfBestResult: 'Silver – Masters Europe 2024' },
+  { name: 'Yacine Fandi',         ajpId: '139720',  scId: null,        ibjjfBestResult: 'Silver Medal – Masters Europe 2024' },
   { name: 'Milla Bahia',          ajpId: null,       scId: null,        ibjjfBestResult: null },
   { name: 'Zakriya Ismail Fandi', ajpId: '227853',  scId: '2425320',  ibjjfBestResult: null },
 ]

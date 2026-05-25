@@ -44,9 +44,9 @@ type Opponent = {
 }
 
 const PLATFORM_BADGE_CLASS: Record<string, string> = {
-  AJP:        'bg-orange-950/50 text-orange-400 border-orange-800/30',
-  Smoothcomp: 'bg-sky-950/50 text-sky-400 border-sky-800/30',
-  IBJJF:      'bg-blue-950/50 text-blue-400 border-blue-800/30',
+  AJP:        'bg-orange-900/70 text-orange-300 border-orange-700/50',
+  Smoothcomp: 'bg-sky-900/70 text-sky-300 border-sky-700/50',
+  IBJJF:      'bg-blue-900/70 text-blue-300 border-blue-700/50',
 }
 
 function PlatformBadge({ label }: { label: string }) {
@@ -496,7 +496,7 @@ export function OpponentAccordion({
       )}
 
       {/* W/L summary — visible when scout job has run */}
-      {(opponent.ajpWins != null || opponent.smoothcompWins != null || opponent.ibjjfWins != null || opponent.ibjjfBestResult != null) && (
+      {(opponent.ajpWins != null || opponent.smoothcompWins != null || opponent.ibjjfBestResult != null) && (
         <div className="px-4 py-2.5 border-t border-border/30 flex items-center gap-4 flex-wrap">
           {opponent.ajpWins != null && (
             <WLBadge label="AJP" wins={opponent.ajpWins} losses={opponent.ajpLosses ?? 0} url={opponent.ajpProfileUrl} />
@@ -504,14 +504,12 @@ export function OpponentAccordion({
           {opponent.smoothcompWins != null && (
             <WLBadge label="Smoothcomp" wins={opponent.smoothcompWins} losses={opponent.smoothcompLosses ?? 0} url={opponent.smoothcompFedUrl} />
           )}
-          {opponent.ibjjfBestResult != null ? (
+          {opponent.ibjjfBestResult != null && (
             <span className="flex items-center gap-1.5 opacity-80">
               <PlatformBadge label="IBJJF" />
               <span className="text-[11px] font-mono text-amber-400/80">{opponent.ibjjfBestResult}</span>
             </span>
-          ) : opponent.ibjjfWins != null ? (
-            <WLBadge label="IBJJF" wins={opponent.ibjjfWins} losses={opponent.ibjjfLosses ?? 0} url={opponent.ibjjfProfileUrl} />
-          ) : null}
+          )}
         </div>
       )}
 
