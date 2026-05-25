@@ -497,87 +497,42 @@ export const buildOpponentIntel = inngest.createFunction(
     const opponent = await step.run('load-opponent', () =>
       db.query.tournamentOpponents.findFirst({
         where: eq(tournamentOpponents.id, opponentId),
-        columns: { smoothcompAthleteId: true, smoothcompProfileUrl: true },
+        columns: { ajpAthleteId: true, ajpProfileUrl: true, smoothcompAthleteId: true, smoothcompProfileUrl: true },
       })
     )
 
-    let athleteId = opponent?.smoothcompAthleteId ?? null
+    // ── AJP (ajptour.com) ─────────────────────────────────────────────────────
+    // AJP uses its own numeric athlete registry — IDs must never be mixed with Smoothcomp.
+    const ajpAthleteId: string | null = await step.run('find-ajp-id', async () => {
+      // 1. Already stored on this record
+      if (opponent?.ajpAthleteId) return opponent.ajpAthleteId
 
-    // If no athlete ID yet, or if the stored ID only points to smoothcomp.com (meaning the prior run
-    // fell back to Smoothcomp without finding the AJP profile), re-run the AJP search.
-    // This lets a re-triggered intel run upgrade a smoothcomp-only hit to an AJP profile.
-    const storedUrlIsAjp = opponent?.smoothcompProfileUrl?.includes('ajptour.com') ?? false
-
-    // AJP and Smoothcomp use separate numeric registries — the same ID refers to different athletes
-    // on each platform. Track the AJP ID explicitly so we never call the AJP API with a Smoothcomp ID.
-    let ajpAthleteId: string | null = storedUrlIsAjp ? athleteId : null
-
-    if (!athleteId || !storedUrlIsAjp) {
-      // Fast path: look up any other opponent record with the same name that already has an AJP URL.
-      // This avoids a 20s web search when we already identified the athlete in a different tournament.
-      const existingAjp = await step.run('lookup-existing-ajp-profile', async () => {
-        const match = await db
-          .select({ athleteId: tournamentOpponents.smoothcompAthleteId, profileUrl: tournamentOpponents.smoothcompProfileUrl })
-          .from(tournamentOpponents)
-          .where(
-            sql`lower(${tournamentOpponents.opponentLabel}) = lower(${athleteName})
-              AND ${tournamentOpponents.id} != ${opponentId}
-              AND ${tournamentOpponents.smoothcompProfileUrl} LIKE '%ajptour.com%'
-              AND ${tournamentOpponents.smoothcompAthleteId} IS NOT NULL`
-          )
-          .limit(1)
-          .then(r => r[0] ?? null)
-        if (match?.athleteId) {
-          await db.update(tournamentOpponents)
-            .set({ smoothcompAthleteId: match.athleteId, smoothcompProfileUrl: match.profileUrl })
-            .where(eq(tournamentOpponents.id, opponentId))
-          return { id: match.athleteId, source: 'ajp' as const }
-        }
-        return { id: null, source: null }
-      })
-
-      if (existingAjp.id) {
-        athleteId = existingAjp.id
-        ajpAthleteId = existingAjp.id
-      } else {
-        const found = await step.run('find-profile-by-name', async () => {
-          const ajpId = await findAjpAthleteIdByName(athleteName)
-          if (ajpId) {
-            await db.update(tournamentOpponents)
-              .set({ smoothcompAthleteId: ajpId, smoothcompProfileUrl: `https://ajptour.com/en/profile/${ajpId}` })
-              .where(eq(tournamentOpponents.id, opponentId))
-            return { id: ajpId, source: 'ajp' as const }
-          }
-          // Not on AJP — try Smoothcomp directly (athletes competing in European/Brazilian events may
-          // only appear on smoothcomp.com, not ajptour.com)
-          const scProfiles = await findSmoothcompProfiles(athleteName)
-          if (scProfiles.length > 0) {
-            const scId = scProfiles[0].athleteId
-            await db.update(tournamentOpponents)
-              .set({ smoothcompAthleteId: scId, smoothcompProfileUrl: `https://smoothcomp.com/en/profile/${scId}` })
-              .where(eq(tournamentOpponents.id, opponentId))
-            return { id: scId, source: 'smoothcomp' as const }
-          }
-          return { id: null, source: null }
-        })
-        if (found.id) {
-          athleteId = found.id
-          if (found.source === 'ajp') ajpAthleteId = found.id
-        }
-      }
-    }
-
-    // --- AJP ---
-    // Only run when we have a verified AJP ID — never use a Smoothcomp ID against the AJP API.
-    // If a prior bad run stored AJP 0W/0L via a Smoothcomp ID, clear it now.
-    if (!ajpAthleteId) {
-      await step.run('clear-stale-ajp-totals', async () => {
+      // 2. Another opponent record for the same athlete name already has an AJP ID
+      const existing = await db
+        .select({ id: tournamentOpponents.ajpAthleteId })
+        .from(tournamentOpponents)
+        .where(sql`lower(${tournamentOpponents.opponentLabel}) = lower(${athleteName})
+          AND ${tournamentOpponents.id} != ${opponentId}
+          AND ${tournamentOpponents.ajpAthleteId} IS NOT NULL`)
+        .limit(1)
+        .then(r => r[0]?.id ?? null)
+      if (existing) {
         await db.update(tournamentOpponents)
-          .set({ ajpWins: null, ajpLosses: null })
+          .set({ ajpAthleteId: existing, ajpProfileUrl: `https://ajptour.com/en/profile/${existing}` })
           .where(eq(tournamentOpponents.id, opponentId))
-        return { cleared: true }
-      })
-    }
+        return existing
+      }
+
+      // 3. Web search (Brave + Gemini grounded)
+      const ajpId = await findAjpAthleteIdByName(athleteName)
+      if (ajpId) {
+        await db.update(tournamentOpponents)
+          .set({ ajpAthleteId: ajpId, ajpProfileUrl: `https://ajptour.com/en/profile/${ajpId}` })
+          .where(eq(tournamentOpponents.id, opponentId))
+      }
+      return ajpId
+    })
+
     if (ajpAthleteId) {
       const _ajpAthleteId = ajpAthleteId
       await step.run('fetch-ajp-totals', async () => {
@@ -659,18 +614,16 @@ export const buildOpponentIntel = inngest.createFunction(
       })
     }
 
-    // --- Smoothcomp ---
+    // --- Smoothcomp (smoothcomp.com — independent from AJP) ---
     await step.run('fetch-smoothcomp-totals', async () => {
       try {
-        // Only reuse a stored athlete ID when it was sourced from smoothcomp.com itself.
-        // AJP IDs must NOT be reused on smoothcomp.com — same numeric ID maps to different athletes
-        // across the two registries (Smoothcomp hosts both but keeps separate rosters).
+        const storedScId = opponent?.smoothcompAthleteId ?? null
         let profiles: Array<{ baseUrl: string; athleteId: string }> = []
-        if (athleteId && !storedUrlIsAjp) {
+        if (storedScId) {
           try {
-            const verified = await verifySmoothcompProfileName(athleteId, athleteName)
+            const verified = await verifySmoothcompProfileName(storedScId, athleteName)
             if (verified) {
-              profiles = [{ baseUrl: 'https://smoothcomp.com', athleteId }]
+              profiles = [{ baseUrl: 'https://smoothcomp.com', athleteId: storedScId }]
             }
           } catch { /* fall through to name search */ }
         }
@@ -678,15 +631,9 @@ export const buildOpponentIntel = inngest.createFunction(
           profiles = await findSmoothcompProfiles(athleteName)
         }
         if (profiles.length === 0) {
-          // No verified profile found. Only clear stale data when the stored source was Smoothcomp itself
-          // (storedUrlIsAjp=false) — meaning a prior SC search stored something we can no longer verify.
-          // When the stored source is AJP (storedUrlIsAjp=true), SC data may have been set manually or
-          // by a previous search that found the right profile; don't wipe it on a search miss.
-          if (!storedUrlIsAjp) {
-            await db.update(tournamentOpponents)
-              .set({ smoothcompWins: null, smoothcompLosses: null, smoothcompFedUrl: null })
-              .where(eq(tournamentOpponents.id, opponentId))
-          }
+          await db.update(tournamentOpponents)
+            .set({ smoothcompWins: null, smoothcompLosses: null, smoothcompFedUrl: null })
+            .where(eq(tournamentOpponents.id, opponentId))
           return { wins: 0, losses: 0 }
         }
 
@@ -832,6 +779,6 @@ export const buildOpponentIntel = inngest.createFunction(
       return dbUpdate
     })
 
-    return { athleteId: athleteId ?? null }
+    return { ajpAthleteId: ajpAthleteId ?? null }
   }
 )

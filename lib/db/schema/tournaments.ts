@@ -43,7 +43,10 @@ export const tournamentOpponents = pgTable('tournament_opponents', {
   opponentLabel: text('opponent_label').notNull(),
   playerCardId: uuid('player_card_id').references(() => playerCards.id),
   seedingNotes: text('seeding_notes'),
-  // Smoothcomp integration
+  // AJP integration (ajptour.com — separate numeric registry from Smoothcomp)
+  ajpAthleteId: text('ajp_athlete_id'),
+  ajpProfileUrl: text('ajp_profile_url'),
+  // Smoothcomp integration (smoothcomp.com — separate numeric registry from AJP)
   smoothcompAthleteId: text('smoothcomp_athlete_id'),
   smoothcompProfileUrl: text('smoothcomp_profile_url'),
   smoothcompProfilePublic: text('smoothcomp_profile_public'), // 'yes' | 'no' | null = unknown
