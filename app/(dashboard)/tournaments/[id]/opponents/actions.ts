@@ -34,6 +34,19 @@ export async function addOpponent(tournamentId: string, formData: FormData) {
   const force = formData.get('force') === 'true'
   if (!name) throw new Error('Opponent name is required')
 
+  // Hard block: same name in same tournament (never overridable)
+  const sameTournamentDupe = await db
+    .select({ id: tournamentOpponents.id })
+    .from(tournamentOpponents)
+    .where(and(
+      sql`lower(${tournamentOpponents.opponentLabel}) = lower(${name})`,
+      eq(tournamentOpponents.tournamentId, tournamentId),
+    ))
+    .limit(1)
+  if (sameTournamentDupe.length > 0) {
+    throw new Error('An opponent with this name already exists in this tournament')
+  }
+
   if (!force) {
     const userId = await getOrCreateDbUserId()
     const dupe = await db
@@ -533,6 +546,25 @@ export async function importSelectedOpponents(
     return { count: toInsert.length }
   } catch (err) {
     return { count: 0, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export async function retriggerIntel(opponentId: string, tournamentId: string): Promise<{ error?: string }> {
+  try {
+    const userId = await getOrCreateDbUserId()
+    const opponent = await db.query.tournamentOpponents.findFirst({
+      where: eq(tournamentOpponents.id, opponentId),
+    })
+    if (!opponent) return { error: 'Opponent not found' }
+
+    await inngest.send({
+      name: 'opponent-intel/build.run',
+      data: { opponentId, athleteName: opponent.opponentLabel, tournamentId, userId },
+    })
+    revalidatePath(`/tournaments/${tournamentId}/opponents`)
+    return {}
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) }
   }
 }
 

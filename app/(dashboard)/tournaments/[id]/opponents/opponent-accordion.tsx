@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { ScoutForm, DeleteOpponentButton, EditOpponentButton, RescanVideoButton } from './opponent-forms'
+import { ScoutForm, DeleteOpponentButton, EditOpponentButton, RescanVideoButton, RetriggerIntelButton } from './opponent-forms'
 import { importCommunityFootage, saveOpponentResult } from './actions'
 
 type FootageRow = {
@@ -503,7 +503,7 @@ export function OpponentAccordion({
 
       {/* W/L summary — visible when scout job has run */}
       {(opponent.ajpWins != null || opponent.smoothcompWins != null || opponent.ibjjfBestResult != null) && (
-        <div className="px-4 py-2.5 border-t border-border/30 flex items-center gap-4 flex-wrap">
+        <div className="px-4 py-2.5 border-t border-border/30 flex items-center gap-4 flex-wrap justify-between">
           {opponent.ajpWins != null ? (
             <WLBadge label="AJP" wins={opponent.ajpWins} losses={opponent.ajpLosses ?? 0} url={opponent.ajpProfileUrl} />
           ) : (
@@ -538,6 +538,7 @@ export function OpponentAccordion({
               <span className="text-[11px] font-mono text-muted-foreground">N/A</span>
             </span>
           )}
+          <RetriggerIntelButton opponentId={opponent.id} tournamentId={tournamentId} />
         </div>
       )}
 
