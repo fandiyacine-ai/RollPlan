@@ -1,7 +1,7 @@
 import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
 import { tournamentOpponents } from '../lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { eq, ne, isNotNull, sql } from 'drizzle-orm'
 
 // AJP/Smoothcomp exposes a public JSON API for athlete event history — no auth, no proxy needed.
 // GET https://ajptour.com/en/profile/{athleteId}/events?page={n}
@@ -513,29 +513,57 @@ export const buildOpponentIntel = inngest.createFunction(
     let ajpAthleteId: string | null = storedUrlIsAjp ? athleteId : null
 
     if (!athleteId || !storedUrlIsAjp) {
-      const found = await step.run('find-ajp-id-by-name', async () => {
-        const ajpId = await findAjpAthleteIdByName(athleteName)
-        if (ajpId) {
+      // Fast path: look up any other opponent record with the same name that already has an AJP URL.
+      // This avoids a 20s web search when we already identified the athlete in a different tournament.
+      const existingAjp = await step.run('lookup-existing-ajp-profile', async () => {
+        const match = await db
+          .select({ athleteId: tournamentOpponents.smoothcompAthleteId, profileUrl: tournamentOpponents.smoothcompProfileUrl })
+          .from(tournamentOpponents)
+          .where(
+            sql`lower(${tournamentOpponents.opponentLabel}) = lower(${athleteName})
+              AND ${tournamentOpponents.id} != ${opponentId}
+              AND ${tournamentOpponents.smoothcompProfileUrl} LIKE '%ajptour.com%'
+              AND ${tournamentOpponents.smoothcompAthleteId} IS NOT NULL`
+          )
+          .limit(1)
+          .then(r => r[0] ?? null)
+        if (match?.athleteId) {
           await db.update(tournamentOpponents)
-            .set({ smoothcompAthleteId: ajpId, smoothcompProfileUrl: `https://ajptour.com/en/profile/${ajpId}` })
+            .set({ smoothcompAthleteId: match.athleteId, smoothcompProfileUrl: match.profileUrl })
             .where(eq(tournamentOpponents.id, opponentId))
-          return { id: ajpId, source: 'ajp' as const }
-        }
-        // Not on AJP — try Smoothcomp directly (athletes competing in European/Brazilian events may
-        // only appear on smoothcomp.com, not ajptour.com)
-        const scProfiles = await findSmoothcompProfiles(athleteName)
-        if (scProfiles.length > 0) {
-          const scId = scProfiles[0].athleteId
-          await db.update(tournamentOpponents)
-            .set({ smoothcompAthleteId: scId, smoothcompProfileUrl: `https://smoothcomp.com/en/profile/${scId}` })
-            .where(eq(tournamentOpponents.id, opponentId))
-          return { id: scId, source: 'smoothcomp' as const }
+          return { id: match.athleteId, source: 'ajp' as const }
         }
         return { id: null, source: null }
       })
-      if (found.id) {
-        athleteId = found.id
-        if (found.source === 'ajp') ajpAthleteId = found.id
+
+      if (existingAjp.id) {
+        athleteId = existingAjp.id
+        ajpAthleteId = existingAjp.id
+      } else {
+        const found = await step.run('find-profile-by-name', async () => {
+          const ajpId = await findAjpAthleteIdByName(athleteName)
+          if (ajpId) {
+            await db.update(tournamentOpponents)
+              .set({ smoothcompAthleteId: ajpId, smoothcompProfileUrl: `https://ajptour.com/en/profile/${ajpId}` })
+              .where(eq(tournamentOpponents.id, opponentId))
+            return { id: ajpId, source: 'ajp' as const }
+          }
+          // Not on AJP — try Smoothcomp directly (athletes competing in European/Brazilian events may
+          // only appear on smoothcomp.com, not ajptour.com)
+          const scProfiles = await findSmoothcompProfiles(athleteName)
+          if (scProfiles.length > 0) {
+            const scId = scProfiles[0].athleteId
+            await db.update(tournamentOpponents)
+              .set({ smoothcompAthleteId: scId, smoothcompProfileUrl: `https://smoothcomp.com/en/profile/${scId}` })
+              .where(eq(tournamentOpponents.id, opponentId))
+            return { id: scId, source: 'smoothcomp' as const }
+          }
+          return { id: null, source: null }
+        })
+        if (found.id) {
+          athleteId = found.id
+          if (found.source === 'ajp') ajpAthleteId = found.id
+        }
       }
     }
 
