@@ -46,16 +46,17 @@ type Opponent = {
 const PLATFORM_BADGE_CLASS: Record<string, string> = {
   AJP:        'bg-orange-900/70 text-orange-300 border-orange-700/50',
   Smoothcomp: 'bg-sky-900/70 text-sky-300 border-sky-700/50',
-  IBJJF:      'bg-blue-900/70 text-blue-300 border-blue-700/50',
+  IBJJF:      'bg-violet-900/70 text-violet-300 border-violet-700/50',
 }
 
 function PlatformBadge({ label }: { label: string }) {
   const cls = PLATFORM_BADGE_CLASS[label] ?? 'bg-zinc-800 text-zinc-400 border-zinc-700/30'
-  const short = label === 'Smoothcomp' ? 'SC' : label
-  return <span className={`text-[9px] font-bold px-1 py-px rounded border flex-shrink-0 ${cls}`}>{short}</span>
+  return <span className={`text-[9px] font-bold px-1 py-px rounded border flex-shrink-0 ${cls}`}>{label}</span>
 }
 
 function WLBadge({ label, wins, losses, url }: { label: string; wins: number; losses: number; url: string | null }) {
+  const total = wins + losses
+  const winPct = total > 0 ? (wins / total) * 100 : 0
   const content = (
     <span className="flex items-center gap-1.5">
       <PlatformBadge label={label} />
@@ -64,6 +65,11 @@ function WLBadge({ label, wins, losses, url }: { label: string; wins: number; lo
         <span className="text-muted-foreground/30 mx-0.5">/</span>
         <span className="text-rose-400/80">{losses}L</span>
       </span>
+      {total > 0 && (
+        <span className="w-10 h-1 rounded-full bg-zinc-700 overflow-hidden flex-shrink-0">
+          <span className="h-full bg-emerald-500/60 block" style={{ width: `${winPct}%` }} />
+        </span>
+      )}
     </span>
   )
   if (url) {
@@ -498,16 +504,38 @@ export function OpponentAccordion({
       {/* W/L summary — visible when scout job has run */}
       {(opponent.ajpWins != null || opponent.smoothcompWins != null || opponent.ibjjfBestResult != null) && (
         <div className="px-4 py-2.5 border-t border-border/30 flex items-center gap-4 flex-wrap">
-          {opponent.ajpWins != null && (
+          {opponent.ajpWins != null ? (
             <WLBadge label="AJP" wins={opponent.ajpWins} losses={opponent.ajpLosses ?? 0} url={opponent.ajpProfileUrl} />
+          ) : (
+            <span className="flex items-center gap-1.5 opacity-30">
+              <PlatformBadge label="AJP" />
+              <span className="text-[11px] font-mono text-muted-foreground">N/A</span>
+            </span>
           )}
-          {opponent.smoothcompWins != null && (
+          {opponent.smoothcompWins != null ? (
             <WLBadge label="Smoothcomp" wins={opponent.smoothcompWins} losses={opponent.smoothcompLosses ?? 0} url={opponent.smoothcompFedUrl} />
+          ) : (
+            <span className="flex items-center gap-1.5 opacity-30">
+              <PlatformBadge label="Smoothcomp" />
+              <span className="text-[11px] font-mono text-muted-foreground">N/A</span>
+            </span>
           )}
-          {opponent.ibjjfBestResult != null && (
-            <span className="flex items-center gap-1.5 opacity-80">
+          {opponent.ibjjfBestResult != null ? (
+            opponent.ibjjfProfileUrl ? (
+              <a href={opponent.ibjjfProfileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 opacity-80 hover:opacity-100 transition-opacity" title="View IBJJF profile">
+                <PlatformBadge label="IBJJF" />
+                <span className="text-[11px] font-mono text-amber-400/80">{opponent.ibjjfBestResult}</span>
+              </a>
+            ) : (
+              <span className="flex items-center gap-1.5 opacity-80">
+                <PlatformBadge label="IBJJF" />
+                <span className="text-[11px] font-mono text-amber-400/80">{opponent.ibjjfBestResult}</span>
+              </span>
+            )
+          ) : (
+            <span className="flex items-center gap-1.5 opacity-30">
               <PlatformBadge label="IBJJF" />
-              <span className="text-[11px] font-mono text-amber-400/80">{opponent.ibjjfBestResult}</span>
+              <span className="text-[11px] font-mono text-muted-foreground">N/A</span>
             </span>
           )}
         </div>
