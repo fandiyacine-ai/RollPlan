@@ -458,20 +458,72 @@ export const buildOpponentIntel = inngest.createFunction(
     if (athleteId) {
       await step.run('fetch-ajp-totals', async () => {
         try {
-          const firstPage = await fetchAjpEventsPage(athleteId, 1)
-          const allEvents: AjpEvent[] = [...(firstPage.data ?? [])]
-          for (let p = 2; p <= (firstPage.last_page ?? 1); p++) {
-            const page = await fetchAjpEventsPage(athleteId, p)
-            allEvents.push(...(page.data ?? []))
-          }
-
           let wins = 0, losses = 0
-          for (const ev of allEvents) {
-            if (ev.upcomingEvent) continue
-            for (const reg of ev.registrations) {
-              if (!reg.published && reg.matches.length === 0) continue
-              wins += reg.matches.filter(m => m.is_winner).length
-              losses += reg.matches.filter(m => !m.is_winner).length
+          let profileApiWorked = false
+
+          try {
+            const firstPage = await fetchAjpEventsPage(athleteId, 1)
+            const allEvents: AjpEvent[] = [...(firstPage.data ?? [])]
+            for (let p = 2; p <= (firstPage.last_page ?? 1); p++) {
+              const page = await fetchAjpEventsPage(athleteId, p)
+              allEvents.push(...(page.data ?? []))
+            }
+            for (const ev of allEvents) {
+              if (ev.upcomingEvent) continue
+              for (const reg of ev.registrations) {
+                if (!reg.published && reg.matches.length === 0) continue
+                wins += reg.matches.filter(m => m.is_winner).length
+                losses += reg.matches.filter(m => !m.is_winner).length
+              }
+            }
+            profileApiWorked = true
+          } catch { /* profile events API blocked (403) — fall through to participants fallback */ }
+
+          if (!profileApiWorked) {
+            // Profile events API is restricted for this athlete. Fall back to searching for
+            // AJP event URLs via Brave, then counting matches from the participants API
+            // (POST /event/{id}/participants) which is not subject to the same restriction.
+            const apiKey = process.env.BRAVE_API_KEY
+            const candidateUrls: string[] = []
+            if (apiKey) {
+              for (const query of nameSearchQueries(athleteName, 'ajptour.com')) {
+                try {
+                  const resp = await fetch(
+                    `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=10`,
+                    { headers: { 'X-Subscription-Token': apiKey, Accept: 'application/json' }, signal: AbortSignal.timeout(12000) }
+                  )
+                  if (!resp.ok) continue
+                  const data = await resp.json() as { web?: { results?: Array<{ url: string }> } }
+                  candidateUrls.push(...(data.web?.results?.map(r => r.url) ?? []))
+                } catch { continue }
+              }
+            }
+            const eventIds = [...new Set(
+              candidateUrls
+                .map(u => u.match(/ajptour\.com\/[a-z]{0,10}\/?event\/(\d+)/)?.[1])
+                .filter((id): id is string => !!id)
+            )]
+            for (const eventId of eventIds.slice(0, 10)) {
+              try {
+                const pResp = await fetch(`https://ajptour.com/en/event/${eventId}/participants`, {
+                  method: 'POST',
+                  headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' },
+                  body: '{}',
+                  signal: AbortSignal.timeout(15000),
+                })
+                if (!pResp.ok) continue
+                const pData = await pResp.json() as {
+                  participants: Array<{ registrations: Array<{ user_id: number; matches?: AjpMatch[]; published?: boolean }> }>
+                }
+                for (const participant of pData.participants ?? []) {
+                  for (const reg of participant.registrations ?? []) {
+                    if (String(reg.user_id) !== athleteId) continue
+                    const matches = reg.matches ?? []
+                    wins += matches.filter(m => m.is_winner).length
+                    losses += matches.filter(m => !m.is_winner).length
+                  }
+                }
+              } catch { continue }
             }
           }
 
@@ -505,20 +557,22 @@ export const buildOpponentIntel = inngest.createFunction(
 
         let wins = 0, losses = 0
         for (const { baseUrl, athleteId: scAthleteId } of profiles) {
-          const firstPage = await fetchSmoothcompEventsPage(baseUrl, scAthleteId, 1)
-          const allEvents: AjpEvent[] = [...(firstPage.data ?? [])]
-          for (let p = 2; p <= (firstPage.last_page ?? 1); p++) {
-            const page = await fetchSmoothcompEventsPage(baseUrl, scAthleteId, p)
-            allEvents.push(...(page.data ?? []))
-          }
-          for (const ev of allEvents) {
-            if (ev.upcomingEvent) continue
-            for (const reg of ev.registrations) {
-              if (!reg.published && reg.matches.length === 0) continue
-              wins += reg.matches.filter(m => m.is_winner).length
-              losses += reg.matches.filter(m => !m.is_winner).length
+          try {
+            const firstPage = await fetchSmoothcompEventsPage(baseUrl, scAthleteId, 1)
+            const allEvents: AjpEvent[] = [...(firstPage.data ?? [])]
+            for (let p = 2; p <= (firstPage.last_page ?? 1); p++) {
+              const page = await fetchSmoothcompEventsPage(baseUrl, scAthleteId, p)
+              allEvents.push(...(page.data ?? []))
             }
-          }
+            for (const ev of allEvents) {
+              if (ev.upcomingEvent) continue
+              for (const reg of ev.registrations) {
+                if (!reg.published && reg.matches.length === 0) continue
+                wins += reg.matches.filter(m => m.is_winner).length
+                losses += reg.matches.filter(m => !m.is_winner).length
+              }
+            }
+          } catch { continue }
         }
 
         if (wins > 0 || losses > 0) {
