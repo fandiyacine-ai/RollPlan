@@ -346,7 +346,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
           {opponents.map((opp) => (
             <OpponentAccordion
               key={opp.id}
-              opponent={{ ...opp, footageStatus: opp.footageStatus ?? 'manual', userResult: opp.userResult ?? null, userResultMethod: opp.userResultMethod ?? null, ajpWins: opp.ajpWins ?? null, ajpLosses: opp.ajpLosses ?? null, ajpProfileUrl: opp.smoothcompProfileUrl ?? null, smoothcompWins: opp.smoothcompWins ?? null, smoothcompLosses: opp.smoothcompLosses ?? null, smoothcompFedUrl: opp.smoothcompFedUrl ?? null, ibjjfWins: opp.ibjjfWins ?? null, ibjjfLosses: opp.ibjjfLosses ?? null, ibjjfProfileUrl: opp.ibjjfProfileUrl ?? null, ibjjfBestResult: opp.ibjjfBestResult ?? null }}
+              opponent={{ ...opp, footageStatus: opp.footageStatus ?? 'manual', userResult: opp.userResult ?? null, userResultMethod: opp.userResultMethod ?? null, ajpWins: opp.ajpWins ?? null, ajpLosses: opp.ajpLosses ?? null, ajpProfileUrl: opp.smoothcompProfileUrl?.includes('ajptour.com') ? opp.smoothcompProfileUrl : null, smoothcompWins: opp.smoothcompWins ?? null, smoothcompLosses: opp.smoothcompLosses ?? null, smoothcompFedUrl: opp.smoothcompFedUrl ?? null, ibjjfWins: opp.ibjjfWins ?? null, ibjjfLosses: opp.ibjjfLosses ?? null, ibjjfProfileUrl: opp.ibjjfProfileUrl ?? null, ibjjfBestResult: opp.ibjjfBestResult ?? null }}
               eventDatePassed={eventDatePassed}
               matches={(matchesByOpponent[opp.id] ?? []).map(m => ({
                 ...m, rowType: 'match' as const, format: m.format ?? null, context: m.context ?? null, label: undefined,

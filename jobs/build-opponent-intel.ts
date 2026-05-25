@@ -575,10 +575,15 @@ export const buildOpponentIntel = inngest.createFunction(
           } catch { continue }
         }
 
+        const fedUrl = `https://smoothcomp.com/en/profile/${profiles[0].athleteId}`
         if (wins > 0 || losses > 0) {
-          const fedUrl = `https://smoothcomp.com/en/profile/${profiles[0].athleteId}`
           await db.update(tournamentOpponents)
             .set({ smoothcompWins: wins, smoothcompLosses: losses, smoothcompFedUrl: fedUrl })
+            .where(eq(tournamentOpponents.id, opponentId))
+        } else {
+          // Profile found but data not public — save URL so UI can show "Private" instead of "N/A"
+          await db.update(tournamentOpponents)
+            .set({ smoothcompFedUrl: fedUrl })
             .where(eq(tournamentOpponents.id, opponentId))
         }
         return { wins, losses }

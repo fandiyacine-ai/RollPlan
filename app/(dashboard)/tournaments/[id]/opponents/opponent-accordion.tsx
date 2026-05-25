@@ -513,6 +513,11 @@ export function OpponentAccordion({
           )}
           {opponent.smoothcompWins != null ? (
             <WLBadge label="Smoothcomp" wins={opponent.smoothcompWins} losses={opponent.smoothcompLosses ?? 0} url={opponent.smoothcompFedUrl} />
+          ) : opponent.smoothcompFedUrl ? (
+            <a href={opponent.smoothcompFedUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 opacity-50 hover:opacity-75 transition-opacity" title="View Smoothcomp profile">
+              <PlatformBadge label="Smoothcomp" />
+              <span className="text-[11px] font-mono text-muted-foreground">Private</span>
+            </a>
           ) : (
             <span className="flex items-center gap-1.5 opacity-30">
               <PlatformBadge label="Smoothcomp" />
