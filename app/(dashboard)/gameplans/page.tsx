@@ -333,7 +333,7 @@ export default async function GameplansPage() {
                     )
                     return (
                       <>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                        <div className={`grid gap-3 ${withData.length === 1 ? 'grid-cols-1 sm:max-w-sm' : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3'}`}>
                           {withData.map(({ opponent, plan, prediction, matchCount, matchSources, hasUpgrade, lastUpgradedAt }) => (
                             <GameCard
                               key={opponent.id}

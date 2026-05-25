@@ -167,6 +167,13 @@ export default async function MatchesPage() {
           <Link href="/upload" className={buttonVariants()}>
             Analyse your first match →
           </Link>
+          <p className="text-xs text-muted-foreground border-t border-border/40 pt-4">
+            Scouted opponent footage lives under{' '}
+            <Link href="/tournaments" className="underline underline-offset-2 hover:text-foreground transition-colors">
+              Tournaments → Opponents
+            </Link>
+            , not here.
+          </p>
         </div>
       </div>
     )
