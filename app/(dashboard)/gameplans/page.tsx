@@ -13,10 +13,10 @@ function daysUntil(dateStr: string | null): number | null {
   return Math.ceil((new Date(dateStr + 'T12:00:00').getTime() - Date.now()) / 86400000)
 }
 
-function ConfidenceDots({ level }: { level: 'low' | 'medium' | 'high' | null }) {
-  if (!level) return <span className="text-[10px] text-muted-foreground/30">—</span>
-  const map = { high: 'High', medium: 'Med', low: 'Low' }
-  return <span className="text-[10px] text-muted-foreground/50">{map[level]}</span>
+function DataQualityNote({ matchCount }: { matchCount: number }) {
+  if (matchCount === 0) return <span className="text-[10px] text-muted-foreground/40">Prediction only</span>
+  if (matchCount === 1) return <span className="text-[10px] text-muted-foreground/40">1 match scouted</span>
+  return <span className="text-[10px] text-muted-foreground/40">{matchCount} matches scouted</span>
 }
 
 function WinBar({ probability, verdict }: { probability: number; verdict: string }) {
@@ -53,9 +53,6 @@ function GameCard({
   hasUpgrade?: boolean
   lastUpgradedAt?: Date | null
 }) {
-  const confidence: 'low' | 'medium' | 'high' | null = prediction?.confidence
-    ?? (matchCount >= 3 ? 'high' : matchCount >= 1 ? 'medium' : null)
-
   return (
     <Link
       href={`/tournaments/${tournamentId}/gameplan?opponent=${opponent.id}&back=/gameplans`}
@@ -77,7 +74,7 @@ function GameCard({
               NEW
             </span>
           )}
-          <ConfidenceDots level={confidence} />
+          <DataQualityNote matchCount={matchCount} />
         </div>
       </div>
 
@@ -331,10 +328,10 @@ export default async function GameplansPage() {
                       </p>
                     )
                     const withData = opponents.filter(o => o.plan || o.matchCount > 0)
-                    const noDataCount = opponents.length - withData.length
+                    const noData = opponents.filter(o => !o.plan && o.matchCount === 0)
                     if (withData.length === 0) return (
                       <p className="text-xs text-muted-foreground py-1">
-                        {opponents.length} opponent{opponents.length !== 1 ? 's' : ''} added — no footage scouted yet.{' '}
+                        No footage scouted yet — {opponents.map(o => o.opponent.opponentLabel.split(' ')[0]).join(', ')}.{' '}
                         <Link href={`/tournaments/${tournament.id}/opponents`} className="underline hover:no-underline">Start scouting →</Link>
                       </p>
                     )
@@ -355,9 +352,11 @@ export default async function GameplansPage() {
                             />
                           ))}
                         </div>
-                        {noDataCount > 0 && (
+                        {noData.length > 0 && (
                           <p className="text-xs text-muted-foreground mt-3">
-                            +{noDataCount} opponent{noDataCount !== 1 ? 's' : ''} without footage.{' '}
+                            No footage yet:{' '}
+                            {noData.slice(0, 3).map(o => o.opponent.opponentLabel.split(' ')[0]).join(', ')}
+                            {noData.length > 3 ? ` +${noData.length - 3} more` : ''}.{' '}
                             <Link href={`/tournaments/${tournament.id}/opponents`} className="underline hover:no-underline">Scout →</Link>
                           </p>
                         )}

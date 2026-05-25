@@ -2,11 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '../../../lib/db'
 import { videos } from '../../../lib/db/schema'
 import { generateAnonymousVideoKey, getPresignedUploadUrl } from '../../../lib/storage/r2'
+import { getOrCreateDbUserId } from '../../../lib/db/get-user'
 
 export const maxDuration = 30
 
 export async function POST(req: NextRequest) {
   try {
+    let userId: string | null = null
+    try {
+      userId = await getOrCreateDbUserId()
+    } catch {
+      return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+    }
+    if (!userId) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+
     const { filename, contentType, size, sourceType, format } = await req.json()
 
     if (!filename) return NextResponse.json({ error: 'filename is required' }, { status: 400 })
@@ -17,7 +26,7 @@ export async function POST(req: NextRequest) {
     const uploadUrl = await getPresignedUploadUrl(key, contentType)
 
     const [video] = await db.insert(videos).values({
-      userId: null,
+      userId,
       r2Key: key,
       originalFilename: filename,
       contentType,

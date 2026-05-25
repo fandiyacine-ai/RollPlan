@@ -304,16 +304,20 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
 
       {/* Sync bracket hint when no bracket URL is linked yet */}
       {opponents.length > 0 && !tournamentRow?.smoothcompUrl?.includes('/bracket/') && (
-        <div className="rounded-lg border border-border/40 bg-muted/30 px-4 py-3 flex items-start gap-3 text-xs text-muted-foreground">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
-          <span>
-            <span className="font-medium text-foreground/70">AI-extracted results may contain errors.</span>{' '}
-            To auto-correct match results from the official draw, edit this tournament and add your Smoothcomp bracket URL — a "Sync from bracket" button will appear here.
+        <details className="group rounded-lg border border-border/40 bg-muted/30 px-4 py-3 text-xs text-muted-foreground cursor-pointer">
+          <summary className="flex items-center gap-2 list-none select-none">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-muted-foreground/60">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <span className="font-medium text-foreground/60">AI match results may contain errors</span>
+            <span className="ml-auto text-muted-foreground/40 group-open:hidden">tap to learn more</span>
+            <span className="ml-auto text-muted-foreground/40 hidden group-open:inline">tap to collapse</span>
+          </summary>
+          <p className="mt-2 pl-5 leading-relaxed">
+            To auto-correct results from the official draw, edit this tournament and add your Smoothcomp bracket URL — a "Sync from bracket" button will appear here.
             Results can also be corrected manually via "Wrong result?" on each match page.
-          </span>
-        </div>
+          </p>
+        </details>
       )}
 
       {opponents.length === 0 ? (

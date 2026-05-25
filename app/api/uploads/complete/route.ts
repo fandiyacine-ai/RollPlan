@@ -54,6 +54,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ videoId })
     }
 
+    const usage2 = await checkMonthlyLimit(userId)
+    if (!usage2.allowed) {
+      return NextResponse.json({
+        error: `You've used all ${usage2.limit} free analyses for this month. Upgrade to continue.`,
+      }, { status: 402 })
+    }
+
     const context = sourceType === 'own_sparring' ? 'sparring' : 'competition'
     const [match] = await db.insert(matches).values({
       videoId,

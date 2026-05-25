@@ -33,6 +33,12 @@ export default async function GameplanPage({
     .from(tournamentOpponents)
     .where(eq(tournamentOpponents.tournamentId, tournamentId))
 
+  const athleteFullName = [clerkUser?.firstName, clerkUser?.lastName].filter(Boolean).join(' ').toLowerCase()
+  const filtered = athleteFullName
+    ? opponents.filter(o => !o.opponentLabel.toLowerCase().includes(athleteFullName))
+    : opponents
+  const selectorOpponents = filtered.length > 0 ? filtered : opponents
+
   if (opponents.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border/50 p-10 text-center space-y-3">
@@ -49,8 +55,8 @@ export default async function GameplanPage({
   }
 
   const activeOpponent = selectedOpponentId
-    ? opponents.find(o => o.id === selectedOpponentId) ?? opponents[0]
-    : opponents[0]
+    ? (selectorOpponents.find(o => o.id === selectedOpponentId) ?? selectorOpponents[0])
+    : selectorOpponents[0]
 
   const scoutedMatches = await db
     .select({
@@ -109,9 +115,9 @@ export default async function GameplanPage({
       )}
 
       {/* Opponent selector */}
-      {opponents.length > 1 && (
+      {selectorOpponents.length > 1 && (
         <OpponentSelector
-          opponents={opponents}
+          opponents={selectorOpponents}
           activeId={activeOpponent.id}
           tournamentId={tournamentId}
           predictionByOpponent={predictionByOpponent}
