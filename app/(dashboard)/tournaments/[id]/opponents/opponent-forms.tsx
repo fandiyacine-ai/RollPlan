@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { addOpponent, submitScoutUrls, deleteOpponent, updateOpponent, rescanVideo, retriggerIntel } from './actions'
 import { Button } from '@/components/ui/button'
@@ -255,32 +255,33 @@ export function RescanVideoButton({ videoId, tournamentId }: { videoId: string; 
 export function RetriggerIntelButton({ opponentId, tournamentId }: { opponentId: string; tournamentId: string }) {
   const router = useRouter()
   const [pending, setPending] = useState(false)
-  const [done, setDone] = useState(false)
+  const [polling, setPolling] = useState(false)
+
+  useEffect(() => {
+    if (!polling) return
+    const id = setInterval(() => router.refresh(), 3000)
+    // Stop after 2 min — job should be done by then
+    const stop = setTimeout(() => { setPolling(false); clearInterval(id) }, 120_000)
+    return () => { clearInterval(id); clearTimeout(stop) }
+  }, [polling, router])
 
   return (
     <button
       type="button"
-      disabled={pending || done}
+      disabled={pending || polling}
       onClick={async () => {
         setPending(true)
         await retriggerIntel(opponentId, tournamentId)
-        router.refresh()
-        setDone(true)
         setPending(false)
+        setPolling(true)
       }}
       className="flex items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors disabled:opacity-40"
       title="Re-run intel scan"
     >
-      {done ? (
-        <span className="text-emerald-400/70">✓ Queued</span>
-      ) : (
-        <>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={pending ? 'animate-spin' : ''}>
-            <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
-          </svg>
-          {pending ? 'Queuing…' : 'Re-run intel'}
-        </>
-      )}
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={pending || polling ? 'animate-spin' : ''}>
+        <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+      </svg>
+      {pending ? 'Queuing…' : polling ? 'Scanning…' : 'Re-run intel'}
     </button>
   )
 }

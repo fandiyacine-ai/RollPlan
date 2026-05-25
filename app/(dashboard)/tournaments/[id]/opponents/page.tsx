@@ -201,14 +201,15 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
     return acc
   }, {})
 
-  const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000)
+  const twentyMinutesAgo = new Date(Date.now() - 20 * 60 * 1000)
   const hasActiveScans = allMatches.some(m => m.status === 'processing' || m.status === 'pending' || m.status === 'uploaded')
     || allPendingVideos.some(v => v.status === 'processing' || v.status === 'pending' || v.status === 'uploaded')
     || opponents.some(o => o.footageStatus === 'pending' || o.footageStatus === 'auto_queued')
-    // Keep polling while a recently-added opponent has no W/L data yet (scout job in flight)
+    // Keep polling while a recently-added opponent still has any platform missing
+    // (job runs AJP → SC → IBJJF sequentially; AJP landing first must not stop the poll)
     || opponents.some(o =>
-        new Date(o.createdAt) > tenMinutesAgo &&
-        o.ajpWins === null && o.smoothcompWins === null && o.ibjjfWins === null && o.ibjjfBestResult === null
+        new Date(o.createdAt) > twentyMinutesAgo &&
+        (o.ajpWins === null || o.smoothcompWins === null || o.ibjjfBestResult === null)
       )
 
   // Opponents with no footage and no active scans — need user action
