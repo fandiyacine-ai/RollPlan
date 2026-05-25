@@ -440,60 +440,64 @@ export const buildOpponentIntel = inngest.createFunction(
     // --- AJP ---
     if (athleteId) {
       await step.run('fetch-ajp-totals', async () => {
-        const firstPage = await fetchAjpEventsPage(athleteId, 1)
-        const allEvents: AjpEvent[] = [...(firstPage.data ?? [])]
-        for (let p = 2; p <= (firstPage.last_page ?? 1); p++) {
-          const page = await fetchAjpEventsPage(athleteId, p)
-          allEvents.push(...(page.data ?? []))
-        }
-
-        let wins = 0, losses = 0
-        for (const ev of allEvents) {
-          if (ev.upcomingEvent) continue
-          for (const reg of ev.registrations) {
-            if (!reg.published && reg.matches.length === 0) continue
-            wins += reg.matches.filter(m => m.is_winner).length
-            losses += reg.matches.filter(m => !m.is_winner).length
+        try {
+          const firstPage = await fetchAjpEventsPage(athleteId, 1)
+          const allEvents: AjpEvent[] = [...(firstPage.data ?? [])]
+          for (let p = 2; p <= (firstPage.last_page ?? 1); p++) {
+            const page = await fetchAjpEventsPage(athleteId, p)
+            allEvents.push(...(page.data ?? []))
           }
-        }
 
-        await db.update(tournamentOpponents)
-          .set({ ajpWins: wins, ajpLosses: losses })
-          .where(eq(tournamentOpponents.id, opponentId))
-        return { wins, losses }
+          let wins = 0, losses = 0
+          for (const ev of allEvents) {
+            if (ev.upcomingEvent) continue
+            for (const reg of ev.registrations) {
+              if (!reg.published && reg.matches.length === 0) continue
+              wins += reg.matches.filter(m => m.is_winner).length
+              losses += reg.matches.filter(m => !m.is_winner).length
+            }
+          }
+
+          await db.update(tournamentOpponents)
+            .set({ ajpWins: wins, ajpLosses: losses })
+            .where(eq(tournamentOpponents.id, opponentId))
+          return { wins, losses }
+        } catch { return { skipped: true } }
       })
     }
 
     // --- Smoothcomp ---
     await step.run('fetch-smoothcomp-totals', async () => {
-      const profiles = await findSmoothcompProfiles(athleteName)
-      if (profiles.length === 0) return { wins: 0, losses: 0 }
+      try {
+        const profiles = await findSmoothcompProfiles(athleteName)
+        if (profiles.length === 0) return { wins: 0, losses: 0 }
 
-      let wins = 0, losses = 0
-      for (const { baseUrl, athleteId: scAthleteId } of profiles) {
-        const firstPage = await fetchSmoothcompEventsPage(baseUrl, scAthleteId, 1)
-        const allEvents: AjpEvent[] = [...(firstPage.data ?? [])]
-        for (let p = 2; p <= (firstPage.last_page ?? 1); p++) {
-          const page = await fetchSmoothcompEventsPage(baseUrl, scAthleteId, p)
-          allEvents.push(...(page.data ?? []))
-        }
-        for (const ev of allEvents) {
-          if (ev.upcomingEvent) continue
-          for (const reg of ev.registrations) {
-            if (!reg.published && reg.matches.length === 0) continue
-            wins += reg.matches.filter(m => m.is_winner).length
-            losses += reg.matches.filter(m => !m.is_winner).length
+        let wins = 0, losses = 0
+        for (const { baseUrl, athleteId: scAthleteId } of profiles) {
+          const firstPage = await fetchSmoothcompEventsPage(baseUrl, scAthleteId, 1)
+          const allEvents: AjpEvent[] = [...(firstPage.data ?? [])]
+          for (let p = 2; p <= (firstPage.last_page ?? 1); p++) {
+            const page = await fetchSmoothcompEventsPage(baseUrl, scAthleteId, p)
+            allEvents.push(...(page.data ?? []))
+          }
+          for (const ev of allEvents) {
+            if (ev.upcomingEvent) continue
+            for (const reg of ev.registrations) {
+              if (!reg.published && reg.matches.length === 0) continue
+              wins += reg.matches.filter(m => m.is_winner).length
+              losses += reg.matches.filter(m => !m.is_winner).length
+            }
           }
         }
-      }
 
-      if (wins > 0 || losses > 0) {
-        const fedUrl = `https://smoothcomp.com/en/profile/${profiles[0].athleteId}`
-        await db.update(tournamentOpponents)
-          .set({ smoothcompWins: wins, smoothcompLosses: losses, smoothcompFedUrl: fedUrl })
-          .where(eq(tournamentOpponents.id, opponentId))
-      }
-      return { wins, losses }
+        if (wins > 0 || losses > 0) {
+          const fedUrl = `https://smoothcomp.com/en/profile/${profiles[0].athleteId}`
+          await db.update(tournamentOpponents)
+            .set({ smoothcompWins: wins, smoothcompLosses: losses, smoothcompFedUrl: fedUrl })
+            .where(eq(tournamentOpponents.id, opponentId))
+        }
+        return { wins, losses }
+      } catch { return { skipped: true } }
     })
 
     // --- IBJJF via BJJ Metrics + jiujitsu.net medal ---
