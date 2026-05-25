@@ -254,24 +254,24 @@ function nameMatchesFuzzy(fullName: string, nameParts: string[], threshold: numb
 }
 
 // Same identity verification as verifyAjpProfileName but for Smoothcomp (main domain only)
-async function verifySmoothcompProfileName(athleteId: string, expectedName: string, trustIfEmpty = false): Promise<boolean> {
+// Returns 'public' (name verified via event participants), 'private' (no events but trusted from search),
+// or 'rejected' (name mismatch or error).
+async function checkSmoothcompProfile(athleteId: string, expectedName: string, trustIfEmpty: boolean): Promise<'public' | 'private' | 'rejected'> {
   const baseUrl = 'https://smoothcomp.com'
   try {
     const page = await fetchSmoothcompEventsPage(baseUrl, athleteId, 1)
     if (!page.data?.length) {
-      // Profile exists but no public event history. Only trust it if the URL came from a
-      // name-based search (trustIfEmpty=true); never trust a bare ID from AJP cross-lookup.
-      return trustIfEmpty
+      return trustIfEmpty ? 'private' : 'rejected'
     }
     const firstEvent = page.data.find(ev => !ev.upcomingEvent)
-    if (!firstEvent) return trustIfEmpty  // Only upcoming events — treat same as empty
+    if (!firstEvent) return trustIfEmpty ? 'private' : 'rejected'
     const pResp = await fetch(`${baseUrl}/en/event/${firstEvent.info.id}/participants`, {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' },
       body: '{}',
       signal: AbortSignal.timeout(15000),
     })
-    if (!pResp.ok) return false
+    if (!pResp.ok) return 'rejected'
     const pData = await pResp.json() as { participants: Array<{ registrations: Array<{ user_id: number; firstname: string; lastname: string }> }> }
     const expectedLower = expectedName.toLowerCase()
     const nameParts = expectedLower.split(/\s+/).filter(p => p.length > 1)
@@ -280,12 +280,18 @@ async function verifySmoothcompProfileName(athleteId: string, expectedName: stri
       for (const reg of participant.registrations ?? []) {
         if (String(reg.user_id) !== athleteId) continue
         const fullName = `${reg.firstname} ${reg.lastname}`.toLowerCase()
-        if (nameMatchesFuzzy(fullName, nameParts, threshold)) return true
+        if (nameMatchesFuzzy(fullName, nameParts, threshold)) return 'public'
       }
     }
-    return false
-  } catch { return false }
+    return 'rejected'
+  } catch { return 'rejected' }
 }
+
+async function verifySmoothcompProfileName(athleteId: string, expectedName: string, trustIfEmpty = false): Promise<boolean> {
+  const result = await checkSmoothcompProfile(athleteId, expectedName, trustIfEmpty)
+  return result !== 'rejected'
+}
+
 
 // Build search query variants from most to least specific.
 // Handles spelling mismatches (e.g. "Zakriya" stored vs "Zakariya" registered)
@@ -348,13 +354,16 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
   const nameParts = name.toLowerCase().split(/\s+/).filter(p => p.length > 1)
   const threshold = nameMatchThreshold(nameParts)
 
-  // Verify direct smoothcomp.com profile URLs before accepting.
-  // trustIfEmpty=true: URL came from a name-based search so a private (no-events) profile is valid.
+  // Verify all direct profile URLs, preferring a publicly-verified profile over a private one.
+  // If only a private match is found (no events, trustIfEmpty), use it as fallback.
   const directProfiles = extractSmoothcompProfiles(candidateUrls)
+  let privateCandidate: string | null = null
   for (const profile of directProfiles) {
-    const ok = await verifySmoothcompProfileName(profile.athleteId, name, true)
-    if (ok) return [{ baseUrl: 'https://smoothcomp.com', athleteId: profile.athleteId }]
+    const status = await checkSmoothcompProfile(profile.athleteId, name, true)
+    if (status === 'public') return [{ baseUrl: 'https://smoothcomp.com', athleteId: profile.athleteId }]
+    if (status === 'private' && !privateCandidate) privateCandidate = profile.athleteId
   }
+  if (privateCandidate) return [{ baseUrl: 'https://smoothcomp.com', athleteId: privateCandidate }]
 
   // Fall back: find smoothcomp.com event IDs from candidate URLs → participants API
   const eventIds = [...new Set(
@@ -376,8 +385,7 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
       for (const participant of pData.participants ?? []) {
         for (const reg of participant.registrations ?? []) {
           const fullName = `${reg.firstname} ${reg.lastname}`.toLowerCase()
-          const matchCount = nameParts.filter(p => fullName.includes(p)).length
-          if (matchCount >= threshold) {
+          if (nameMatchesFuzzy(fullName, nameParts, threshold)) {
             return [{ baseUrl: 'https://smoothcomp.com', athleteId: String(reg.user_id) }]
           }
         }
