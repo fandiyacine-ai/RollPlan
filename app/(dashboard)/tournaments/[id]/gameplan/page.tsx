@@ -1,7 +1,7 @@
 import { currentUser } from '@clerk/nextjs/server'
 import { db } from '../../../../../lib/db'
 import { gameplans, tournamentOpponents, matches, planExecutions } from '../../../../../lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import Link from 'next/link'
 import { GenerateGameplanButton } from './generate-button'
 import { OpponentSelector } from './opponent-selector'
@@ -54,9 +54,19 @@ export default async function GameplanPage({
     )
   }
 
+  // Sort selector: opponents with an existing gameplan come first so the default is never an empty state
+  const opponentIds = selectorOpponents.map(o => o.id)
+  const gameplansForOpponents = opponentIds.length > 0
+    ? await db.select({ opponentId: gameplans.opponentId }).from(gameplans).where(inArray(gameplans.opponentId, opponentIds))
+    : []
+  const opponentsWithGameplan = new Set(gameplansForOpponents.map(g => g.opponentId))
+  const sortedOpponents = [...selectorOpponents].sort((a, b) =>
+    (opponentsWithGameplan.has(a.id) ? 0 : 1) - (opponentsWithGameplan.has(b.id) ? 0 : 1)
+  )
+
   const activeOpponent = selectedOpponentId
-    ? (selectorOpponents.find(o => o.id === selectedOpponentId) ?? selectorOpponents[0])
-    : selectorOpponents[0]
+    ? (sortedOpponents.find(o => o.id === selectedOpponentId) ?? sortedOpponents[0])
+    : sortedOpponents[0]
 
   const scoutedMatches = await db
     .select({
@@ -115,9 +125,9 @@ export default async function GameplanPage({
       )}
 
       {/* Opponent selector */}
-      {selectorOpponents.length > 1 && (
+      {sortedOpponents.length > 1 && (
         <OpponentSelector
-          opponents={selectorOpponents}
+          opponents={sortedOpponents}
           activeId={activeOpponent.id}
           tournamentId={tournamentId}
           predictionByOpponent={predictionByOpponent}

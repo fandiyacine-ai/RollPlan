@@ -37,7 +37,7 @@ export function generateVideoKey(userId: string, filename: string): string {
 
 export function generateAnonymousVideoKey(filename: string): string {
   const ext = filename.split('.').pop() ?? 'mp4'
-  return `uploads/${Date.now()}.${ext}`
+  return `uploads/${crypto.randomUUID()}.${ext}`
 }
 
 export function isStoredInR2(r2Key: string): boolean {
