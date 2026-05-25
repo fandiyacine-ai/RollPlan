@@ -407,6 +407,9 @@ export const buildOpponentIntel = inngest.createFunction(
     triggers: [{ event: 'opponent-intel/build.run' }],
     retries: 1,
     rateLimit: { limit: 10, period: '1m' },
+    // Prevent concurrent runs for the same opponent — Re-run button spamming
+    // or duplicate events would otherwise race and overwrite each other's DB writes.
+    concurrency: { limit: 1, key: 'event.data.opponentId' },
   },
   async ({ event, step }: {
     event: {
@@ -548,11 +551,14 @@ export const buildOpponentIntel = inngest.createFunction(
         let profiles: Array<{ baseUrl: string; athleteId: string }> = []
         if (athleteId) {
           try {
-            const testPage = await fetchSmoothcompEventsPage('https://smoothcomp.com', athleteId, 1)
-            if ((testPage.data?.length ?? 0) > 0) {
+            // Verify name matches before trusting this ID on smoothcomp.com —
+            // AJP and Smoothcomp share the same numeric IDs but different athlete registries,
+            // so ID X on AJP may belong to a different person on smoothcomp.com.
+            const verified = await verifySmoothcompProfileName(athleteId, athleteName)
+            if (verified) {
               profiles = [{ baseUrl: 'https://smoothcomp.com', athleteId }]
             }
-          } catch { /* not on smoothcomp.com with this ID — fall through to name search */ }
+          } catch { /* not on smoothcomp.com — fall through to name search */ }
         }
         if (profiles.length === 0) {
           profiles = await findSmoothcompProfiles(athleteName)
@@ -658,13 +664,13 @@ export const buildOpponentIntel = inngest.createFunction(
             const medals = athleteData.medals ?? []
             if (!medals.length) break
 
-            // Best result: lowest place number (1=Gold > 2=Silver > 3=Bronze)
-            const best = medals.sort((a, b) => a.place - b.place)[0]
-            const placeLabel = PLACE_LABEL[best.place] ?? `${best.place}th`
-            const year = best.year ?? (best.date ? new Date(best.date).getFullYear() : null)
-            dbUpdate.ibjjfBestResult = year
-              ? `${placeLabel} Medal – ${best.event_name} ${year}`
-              : `${placeLabel} Medal – ${best.event_name}`
+            // Store all medals sorted by place (Gold first), pipe-separated
+            const sorted = [...medals].sort((a, b) => a.place - b.place)
+            dbUpdate.ibjjfBestResult = sorted.map(m => {
+              const label = PLACE_LABEL[m.place] ?? `${m.place}th`
+              const year = m.year ?? (m.date ? new Date(m.date).getFullYear() : null)
+              return year ? `${label} – ${m.event_name} ${year}` : `${label} – ${m.event_name}`
+            }).join('|')
             break
           }
         }

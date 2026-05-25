@@ -525,17 +525,27 @@ export function OpponentAccordion({
             </span>
           )}
           {opponent.ibjjfBestResult != null ? (
-            opponent.ibjjfProfileUrl ? (
-              <a href={opponent.ibjjfProfileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 opacity-80 hover:opacity-100 transition-opacity" title="View IBJJF profile">
-                <PlatformBadge label="IBJJF" />
-                <span className="text-[11px] font-mono text-amber-400/80">{opponent.ibjjfBestResult}</span>
-              </a>
-            ) : (
-              <span className="flex items-center gap-1.5 opacity-80">
-                <PlatformBadge label="IBJJF" />
-                <span className="text-[11px] font-mono text-amber-400/80">{opponent.ibjjfBestResult}</span>
-              </span>
-            )
+            (() => {
+              const medals = opponent.ibjjfBestResult.split('|').filter(Boolean)
+              const content = (
+                <span className="flex flex-col gap-0.5">
+                  {medals.map((m, i) => (
+                    <span key={i} className="text-[11px] font-mono text-amber-400/80 leading-tight">{m}</span>
+                  ))}
+                </span>
+              )
+              return opponent.ibjjfProfileUrl ? (
+                <a href={opponent.ibjjfProfileUrl} target="_blank" rel="noopener noreferrer" className="flex items-start gap-1.5 opacity-80 hover:opacity-100 transition-opacity" title="View IBJJF profile">
+                  <PlatformBadge label="IBJJF" />
+                  {content}
+                </a>
+              ) : (
+                <span className="flex items-start gap-1.5 opacity-80">
+                  <PlatformBadge label="IBJJF" />
+                  {content}
+                </span>
+              )
+            })()
           ) : opponent.ibjjfProfileUrl ? (
             <a href={opponent.ibjjfProfileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 opacity-50 hover:opacity-75 transition-opacity" title="View IBJJF profile">
               <PlatformBadge label="IBJJF" />
