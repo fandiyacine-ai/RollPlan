@@ -226,6 +226,36 @@ function extractSmoothcompProfiles(urls: string[]): Array<{ baseUrl: string; ath
   return profiles
 }
 
+// Same identity verification as verifyAjpProfileName but for Smoothcomp subdomains
+async function verifySmoothcompProfileName(baseUrl: string, athleteId: string, expectedName: string): Promise<boolean> {
+  try {
+    const page = await fetchSmoothcompEventsPage(baseUrl, athleteId, 1)
+    if (!page.data?.length) return false
+    const firstEvent = page.data.find(ev => !ev.upcomingEvent)
+    if (!firstEvent) return false
+    const pResp = await fetch(`${baseUrl}/en/event/${firstEvent.info.id}/participants`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' },
+      body: '{}',
+      signal: AbortSignal.timeout(15000),
+    })
+    if (!pResp.ok) return false
+    const pData = await pResp.json() as { participants: Array<{ registrations: Array<{ user_id: number; firstname: string; lastname: string }> }> }
+    const expectedLower = expectedName.toLowerCase()
+    const nameParts = expectedLower.split(/\s+/).filter(p => p.length > 1)
+    const threshold = nameParts.length <= 3 ? nameParts.length : Math.ceil(nameParts.length * 2 / 3)
+    for (const participant of pData.participants ?? []) {
+      for (const reg of participant.registrations ?? []) {
+        if (String(reg.user_id) !== athleteId) continue
+        const fullName = `${reg.firstname} ${reg.lastname}`.toLowerCase()
+        const matchCount = nameParts.filter(p => fullName.includes(p)).length
+        if (matchCount >= threshold) return true
+      }
+    }
+    return false
+  } catch { return false }
+}
+
 // Multi-engine search for Smoothcomp profiles — Brave → Google → DuckDuckGo
 // Returns one entry per unique subdomain (e.g. avasports.smoothcomp.com, smoothcomp.com)
 async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: string; athleteId: string }>> {
@@ -259,9 +289,17 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
 
   if (candidateUrls.length === 0) return []
 
-  // Prefer direct profile URLs
+  const nameParts = name.toLowerCase().split(/\s+/).filter(p => p.length > 1)
+  const threshold = nameParts.length <= 3 ? nameParts.length : Math.ceil(nameParts.length * 2 / 3)
+
+  // Verify direct profile URLs before accepting
   const directProfiles = extractSmoothcompProfiles(candidateUrls)
-  if (directProfiles.length > 0) return directProfiles
+  const verifiedDirect: Array<{ baseUrl: string; athleteId: string }> = []
+  for (const profile of directProfiles) {
+    const ok = await verifySmoothcompProfileName(profile.baseUrl, profile.athleteId, name)
+    if (ok) verifiedDirect.push(profile)
+  }
+  if (verifiedDirect.length > 0) return verifiedDirect
 
   // Fall back: extract unique {baseUrl, eventId} pairs — one per subdomain
   const seen = new Map<string, string>() // baseUrl → first eventId found
@@ -272,7 +310,6 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
 
   if (seen.size === 0) return []
 
-  const nameLower = name.toLowerCase()
   const profiles: Array<{ baseUrl: string; athleteId: string }> = []
 
   for (const [baseUrl, eventId] of seen) {
@@ -288,7 +325,8 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
       for (const participant of pData.participants ?? []) {
         for (const reg of participant.registrations ?? []) {
           const fullName = `${reg.firstname} ${reg.lastname}`.toLowerCase()
-          if (fullName.includes(nameLower) || nameLower.includes(fullName.split(' ')[0])) {
+          const matchCount = nameParts.filter(p => fullName.includes(p)).length
+          if (matchCount >= threshold) {
             profiles.push({ baseUrl, athleteId: String(reg.user_id) })
             break
           }
