@@ -304,15 +304,18 @@ export function AddOpponentForm({ tournamentId }: { tournamentId: string }) {
     setDupeWarning(null)
     if (force) fd.set('force', 'true')
     try {
-      await addOpponent(tournamentId, fd)
-      setOpen(false)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Something went wrong'
-      if (msg.startsWith('DUPE:')) {
-        setDupeWarning(msg.slice(5))
+      const result = await addOpponent(tournamentId, fd)
+      if (result.ok) {
+        setOpen(false)
+      } else if (result.type === 'dupe') {
+        setDupeWarning(result.tournamentName)
+      } else if (result.type === 'same_tournament') {
+        setError('An opponent with this name already exists in this tournament')
       } else {
-        setError(msg)
+        setError(result.message)
       }
+    } catch {
+      setError('Something went wrong. Please try again.')
     } finally {
       setPending(false)
     }

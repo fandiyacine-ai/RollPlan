@@ -29,10 +29,19 @@ function parseYouTubeTimestamp(url: string): number {
 }
 import { cloneVideoMatches } from '../../../../../lib/db/clone-analysis'
 
-export async function addOpponent(tournamentId: string, formData: FormData) {
+type AddOpponentResult =
+  | { ok: true }
+  | { ok: false; type: 'same_tournament' }
+  | { ok: false; type: 'dupe'; tournamentName: string }
+  | { ok: false; type: 'error'; message: string }
+
+export async function addOpponent(
+  tournamentId: string,
+  formData: FormData,
+): Promise<AddOpponentResult> {
   const name = (formData.get('name') as string)?.trim()
   const force = formData.get('force') === 'true'
-  if (!name) throw new Error('Opponent name is required')
+  if (!name) return { ok: false, type: 'error', message: 'Opponent name is required' }
 
   try {
     // Hard block: same name in same tournament (never overridable)
@@ -45,7 +54,7 @@ export async function addOpponent(tournamentId: string, formData: FormData) {
       ))
       .limit(1)
     if (sameTournamentDupe.length > 0) {
-      throw new Error('An opponent with this name already exists in this tournament')
+      return { ok: false, type: 'same_tournament' }
     }
 
     if (!force) {
@@ -62,8 +71,7 @@ export async function addOpponent(tournamentId: string, formData: FormData) {
         .limit(1)
 
       if (dupe.length > 0) {
-        // Special prefix: caught in the form to show a confirm step instead of a hard error
-        throw new Error(`DUPE:${dupe[0].tournamentName}`)
+        return { ok: false, type: 'dupe', tournamentName: dupe[0].tournamentName }
       }
     }
 
@@ -90,11 +98,9 @@ export async function addOpponent(tournamentId: string, formData: FormData) {
     }
 
     revalidatePath(`/tournaments/${tournamentId}/opponents`)
+    return { ok: true }
   } catch (err) {
-    // Re-throw recognisable errors as plain Error objects so they serialise correctly
-    // across the Server Action boundary and are caught by the form's try/catch.
-    if (err instanceof Error) throw err
-    throw new Error(String(err))
+    return { ok: false, type: 'error', message: err instanceof Error ? err.message : 'Failed to add opponent' }
   }
 }
 
