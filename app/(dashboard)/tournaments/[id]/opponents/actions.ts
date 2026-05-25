@@ -198,21 +198,32 @@ export async function submitScoutUrls(tournamentId: string, opponentId: string, 
         where: (v) => and(eq(v.publicUrl, storedUrl), eq(v.status, 'analysed'), isNotNull(v.tournamentOpponentId)),
       })
       if (priorVideo) {
-        // Create a stub video record owned by this user
-        const [stubVideo] = await db.insert(videos).values({
-          userId,
-          r2Key: `url/${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          originalFilename: storedUrl,
-          contentType: 'video/mp4',
-          sizeBytes: 0,
-          sourceType: 'opponent',
-          publicUrl: storedUrl,
-          status: 'processing',
-          tournamentOpponentId: opponentId,
-        }).returning()
+        // Check if the prior video actually has analysed matches — if 0 matches, the athlete
+        // wasn't found in that video, so cloning would produce a dead 'processing' stub.
+        // Fall through to a fresh scan instead.
+        const priorMatchCount = await db.select({ id: matches.id })
+          .from(matches)
+          .where(and(eq(matches.videoId, priorVideo.id), eq(matches.status, 'analysed')))
+          .limit(1)
+          .then(r => r.length)
 
-        await cloneVideoMatches(priorVideo.id, stubVideo.id, opponentId, userId)
-        continue
+        if (priorMatchCount > 0) {
+          const [stubVideo] = await db.insert(videos).values({
+            userId,
+            r2Key: `url/${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            originalFilename: storedUrl,
+            contentType: 'video/mp4',
+            sizeBytes: 0,
+            sourceType: 'opponent',
+            publicUrl: storedUrl,
+            status: 'processing',
+            tournamentOpponentId: opponentId,
+          }).returning()
+
+          await cloneVideoMatches(priorVideo.id, stubVideo.id, opponentId, userId)
+          continue
+        }
+        // priorMatchCount === 0: athlete not found in prior scan — do a fresh scan below
       }
     }
 
