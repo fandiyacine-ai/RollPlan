@@ -1,4 +1,5 @@
 import { serve } from 'inngest/next'
+import { NextRequest, NextResponse } from 'next/server'
 import { inngest } from '../../../../lib/inngest'
 import { analyzeVideo } from '../../../../jobs/analyze-video'
 import { generateGameplan } from '../../../../jobs/generate-gameplan'
@@ -16,7 +17,22 @@ import { buildOpponentIntel } from '../../../../jobs/build-opponent-intel'
 
 export const maxDuration = 300
 
-export const { GET, POST, PUT } = serve({
+const handlers = serve({
   client: inngest,
   functions: [analyzeVideo, generateGameplan, scanUrl, smoothcompMonitorBracket, smoothcompProcessBracket, smoothcompDiscoverFootage, generateExecutionDebrief, syncTournamentCatalog, ingestTechnique, techniqueKbAgent, rescanMatchesWithKb, backfillAthleteIntel, buildOpponentIntel],
 })
+
+function safe(handler: (req: NextRequest) => Promise<Response>) {
+  return async (req: NextRequest) => {
+    try {
+      return await handler(req)
+    } catch (err) {
+      console.error('[inngest] handler error:', err instanceof Error ? err.message : String(err))
+      return NextResponse.json({ error: 'invalid request' }, { status: 400 })
+    }
+  }
+}
+
+export const GET = safe(handlers.GET as (req: NextRequest) => Promise<Response>)
+export const POST = safe(handlers.POST as (req: NextRequest) => Promise<Response>)
+export const PUT = safe(handlers.PUT as (req: NextRequest) => Promise<Response>)
