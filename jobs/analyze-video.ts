@@ -68,7 +68,17 @@ export const analyzeVideo = inngest.createFunction(
           videoEndSeconds: match?.matchEndSeconds ?? null,
         }
       }
-      const geminiFileUri = await uploadVideoToGemini(video.publicUrl, video.contentType)
+      let geminiFileUri: string
+      try {
+        geminiFileUri = await uploadVideoToGemini(video.publicUrl, video.contentType)
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        if (msg.includes('file processing failed') || msg.includes('Gemini file processing')) {
+          await markFailed(matchId, videoId)
+          throw new NonRetriableError('This video could not be processed — the file may be in an unsupported format or was rejected by the AI provider. Try a different video source.')
+        }
+        throw err
+      }
       return { geminiFileUri, isYouTube: false, videoStartSeconds: null, videoEndSeconds: null }
     })
 
