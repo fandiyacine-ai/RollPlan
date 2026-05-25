@@ -488,6 +488,11 @@ export const buildOpponentIntel = inngest.createFunction(
     // fell back to Smoothcomp without finding the AJP profile), re-run the AJP search.
     // This lets a re-triggered intel run upgrade a smoothcomp-only hit to an AJP profile.
     const storedUrlIsAjp = opponent?.smoothcompProfileUrl?.includes('ajptour.com') ?? false
+
+    // AJP and Smoothcomp use separate numeric registries — the same ID refers to different athletes
+    // on each platform. Track the AJP ID explicitly so we never call the AJP API with a Smoothcomp ID.
+    let ajpAthleteId: string | null = storedUrlIsAjp ? athleteId : null
+
     if (!athleteId || !storedUrlIsAjp) {
       const found = await step.run('find-ajp-id-by-name', async () => {
         const ajpId = await findAjpAthleteIdByName(athleteName)
@@ -495,7 +500,7 @@ export const buildOpponentIntel = inngest.createFunction(
           await db.update(tournamentOpponents)
             .set({ smoothcompAthleteId: ajpId, smoothcompProfileUrl: `https://ajptour.com/en/profile/${ajpId}` })
             .where(eq(tournamentOpponents.id, opponentId))
-          return { id: ajpId }
+          return { id: ajpId, source: 'ajp' as const }
         }
         // Not on AJP — try Smoothcomp directly (athletes competing in European/Brazilian events may
         // only appear on smoothcomp.com, not ajptour.com)
@@ -505,25 +510,39 @@ export const buildOpponentIntel = inngest.createFunction(
           await db.update(tournamentOpponents)
             .set({ smoothcompAthleteId: scId, smoothcompProfileUrl: `https://smoothcomp.com/en/profile/${scId}` })
             .where(eq(tournamentOpponents.id, opponentId))
-          return { id: scId }
+          return { id: scId, source: 'smoothcomp' as const }
         }
-        return { id: null }
+        return { id: null, source: null }
       })
-      if (found.id) athleteId = found.id
+      if (found.id) {
+        athleteId = found.id
+        if (found.source === 'ajp') ajpAthleteId = found.id
+      }
     }
 
     // --- AJP ---
-    if (athleteId) {
+    // Only run when we have a verified AJP ID — never use a Smoothcomp ID against the AJP API.
+    // If a prior bad run stored AJP 0W/0L via a Smoothcomp ID, clear it now.
+    if (!ajpAthleteId) {
+      await step.run('clear-stale-ajp-totals', async () => {
+        await db.update(tournamentOpponents)
+          .set({ ajpWins: null, ajpLosses: null })
+          .where(eq(tournamentOpponents.id, opponentId))
+        return { cleared: true }
+      })
+    }
+    if (ajpAthleteId) {
+      const _ajpAthleteId = ajpAthleteId
       await step.run('fetch-ajp-totals', async () => {
         try {
           let wins = 0, losses = 0
           let profileApiWorked = false
 
           try {
-            const firstPage = await fetchAjpEventsPage(athleteId, 1)
+            const firstPage = await fetchAjpEventsPage(_ajpAthleteId, 1)
             const allEvents: AjpEvent[] = [...(firstPage.data ?? [])]
             for (let p = 2; p <= (firstPage.last_page ?? 1); p++) {
-              const page = await fetchAjpEventsPage(athleteId, p)
+              const page = await fetchAjpEventsPage(_ajpAthleteId, p)
               allEvents.push(...(page.data ?? []))
             }
             for (const ev of allEvents) {
@@ -575,7 +594,7 @@ export const buildOpponentIntel = inngest.createFunction(
                 }
                 for (const participant of pData.participants ?? []) {
                   for (const reg of participant.registrations ?? []) {
-                    if (String(reg.user_id) !== athleteId) continue
+                    if (String(reg.user_id) !== _ajpAthleteId) continue
                     const matches = reg.matches ?? []
                     wins += matches.filter(m => m.is_winner).length
                     losses += matches.filter(m => !m.is_winner).length
