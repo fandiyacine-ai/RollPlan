@@ -61,7 +61,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
     : false
   const showPostEventBanner = eventDatePassed && !tournamentRow?.outcome
 
-  let opponents: { id: string; tournamentId: string; opponentLabel: string; playerCardId: string | null; seedingNotes: string | null; createdAt: Date; footageStatus: string; smoothcompAthleteId: string | null; smoothcompProfileUrl: string | null; userResult: string | null; userResultMethod: string | null; ajpWins: number | null; ajpLosses: number | null; smoothcompWins: number | null; smoothcompLosses: number | null; smoothcompFedUrl: string | null; ibjjfWins: number | null; ibjjfLosses: number | null; ibjjfProfileUrl: string | null; ibjjfBestResult: string | null }[]
+  let opponents: { id: string; tournamentId: string; opponentLabel: string; playerCardId: string | null; seedingNotes: string | null; createdAt: Date; footageStatus: string; ajpAthleteId: string | null; ajpProfileUrl: string | null; smoothcompAthleteId: string | null; smoothcompProfileUrl: string | null; userResult: string | null; userResultMethod: string | null; ajpWins: number | null; ajpLosses: number | null; smoothcompWins: number | null; smoothcompLosses: number | null; smoothcompFedUrl: string | null; ibjjfWins: number | null; ibjjfLosses: number | null; ibjjfProfileUrl: string | null; ibjjfBestResult: string | null }[]
   try {
     opponents = await db
       .select({
@@ -72,6 +72,8 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
         seedingNotes: tournamentOpponents.seedingNotes,
         createdAt: tournamentOpponents.createdAt,
         footageStatus: tournamentOpponents.footageStatus,
+        ajpAthleteId: tournamentOpponents.ajpAthleteId,
+        ajpProfileUrl: tournamentOpponents.ajpProfileUrl,
         smoothcompAthleteId: tournamentOpponents.smoothcompAthleteId,
         smoothcompProfileUrl: tournamentOpponents.smoothcompProfileUrl,
         userResult: tournamentOpponents.userResult,
@@ -355,7 +357,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
           {opponents.map((opp) => (
             <OpponentAccordion
               key={opp.id}
-              opponent={{ ...opp, footageStatus: opp.footageStatus ?? 'manual', userResult: opp.userResult ?? null, userResultMethod: opp.userResultMethod ?? null, ajpWins: opp.ajpWins ?? null, ajpLosses: opp.ajpLosses ?? null, ajpProfileUrl: opp.smoothcompProfileUrl?.includes('ajptour.com') ? opp.smoothcompProfileUrl : null, smoothcompWins: opp.smoothcompWins ?? null, smoothcompLosses: opp.smoothcompLosses ?? null, smoothcompFedUrl: opp.smoothcompFedUrl ?? null, ibjjfWins: opp.ibjjfWins ?? null, ibjjfLosses: opp.ibjjfLosses ?? null, ibjjfProfileUrl: opp.ibjjfProfileUrl ?? null, ibjjfBestResult: opp.ibjjfBestResult ?? null }}
+              opponent={{ ...opp, footageStatus: opp.footageStatus ?? 'manual', userResult: opp.userResult ?? null, userResultMethod: opp.userResultMethod ?? null, ajpWins: opp.ajpWins ?? null, ajpLosses: opp.ajpLosses ?? null, ajpProfileUrl: opp.ajpProfileUrl ?? null, smoothcompWins: opp.smoothcompWins ?? null, smoothcompLosses: opp.smoothcompLosses ?? null, smoothcompFedUrl: opp.smoothcompFedUrl ?? null, ibjjfWins: opp.ibjjfWins ?? null, ibjjfLosses: opp.ibjjfLosses ?? null, ibjjfProfileUrl: opp.ibjjfProfileUrl ?? null, ibjjfBestResult: opp.ibjjfBestResult ?? null }}
               eventDatePassed={eventDatePassed}
               matches={(matchesByOpponent[opp.id] ?? []).map(m => ({
                 ...m, rowType: 'match' as const, format: m.format ?? null, context: m.context ?? null, label: undefined,
