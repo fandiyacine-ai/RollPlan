@@ -345,7 +345,7 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
   // 2. Gemini + Google Search grounding — always run, not just as fallback
   // Brave may find unrelated event pages and miss the actual profile; Gemini has better recall
   const geminiUrls = await geminiGroundedSearch(
-    `Find the smoothcomp.com/en/profile/NUMBERS profile page for BJJ athlete "${name}". Return only the direct profile URL.`,
+    `Find smoothcomp.com pages for BJJ athlete "${name}". Return any direct profile URLs (smoothcomp.com/*/profile/NUMBERS) or bracket/event pages (smoothcomp.com/*/event/NUMBERS/bracket) that mention this athlete.`,
     'smoothcomp.com'
   )
   const seenUrls = new Set(candidateUrls)
@@ -359,7 +359,6 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
   const threshold = nameMatchThreshold(nameParts)
 
   // Verify all direct profile URLs, preferring a publicly-verified profile over a private one.
-  // If only a private match is found (no events, trustIfEmpty), use it as fallback.
   const directProfiles = extractSmoothcompProfiles(candidateUrls)
   let privateCandidate: string | null = null
   for (const profile of directProfiles) {
@@ -367,9 +366,11 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
     if (status === 'public') return [{ baseUrl: 'https://smoothcomp.com', athleteId: profile.athleteId }]
     if (status === 'private' && !privateCandidate) privateCandidate = profile.athleteId
   }
-  if (privateCandidate) return [{ baseUrl: 'https://smoothcomp.com', athleteId: privateCandidate }]
 
-  // Fall back: find smoothcomp.com event IDs from candidate URLs → participants API
+  // Event/bracket fallback: Google/Brave often indexes bracket pages (smoothcomp.com/locale/event/ID/bracket/...)
+  // that contain the athlete's name even when their profile URL doesn't appear in results.
+  // Extract event IDs from ALL candidate URLs (including bracket URLs) and check participants.
+  // This runs even if a private candidate was found — a publicly-verified event match is preferred.
   const eventIds = [...new Set(
     candidateUrls
       .map(u => u.match(/^https?:\/\/smoothcomp\.com\/[^/]+\/event\/(\d+)/)?.[1])
@@ -396,6 +397,9 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
       }
     } catch { continue }
   }
+
+  // Last resort: a private profile found via name search (can't be name-verified but URL is plausible)
+  if (privateCandidate) return [{ baseUrl: 'https://smoothcomp.com', athleteId: privateCandidate }]
 
   return []
 }
