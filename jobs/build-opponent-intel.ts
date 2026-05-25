@@ -441,10 +441,10 @@ export const buildOpponentIntel = inngest.createFunction(
     if (athleteId) {
       await step.run('fetch-ajp-totals', async () => {
         const firstPage = await fetchAjpEventsPage(athleteId, 1)
-        const allEvents: AjpEvent[] = [...firstPage.data]
-        for (let p = 2; p <= firstPage.last_page; p++) {
+        const allEvents: AjpEvent[] = [...(firstPage.data ?? [])]
+        for (let p = 2; p <= (firstPage.last_page ?? 1); p++) {
           const page = await fetchAjpEventsPage(athleteId, p)
-          allEvents.push(...page.data)
+          allEvents.push(...(page.data ?? []))
         }
 
         let wins = 0, losses = 0
@@ -472,10 +472,10 @@ export const buildOpponentIntel = inngest.createFunction(
       let wins = 0, losses = 0
       for (const { baseUrl, athleteId: scAthleteId } of profiles) {
         const firstPage = await fetchSmoothcompEventsPage(baseUrl, scAthleteId, 1)
-        const allEvents: AjpEvent[] = [...firstPage.data]
-        for (let p = 2; p <= firstPage.last_page; p++) {
+        const allEvents: AjpEvent[] = [...(firstPage.data ?? [])]
+        for (let p = 2; p <= (firstPage.last_page ?? 1); p++) {
           const page = await fetchSmoothcompEventsPage(baseUrl, scAthleteId, p)
-          allEvents.push(...page.data)
+          allEvents.push(...(page.data ?? []))
         }
         for (const ev of allEvents) {
           if (ev.upcomingEvent) continue
