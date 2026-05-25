@@ -61,5 +61,6 @@ export const tournamentOpponents = pgTable('tournament_opponents', {
   ibjjfWins: integer('ibjjf_wins'),
   ibjjfLosses: integer('ibjjf_losses'),
   ibjjfProfileUrl: text('ibjjf_profile_url'),
+  ibjjfBestResult: text('ibjjf_best_result'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })

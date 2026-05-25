@@ -140,9 +140,12 @@ async function geminiGroundedSearch(query: string, domain: string): Promise<stri
 // Profile URL gives the athlete ID directly; event URL triggers participants POST fallback.
 async function findAjpAthleteIdByName(name: string): Promise<string | null> {
   // 1. Brave Search API (JSON, no bot issues — but AJP not always indexed)
+  // Collect URLs across all query variants — same logic as findSmoothcompProfiles
   const apiKey = process.env.BRAVE_API_KEY
+  let allAjpUrls: string[] = []
   if (apiKey) {
-    for (const query of [`"${name}" site:ajptour.com`, `${name} site:ajptour.com`, `"${name}" ajptour.com`]) {
+    const seen = new Set<string>()
+    for (const query of nameSearchQueries(name, 'ajptour.com')) {
       try {
         const resp = await fetch(
           `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=10`,
@@ -150,19 +153,19 @@ async function findAjpAthleteIdByName(name: string): Promise<string | null> {
         )
         if (!resp.ok) continue
         const data = await resp.json() as { web?: { results?: Array<{ url: string }> } }
-        const urls = (data.web?.results ?? []).map(r => r.url)
-        if (urls.length > 0) {
-          for (const url of urls) {
-            const m = url.match(/ajptour\.com\/[a-z]{0,5}\/profile\/(\d+)/)
-            if (m && await verifyAjpProfileName(m[1], name)) return m[1]
-          }
-          const eventIds = [...new Set(urls.map(u => u.match(/ajptour\.com\/[a-z]{0,10}\/?event\/(\d+)/)?.[1]).filter(Boolean) as string[])]
-          if (eventIds.length > 0) {
-            const found = await findIdFromEventParticipants(eventIds, name)
-            if (found) return found
-          }
+        for (const r of data.web?.results ?? []) {
+          if (!seen.has(r.url)) { seen.add(r.url); allAjpUrls.push(r.url) }
         }
       } catch { continue }
+    }
+    for (const url of allAjpUrls) {
+      const m = url.match(/ajptour\.com\/[a-z]{0,5}\/profile\/(\d+)/)
+      if (m && await verifyAjpProfileName(m[1], name)) return m[1]
+    }
+    const eventIds = [...new Set(allAjpUrls.map(u => u.match(/ajptour\.com\/[a-z]{0,10}\/?event\/(\d+)/)?.[1]).filter(Boolean) as string[])]
+    if (eventIds.length > 0) {
+      const found = await findIdFromEventParticipants(eventIds, name)
+      if (found) return found
     }
   }
 
@@ -215,19 +218,19 @@ async function findIdFromEventParticipants(eventIds: string[], name: string): Pr
   return null
 }
 
-// Extract smoothcomp profile entries from a list of raw URLs
+// Extract smoothcomp.com profile entries — main domain only, no federation subdomains
 function extractSmoothcompProfiles(urls: string[]): Array<{ baseUrl: string; athleteId: string }> {
-  const seen = new Set<string>()
   const profiles: Array<{ baseUrl: string; athleteId: string }> = []
   for (const url of urls) {
-    const m = url.match(/^(https?:\/\/(?:[a-z0-9-]+\.)?smoothcomp\.com)\/[a-z]{0,5}\/profile\/(\d+)/)
-    if (m && !seen.has(m[1])) { seen.add(m[1]); profiles.push({ baseUrl: m[1], athleteId: m[2] }) }
+    const m = url.match(/^https?:\/\/smoothcomp\.com\/[a-z]{0,5}\/profile\/(\d+)/)
+    if (m) profiles.push({ baseUrl: 'https://smoothcomp.com', athleteId: m[1] })
   }
   return profiles
 }
 
-// Same identity verification as verifyAjpProfileName but for Smoothcomp subdomains
-async function verifySmoothcompProfileName(baseUrl: string, athleteId: string, expectedName: string): Promise<boolean> {
+// Same identity verification as verifyAjpProfileName but for Smoothcomp (main domain only)
+async function verifySmoothcompProfileName(athleteId: string, expectedName: string): Promise<boolean> {
+  const baseUrl = 'https://smoothcomp.com'
   try {
     const page = await fetchSmoothcompEventsPage(baseUrl, athleteId, 1)
     if (!page.data?.length) return false
@@ -256,16 +259,34 @@ async function verifySmoothcompProfileName(baseUrl: string, athleteId: string, e
   } catch { return false }
 }
 
-// Multi-engine search for Smoothcomp profiles — Brave → Google → DuckDuckGo
-// Returns one entry per unique subdomain (e.g. avasports.smoothcomp.com, smoothcomp.com)
+// Build search query variants from most to least specific.
+// Handles spelling mismatches (e.g. "Zakriya" stored vs "Zakariya" registered)
+// by also trying first+last only and last-name-only queries.
+function nameSearchQueries(name: string, domain: string): string[] {
+  const parts = name.trim().split(/\s+/)
+  const queries = [`"${name}" site:${domain}`, `${name} site:${domain}`]
+  if (parts.length >= 3) {
+    const firstLast = `${parts[0]} ${parts[parts.length - 1]}`
+    queries.push(`"${firstLast}" site:${domain}`, `${firstLast} site:${domain}`)
+  }
+  if (parts.length >= 2) {
+    queries.push(`${parts[parts.length - 1]} site:${domain}`)
+  }
+  return queries
+}
+
+// Multi-engine search for Smoothcomp profiles — Brave → Gemini
+// Only searches smoothcomp.com (main domain)
 async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: string; athleteId: string }>> {
-  // Collect all candidate URLs across engines, then process together
   let candidateUrls: string[] = []
 
-  // 1. Brave
+  // 1. Brave — run all query variants and collect unique URLs across all of them.
+  // Don't stop at first-query results: a shorter/alternate-spelling query may find the profile
+  // when the full stored name fails (e.g. "Zakriya" stored vs "Zakariya" registered).
   const apiKey = process.env.BRAVE_API_KEY
   if (apiKey) {
-    for (const query of [`"${name}" site:smoothcomp.com`, `${name} site:smoothcomp.com`, `"${name}" smoothcomp.com`]) {
+    const seen = new Set<string>()
+    for (const query of nameSearchQueries(name, 'smoothcomp.com')) {
       try {
         const resp = await fetch(
           `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=10`,
@@ -273,8 +294,12 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
         )
         if (!resp.ok) continue
         const data = await resp.json() as { web?: { results?: Array<{ url: string }> } }
-        const urls = (data.web?.results ?? []).map(r => r.url)
-        if (urls.length > 0) { candidateUrls = urls; break }
+        for (const url of data.web?.results ?? []) {
+          if (url.url.includes('smoothcomp.com') && !seen.has(url.url)) {
+            seen.add(url.url)
+            candidateUrls.push(url.url)
+          }
+        }
       } catch { continue }
     }
   }
@@ -292,29 +317,23 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
   const nameParts = name.toLowerCase().split(/\s+/).filter(p => p.length > 1)
   const threshold = nameParts.length <= 3 ? nameParts.length : Math.ceil(nameParts.length * 2 / 3)
 
-  // Verify direct profile URLs before accepting
+  // Verify direct smoothcomp.com profile URLs before accepting
   const directProfiles = extractSmoothcompProfiles(candidateUrls)
-  const verifiedDirect: Array<{ baseUrl: string; athleteId: string }> = []
   for (const profile of directProfiles) {
-    const ok = await verifySmoothcompProfileName(profile.baseUrl, profile.athleteId, name)
-    if (ok) verifiedDirect.push(profile)
-  }
-  if (verifiedDirect.length > 0) return verifiedDirect
-
-  // Fall back: extract unique {baseUrl, eventId} pairs — one per subdomain
-  const seen = new Map<string, string>() // baseUrl → first eventId found
-  for (const url of candidateUrls) {
-    const m = url.match(/^(https?:\/\/(?:[a-z0-9-]+\.)?smoothcomp\.com)\/[^/]+\/event\/(\d+)/)
-    if (m && !seen.has(m[1])) seen.set(m[1], m[2])
+    const ok = await verifySmoothcompProfileName(profile.athleteId, name)
+    if (ok) return [{ baseUrl: 'https://smoothcomp.com', athleteId: profile.athleteId }]
   }
 
-  if (seen.size === 0) return []
+  // Fall back: find smoothcomp.com event IDs from candidate URLs → participants API
+  const eventIds = [...new Set(
+    candidateUrls
+      .map(u => u.match(/^https?:\/\/smoothcomp\.com\/[^/]+\/event\/(\d+)/)?.[1])
+      .filter((id): id is string => !!id)
+  )]
 
-  const profiles: Array<{ baseUrl: string; athleteId: string }> = []
-
-  for (const [baseUrl, eventId] of seen) {
+  for (const eventId of eventIds) {
     try {
-      const pResp = await fetch(`${baseUrl}/en/event/${eventId}/participants`, {
+      const pResp = await fetch(`https://smoothcomp.com/en/event/${eventId}/participants`, {
         method: 'POST',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' },
         body: '{}',
@@ -327,16 +346,14 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
           const fullName = `${reg.firstname} ${reg.lastname}`.toLowerCase()
           const matchCount = nameParts.filter(p => fullName.includes(p)).length
           if (matchCount >= threshold) {
-            profiles.push({ baseUrl, athleteId: String(reg.user_id) })
-            break
+            return [{ baseUrl: 'https://smoothcomp.com', athleteId: String(reg.user_id) }]
           }
         }
-        if (profiles.find(p => p.baseUrl === baseUrl)) break
       }
     } catch { continue }
   }
 
-  return profiles
+  return []
 }
 
 async function fetchSmoothcompEventsPage(baseUrl: string, athleteId: string, page: number): Promise<AjpEventsPage> {
@@ -465,8 +482,7 @@ export const buildOpponentIntel = inngest.createFunction(
       }
 
       if (wins > 0 || losses > 0) {
-        const firstProfile = profiles[0]
-        const fedUrl = `${firstProfile.baseUrl}/en/profile/${firstProfile.athleteId}`
+        const fedUrl = `https://smoothcomp.com/en/profile/${profiles[0].athleteId}`
         await db.update(tournamentOpponents)
           .set({ smoothcompWins: wins, smoothcompLosses: losses, smoothcompFedUrl: fedUrl })
           .where(eq(tournamentOpponents.id, opponentId))
@@ -474,40 +490,93 @@ export const buildOpponentIntel = inngest.createFunction(
       return { wins, losses }
     })
 
-    // --- IBJJF via BJJ Metrics ---
+    // --- IBJJF via BJJ Metrics + jiujitsu.net medal ---
     await step.run('fetch-ibjjf-totals', async () => {
-      const searchResp = await fetch('https://bjjmetrics.com/search_ibjjf_matches_names', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' },
-        body: JSON.stringify({ name: athleteName }),
-        signal: AbortSignal.timeout(15000),
-      })
-      if (!searchResp.ok) return { wins: 0, losses: 0 }
-      const searchData = await searchResp.json() as { success: boolean; names?: Array<{ name: string }> }
-      if (!searchData.success || !searchData.names?.length) return { wins: 0, losses: 0 }
+      const dbUpdate: Record<string, unknown> = {}
 
-      const exactName = searchData.names[0].name
-      const matchesResp = await fetch('https://bjjmetrics.com/get_ibjjf_matches', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' },
-        body: JSON.stringify({ name: exactName }),
-        signal: AbortSignal.timeout(15000),
-      })
-      if (!matchesResp.ok) return { wins: 0, losses: 0 }
-      const matchesData = await matchesResp.json() as {
-        success: boolean
-        matches?: Array<{ winner_name: string; loser_name: string }>
+      // BJJ Metrics: W/L from final matches
+      try {
+        const searchResp = await fetch('https://bjjmetrics.com/search_ibjjf_matches_names', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' },
+          body: JSON.stringify({ name: athleteName }),
+          signal: AbortSignal.timeout(15000),
+        })
+        if (searchResp.ok) {
+          const searchData = await searchResp.json() as { success: boolean; names?: Array<{ name: string }> }
+          if (searchData.success && searchData.names?.length) {
+            const exactName = searchData.names[0].name
+            const matchesResp = await fetch('https://bjjmetrics.com/get_ibjjf_matches', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' },
+              body: JSON.stringify({ name: exactName }),
+              signal: AbortSignal.timeout(15000),
+            })
+            if (matchesResp.ok) {
+              const matchesData = await matchesResp.json() as {
+                success: boolean
+                matches?: Array<{ winner_name: string; loser_name: string }>
+              }
+              if (matchesData.success && matchesData.matches?.length) {
+                const wins = matchesData.matches.filter(m => m.winner_name === exactName).length
+                const losses = matchesData.matches.filter(m => m.loser_name === exactName).length
+                const fighterSlug = exactName.toLowerCase().replace(/\s+/g, '-')
+                dbUpdate.ibjjfWins = wins
+                dbUpdate.ibjjfLosses = losses
+                dbUpdate.ibjjfProfileUrl = `https://bjjmetrics.com/fighter/${fighterSlug}`
+              }
+            }
+          }
+        }
+      } catch { /* non-fatal */ }
+
+      // jiujitsu.net: best medal result
+      try {
+        const jjSearchResp = await fetch(
+          `https://jiujitsu.net/api/search?q=${encodeURIComponent(athleteName)}`,
+          { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(12000) }
+        )
+        if (jjSearchResp.ok) {
+          const jjSearch = await jjSearchResp.json() as Array<{ slug: string; name: string; id: string }>
+          const PLACE_LABEL: Record<number, string> = { 1: 'Gold', 2: 'Silver', 3: 'Bronze' }
+          for (const athlete of jjSearch.slice(0, 3)) {
+            const athleteResp = await fetch(
+              `https://jiujitsu.net/api/athlete/${athlete.slug}`,
+              { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(12000) }
+            )
+            if (!athleteResp.ok) continue
+            const athleteData = await athleteResp.json() as {
+              name?: string
+              medals?: Array<{ place: number; event_name: string; year?: number; date?: string }>
+            }
+            // Verify name matches
+            const foundName = (athleteData.name ?? '').toLowerCase()
+            const nameParts = athleteName.toLowerCase().split(/\s+/).filter(p => p.length > 1)
+            const matchCount = nameParts.filter(p => foundName.includes(p)).length
+            if (matchCount < nameParts.length) continue
+
+            const medals = athleteData.medals ?? []
+            if (!medals.length) break
+
+            // Best result: lowest place number (1=Gold > 2=Silver > 3=Bronze)
+            const best = medals.sort((a, b) => a.place - b.place)[0]
+            const placeLabel = PLACE_LABEL[best.place] ?? `${best.place}th`
+            const year = best.year ?? (best.date ? new Date(best.date).getFullYear() : null)
+            dbUpdate.ibjjfBestResult = year
+              ? `${placeLabel} – ${best.event_name} ${year}`
+              : `${placeLabel} – ${best.event_name}`
+            break
+          }
+        }
+      } catch { /* non-fatal */ }
+
+      if (Object.keys(dbUpdate).length > 0) {
+        await db.update(tournamentOpponents)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .set(dbUpdate as any)
+          .where(eq(tournamentOpponents.id, opponentId))
       }
-      if (!matchesData.success || !matchesData.matches?.length) return { wins: 0, losses: 0 }
-
-      const wins = matchesData.matches.filter(m => m.winner_name === exactName).length
-      const losses = matchesData.matches.filter(m => m.loser_name === exactName).length
-      const fighterSlug = exactName.toLowerCase().replace(/\s+/g, '-')
-
-      await db.update(tournamentOpponents)
-        .set({ ibjjfWins: wins, ibjjfLosses: losses, ibjjfProfileUrl: `https://bjjmetrics.com/fighter/${fighterSlug}` })
-        .where(eq(tournamentOpponents.id, opponentId))
-      return { wins, losses }
+      return dbUpdate
     })
 
     return { athleteId: athleteId ?? null }
