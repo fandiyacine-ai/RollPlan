@@ -744,10 +744,23 @@ export const buildOpponentIntel = inngest.createFunction(
           const medals = body.medals ?? []
           if (!medals.length) break
 
-          // Deduplicate: prefer event_medals_only entries; skip "(Results)" duplicates
-          const deduped = medals.filter(m => m.event_medals_only === true)
-          const finalMedals = deduped.length > 0 ? deduped : medals.filter(m => !m.event_name.includes('(Results)'))
-          const sorted = [...(finalMedals.length > 0 ? finalMedals : medals)].sort((a, b) => a.place - b.place)
+          // Deduplicate per event: jiujitsu.net sometimes returns both an "event_medals_only" entry
+          // and a "(Results)" duplicate for the same event. Keep one entry per event, preferring
+          // the event_medals_only version. Do NOT filter globally — an athlete can have medals
+          // at multiple events, some with event_medals_only=true and some without.
+          const eventMap = new Map<string, typeof medals[0]>()
+          for (const medal of medals) {
+            const key = medal.event_name.replace(/\s*\(Results\)\s*$/i, '').trim()
+            const existing = eventMap.get(key)
+            if (!existing) {
+              eventMap.set(key, medal)
+            } else if (medal.event_medals_only === true && existing.event_medals_only !== true) {
+              eventMap.set(key, medal)
+            } else if (medal.event_medals_only === existing.event_medals_only && medal.place < existing.place) {
+              eventMap.set(key, medal)
+            }
+          }
+          const sorted = [...eventMap.values()].sort((a, b) => a.place - b.place)
 
           dbUpdate.ibjjfBestResult = sorted.map(m => {
             const label = PLACE_LABEL[m.place] ?? `${m.place}th`
