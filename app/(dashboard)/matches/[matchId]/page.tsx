@@ -154,26 +154,30 @@ export default async function MatchDetailPage({
   if (match.tournamentOpponentId && match.status === 'analysed') {
     return (
       <>
-        <ScoutingView
-          match={{
-            id: match.id,
-            competitorLabel: match.competitorLabel,
-            opponentLabel: match.opponentLabel,
-            format: match.format,
-            context: match.context,
-            eventName: match.eventName,
-            resultWinner: match.resultWinner,
-            resultMethod: match.resultMethod,
-            resultTechnique: match.resultTechnique,
-          }}
-          videoUrl={video?.publicUrl ?? null}
-          insights={matchInsights}
-          timelineItems={timelineItems}
-          sortedPositions={sortedPositions}
-          maxPositionTime={maxPositionTime}
-          positionNames={POSITION_MAP}
-          backHref={backHref}
-        />
+        {/* Negate main's padding so ScoutingView fills the exact viewport below the nav (h-14 = 3.5rem).
+            -mb-24 cancels pb-24 on mobile; sm:-mb-6 cancels pb-6 on desktop. */}
+        <div className="-mx-6 -mt-6 -mb-24 sm:-mx-6 sm:-mt-6 sm:-mb-6 h-[calc(100svh-3.5rem)] overflow-hidden flex flex-col">
+          <ScoutingView
+            match={{
+              id: match.id,
+              competitorLabel: match.competitorLabel,
+              opponentLabel: match.opponentLabel,
+              format: match.format,
+              context: match.context,
+              eventName: match.eventName,
+              resultWinner: match.resultWinner,
+              resultMethod: match.resultMethod,
+              resultTechnique: match.resultTechnique,
+            }}
+            videoUrl={video?.publicUrl ?? null}
+            insights={matchInsights}
+            timelineItems={timelineItems}
+            sortedPositions={sortedPositions}
+            maxPositionTime={maxPositionTime}
+            positionNames={POSITION_MAP}
+            backHref={backHref}
+          />
+        </div>
         {isAdmin(clerkUserId) && (
           <div className="fixed bottom-4 right-4 z-50 bg-zinc-900/95 backdrop-blur border border-zinc-700 rounded-lg px-3 py-2 flex items-center gap-2 text-[10px]">
             <span className="text-zinc-500">Admin</span>
