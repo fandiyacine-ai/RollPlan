@@ -1,5 +1,5 @@
 import { db } from '../../../../../lib/db'
-import { tournaments, tournamentOpponents, matches, videos, gameplans, athleteCompetitionHistory } from '../../../../../lib/db/schema'
+import { tournaments, tournamentOpponents, matches, videos, gameplans } from '../../../../../lib/db/schema'
 import { eq, inArray, isNull, and, notLike, like, sql } from 'drizzle-orm'
 import { AddOpponentForm } from './opponent-forms'
 import { OpponentAccordion } from './opponent-accordion'
@@ -55,7 +55,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
     : false
   const showPostEventBanner = eventDatePassed && !tournamentRow?.outcome
 
-  let opponents: { id: string; tournamentId: string; opponentLabel: string; playerCardId: string | null; seedingNotes: string | null; createdAt: Date; footageStatus: string; smoothcompAthleteId: string | null; userResult: string | null; userResultMethod: string | null }[]
+  let opponents: { id: string; tournamentId: string; opponentLabel: string; playerCardId: string | null; seedingNotes: string | null; createdAt: Date; footageStatus: string; smoothcompAthleteId: string | null; smoothcompProfileUrl: string | null; userResult: string | null; userResultMethod: string | null; ajpWins: number | null; ajpLosses: number | null; smoothcompWins: number | null; smoothcompLosses: number | null; smoothcompFedUrl: string | null; ibjjfWins: number | null; ibjjfLosses: number | null; ibjjfProfileUrl: string | null }[]
   try {
     opponents = await db
       .select({
@@ -67,8 +67,17 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
         createdAt: tournamentOpponents.createdAt,
         footageStatus: tournamentOpponents.footageStatus,
         smoothcompAthleteId: tournamentOpponents.smoothcompAthleteId,
+        smoothcompProfileUrl: tournamentOpponents.smoothcompProfileUrl,
         userResult: tournamentOpponents.userResult,
         userResultMethod: tournamentOpponents.userResultMethod,
+        ajpWins: tournamentOpponents.ajpWins,
+        ajpLosses: tournamentOpponents.ajpLosses,
+        smoothcompWins: tournamentOpponents.smoothcompWins,
+        smoothcompLosses: tournamentOpponents.smoothcompLosses,
+        smoothcompFedUrl: tournamentOpponents.smoothcompFedUrl,
+        ibjjfWins: tournamentOpponents.ibjjfWins,
+        ibjjfLosses: tournamentOpponents.ibjjfLosses,
+        ibjjfProfileUrl: tournamentOpponents.ibjjfProfileUrl,
       })
       .from(tournamentOpponents)
       .where(eq(tournamentOpponents.tournamentId, tournamentId))
@@ -191,48 +200,14 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
     return acc
   }, {})
 
-  // Competition history for all opponents — shown even with no footage
-  const competitionHistoryByOpponent: Record<string, { id: string; eventName: string; eventDate: string | null; placement: string | null; federation: string; wins: number | null; losses: number | null }[]> = {}
-  if (opponentIds.length > 0) {
-    const historyRows = await db
-      .select({
-        id: athleteCompetitionHistory.id,
-        tournamentOpponentId: athleteCompetitionHistory.tournamentOpponentId,
-        eventName: athleteCompetitionHistory.eventName,
-        eventDate: athleteCompetitionHistory.eventDate,
-        placement: athleteCompetitionHistory.placement,
-        federation: athleteCompetitionHistory.federation,
-        wins: athleteCompetitionHistory.wins,
-        losses: athleteCompetitionHistory.losses,
-      })
-      .from(athleteCompetitionHistory)
-      .where(inArray(athleteCompetitionHistory.tournamentOpponentId, opponentIds))
-      .orderBy(athleteCompetitionHistory.eventDate)
-      .catch(() => [])
-
-    for (const row of historyRows) {
-      if (!row.tournamentOpponentId) continue
-      competitionHistoryByOpponent[row.tournamentOpponentId] ??= []
-      competitionHistoryByOpponent[row.tournamentOpponentId].push({
-        id: row.id,
-        eventName: row.eventName,
-        eventDate: row.eventDate ?? null,
-        placement: row.placement ?? null,
-        federation: row.federation,
-        wins: row.wins ?? null,
-        losses: row.losses ?? null,
-      })
-    }
-  }
-
   const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000)
   const hasActiveScans = allMatches.some(m => m.status === 'processing' || m.status === 'pending' || m.status === 'uploaded')
     || allPendingVideos.some(v => v.status === 'processing' || v.status === 'pending' || v.status === 'uploaded')
     || opponents.some(o => o.footageStatus === 'pending' || o.footageStatus === 'auto_queued')
-    // Keep polling while a recently-added opponent has no competition history yet (scout job in flight)
+    // Keep polling while a recently-added opponent has no W/L data yet (scout job in flight)
     || opponents.some(o =>
         new Date(o.createdAt) > tenMinutesAgo &&
-        (competitionHistoryByOpponent[o.id] ?? []).length === 0
+        o.ajpWins === null && o.smoothcompWins === null && o.ibjjfWins === null
       )
 
   // Opponents with no footage and no active scans — need user action
@@ -369,8 +344,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
           {opponents.map((opp) => (
             <OpponentAccordion
               key={opp.id}
-              opponent={{ ...opp, footageStatus: opp.footageStatus ?? 'manual', userResult: opp.userResult ?? null, userResultMethod: opp.userResultMethod ?? null }}
-              competitionHistory={competitionHistoryByOpponent[opp.id] ?? []}
+              opponent={{ ...opp, footageStatus: opp.footageStatus ?? 'manual', userResult: opp.userResult ?? null, userResultMethod: opp.userResultMethod ?? null, ajpWins: opp.ajpWins ?? null, ajpLosses: opp.ajpLosses ?? null, ajpProfileUrl: opp.smoothcompProfileUrl ?? null, smoothcompWins: opp.smoothcompWins ?? null, smoothcompLosses: opp.smoothcompLosses ?? null, smoothcompFedUrl: opp.smoothcompFedUrl ?? null, ibjjfWins: opp.ibjjfWins ?? null, ibjjfLosses: opp.ibjjfLosses ?? null, ibjjfProfileUrl: opp.ibjjfProfileUrl ?? null }}
               eventDatePassed={eventDatePassed}
               matches={(matchesByOpponent[opp.id] ?? []).map(m => ({
                 ...m, rowType: 'match' as const, format: m.format ?? null, context: m.context ?? null, label: undefined,

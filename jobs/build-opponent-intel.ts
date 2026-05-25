@@ -1,6 +1,6 @@
 import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
-import { tournamentOpponents, athleteCompetitionHistory } from '../lib/db/schema'
+import { tournamentOpponents } from '../lib/db/schema'
 import { eq } from 'drizzle-orm'
 
 // AJP/Smoothcomp exposes a public JSON API for athlete event history — no auth, no proxy needed.
@@ -39,14 +39,6 @@ type AjpEventsPage = {
   current_page: number
   last_page: number
   data: AjpEvent[]
-}
-
-function ordinal(n: number | null): string | null {
-  if (n === null) return null
-  if (n === 1) return '1st'
-  if (n === 2) return '2nd'
-  if (n === 3) return '3rd'
-  return `${n}th`
 }
 
 // Extract AJP profile ID from any URL found in search results
@@ -369,8 +361,6 @@ export const buildOpponentIntel = inngest.createFunction(
     )
 
     let athleteId = opponent?.smoothcompAthleteId ?? null
-    let ajpInserted = 0
-    let ibjjfInserted = 0
 
     // If no athlete ID yet (manually-added opponent), try to find them via Google + participants API
     if (!athleteId) {
@@ -386,271 +376,102 @@ export const buildOpponentIntel = inngest.createFunction(
       if (found.id) athleteId = found.id
     }
 
-    // --- AJP / Smoothcomp ---
+    // --- AJP ---
     if (athleteId) {
-      const ajpResult = await step.run('fetch-ajp-history', async () => {
+      await step.run('fetch-ajp-totals', async () => {
         const firstPage = await fetchAjpEventsPage(athleteId, 1)
         const allEvents: AjpEvent[] = [...firstPage.data]
-
         for (let p = 2; p <= firstPage.last_page; p++) {
           const page = await fetchAjpEventsPage(athleteId, p)
           allEvents.push(...page.data)
         }
 
-        // Build rows — one row per registration (division) per event
-        const rows: Array<typeof athleteCompetitionHistory.$inferInsert> = []
-
+        let wins = 0, losses = 0
         for (const ev of allEvents) {
           if (ev.upcomingEvent) continue
-          const eventUrl = `https://ajptour.com/en/event/${ev.info.id}`
-          const eventDate = ev.info.event_start
-            ? new Date(ev.info.event_start).toISOString().slice(0, 10)
-            : null
-
           for (const reg of ev.registrations) {
             if (!reg.published && reg.matches.length === 0) continue
-
-            const wins = reg.matches.filter(m => m.is_winner).length
-            const losses = reg.matches.filter(m => !m.is_winner).length
-            const submissionWins = reg.matches.filter(m => m.is_winner && m.outcome.toLowerCase().includes('submission')).length
-            const pointsWins = wins - submissionWins
-            const submissionLosses = reg.matches.filter(m => !m.is_winner && m.outcome.toLowerCase().includes('submission')).length
-
-            rows.push({
-              smoothcompAthleteId: athleteId,
-              tournamentOpponentId: opponentId,
-              federation: 'ajp',
-              eventName: `${ev.info.title} — ${reg.group}`,
-              eventId: `ajp-${ev.info.id}-${reg.id}`,
-              eventUrl,
-              eventDate,
-              placement: ordinal(reg.placement),
-              wins,
-              losses,
-              submissionWins,
-              pointsWins,
-              submissionLosses,
-            })
+            wins += reg.matches.filter(m => m.is_winner).length
+            losses += reg.matches.filter(m => !m.is_winner).length
           }
         }
 
-        if (rows.length === 0) return { inserted: 0 }
-
-        const result = await db
-          .insert(athleteCompetitionHistory)
-          .values(rows)
-          .onConflictDoNothing()
-          .returning({ id: athleteCompetitionHistory.id })
-
-        return { inserted: result.length, total: rows.length }
+        await db.update(tournamentOpponents)
+          .set({ ajpWins: wins, ajpLosses: losses })
+          .where(eq(tournamentOpponents.id, opponentId))
+        return { wins, losses }
       })
-
-      ajpInserted = ajpResult.inserted
     }
 
-    // --- Smoothcomp (non-AJP federation events) ---
-    // Same API as AJP but on smoothcomp.com subdomains (e.g. avasports.smoothcomp.com)
-    // Each federation subdomain has its own athlete IDs — find them via Brave search + participants POST
-    let smoothcompInserted = 0
-    const smoothcompResult = await step.run('fetch-smoothcomp-history', async () => {
+    // --- Smoothcomp ---
+    await step.run('fetch-smoothcomp-totals', async () => {
       const profiles = await findSmoothcompProfiles(athleteName)
-      if (profiles.length === 0) return { inserted: 0 }
+      if (profiles.length === 0) return { wins: 0, losses: 0 }
 
-      const rows: Array<typeof athleteCompetitionHistory.$inferInsert> = []
-      const athleteKey = athleteId ?? athleteName.toLowerCase().replace(/\s+/g, '-')
-
+      let wins = 0, losses = 0
       for (const { baseUrl, athleteId: scAthleteId } of profiles) {
-        // Derive a short federation label from the subdomain (e.g. "avasports")
-        const subdomainLabel = new URL(baseUrl).hostname.replace('.smoothcomp.com', '').replace('smoothcomp.com', 'smoothcomp')
-
         const firstPage = await fetchSmoothcompEventsPage(baseUrl, scAthleteId, 1)
         const allEvents: AjpEvent[] = [...firstPage.data]
         for (let p = 2; p <= firstPage.last_page; p++) {
           const page = await fetchSmoothcompEventsPage(baseUrl, scAthleteId, p)
           allEvents.push(...page.data)
         }
-
         for (const ev of allEvents) {
           if (ev.upcomingEvent) continue
-          const eventUrl = `${baseUrl}/en/event/${ev.info.id}`
-          const eventDate = ev.info.event_start ? new Date(ev.info.event_start).toISOString().slice(0, 10) : null
-
           for (const reg of ev.registrations) {
             if (!reg.published && reg.matches.length === 0) continue
-            const wins = reg.matches.filter(m => m.is_winner).length
-            const losses = reg.matches.filter(m => !m.is_winner).length
-            const submissionWins = reg.matches.filter(m => m.is_winner && m.outcome.toLowerCase().includes('submission')).length
-            const submissionLosses = reg.matches.filter(m => !m.is_winner && m.outcome.toLowerCase().includes('submission')).length
-
-            rows.push({
-              smoothcompAthleteId: athleteKey,
-              tournamentOpponentId: opponentId,
-              federation: 'smoothcomp',
-              eventName: `${ev.info.title} — ${reg.group}`,
-              eventId: `sc-${subdomainLabel}-${ev.info.id}-${reg.id}`,
-              eventUrl,
-              eventDate,
-              placement: ordinal(reg.placement),
-              wins,
-              losses,
-              submissionWins,
-              pointsWins: wins - submissionWins,
-              submissionLosses,
-            })
+            wins += reg.matches.filter(m => m.is_winner).length
+            losses += reg.matches.filter(m => !m.is_winner).length
           }
         }
       }
 
-      if (rows.length === 0) return { inserted: 0 }
-
-      const result = await db
-        .insert(athleteCompetitionHistory)
-        .values(rows)
-        .onConflictDoNothing()
-        .returning({ id: athleteCompetitionHistory.id })
-
-      return { inserted: result.length, total: rows.length }
+      if (wins > 0 || losses > 0) {
+        const firstProfile = profiles[0]
+        const fedUrl = `${firstProfile.baseUrl}/en/profile/${firstProfile.athleteId}`
+        await db.update(tournamentOpponents)
+          .set({ smoothcompWins: wins, smoothcompLosses: losses, smoothcompFedUrl: fedUrl })
+          .where(eq(tournamentOpponents.id, opponentId))
+      }
+      return { wins, losses }
     })
-    smoothcompInserted = smoothcompResult.inserted
 
-    // --- IBJJF via BJJ Metrics (open JSON API, no auth, no Playwright) ---
-    // POST /search_ibjjf_matches_names → exact name
-    // POST /get_ibjjf_matches → full match history per tournament
-    // GET  /fighter/{slug}           → HTML table with actual placement numbers (1, 2, 3)
-    const ibjjfResult = await step.run('fetch-ibjjf-history', async () => {
-      // Step 1: find exact name
+    // --- IBJJF via BJJ Metrics ---
+    await step.run('fetch-ibjjf-totals', async () => {
       const searchResp = await fetch('https://bjjmetrics.com/search_ibjjf_matches_names', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' },
         body: JSON.stringify({ name: athleteName }),
         signal: AbortSignal.timeout(15000),
       })
-      if (!searchResp.ok) return { inserted: 0, found: false }
-      const searchData = await searchResp.json() as { success: boolean; names?: Array<{ name: string; total_matches: string }> }
-      if (!searchData.success || !searchData.names?.length) return { inserted: 0, found: false }
+      if (!searchResp.ok) return { wins: 0, losses: 0 }
+      const searchData = await searchResp.json() as { success: boolean; names?: Array<{ name: string }> }
+      if (!searchData.success || !searchData.names?.length) return { wins: 0, losses: 0 }
 
       const exactName = searchData.names[0].name
-      const fighterSlug = exactName.toLowerCase().replace(/\s+/g, '-')
-
-      // Step 2: fetch all matches for that athlete
       const matchesResp = await fetch('https://bjjmetrics.com/get_ibjjf_matches', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' },
         body: JSON.stringify({ name: exactName }),
         signal: AbortSignal.timeout(15000),
       })
-      if (!matchesResp.ok) return { inserted: 0, found: true }
+      if (!matchesResp.ok) return { wins: 0, losses: 0 }
       const matchesData = await matchesResp.json() as {
         success: boolean
-        matches?: Array<{
-          tournament_name: string
-          division: string
-          match_date: string
-          winner_name: string
-          loser_name: string
-        }>
+        matches?: Array<{ winner_name: string; loser_name: string }>
       }
-      if (!matchesData.success || !matchesData.matches?.length) return { inserted: 0, found: true }
+      if (!matchesData.success || !matchesData.matches?.length) return { wins: 0, losses: 0 }
 
-      // Step 3: fetch fighter profile page for actual placement numbers
-      // The HTML table has: competition | division | place | team
-      const placementMap = new Map<string, string | null>()
-      try {
-        const profileResp = await fetch(`https://bjjmetrics.com/fighter/${fighterSlug}`, {
-          headers: { 'User-Agent': 'Mozilla/5.0' },
-          signal: AbortSignal.timeout(20000),
-        })
-        if (profileResp.ok) {
-          const html = await profileResp.text()
-          const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi
-          let rowMatch: RegExpExecArray | null
-          while ((rowMatch = rowRegex.exec(html)) !== null) {
-            const tdRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi
-            const tdValues: string[] = []
-            let tdMatch: RegExpExecArray | null
-            while ((tdMatch = tdRegex.exec(rowMatch[1])) !== null) {
-              tdValues.push(tdMatch[1].replace(/<[^>]+>/g, '').trim())
-            }
-            if (tdValues.length >= 3) {
-              const [competition, division, place] = tdValues
-              const placeNum = parseInt(place)
-              if (!isNaN(placeNum) && competition && division) {
-                const key = `${competition}||${division}`
-                if (!placementMap.has(key)) placementMap.set(key, ordinal(placeNum))
-              }
-            }
-          }
-        }
-      } catch { /* profile page optional — fall back to wins/losses heuristic */ }
+      const wins = matchesData.matches.filter(m => m.winner_name === exactName).length
+      const losses = matchesData.matches.filter(m => m.loser_name === exactName).length
+      const fighterSlug = exactName.toLowerCase().replace(/\s+/g, '-')
 
-      // Group matches by tournament+division to compute wins/losses per event
-      const groupKey = (m: { tournament_name: string; division: string }) =>
-        `${m.tournament_name}||${m.division}`
-
-      const groups = new Map<string, { wins: number; losses: number; date: string; tournament: string; division: string }>()
-      for (const m of matchesData.matches) {
-        const key = groupKey(m)
-        const isWin = m.winner_name === exactName
-        const existing = groups.get(key)
-        if (existing) {
-          if (isWin) { existing.wins++ } else { existing.losses++ }
-        } else {
-          groups.set(key, {
-            wins: isWin ? 1 : 0,
-            losses: isWin ? 0 : 1,
-            date: m.match_date,
-            tournament: m.tournament_name,
-            division: m.division,
-          })
-        }
-      }
-
-      const athleteKey = athleteId ?? fighterSlug
-      const rows: Array<typeof athleteCompetitionHistory.$inferInsert> = []
-
-      for (const [key, g] of groups) {
-        const slug = `${g.tournament}-${g.division}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 60)
-        // Use profile page placement if found; fall back to: 1st if undefeated, else null
-        const placement = placementMap.has(key)
-          ? placementMap.get(key) ?? null
-          : g.losses === 0 ? '1st' : null
-        rows.push({
-          smoothcompAthleteId: athleteKey,
-          tournamentOpponentId: opponentId,
-          federation: 'ibjjf',
-          eventName: `${g.tournament} — ${g.division}`,
-          eventId: `ibjjf-${slug}`,
-          eventUrl: `https://bjjmetrics.com/fighter/${fighterSlug}`,
-          eventDate: g.date,
-          placement,
-          wins: g.wins,
-          losses: g.losses,
-          submissionWins: null,
-          pointsWins: null,
-          submissionLosses: null,
-        })
-      }
-
-      if (rows.length === 0) return { inserted: 0, found: true }
-
-      const result = await db
-        .insert(athleteCompetitionHistory)
-        .values(rows)
-        .onConflictDoNothing()
-        .returning({ id: athleteCompetitionHistory.id })
-
-      return { inserted: result.length, total: rows.length, found: true, exactName }
+      await db.update(tournamentOpponents)
+        .set({ ibjjfWins: wins, ibjjfLosses: losses, ibjjfProfileUrl: `https://bjjmetrics.com/fighter/${fighterSlug}` })
+        .where(eq(tournamentOpponents.id, opponentId))
+      return { wins, losses }
     })
 
-    ibjjfInserted = ibjjfResult.inserted
-
-    const total = ajpInserted + smoothcompInserted + ibjjfInserted
-    return {
-      ajpInserted,
-      smoothcompInserted,
-      ibjjfInserted,
-      total,
-      athleteId: athleteId ?? null,
-    }
+    return { athleteId: athleteId ?? null }
   }
 )

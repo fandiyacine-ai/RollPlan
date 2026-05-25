@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, date, timestamp } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, date, timestamp, integer } from 'drizzle-orm/pg-core'
 import { users } from './users'
 import { playerCards } from './player-cards'
 import { canonicalTournaments } from './canonical-tournaments'
@@ -52,5 +52,14 @@ export const tournamentOpponents = pgTable('tournament_opponents', {
   userResult: text('user_result'),         // 'win' | 'loss' | 'draw' | null
   userResultMethod: text('user_result_method'), // 'submission' | 'points' | 'dq' | 'walkover' | null
   userResultTechnique: text('user_result_technique'), // e.g. 'rear naked choke' | null
+  // Career W/L totals + profile links per federation — computed by the scout job
+  ajpWins: integer('ajp_wins'),
+  ajpLosses: integer('ajp_losses'),
+  smoothcompWins: integer('smoothcomp_wins'),
+  smoothcompLosses: integer('smoothcomp_losses'),
+  smoothcompFedUrl: text('smoothcomp_fed_url'),   // Smoothcomp federation profile URL
+  ibjjfWins: integer('ibjjf_wins'),
+  ibjjfLosses: integer('ibjjf_losses'),
+  ibjjfProfileUrl: text('ibjjf_profile_url'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })
