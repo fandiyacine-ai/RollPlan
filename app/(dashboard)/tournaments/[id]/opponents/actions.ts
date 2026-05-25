@@ -34,61 +34,68 @@ export async function addOpponent(tournamentId: string, formData: FormData) {
   const force = formData.get('force') === 'true'
   if (!name) throw new Error('Opponent name is required')
 
-  // Hard block: same name in same tournament (never overridable)
-  const sameTournamentDupe = await db
-    .select({ id: tournamentOpponents.id })
-    .from(tournamentOpponents)
-    .where(and(
-      sql`lower(${tournamentOpponents.opponentLabel}) = lower(${name})`,
-      eq(tournamentOpponents.tournamentId, tournamentId),
-    ))
-    .limit(1)
-  if (sameTournamentDupe.length > 0) {
-    throw new Error('An opponent with this name already exists in this tournament')
-  }
-
-  if (!force) {
-    const userId = await getOrCreateDbUserId()
-    const dupe = await db
-      .select({ tournamentName: tournaments.name })
+  try {
+    // Hard block: same name in same tournament (never overridable)
+    const sameTournamentDupe = await db
+      .select({ id: tournamentOpponents.id })
       .from(tournamentOpponents)
-      .innerJoin(tournaments, eq(tournaments.id, tournamentOpponents.tournamentId))
       .where(and(
         sql`lower(${tournamentOpponents.opponentLabel}) = lower(${name})`,
-        ne(tournamentOpponents.tournamentId, tournamentId),
-        eq(tournaments.userId, userId),
+        eq(tournamentOpponents.tournamentId, tournamentId),
       ))
       .limit(1)
-
-    if (dupe.length > 0) {
-      // Special prefix: caught in the form to show a confirm step instead of a hard error
-      throw new Error(`DUPE:${dupe[0].tournamentName}`)
+    if (sameTournamentDupe.length > 0) {
+      throw new Error('An opponent with this name already exists in this tournament')
     }
-  }
 
-  const [inserted] = await db.insert(tournamentOpponents).values({
-    tournamentId,
-    opponentLabel: name,
-    seedingNotes: (formData.get('notes') as string)?.trim() || null,
-  }).returning({ id: tournamentOpponents.id })
-
-  // Fire multi-federation intel search for any manually added opponent
-  if (inserted) {
-    try {
+    if (!force) {
       const userId = await getOrCreateDbUserId()
-      await inngest.send({
-        name: 'opponent-intel/build.run',
-        data: {
-          opponentId: inserted.id,
-          athleteName: name,
-          tournamentId,
-          userId,
-        },
-      })
-    } catch { /* Inngest not configured — opponent created, intel won't auto-run */ }
-  }
+      const dupe = await db
+        .select({ tournamentName: tournaments.name })
+        .from(tournamentOpponents)
+        .innerJoin(tournaments, eq(tournaments.id, tournamentOpponents.tournamentId))
+        .where(and(
+          sql`lower(${tournamentOpponents.opponentLabel}) = lower(${name})`,
+          ne(tournamentOpponents.tournamentId, tournamentId),
+          eq(tournaments.userId, userId),
+        ))
+        .limit(1)
 
-  revalidatePath(`/tournaments/${tournamentId}/opponents`)
+      if (dupe.length > 0) {
+        // Special prefix: caught in the form to show a confirm step instead of a hard error
+        throw new Error(`DUPE:${dupe[0].tournamentName}`)
+      }
+    }
+
+    const [inserted] = await db.insert(tournamentOpponents).values({
+      tournamentId,
+      opponentLabel: name,
+      seedingNotes: (formData.get('notes') as string)?.trim() || null,
+    }).returning({ id: tournamentOpponents.id })
+
+    // Fire multi-federation intel search for any manually added opponent
+    if (inserted) {
+      try {
+        const userId = await getOrCreateDbUserId()
+        await inngest.send({
+          name: 'opponent-intel/build.run',
+          data: {
+            opponentId: inserted.id,
+            athleteName: name,
+            tournamentId,
+            userId,
+          },
+        })
+      } catch { /* Inngest not configured — opponent created, intel won't auto-run */ }
+    }
+
+    revalidatePath(`/tournaments/${tournamentId}/opponents`)
+  } catch (err) {
+    // Re-throw recognisable errors as plain Error objects so they serialise correctly
+    // across the Server Action boundary and are caught by the form's try/catch.
+    if (err instanceof Error) throw err
+    throw new Error(String(err))
+  }
 }
 
 export async function rescanVideo(videoId: string, tournamentId: string): Promise<{ error?: string }> {

@@ -33,9 +33,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const { userId: clerkId } = await auth()
   const isAdmin = !!process.env.ADMIN_CLERK_USER_ID && clerkId === process.env.ADMIN_CLERK_USER_ID
 
-  const userId = await getOrCreateDbUserId()
-  const user = await db.query.users.findFirst({ where: eq(users.id, userId) })
-  const showOnboarding = !user?.onboardingComplete || user.onboardingComplete === 'false'
+  let userId: string | null = null
+  let user: Awaited<ReturnType<typeof db.query.users.findFirst>> | null = null
+  try {
+    userId = await getOrCreateDbUserId()
+    if (userId) user = await db.query.users.findFirst({ where: eq(users.id, userId) }) ?? null
+  } catch { /* layout renders without user data — page-level error boundaries handle specifics */ }
+  const showOnboarding = userId != null && (!user?.onboardingComplete || user.onboardingComplete === 'false')
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
