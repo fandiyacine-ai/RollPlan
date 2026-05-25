@@ -659,7 +659,7 @@ export const buildOpponentIntel = inngest.createFunction(
           if (!athleteResp.ok) continue
           const body = await athleteResp.json() as {
             athlete?: { name?: string }
-            medals?: Array<{ place: number; event_name: string; happened_at?: string }>
+            medals?: Array<{ place: number; event_name: string; happened_at?: string; event_medals_only?: boolean | null }>
           }
           const foundName = (body.athlete?.name ?? '').toLowerCase()
           const namePartsLower = athleteName.toLowerCase().split(/\s+/).filter(p => p.length > 1)
@@ -669,11 +669,18 @@ export const buildOpponentIntel = inngest.createFunction(
           const medals = body.medals ?? []
           if (!medals.length) break
 
-          const sorted = [...medals].sort((a, b) => a.place - b.place)
+          // Deduplicate: prefer event_medals_only entries; skip "(Results)" duplicates
+          const deduped = medals.filter(m => m.event_medals_only === true)
+          const finalMedals = deduped.length > 0 ? deduped : medals.filter(m => !m.event_name.includes('(Results)'))
+          const sorted = [...(finalMedals.length > 0 ? finalMedals : medals)].sort((a, b) => a.place - b.place)
+
           dbUpdate.ibjjfBestResult = sorted.map(m => {
             const label = PLACE_LABEL[m.place] ?? `${m.place}th`
             const year = m.happened_at ? new Date(m.happened_at).getFullYear() : null
-            return year ? `${label} – ${m.event_name} ${year}` : `${label} – ${m.event_name}`
+            // Only append year if not already in the event name
+            const yearStr = year ? String(year) : null
+            const nameHasYear = yearStr && m.event_name.includes(yearStr)
+            return nameHasYear ? `${label} – ${m.event_name}` : year ? `${label} – ${m.event_name} ${year}` : `${label} – ${m.event_name}`
           }).join('|')
           break
         }
