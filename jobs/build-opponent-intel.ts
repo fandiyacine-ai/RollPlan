@@ -41,6 +41,13 @@ type AjpEventsPage = {
   data: AjpEvent[]
 }
 
+// Middle names are optional: first+last must match, middle is bonus.
+function nameMatchThreshold(parts: string[]): number {
+  if (parts.length <= 2) return parts.length
+  if (parts.length === 3) return 2  // middle name optional
+  return Math.ceil(parts.length * 2 / 3)
+}
+
 // Extract AJP profile ID from any URL found in search results
 function extractAjpProfileId(urls: string[]): string | null {
   for (const url of urls) {
@@ -74,8 +81,7 @@ async function verifyAjpProfileName(athleteId: string, expectedName: string): Pr
     const pData = await pResp.json() as { participants: Array<{ registrations: Array<{ user_id: number; firstname: string; lastname: string }> }> }
     const expectedLower = expectedName.toLowerCase()
     const nameParts = expectedLower.split(/\s+/).filter(p => p.length > 1)
-    // Require all parts for short names (≤3 words), 2/3 for longer
-    const threshold = nameParts.length <= 3 ? nameParts.length : Math.ceil(nameParts.length * 2 / 3)
+    const threshold = nameMatchThreshold(nameParts)
 
     for (const participant of pData.participants ?? []) {
       for (const reg of participant.registrations ?? []) {
@@ -246,7 +252,7 @@ async function verifySmoothcompProfileName(athleteId: string, expectedName: stri
     const pData = await pResp.json() as { participants: Array<{ registrations: Array<{ user_id: number; firstname: string; lastname: string }> }> }
     const expectedLower = expectedName.toLowerCase()
     const nameParts = expectedLower.split(/\s+/).filter(p => p.length > 1)
-    const threshold = nameParts.length <= 3 ? nameParts.length : Math.ceil(nameParts.length * 2 / 3)
+    const threshold = nameMatchThreshold(nameParts)
     for (const participant of pData.participants ?? []) {
       for (const reg of participant.registrations ?? []) {
         if (String(reg.user_id) !== athleteId) continue
@@ -315,7 +321,7 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
   if (candidateUrls.length === 0) return []
 
   const nameParts = name.toLowerCase().split(/\s+/).filter(p => p.length > 1)
-  const threshold = nameParts.length <= 3 ? nameParts.length : Math.ceil(nameParts.length * 2 / 3)
+  const threshold = nameMatchThreshold(nameParts)
 
   // Verify direct smoothcomp.com profile URLs before accepting
   const directProfiles = extractSmoothcompProfiles(candidateUrls)
@@ -549,11 +555,11 @@ export const buildOpponentIntel = inngest.createFunction(
               name?: string
               medals?: Array<{ place: number; event_name: string; year?: number; date?: string }>
             }
-            // Verify name matches
+            // Verify name matches (middle names are optional)
             const foundName = (athleteData.name ?? '').toLowerCase()
             const nameParts = athleteName.toLowerCase().split(/\s+/).filter(p => p.length > 1)
             const matchCount = nameParts.filter(p => foundName.includes(p)).length
-            if (matchCount < nameParts.length) continue
+            if (matchCount < nameMatchThreshold(nameParts)) continue
 
             const medals = athleteData.medals ?? []
             if (!medals.length) break

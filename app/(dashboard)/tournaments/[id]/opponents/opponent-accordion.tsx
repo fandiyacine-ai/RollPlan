@@ -43,10 +43,22 @@ type Opponent = {
   ibjjfBestResult: string | null
 }
 
-function WLBadge({ label, wins, losses, url, faviconUrl }: { label: string; wins: number; losses: number; url: string | null; faviconUrl: string }) {
+const PLATFORM_BADGE_CLASS: Record<string, string> = {
+  AJP:        'bg-orange-950/50 text-orange-400 border-orange-800/30',
+  Smoothcomp: 'bg-sky-950/50 text-sky-400 border-sky-800/30',
+  IBJJF:      'bg-blue-950/50 text-blue-400 border-blue-800/30',
+}
+
+function PlatformBadge({ label }: { label: string }) {
+  const cls = PLATFORM_BADGE_CLASS[label] ?? 'bg-zinc-800 text-zinc-400 border-zinc-700/30'
+  const short = label === 'Smoothcomp' ? 'SC' : label
+  return <span className={`text-[9px] font-bold px-1 py-px rounded border flex-shrink-0 ${cls}`}>{short}</span>
+}
+
+function WLBadge({ label, wins, losses, url }: { label: string; wins: number; losses: number; url: string | null }) {
   const content = (
     <span className="flex items-center gap-1.5">
-      <img src={faviconUrl} alt={label} width={12} height={12} className="rounded-sm opacity-60 flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+      <PlatformBadge label={label} />
       <span className="text-[11px] font-mono">
         <span className="text-emerald-400/80">{wins}W</span>
         <span className="text-muted-foreground/30 mx-0.5">/</span>
@@ -487,36 +499,18 @@ export function OpponentAccordion({
       {(opponent.ajpWins != null || opponent.smoothcompWins != null || opponent.ibjjfWins != null || opponent.ibjjfBestResult != null) && (
         <div className="px-4 py-2.5 border-t border-border/30 flex items-center gap-4 flex-wrap">
           {opponent.ajpWins != null && (
-            <WLBadge
-              label="AJP"
-              wins={opponent.ajpWins}
-              losses={opponent.ajpLosses ?? 0}
-              url={opponent.ajpProfileUrl}
-              faviconUrl="https://ajptour.com/favicon.ico"
-            />
+            <WLBadge label="AJP" wins={opponent.ajpWins} losses={opponent.ajpLosses ?? 0} url={opponent.ajpProfileUrl} />
           )}
           {opponent.smoothcompWins != null && (
-            <WLBadge
-              label="Smoothcomp"
-              wins={opponent.smoothcompWins}
-              losses={opponent.smoothcompLosses ?? 0}
-              url={opponent.smoothcompFedUrl}
-              faviconUrl="https://smoothcomp.com/favicon.ico"
-            />
+            <WLBadge label="Smoothcomp" wins={opponent.smoothcompWins} losses={opponent.smoothcompLosses ?? 0} url={opponent.smoothcompFedUrl} />
           )}
           {opponent.ibjjfBestResult != null ? (
-            <span className="flex items-center gap-1.5 opacity-70">
-              <img src="https://ibjjf.com/favicon.ico" alt="IBJJF" width={12} height={12} className="rounded-sm opacity-60 flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+            <span className="flex items-center gap-1.5 opacity-80">
+              <PlatformBadge label="IBJJF" />
               <span className="text-[11px] font-mono text-amber-400/80">{opponent.ibjjfBestResult}</span>
             </span>
           ) : opponent.ibjjfWins != null ? (
-            <WLBadge
-              label="IBJJF"
-              wins={opponent.ibjjfWins}
-              losses={opponent.ibjjfLosses ?? 0}
-              url={opponent.ibjjfProfileUrl}
-              faviconUrl="https://ibjjf.com/favicon.ico"
-            />
+            <WLBadge label="IBJJF" wins={opponent.ibjjfWins} losses={opponent.ibjjfLosses ?? 0} url={opponent.ibjjfProfileUrl} />
           ) : null}
         </div>
       )}
