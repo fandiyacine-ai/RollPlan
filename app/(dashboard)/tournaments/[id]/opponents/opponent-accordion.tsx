@@ -333,7 +333,13 @@ export function OpponentAccordion({
     : pending > 0
     ? <><span className="text-blue-400">Scanning</span> · {analysed} match{analysed !== 1 ? 'es' : ''} found so far</>
     : analysed > 0
-    ? `${analysed} match${analysed !== 1 ? 'es' : ''} ready${failed > 0 ? ` · ${failed} failed` : ''}`
+    ? (() => {
+        const firstAnalysed = matches.find(m => m.status === 'analysed')
+        const label = `${analysed} match${analysed !== 1 ? 'es' : ''} ready${failed > 0 ? ` · ${failed} failed` : ''}`
+        return firstAnalysed
+          ? <Link href={`/matches/${firstAnalysed.id}`} className="text-emerald-400 hover:text-emerald-300 transition-colors">{label} →</Link>
+          : label
+      })()
     : failed > 0
     ? <span className="text-rose-400">{failed} failed</span>
     : footageStatus === 'pending'
@@ -508,7 +514,7 @@ export function OpponentAccordion({
           ) : (
             <span className="flex items-center gap-1.5 opacity-30">
               <PlatformBadge label="AJP" />
-              <span className="text-[11px] font-mono text-muted-foreground">N/A</span>
+              <span className="text-[11px] text-muted-foreground/60">—</span>
             </span>
           )}
           {opponent.smoothcompWins != null ? (
@@ -521,7 +527,7 @@ export function OpponentAccordion({
           ) : (
             <span className="flex items-center gap-1.5 opacity-30">
               <PlatformBadge label="Smoothcomp" />
-              <span className="text-[11px] font-mono text-muted-foreground">N/A</span>
+              <span className="text-[11px] text-muted-foreground/60">—</span>
             </span>
           )}
           {opponent.ibjjfBestResult != null ? (
@@ -554,7 +560,7 @@ export function OpponentAccordion({
           ) : (
             <span className="flex items-center gap-1.5 opacity-30">
               <PlatformBadge label="IBJJF" />
-              <span className="text-[11px] font-mono text-muted-foreground">N/A</span>
+              <span className="text-[11px] text-muted-foreground/60">—</span>
             </span>
           )}
           <RetriggerIntelButton opponentId={opponent.id} tournamentId={tournamentId} />

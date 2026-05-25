@@ -104,12 +104,12 @@ export default async function GameplanPage({
     : null
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3 sm:space-y-5">
       {isGenerating && <AutoRefresh intervalMs={5000} />}
 
-      {/* Back to My Gameplans — when navigating from /gameplans */}
+      {/* Back to My Gameplans — desktop only to save vertical space on mobile */}
       {backHref === '/gameplans' && (
-        <Link href="/gameplans" className="text-xs text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1">
+        <Link href="/gameplans" className="hidden sm:inline-flex text-xs text-muted-foreground hover:text-foreground transition-colors items-center gap-1">
           ← My Gameplans
         </Link>
       )}
@@ -138,7 +138,7 @@ export default async function GameplanPage({
             <div className="flex items-center gap-2 min-w-0">
               {plan && <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-foreground/[0.06] text-foreground/60 border border-border/40 flex-shrink-0">AI</span>}
               <span className="text-sm font-semibold truncate">{activeOpponent.opponentLabel}</span>
-              <span className="text-[10px] text-muted-foreground/50 flex-shrink-0">{scoutedCount}m</span>
+              <span className="text-[10px] text-muted-foreground/50 flex-shrink-0">{scoutedCount} match{scoutedCount !== 1 ? 'es' : ''}</span>
             </div>
             <GenerateGameplanButton
               tournamentId={tournamentId}
@@ -176,9 +176,9 @@ export default async function GameplanPage({
                     const isWin = m.resultWinner === 'user'
                     const label = m.resultMethod === 'submission'
                       ? (isWin ? `W — Sub${m.resultTechnique ? ` (${m.resultTechnique})` : ''}` : `L — Sub${m.resultTechnique ? ` (${m.resultTechnique})` : ''}`)
-                      : m.resultMethod === 'points' ? (isWin ? 'W — Pts' : 'L — Pts')
-                      : m.resultMethod === 'walkover' ? (isWin ? 'W — WO' : 'L — WO')
-                      : isWin ? 'W' : 'L'
+                      : m.resultMethod === 'points' ? (isWin ? 'W — Points' : 'L — Points')
+                      : m.resultMethod === 'walkover' ? (isWin ? 'W — Walkover' : 'L — Walkover')
+                      : isWin ? 'W — Win' : 'L — Loss'
                     return (
                       <span key={m.id} className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
                         isWin ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/30' : 'bg-rose-950/60 text-rose-400 border border-rose-800/30'
