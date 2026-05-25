@@ -254,17 +254,17 @@ function nameMatchesFuzzy(fullName: string, nameParts: string[], threshold: numb
 }
 
 // Same identity verification as verifyAjpProfileName but for Smoothcomp (main domain only)
-async function verifySmoothcompProfileName(athleteId: string, expectedName: string): Promise<boolean> {
+async function verifySmoothcompProfileName(athleteId: string, expectedName: string, trustIfEmpty = false): Promise<boolean> {
   const baseUrl = 'https://smoothcomp.com'
   try {
     const page = await fetchSmoothcompEventsPage(baseUrl, athleteId, 1)
     if (!page.data?.length) {
-      // Profile exists but has no public event history (private/new athlete).
-      // The URL came from a name-based search so trust it rather than silently reject.
-      return true
+      // Profile exists but no public event history. Only trust it if the URL came from a
+      // name-based search (trustIfEmpty=true); never trust a bare ID from AJP cross-lookup.
+      return trustIfEmpty
     }
     const firstEvent = page.data.find(ev => !ev.upcomingEvent)
-    if (!firstEvent) return true  // Only upcoming events — private, trust it
+    if (!firstEvent) return trustIfEmpty  // Only upcoming events — treat same as empty
     const pResp = await fetch(`${baseUrl}/en/event/${firstEvent.info.id}/participants`, {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' },
@@ -348,10 +348,11 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
   const nameParts = name.toLowerCase().split(/\s+/).filter(p => p.length > 1)
   const threshold = nameMatchThreshold(nameParts)
 
-  // Verify direct smoothcomp.com profile URLs before accepting
+  // Verify direct smoothcomp.com profile URLs before accepting.
+  // trustIfEmpty=true: URL came from a name-based search so a private (no-events) profile is valid.
   const directProfiles = extractSmoothcompProfiles(candidateUrls)
   for (const profile of directProfiles) {
-    const ok = await verifySmoothcompProfileName(profile.athleteId, name)
+    const ok = await verifySmoothcompProfileName(profile.athleteId, name, true)
     if (ok) return [{ baseUrl: 'https://smoothcomp.com', athleteId: profile.athleteId }]
   }
 
@@ -563,20 +564,17 @@ export const buildOpponentIntel = inngest.createFunction(
     // --- Smoothcomp ---
     await step.run('fetch-smoothcomp-totals', async () => {
       try {
-        // AJP Tour runs on Smoothcomp infrastructure — athlete IDs are shared across both platforms.
-        // If we already have an ID (from AJP or from a prior Smoothcomp search), try it on
-        // smoothcomp.com directly before doing an independent name-based search.
+        // Only reuse a stored athlete ID when it was sourced from smoothcomp.com itself.
+        // AJP IDs must NOT be reused on smoothcomp.com — same numeric ID maps to different athletes
+        // across the two registries (Smoothcomp hosts both but keeps separate rosters).
         let profiles: Array<{ baseUrl: string; athleteId: string }> = []
-        if (athleteId) {
+        if (athleteId && !storedUrlIsAjp) {
           try {
-            // Verify name matches before trusting this ID on smoothcomp.com —
-            // AJP and Smoothcomp share the same numeric IDs but different athlete registries,
-            // so ID X on AJP may belong to a different person on smoothcomp.com.
             const verified = await verifySmoothcompProfileName(athleteId, athleteName)
             if (verified) {
               profiles = [{ baseUrl: 'https://smoothcomp.com', athleteId }]
             }
-          } catch { /* not on smoothcomp.com — fall through to name search */ }
+          } catch { /* fall through to name search */ }
         }
         if (profiles.length === 0) {
           profiles = await findSmoothcompProfiles(athleteName)
