@@ -532,26 +532,38 @@ export async function importSelectedOpponents(
       }))
     ).returning()
 
-    // Phase 2: fire footage discovery for each imported athlete
+    // Phase 2: fire footage discovery + stat intel for each imported athlete
     for (const opp of inserted) {
-      if (!opp.smoothcompProfileUrl) continue
       try {
-        await inngest.send({
-          name: 'smoothcomp/discover.footage',
-          data: {
-            tournamentId,
-            opponentId: opp.id,
-            profileUrl: opp.smoothcompProfileUrl,
-            athleteId: opp.smoothcompAthleteId ?? '',
-            athleteName: opp.opponentLabel,
-            userId,
+        await inngest.send([
+          ...(opp.smoothcompProfileUrl ? [{
+            name: 'smoothcomp/discover.footage' as const,
+            data: {
+              tournamentId,
+              opponentId: opp.id,
+              profileUrl: opp.smoothcompProfileUrl,
+              athleteId: opp.smoothcompAthleteId ?? '',
+              athleteName: opp.opponentLabel,
+              userId,
+            },
+          }] : []),
+          {
+            name: 'opponent-intel/build.run' as const,
+            data: {
+              opponentId: opp.id,
+              athleteName: opp.opponentLabel,
+              tournamentId,
+              userId,
+            },
           },
-        })
-        await db.update(tournamentOpponents)
-          .set({ footageStatus: 'auto_queued' })
-          .where(eq(tournamentOpponents.id, opp.id))
+        ])
+        if (opp.smoothcompProfileUrl) {
+          await db.update(tournamentOpponents)
+            .set({ footageStatus: 'auto_queued' })
+            .where(eq(tournamentOpponents.id, opp.id))
+        }
       } catch {
-        // Inngest not configured — opponent created, discovery won't auto-run
+        // Inngest not configured — opponent created, discovery/intel won't auto-run
       }
     }
 
