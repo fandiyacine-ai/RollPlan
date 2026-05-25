@@ -502,8 +502,7 @@ export function OpponentAccordion({
       )}
 
       {/* W/L summary — visible when scout job has run */}
-      {(opponent.ajpWins != null || opponent.smoothcompWins != null || opponent.ibjjfBestResult != null) && (
-        <div className="px-4 py-2.5 border-t border-border/30 flex items-center gap-4 flex-wrap justify-between">
+      <div className="px-4 py-2.5 border-t border-border/30 flex items-center gap-4 flex-wrap justify-between">
           {opponent.ajpWins != null ? (
             <WLBadge label="AJP" wins={opponent.ajpWins} losses={opponent.ajpLosses ?? 0} url={opponent.ajpProfileUrl} />
           ) : (
@@ -540,7 +539,6 @@ export function OpponentAccordion({
           )}
           <RetriggerIntelButton opponentId={opponent.id} tournamentId={tournamentId} />
         </div>
-      )}
 
       {/* Post-event result row — always visible when event date has passed */}
       {eventDatePassed && (
