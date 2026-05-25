@@ -238,14 +238,33 @@ function extractSmoothcompProfiles(urls: string[]): Array<{ baseUrl: string; ath
   return profiles
 }
 
+// Fuzzy name check: exact substring match first, then last-name-exact + first-name-prefix.
+// Handles spelling variants like "Zakriya" vs "Zakariya" (same first 3 chars, same last name).
+function nameMatchesFuzzy(fullName: string, nameParts: string[], threshold: number): boolean {
+  const matchCount = nameParts.filter(p => fullName.includes(p)).length
+  if (matchCount >= threshold) return true
+  if (nameParts.length < 2) return false
+  const lastName = nameParts[nameParts.length - 1]
+  const firstName = nameParts[0]
+  const profileWords = fullName.split(/\s+/)
+  const lastNameMatch = profileWords.includes(lastName)
+  const firstPrefix = firstName.slice(0, 3)
+  const firstNameFuzzy = firstName.length >= 5 && profileWords.some(w => w.length >= 5 && w.startsWith(firstPrefix))
+  return lastNameMatch && firstNameFuzzy
+}
+
 // Same identity verification as verifyAjpProfileName but for Smoothcomp (main domain only)
 async function verifySmoothcompProfileName(athleteId: string, expectedName: string): Promise<boolean> {
   const baseUrl = 'https://smoothcomp.com'
   try {
     const page = await fetchSmoothcompEventsPage(baseUrl, athleteId, 1)
-    if (!page.data?.length) return false
+    if (!page.data?.length) {
+      // Profile exists but has no public event history (private/new athlete).
+      // The URL came from a name-based search so trust it rather than silently reject.
+      return true
+    }
     const firstEvent = page.data.find(ev => !ev.upcomingEvent)
-    if (!firstEvent) return false
+    if (!firstEvent) return true  // Only upcoming events — private, trust it
     const pResp = await fetch(`${baseUrl}/en/event/${firstEvent.info.id}/participants`, {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' },
@@ -261,8 +280,7 @@ async function verifySmoothcompProfileName(athleteId: string, expectedName: stri
       for (const reg of participant.registrations ?? []) {
         if (String(reg.user_id) !== athleteId) continue
         const fullName = `${reg.firstname} ${reg.lastname}`.toLowerCase()
-        const matchCount = nameParts.filter(p => fullName.includes(p)).length
-        if (matchCount >= threshold) return true
+        if (nameMatchesFuzzy(fullName, nameParts, threshold)) return true
       }
     }
     return false
@@ -609,6 +627,7 @@ export const buildOpponentIntel = inngest.createFunction(
     // --- IBJJF via BJJ Metrics + jiujitsu.net medal ---
     await step.run('fetch-ibjjf-totals', async () => {
       const dbUpdate: Record<string, unknown> = {}
+      let bjjmetricsExactSlug: string | null = null
 
       // BJJ Metrics: W/L from final matches
       try {
@@ -636,6 +655,7 @@ export const buildOpponentIntel = inngest.createFunction(
               if (matchesData.success && matchesData.matches?.length) {
                 const fighterSlug = exactName.toLowerCase().replace(/\s+/g, '-')
                 dbUpdate.ibjjfProfileUrl = `https://bjjmetrics.com/fighter/${fighterSlug}`
+                bjjmetricsExactSlug = fighterSlug
               }
             }
           }
@@ -643,14 +663,15 @@ export const buildOpponentIntel = inngest.createFunction(
       } catch { /* non-fatal */ }
 
       // jiujitsu.net: medals via /api/athlete/{slug} (search endpoint returns HTML as of May 2026)
-      // Try slug variants: full name, then first+last only (drops middle name)
+      // Try slug variants: bjjmetrics exact name (most reliable), full stored name, then first+last only
       try {
         const PLACE_LABEL: Record<number, string> = { 1: 'Gold', 2: 'Silver', 3: 'Bronze' }
         const nameParts = athleteName.trim().split(/\s+/)
         const slugVariants = [
+          ...(bjjmetricsExactSlug ? [bjjmetricsExactSlug] : []),
           athleteName.toLowerCase().replace(/\s+/g, '-'),
           ...(nameParts.length > 2 ? [`${nameParts[0]}-${nameParts[nameParts.length - 1]}`.toLowerCase()] : []),
-        ]
+        ].filter((s, i, arr) => arr.indexOf(s) === i) // deduplicate
         for (const slug of slugVariants) {
           const athleteResp = await fetch(
             `https://jiujitsu.net/api/athlete/${slug}?gi=true&all_medals=false`,
