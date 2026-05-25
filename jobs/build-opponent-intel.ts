@@ -41,6 +41,12 @@ type AjpEventsPage = {
   data: AjpEvent[]
 }
 
+// Strip diacritics for comparison: "Mäki" → "Maki", "João" → "Joao".
+// Athletes often register on platforms without accents even if their legal name has them.
+function normalizeName(name: string): string {
+  return name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+}
+
 // Middle names are optional: first+last must match, middle is bonus.
 function nameMatchThreshold(parts: string[]): number {
   if (parts.length <= 2) return parts.length
@@ -83,14 +89,14 @@ async function verifyAjpProfileName(athleteId: string, expectedName: string, fal
     if (!pResp.ok) return false
 
     const pData = await pResp.json() as { participants: Array<{ registrations: Array<{ user_id: number; firstname: string; lastname: string }> }> }
-    const expectedLower = expectedName.toLowerCase()
-    const nameParts = expectedLower.split(/\s+/).filter(p => p.length > 1)
+    const normExpected = normalizeName(expectedName)
+    const nameParts = normExpected.split(/\s+/).filter(p => p.length > 1)
     const threshold = nameMatchThreshold(nameParts)
 
     for (const participant of pData.participants ?? []) {
       for (const reg of participant.registrations ?? []) {
         if (String(reg.user_id) !== athleteId) continue
-        const fullName = `${reg.firstname} ${reg.lastname}`.toLowerCase()
+        const fullName = normalizeName(`${reg.firstname} ${reg.lastname}`)
         const matchCount = nameParts.filter(p => fullName.includes(p)).length
         if (matchCount >= threshold) return true
       }
@@ -203,8 +209,8 @@ async function findAjpAthleteIdByName(name: string): Promise<string | null> {
 }
 
 async function findIdFromEventParticipants(eventIds: string[], name: string): Promise<string | null> {
-  const nameLower = name.toLowerCase()
-  const nameParts = nameLower.split(/\s+/).filter(p => p.length > 1)
+  const normName = normalizeName(name)
+  const nameParts = normName.split(/\s+/).filter(p => p.length > 1)
   const threshold = nameMatchThreshold(nameParts)
   for (const eventId of eventIds.slice(0, 5)) {
     try {
@@ -218,7 +224,7 @@ async function findIdFromEventParticipants(eventIds: string[], name: string): Pr
       const data = await pResp.json() as { participants: Array<{ registrations: Array<{ user_id: number; firstname: string; lastname: string }> }> }
       for (const participant of data.participants ?? []) {
         for (const reg of participant.registrations ?? []) {
-          const fullName = `${reg.firstname} ${reg.lastname}`.toLowerCase()
+          const fullName = normalizeName(`${reg.firstname} ${reg.lastname}`)
           const matchCount = nameParts.filter(p => fullName.includes(p)).length
           if (matchCount >= threshold) return String(reg.user_id)
         }
@@ -241,12 +247,14 @@ function extractSmoothcompProfiles(urls: string[]): Array<{ baseUrl: string; ath
 // Fuzzy name check: exact substring match first, then last-name-exact + first-name-prefix.
 // Handles spelling variants like "Zakriya" vs "Zakariya" (same first 3 chars, same last name).
 function nameMatchesFuzzy(fullName: string, nameParts: string[], threshold: number): boolean {
-  const matchCount = nameParts.filter(p => fullName.includes(p)).length
+  const normFull = normalizeName(fullName)
+  const normParts = nameParts.map(normalizeName)
+  const matchCount = normParts.filter(p => normFull.includes(p)).length
   if (matchCount >= threshold) return true
-  if (nameParts.length < 2) return false
-  const lastName = nameParts[nameParts.length - 1]
-  const firstName = nameParts[0]
-  const profileWords = fullName.split(/\s+/)
+  if (normParts.length < 2) return false
+  const lastName = normParts[normParts.length - 1]
+  const firstName = normParts[0]
+  const profileWords = normFull.split(/\s+/)
   const lastNameMatch = profileWords.includes(lastName)
   const firstPrefix = firstName.slice(0, 3)
   const firstNameFuzzy = firstName.length >= 5 && profileWords.some(w => w.length >= 5 && w.startsWith(firstPrefix))
@@ -273,13 +281,13 @@ async function checkSmoothcompProfile(athleteId: string, expectedName: string, t
     })
     if (!pResp.ok) return 'rejected'
     const pData = await pResp.json() as { participants: Array<{ registrations: Array<{ user_id: number; firstname: string; lastname: string }> }> }
-    const expectedLower = expectedName.toLowerCase()
-    const nameParts = expectedLower.split(/\s+/).filter(p => p.length > 1)
+    const normExpected = normalizeName(expectedName)
+    const nameParts = normExpected.split(/\s+/).filter(p => p.length > 1)
     const threshold = nameMatchThreshold(nameParts)
     for (const participant of pData.participants ?? []) {
       for (const reg of participant.registrations ?? []) {
         if (String(reg.user_id) !== athleteId) continue
-        const fullName = `${reg.firstname} ${reg.lastname}`.toLowerCase()
+        const fullName = normalizeName(`${reg.firstname} ${reg.lastname}`)
         if (nameMatchesFuzzy(fullName, nameParts, threshold)) return 'public'
       }
     }
@@ -299,6 +307,17 @@ async function verifySmoothcompProfileName(athleteId: string, expectedName: stri
 function nameSearchQueries(name: string, domain: string): string[] {
   const parts = name.trim().split(/\s+/)
   const queries = [`"${name}" site:${domain}`, `${name} site:${domain}`]
+
+  // If the name has diacritics (ä, ö, ü, etc.), also search without them —
+  // athletes often register on platforms using the ASCII version of their name.
+  const normalizedName = parts.map(p => {
+    const n = normalizeName(p)
+    return n.charAt(0).toUpperCase() + n.slice(1)
+  }).join(' ')
+  if (normalizedName !== name) {
+    queries.push(`"${normalizedName}" site:${domain}`, `${normalizedName} site:${domain}`)
+  }
+
   if (parts.length >= 3) {
     const firstLast = `${parts[0]} ${parts[parts.length - 1]}`
     queries.push(`"${firstLast}" site:${domain}`, `${firstLast} site:${domain}`)
@@ -364,7 +383,7 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
 
   if (candidateUrls.length === 0) return []
 
-  const nameParts = name.toLowerCase().split(/\s+/).filter(p => p.length > 1)
+  const nameParts = normalizeName(name).split(/\s+/).filter(p => p.length > 1)
   const threshold = nameMatchThreshold(nameParts)
 
   // Verify all direct profile URLs, preferring a publicly-verified profile over a private one.
@@ -405,7 +424,7 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
       const pData = await pResp.json() as { participants: Array<{ registrations: Array<{ user_id: number; firstname: string; lastname: string }> }> }
       for (const participant of pData.participants ?? []) {
         for (const reg of participant.registrations ?? []) {
-          const fullName = `${reg.firstname} ${reg.lastname}`.toLowerCase()
+          const fullName = normalizeName(`${reg.firstname} ${reg.lastname}`)
           if (nameMatchesFuzzy(fullName, nameParts, threshold)) {
             return [{ baseUrl: 'https://smoothcomp.com', athleteId: String(reg.user_id) }]
           }
@@ -721,9 +740,11 @@ export const buildOpponentIntel = inngest.createFunction(
       try {
         const PLACE_LABEL: Record<number, string> = { 1: 'Gold', 2: 'Silver', 3: 'Bronze' }
         const nameParts = athleteName.trim().split(/\s+/)
+        const normalizedSlugName = normalizeName(athleteName).replace(/\s+/g, '-')
         const slugVariants = [
           ...(bjjmetricsExactSlug ? [bjjmetricsExactSlug] : []),
           athleteName.toLowerCase().replace(/\s+/g, '-'),
+          normalizedSlugName,
           ...(nameParts.length > 2 ? [`${nameParts[0]}-${nameParts[nameParts.length - 1]}`.toLowerCase()] : []),
         ].filter((s, i, arr) => arr.indexOf(s) === i) // deduplicate
         for (const slug of slugVariants) {
@@ -736,8 +757,8 @@ export const buildOpponentIntel = inngest.createFunction(
             athlete?: { name?: string }
             medals?: Array<{ place: number; event_name: string; happened_at?: string; event_medals_only?: boolean | null }>
           }
-          const foundName = (body.athlete?.name ?? '').toLowerCase()
-          const namePartsLower = athleteName.toLowerCase().split(/\s+/).filter(p => p.length > 1)
+          const foundName = normalizeName(body.athlete?.name ?? '')
+          const namePartsLower = normalizeName(athleteName).split(/\s+/).filter(p => p.length > 1)
           const matchCount = namePartsLower.filter(p => foundName.includes(p)).length
           if (matchCount < nameMatchThreshold(namePartsLower)) continue
 
