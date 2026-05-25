@@ -82,14 +82,15 @@ async function verifyAjpProfileName(athleteId: string, expectedName: string): Pr
     const pData = await pResp.json() as { participants: Array<{ registrations: Array<{ user_id: number; firstname: string; lastname: string }> }> }
     const expectedLower = expectedName.toLowerCase()
     const nameParts = expectedLower.split(/\s+/).filter(p => p.length > 1)
+    // Require all parts for short names (≤3 words), 2/3 for longer
+    const threshold = nameParts.length <= 3 ? nameParts.length : Math.ceil(nameParts.length * 2 / 3)
 
     for (const participant of pData.participants ?? []) {
       for (const reg of participant.registrations ?? []) {
         if (String(reg.user_id) !== athleteId) continue
         const fullName = `${reg.firstname} ${reg.lastname}`.toLowerCase()
-        // At least half the name parts must match
         const matchCount = nameParts.filter(p => fullName.includes(p)).length
-        if (matchCount >= Math.ceil(nameParts.length / 2)) return true
+        if (matchCount >= threshold) return true
       }
     }
     return false
