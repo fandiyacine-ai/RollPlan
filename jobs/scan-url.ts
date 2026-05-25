@@ -180,6 +180,9 @@ export const scanUrl = inngest.createFunction(
               : 'Video is too long for a single analysis pass — submit as a YouTube URL or split into ~1-hour segments.'
           )
         }
+        if (msg.includes('file processing failed') || msg.includes('Gemini file processing')) {
+          await failAndThrow('This video could not be processed — the file may be in an unsupported format or was rejected by the AI provider. Try a different video source.')
+        }
         // Transient Gemini/network errors — don't mark as permanently failed, let Inngest retry
         if (
           err instanceof SyntaxError ||
