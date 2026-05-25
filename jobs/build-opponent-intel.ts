@@ -316,6 +316,11 @@ function nameSearchQueries(name: string, domain: string): string[] {
 // Multi-engine search for Smoothcomp profiles — Brave → Gemini
 // Only searches smoothcomp.com (main domain)
 async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: string; athleteId: string }>> {
+  // Track which URLs were found by "strong" queries (containing the athlete's first name).
+  // Private profiles are only trusted as a last resort if found by a strong query —
+  // last-name-only queries can match ghost profiles or unrelated athletes.
+  const firstName = name.trim().split(/\s+/)[0].toLowerCase()
+  const strongQueryUrls = new Set<string>()
   let candidateUrls: string[] = []
 
   // 1. Brave — run all query variants and collect unique URLs across all of them.
@@ -325,6 +330,7 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
   if (apiKey) {
     const seen = new Set<string>()
     for (const query of nameSearchQueries(name, 'smoothcomp.com')) {
+      const isStrongQuery = query.toLowerCase().includes(firstName)
       try {
         const resp = await fetch(
           `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=10`,
@@ -336,14 +342,16 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
           if (url.url.includes('smoothcomp.com') && !seen.has(url.url)) {
             seen.add(url.url)
             candidateUrls.push(url.url)
+            if (isStrongQuery) strongQueryUrls.add(url.url)
           }
         }
       } catch { continue }
     }
   }
 
-  // 2. Gemini + Google Search grounding — always run, not just as fallback
-  // Brave may find unrelated event pages and miss the actual profile; Gemini has better recall
+  // 2. Gemini + Google Search grounding — always run, not just as fallback.
+  // Brave may find unrelated event pages and miss the actual profile; Gemini has better recall.
+  // Gemini results are treated as strong (they used the athlete's full name in the query).
   const geminiUrls = await geminiGroundedSearch(
     `Find smoothcomp.com pages for BJJ athlete "${name}". Return any direct profile URLs (smoothcomp.com/*/profile/NUMBERS) or bracket/event pages (smoothcomp.com/*/event/NUMBERS/bracket) that mention this athlete.`,
     'smoothcomp.com'
@@ -351,6 +359,7 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
   const seenUrls = new Set(candidateUrls)
   for (const u of geminiUrls) {
     if (!seenUrls.has(u)) { seenUrls.add(u); candidateUrls.push(u) }
+    strongQueryUrls.add(u)
   }
 
   if (candidateUrls.length === 0) return []
@@ -359,12 +368,19 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
   const threshold = nameMatchThreshold(nameParts)
 
   // Verify all direct profile URLs, preferring a publicly-verified profile over a private one.
+  // Private candidates are only accepted when found by a strong query (first name present).
+  // Last-name-only search results can match ghost profiles or unrelated athletes with the same surname.
   const directProfiles = extractSmoothcompProfiles(candidateUrls)
   let privateCandidate: string | null = null
   for (const profile of directProfiles) {
     const status = await checkSmoothcompProfile(profile.athleteId, name, true)
     if (status === 'public') return [{ baseUrl: 'https://smoothcomp.com', athleteId: profile.athleteId }]
-    if (status === 'private' && !privateCandidate) privateCandidate = profile.athleteId
+    if (status === 'private' && !privateCandidate) {
+      // Only trust a private profile if the URL that found it came from a strong query (first name present).
+      // Check both /en/ and any locale variant since search results may use different locale prefixes.
+      const foundByStrong = [...strongQueryUrls].some(u => u.includes(`/profile/${profile.athleteId}`))
+      if (foundByStrong) privateCandidate = profile.athleteId
+    }
   }
 
   // Event/bracket fallback: Google/Brave often indexes bracket pages (smoothcomp.com/locale/event/ID/bracket/...)
@@ -398,7 +414,7 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
     } catch { continue }
   }
 
-  // Last resort: a private profile found via name search (can't be name-verified but URL is plausible)
+  // Last resort: a private profile found via a strong name search (first-name match required).
   if (privateCandidate) return [{ baseUrl: 'https://smoothcomp.com', athleteId: privateCandidate }]
 
   return []
@@ -596,10 +612,15 @@ export const buildOpponentIntel = inngest.createFunction(
           profiles = await findSmoothcompProfiles(athleteName)
         }
         if (profiles.length === 0) {
-          // No verified profile — clear any stale data written by a previous run with looser checks
-          await db.update(tournamentOpponents)
-            .set({ smoothcompWins: null, smoothcompLosses: null, smoothcompFedUrl: null })
-            .where(eq(tournamentOpponents.id, opponentId))
+          // No verified profile found. Only clear stale data when the stored source was Smoothcomp itself
+          // (storedUrlIsAjp=false) — meaning a prior SC search stored something we can no longer verify.
+          // When the stored source is AJP (storedUrlIsAjp=true), SC data may have been set manually or
+          // by a previous search that found the right profile; don't wipe it on a search miss.
+          if (!storedUrlIsAjp) {
+            await db.update(tournamentOpponents)
+              .set({ smoothcompWins: null, smoothcompLosses: null, smoothcompFedUrl: null })
+              .where(eq(tournamentOpponents.id, opponentId))
+          }
           return { wins: 0, losses: 0 }
         }
 
