@@ -291,11 +291,14 @@ export function AddOpponentForm({ tournamentId }: { tournamentId: string }) {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dupeWarning, setDupeWarning] = useState<string | null>(null)
-  const formRef = useRef<HTMLFormElement>(null)
+  // React 19 resets uncontrolled form inputs after a form action completes.
+  // We capture the submitted name in state so "Add anyway" can reuse it.
+  const [pendingName, setPendingName] = useState<string | null>(null)
+  const [pendingNotes, setPendingNotes] = useState<string | null>(null)
 
   function handleClose(o: boolean) {
     setOpen(o)
-    if (!o) { setPending(false); setError(null); setDupeWarning(null) }
+    if (!o) { setPending(false); setError(null); setDupeWarning(null); setPendingName(null); setPendingNotes(null) }
   }
 
   async function handleSubmit(fd: FormData, force = false) {
@@ -308,6 +311,9 @@ export function AddOpponentForm({ tournamentId }: { tournamentId: string }) {
       if (result.ok) {
         setOpen(false)
       } else if (result.type === 'dupe') {
+        // Capture the name/notes before React 19 resets the form inputs
+        setPendingName((fd.get('name') as string) ?? null)
+        setPendingNotes((fd.get('notes') as string) ?? null)
         setDupeWarning(result.tournamentName)
       } else if (result.type === 'same_tournament') {
         setError('An opponent with this name already exists in this tournament')
@@ -329,7 +335,6 @@ export function AddOpponentForm({ tournamentId }: { tournamentId: string }) {
           <DialogTitle>Add Opponent</DialogTitle>
         </DialogHeader>
         <form
-          ref={formRef}
           id="add-opponent-form"
           action={(fd) => handleSubmit(fd)}
           className="space-y-3"
@@ -356,8 +361,11 @@ export function AddOpponentForm({ tournamentId }: { tournamentId: string }) {
                 variant="outline"
                 className="border-amber-800/50 text-amber-300 hover:bg-amber-950/40"
                 onClick={() => {
-                  if (!formRef.current) return
-                  handleSubmit(new FormData(formRef.current), true)
+                  if (!pendingName) return
+                  const fd = new FormData()
+                  fd.set('name', pendingName)
+                  if (pendingNotes) fd.set('notes', pendingNotes)
+                  handleSubmit(fd, true)
                 }}
               >
                 Add anyway
