@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { CreateTournamentForm, DeleteTournamentButton, EditTournamentButton } from './create-form'
 import { countryFlag, giNoGi } from '../../../lib/tournament-utils'
 import { RulesetBadge } from '@/components/ruleset-badge'
+import { getOrCreateDbUserId } from '../../../lib/db/get-user'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,7 +31,8 @@ function fmtDate(dateStr: string): string {
 }
 
 export default async function TournamentsPage() {
-  const allTournaments = await db
+  const userId = await getOrCreateDbUserId().catch(() => null)
+  const allTournaments = userId ? await db
     .select({
       id: tournaments.id,
       name: tournaments.name,
@@ -44,7 +46,8 @@ export default async function TournamentsPage() {
     })
     .from(tournaments)
     .leftJoin(canonicalTournaments, eq(tournaments.canonicalTournamentId, canonicalTournaments.id))
-    .orderBy(desc(tournaments.createdAt))
+    .where(eq(tournaments.userId, userId))
+    .orderBy(desc(tournaments.createdAt)) : []
 
   return (
     <div className="space-y-6 max-w-2xl">

@@ -1,7 +1,8 @@
 import { currentUser } from '@clerk/nextjs/server'
 import { db } from '../../../../../lib/db'
-import { gameplans, tournamentOpponents, matches, planExecutions } from '../../../../../lib/db/schema'
-import { eq, inArray } from 'drizzle-orm'
+import { gameplans, tournamentOpponents, matches, planExecutions, tournaments } from '../../../../../lib/db/schema'
+import { eq, inArray, and } from 'drizzle-orm'
+import { getOrCreateDbUserId } from '../../../../../lib/db/get-user'
 import Link from 'next/link'
 import { GenerateGameplanButton } from './generate-button'
 import { OpponentSelector } from './opponent-selector'
@@ -27,6 +28,15 @@ export default async function GameplanPage({
 
   const clerkUser = await currentUser().catch(() => null)
   const athleteName = clerkUser?.firstName ?? clerkUser?.username ?? null
+
+  const userId = await getOrCreateDbUserId().catch(() => null)
+  const tournamentOwned = userId ? await db
+    .select({ id: tournaments.id })
+    .from(tournaments)
+    .where(and(eq(tournaments.id, tournamentId), eq(tournaments.userId, userId)))
+    .limit(1)
+    .then(r => r[0] ?? null) : null
+  if (!tournamentOwned) return <div className="p-6 text-muted-foreground text-sm">Tournament not found.</div>
 
   const opponents = await db
     .select()

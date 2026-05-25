@@ -37,6 +37,8 @@ function DbError({ label, err }: { label: string; err: unknown }) {
 export default async function OpponentsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: tournamentId } = await params
 
+  const userId = await getOrCreateDbUserId().catch(() => null)
+
   const tournamentRow = await db
     .select({
       name: tournaments.name,
@@ -45,10 +47,14 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
       outcome: tournaments.outcome,
     })
     .from(tournaments)
-    .where(eq(tournaments.id, tournamentId))
+    .where(and(eq(tournaments.id, tournamentId), ...(userId ? [eq(tournaments.userId, userId)] : [])))
     .limit(1)
     .then(r => r[0] ?? null)
     .catch(() => null)
+
+  if (!tournamentRow) {
+    return <div className="p-6 text-muted-foreground text-sm">Tournament not found.</div>
+  }
 
   const eventDatePassed = tournamentRow?.eventDate
     ? new Date(tournamentRow.eventDate) < new Date()
@@ -90,7 +96,6 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
   const opponentIds = opponents.map(o => o.id)
 
   // Community footage counts (cross-user, same Smoothcomp athlete ID)
-  const userId = await getOrCreateDbUserId().catch(() => null)
   const smoothcompIds = opponents.map(o => o.smoothcompAthleteId).filter(Boolean) as string[]
   const communityCountByAthleteId: Record<string, number> = userId && smoothcompIds.length > 0
     ? await getCommunityMatchCounts(smoothcompIds, userId, opponentIds).catch(() => ({}))
