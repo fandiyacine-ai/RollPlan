@@ -1,6 +1,6 @@
 import { db } from '.'
 import { matches, users, videos, gameplans, tournaments } from './schema'
-import { eq, and, gte, count, sum, sql } from 'drizzle-orm'
+import { eq, and, gte, ne, count, sum, sql } from 'drizzle-orm'
 
 export type UserUsageStats = {
   planTier: string
@@ -81,6 +81,25 @@ export async function getMonthlyMatchCount(userId: string): Promise<number> {
   return row?.total ?? 0
 }
 
+// Count all non-failed matches created this month — used for limit enforcement
+// so concurrent uploads can't both pass a check that only counts analysed matches
+async function getMonthlyActiveMatchCount(userId: string): Promise<number> {
+  const startOfMonth = new Date()
+  startOfMonth.setDate(1)
+  startOfMonth.setHours(0, 0, 0, 0)
+
+  const [row] = await db
+    .select({ total: count() })
+    .from(matches)
+    .where(and(
+      eq(matches.userId, userId),
+      ne(matches.status, 'failed'),
+      gte(matches.createdAt, startOfMonth),
+    ))
+
+  return row?.total ?? 0
+}
+
 export async function checkMonthlyLimit(userId: string): Promise<{ allowed: boolean; used: number; limit: number }> {
   const [user] = await db.select({ planTier: users.planTier }).from(users).where(eq(users.id, userId))
 
@@ -90,6 +109,10 @@ export async function checkMonthlyLimit(userId: string): Promise<{ allowed: bool
     return { allowed: true, used, limit: Infinity }
   }
 
-  const used = await getMonthlyMatchCount(userId)
-  return { allowed: used < FREE_MONTHLY_MATCH_LIMIT, used, limit: FREE_MONTHLY_MATCH_LIMIT }
+  // `used` is analysed-only for display; `activeCount` includes pending+processing for enforcement
+  const [used, activeCount] = await Promise.all([
+    getMonthlyMatchCount(userId),
+    getMonthlyActiveMatchCount(userId),
+  ])
+  return { allowed: activeCount < FREE_MONTHLY_MATCH_LIMIT, used, limit: FREE_MONTHLY_MATCH_LIMIT }
 }

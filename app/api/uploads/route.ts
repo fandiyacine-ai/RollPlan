@@ -16,11 +16,16 @@ export async function POST(req: NextRequest) {
     }
     if (!userId) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
+    const VALID_SOURCE_TYPES = ['own_competition', 'own_sparring', 'opponent', 'public_url'] as const
+    const VALID_FORMATS = ['gi', 'no_gi'] as const
+
     const { filename, contentType, size, sourceType, format } = await req.json()
 
     if (!filename) return NextResponse.json({ error: 'filename is required' }, { status: 400 })
     if (!contentType?.startsWith('video/')) return NextResponse.json({ error: 'Only video files are accepted' }, { status: 400 })
     if (size > 2 * 1024 * 1024 * 1024) return NextResponse.json({ error: 'File exceeds 2 GB limit' }, { status: 400 })
+    if (sourceType && !VALID_SOURCE_TYPES.includes(sourceType)) return NextResponse.json({ error: 'Invalid sourceType' }, { status: 400 })
+    if (format && !VALID_FORMATS.includes(format)) return NextResponse.json({ error: 'Invalid format' }, { status: 400 })
 
     const key = generateAnonymousVideoKey(filename)
     const uploadUrl = await getPresignedUploadUrl(key, contentType)

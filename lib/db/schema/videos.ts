@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp, pgEnum } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, integer, timestamp, pgEnum, uniqueIndex } from 'drizzle-orm/pg-core'
 import { users } from './users'
 import { tournamentOpponents } from './tournaments'
 
@@ -20,4 +20,6 @@ export const videos = pgTable('videos', {
   failureReason: text('failure_reason'),
   uploadedAt: timestamp('uploaded_at').notNull().defaultNow(),
   tournamentOpponentId: uuid('tournament_opponent_id').references(() => tournamentOpponents.id, { onDelete: 'set null' }),
-})
+}, (table) => ({
+  r2KeyIdx: uniqueIndex('videos_r2_key_idx').on(table.r2Key),
+}))
