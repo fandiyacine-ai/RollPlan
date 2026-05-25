@@ -136,7 +136,7 @@ export function Nav({ usageSlot }: { usageSlot?: React.ReactNode }) {
         {/* Left: brand + desktop nav */}
         <div className="flex items-center gap-6 sm:gap-8">
           <Link href="/" className="flex items-center gap-2 group shrink-0">
-            <span className="text-xl font-extrabold tracking-tight [font-family:var(--font-brand)]">Frame<span className="text-muted-foreground font-bold">Matters</span></span>
+            <span className="text-xl font-extrabold tracking-tight [font-family:var(--font-brand)]">Roll<span className="text-muted-foreground font-bold">Plan</span></span>
           </Link>
 
           {/* Desktop nav links */}

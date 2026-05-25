@@ -9,7 +9,7 @@ const inter = Inter({ subsets: ['latin'] })
 const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-brand', weight: ['700'] })
 
 export const metadata: Metadata = {
-  title: 'FrameMatters — AI BJJ Match Analysis',
+  title: 'RollPlan — AI BJJ Match Analysis',
   description: 'Upload your BJJ footage. AI maps every position, event, and turning point — all traced to timestamps.',
 }
 

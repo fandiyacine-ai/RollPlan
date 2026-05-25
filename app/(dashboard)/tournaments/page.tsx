@@ -101,9 +101,11 @@ export default async function TournamentsPage() {
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <RulesetBadge ruleset={t.ruleset} />
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
-                        {format === 'nogi' ? 'No-Gi' : 'Gi'}
-                      </span>
+                      {t.ruleset !== 'nogi' && (
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
+                          {format === 'nogi' ? 'No-Gi' : 'Gi'}
+                        </span>
+                      )}
                       {t.division && (
                         <span className="text-xs text-muted-foreground truncate">{t.division}</span>
                       )}

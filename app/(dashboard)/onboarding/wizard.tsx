@@ -106,7 +106,7 @@ export function OnboardingWizard() {
     return (
       <Overlay>
         <div className="text-center mb-6">
-          <h1 className="text-xl font-bold tracking-tight">Welcome to FrameMatters</h1>
+          <h1 className="text-xl font-bold tracking-tight">Welcome to RollPlan</h1>
           <p className="text-sm text-muted-foreground mt-1">What brings you here today?</p>
         </div>
 
@@ -240,7 +240,7 @@ export function OnboardingWizard() {
                   {ev.userCount > 0 && (
                     <>
                       <span className="opacity-30">·</span>
-                      <span className="text-primary/60">{ev.userCount} prepping on FrameMatters</span>
+                      <span className="text-primary/60">{ev.userCount} prepping on RollPlan</span>
                     </>
                   )}
                 </div>

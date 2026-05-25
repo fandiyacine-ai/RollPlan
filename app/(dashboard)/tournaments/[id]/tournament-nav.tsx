@@ -1,7 +1,27 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
+
+const BACK_LINK_CLASS = 'text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/50 hover:text-muted-foreground inline-block mb-3 transition-colors'
+
+function BackLinkInner() {
+  const searchParams = useSearchParams()
+  const back = searchParams.get('back')
+  if (back === '/gameplans') {
+    return <Link href="/gameplans" className={BACK_LINK_CLASS}>← My Gameplans</Link>
+  }
+  return <Link href="/tournaments" className={BACK_LINK_CLASS}>← Tournaments</Link>
+}
+
+export function TournamentBackLink() {
+  return (
+    <Suspense fallback={<Link href="/tournaments" className={BACK_LINK_CLASS}>← Tournaments</Link>}>
+      <BackLinkInner />
+    </Suspense>
+  )
+}
 
 export function TournamentNav({ id }: { id: string }) {
   const pathname = usePathname()

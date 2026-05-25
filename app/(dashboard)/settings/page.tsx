@@ -5,7 +5,7 @@ import { getOrCreateDbUserId } from '../../../lib/db/get-user'
 import { SettingsForm } from './settings-form'
 import Link from 'next/link'
 
-export const metadata = { title: 'Settings — FrameMatters' }
+export const metadata = { title: 'Settings — RollPlan' }
 
 export default async function SettingsPage() {
   const userId = await getOrCreateDbUserId()

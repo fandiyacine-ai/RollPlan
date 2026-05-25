@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-export const metadata = { title: 'Contact — FrameMatters' }
+export const metadata = { title: 'Contact — RollPlan' }
 
 export default function ContactPage() {
   return (
@@ -41,7 +41,7 @@ export default function ContactPage() {
               </svg>
             }
             title="Feedback & feature requests"
-            description="Using FrameMatters and have an idea? We&apos;re actively building — your input shapes what ships next."
+            description="Using RollPlan and have an idea? We&apos;re actively building — your input shapes what ships next."
             cta="feedback@framematters.app"
             href="mailto:feedback@framematters.app"
           />

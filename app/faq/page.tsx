@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-export const metadata = { title: 'FAQ — FrameMatters' }
+export const metadata = { title: 'FAQ — RollPlan' }
 
 const FAQ = [
   {
@@ -105,7 +105,7 @@ export default function FaqPage() {
         <div className="mb-12">
           <h1 className="text-3xl font-bold tracking-tight mb-3">Frequently Asked Questions</h1>
           <p className="text-muted-foreground">
-            Everything you need to know about FrameMatters. Something missing?{' '}
+            Everything you need to know about RollPlan. Something missing?{' '}
             <a href="mailto:support@framematters.app" className="underline underline-offset-2 hover:text-foreground">
               Drop us a line.
             </a>

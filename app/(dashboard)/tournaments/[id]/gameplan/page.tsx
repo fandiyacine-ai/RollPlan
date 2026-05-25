@@ -117,13 +117,6 @@ export default async function GameplanPage({
     <div className="space-y-3 sm:space-y-5">
       {isGenerating && <AutoRefresh intervalMs={5000} />}
 
-      {/* Back to My Gameplans — desktop only to save vertical space on mobile */}
-      {backHref === '/gameplans' && (
-        <Link href="/gameplans" className="hidden sm:inline-flex text-xs text-muted-foreground hover:text-foreground transition-colors items-center gap-1">
-          ← My Gameplans
-        </Link>
-      )}
-
       {/* Opponent selector */}
       {sortedOpponents.length > 1 && (
         <OpponentSelector

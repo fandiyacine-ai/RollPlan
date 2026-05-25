@@ -21,7 +21,7 @@ function formatTime(seconds: number): string {
 export async function generateMetadata({ params }: { params: Promise<{ shortId: string }> }): Promise<Metadata> {
   const { shortId } = await params
   const match = await db.query.matches.findFirst({ where: eq(matches.shareToken, shortId) })
-  if (!match) return { title: 'Match Analysis — FrameMatters' }
+  if (!match) return { title: 'Match Analysis — RollPlan' }
 
   const segments = await db.select().from(positionSegments).where(eq(positionSegments.matchId, match.id))
   const totalTime = segments.reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
@@ -44,7 +44,7 @@ export async function generateMetadata({ params }: { params: Promise<{ shortId: 
   return {
     title,
     description,
-    openGraph: { title, description, siteName: 'FrameMatters' },
+    openGraph: { title, description, siteName: 'RollPlan' },
     twitter: { card: 'summary', title, description },
   }
 }
@@ -217,7 +217,7 @@ export default async function SharedMatchPage({ params }: { params: Promise<{ sh
         <div className="border-t border-border/60 pt-6 text-center space-y-2">
           <p className="text-sm text-muted-foreground">Analyse your own BJJ matches with AI</p>
           <Link href="/" className="inline-block text-sm px-4 py-2 rounded-lg bg-foreground text-background font-medium hover:opacity-90 transition-opacity">
-            Try FrameMatters free →
+            Try RollPlan free →
           </Link>
         </div>
       </main>

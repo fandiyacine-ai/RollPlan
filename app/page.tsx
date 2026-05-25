@@ -35,7 +35,7 @@ export default function HomePage() {
           </h1>
 
           <p className="text-base text-muted-foreground leading-relaxed max-w-lg mx-auto">
-            FrameMatters turns your BJJ footage into a full analysis — every position,
+            RollPlan turns your BJJ footage into a full analysis — every position,
             transition, and turning point traced to the exact timestamp.
             No more guessing what went wrong.
           </p>
@@ -55,7 +55,7 @@ export default function HomePage() {
       <section className="px-6 py-16 max-w-3xl mx-auto w-full">
         <div className="rounded-2xl border bg-card p-8 sm:p-10 space-y-8">
           <div className="text-center space-y-2">
-            <h2 className="text-2xl font-bold">What FrameMatters does</h2>
+            <h2 className="text-2xl font-bold">What RollPlan does</h2>
             <p className="text-sm text-muted-foreground max-w-md mx-auto">
               Upload a match clip and the AI does the work — no tagging, no manual breakdown.
             </p>
