@@ -302,6 +302,10 @@ function nameSearchQueries(name: string, domain: string): string[] {
   if (parts.length >= 3) {
     const firstLast = `${parts[0]} ${parts[parts.length - 1]}`
     queries.push(`"${firstLast}" site:${domain}`, `${firstLast} site:${domain}`)
+    // Middle + last name: bypasses first-name spelling variants (e.g. "Zakriya" vs "Zakariya")
+    // while still uniquely identifying the person.
+    const middleLast = `${parts[1]} ${parts[parts.length - 1]}`
+    queries.push(`${middleLast} site:${domain}`)
   }
   if (parts.length >= 2) {
     queries.push(`${parts[parts.length - 1]} site:${domain}`)
