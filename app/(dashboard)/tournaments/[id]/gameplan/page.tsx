@@ -338,63 +338,55 @@ function GeneratingState({ opponentLabel, athleteName }: { opponentLabel: string
 
 function MatchCard({ card }: { card: GameplanOutput['match_card'] }) {
   return (
-    <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
-      {/* Header */}
-      <div className="px-5 py-3 border-b border-border/60 flex items-center gap-2">
-        <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-        <p className="text-xs font-medium text-muted-foreground">Match day</p>
+    <div className="rounded-xl overflow-hidden border border-border/60 bg-card shadow-sm">
+      {/* Inverted header — anchors the card as a distinct briefing artifact */}
+      <div className="bg-foreground px-5 py-2.5 flex items-center gap-2.5">
+        <span className="w-1.5 h-1.5 rounded-full bg-background/30 animate-pulse flex-shrink-0" />
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-background/70">Match Day</p>
       </div>
 
-      <div className="p-5 space-y-4">
-        {/* Headline */}
-        <p className="text-base font-semibold leading-snug">{card.headline}</p>
+      <div className="px-5 pt-4 pb-5 space-y-4">
+        {/* Headline — dominant */}
+        <p className="text-lg font-bold leading-snug">{card.headline}</p>
 
-        {/* Attack chain — arrows between steps */}
-        <div className="space-y-1.5">
-          <p className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-widest">Attack</p>
-          {/* Mobile: vertical */}
-          <div className="flex flex-col gap-1 sm:hidden">
-            {card.attack_chain.map((step, i) => (
-              <div key={i} className="flex gap-2 items-center">
-                {i > 0 && <svg className="w-3 h-3 text-muted-foreground/25 flex-shrink-0 -rotate-90" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2 6h8M7 3l3 3-3 3"/></svg>}
-                {i === 0 && <div className="w-3 flex-shrink-0" />}
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-foreground/[0.06] border border-border/40">{step}</span>
-              </div>
-            ))}
-          </div>
-          {/* Desktop: horizontal */}
-          <div className="hidden sm:flex flex-wrap items-center gap-1.5">
+        {/* Attack sequence — numbered inverted pills */}
+        <div className="space-y-2">
+          <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-muted-foreground/40">Attack sequence</p>
+          <div className="flex flex-wrap items-center gap-y-2 gap-x-1">
             {card.attack_chain.map((step, i, arr) => (
-              <span key={i} className="flex items-center gap-1.5">
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-foreground/[0.06] border border-border/40">{step}</span>
+              <span key={i} className="flex items-center gap-1">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-foreground text-background">
+                  <span className="text-[9px] font-black opacity-40 tabular-nums">{i + 1}</span>
+                  {step}
+                </span>
                 {i < arr.length - 1 && (
-                  <svg className="w-3 h-3 text-muted-foreground/25 flex-shrink-0" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2 6h8M7 3l3 3-3 3"/></svg>
+                  <svg className="w-3 h-3 text-muted-foreground/25 flex-shrink-0 mx-0.5" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2 6h8M7 3l3 3-3 3"/></svg>
                 )}
               </span>
             ))}
           </div>
         </div>
 
-        {/* Open with + Watch out — 2 col */}
+        {/* Open with + Watch out — left-bordered cells, high contrast */}
         <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-lg bg-foreground/[0.04] border border-border/30 px-3 py-2.5 space-y-1">
-            <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Open with</p>
+          <div className="rounded-lg border-l-[3px] border-emerald-500 bg-emerald-500/[0.07] dark:bg-emerald-500/[0.08] px-3 py-2.5 space-y-1">
+            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-500">Open with</p>
             <p className="text-xs font-bold leading-snug">{card.open_with}</p>
           </div>
-          <div className="rounded-lg bg-rose-950/30 border border-rose-500/25 px-3 py-2.5 space-y-1">
-            <p className="text-[9px] font-bold uppercase tracking-widest text-rose-500/70">Watch out</p>
-            <p className="text-xs font-bold leading-snug text-rose-300">{card.watch_out}</p>
+          <div className="rounded-lg border-l-[3px] border-rose-500 bg-rose-500/[0.07] dark:bg-rose-500/[0.08] px-3 py-2.5 space-y-1">
+            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-rose-600 dark:text-rose-400">Watch out</p>
+            <p className="text-xs font-bold leading-snug text-rose-700 dark:text-rose-300">{card.watch_out}</p>
           </div>
         </div>
-
-        {/* If losing */}
-        {card.if_losing_points && (
-          <div className="flex gap-2.5 items-center pt-3 border-t border-amber-500/20 bg-amber-950/10 -mx-5 px-5 -mb-5 pb-5 mt-1 rounded-b-xl">
-            <span className="text-[10px] font-bold text-amber-500/70 whitespace-nowrap flex-shrink-0 uppercase tracking-wider">If losing</span>
-            <p className="text-xs font-medium text-amber-200/70 leading-snug">{card.if_losing_points}</p>
-          </div>
-        )}
       </div>
+
+      {/* If losing — full-width footer strip */}
+      {card.if_losing_points && (
+        <div className="border-t border-amber-500/30 bg-amber-500/[0.07] dark:bg-amber-500/[0.08] px-5 py-3 flex items-start gap-3">
+          <span className="text-[9px] font-black uppercase tracking-[0.18em] text-amber-600 dark:text-amber-400 whitespace-nowrap flex-shrink-0 pt-px">If losing</span>
+          <p className="text-xs font-semibold leading-snug text-amber-800 dark:text-amber-300">{card.if_losing_points}</p>
+        </div>
+      )}
     </div>
   )
 }
