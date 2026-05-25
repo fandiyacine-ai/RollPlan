@@ -201,6 +201,8 @@ async function findAjpAthleteIdByName(name: string): Promise<string | null> {
 
 async function findIdFromEventParticipants(eventIds: string[], name: string): Promise<string | null> {
   const nameLower = name.toLowerCase()
+  const nameParts = nameLower.split(/\s+/).filter(p => p.length > 1)
+  const threshold = nameMatchThreshold(nameParts)
   for (const eventId of eventIds.slice(0, 5)) {
     try {
       const pResp = await fetch(`https://ajptour.com/en/event/${eventId}/participants`, {
@@ -214,9 +216,8 @@ async function findIdFromEventParticipants(eventIds: string[], name: string): Pr
       for (const participant of data.participants ?? []) {
         for (const reg of participant.registrations ?? []) {
           const fullName = `${reg.firstname} ${reg.lastname}`.toLowerCase()
-          if (fullName.includes(nameLower) || nameLower.includes(fullName.split(' ')[0])) {
-            return String(reg.user_id)
-          }
+          const matchCount = nameParts.filter(p => fullName.includes(p)).length
+          if (matchCount >= threshold) return String(reg.user_id)
         }
       }
     } catch { continue }
@@ -310,12 +311,15 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
     }
   }
 
-  // 2. Gemini + Google Search grounding
-  if (candidateUrls.length === 0) {
-    candidateUrls = await geminiGroundedSearch(
-      `Find smoothcomp.com profile URLs for BJJ athlete "${name}". Return the profile URLs.`,
-      'smoothcomp.com'
-    )
+  // 2. Gemini + Google Search grounding — always run, not just as fallback
+  // Brave may find unrelated event pages and miss the actual profile; Gemini has better recall
+  const geminiUrls = await geminiGroundedSearch(
+    `Find the smoothcomp.com/en/profile/NUMBERS profile page for BJJ athlete "${name}". Return only the direct profile URL.`,
+    'smoothcomp.com'
+  )
+  const seenUrls = new Set(candidateUrls)
+  for (const u of geminiUrls) {
+    if (!seenUrls.has(u)) { seenUrls.add(u); candidateUrls.push(u) }
   }
 
   if (candidateUrls.length === 0) return []
@@ -423,16 +427,29 @@ export const buildOpponentIntel = inngest.createFunction(
 
     let athleteId = opponent?.smoothcompAthleteId ?? null
 
-    // If no athlete ID yet (manually-added opponent), try to find them via Google + participants API
+    // If no athlete ID yet (manually-added opponent), try to find them via Google + participants API.
+    // Search AJP first; if not found there, fall back to Smoothcomp (same underlying platform,
+    // shared athlete registry — the ID works on both ajptour.com and smoothcomp.com).
     if (!athleteId) {
       const found = await step.run('find-ajp-id-by-name', async () => {
-        const id = await findAjpAthleteIdByName(athleteName)
-        if (id) {
+        const ajpId = await findAjpAthleteIdByName(athleteName)
+        if (ajpId) {
           await db.update(tournamentOpponents)
-            .set({ smoothcompAthleteId: id, smoothcompProfileUrl: `https://ajptour.com/en/profile/${id}` })
+            .set({ smoothcompAthleteId: ajpId, smoothcompProfileUrl: `https://ajptour.com/en/profile/${ajpId}` })
             .where(eq(tournamentOpponents.id, opponentId))
+          return { id: ajpId }
         }
-        return { id }
+        // Not on AJP — try Smoothcomp directly (athletes competing in European/Brazilian events may
+        // only appear on smoothcomp.com, not ajptour.com)
+        const scProfiles = await findSmoothcompProfiles(athleteName)
+        if (scProfiles.length > 0) {
+          const scId = scProfiles[0].athleteId
+          await db.update(tournamentOpponents)
+            .set({ smoothcompAthleteId: scId, smoothcompProfileUrl: `https://smoothcomp.com/en/profile/${scId}` })
+            .where(eq(tournamentOpponents.id, opponentId))
+          return { id: scId }
+        }
+        return { id: null }
       })
       if (found.id) athleteId = found.id
     }
@@ -469,7 +486,21 @@ export const buildOpponentIntel = inngest.createFunction(
     // --- Smoothcomp ---
     await step.run('fetch-smoothcomp-totals', async () => {
       try {
-        const profiles = await findSmoothcompProfiles(athleteName)
+        // AJP Tour runs on Smoothcomp infrastructure — athlete IDs are shared across both platforms.
+        // If we already have an ID (from AJP or from a prior Smoothcomp search), try it on
+        // smoothcomp.com directly before doing an independent name-based search.
+        let profiles: Array<{ baseUrl: string; athleteId: string }> = []
+        if (athleteId) {
+          try {
+            const testPage = await fetchSmoothcompEventsPage('https://smoothcomp.com', athleteId, 1)
+            if ((testPage.data?.length ?? 0) > 0) {
+              profiles = [{ baseUrl: 'https://smoothcomp.com', athleteId }]
+            }
+          } catch { /* not on smoothcomp.com with this ID — fall through to name search */ }
+        }
+        if (profiles.length === 0) {
+          profiles = await findSmoothcompProfiles(athleteName)
+        }
         if (profiles.length === 0) return { wins: 0, losses: 0 }
 
         let wins = 0, losses = 0
