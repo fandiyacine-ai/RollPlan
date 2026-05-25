@@ -373,22 +373,22 @@ function MatchCard({ card }: { card: GameplanOutput['match_card'] }) {
         </div>
 
         {/* Open with + Watch out — 2 col */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <p className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-widest">Open with</p>
-            <p className="text-xs font-semibold leading-snug">{card.open_with}</p>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-lg bg-foreground/[0.04] border border-border/30 px-3 py-2.5 space-y-1">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Open with</p>
+            <p className="text-xs font-bold leading-snug">{card.open_with}</p>
           </div>
-          <div className="space-y-1">
-            <p className="text-[10px] font-medium text-rose-500/70 uppercase tracking-widest">Watch out</p>
-            <p className="text-xs font-semibold leading-snug text-rose-400">{card.watch_out}</p>
+          <div className="rounded-lg bg-rose-950/30 border border-rose-500/25 px-3 py-2.5 space-y-1">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-rose-500/70">Watch out</p>
+            <p className="text-xs font-bold leading-snug text-rose-300">{card.watch_out}</p>
           </div>
         </div>
 
         {/* If losing */}
         {card.if_losing_points && (
-          <div className="flex gap-2.5 items-center pt-3 border-t border-border/40">
-            <span className="text-[10px] font-medium text-muted-foreground/50 whitespace-nowrap flex-shrink-0">If losing</span>
-            <p className="text-xs font-medium text-foreground/70 leading-snug">{card.if_losing_points}</p>
+          <div className="flex gap-2.5 items-center pt-3 border-t border-amber-500/20 bg-amber-950/10 -mx-5 px-5 -mb-5 pb-5 mt-1 rounded-b-xl">
+            <span className="text-[10px] font-bold text-amber-500/70 whitespace-nowrap flex-shrink-0 uppercase tracking-wider">If losing</span>
+            <p className="text-xs font-medium text-amber-200/70 leading-snug">{card.if_losing_points}</p>
           </div>
         )}
       </div>
@@ -653,10 +653,11 @@ function CollapsibleCard({ title, titleColor = 'text-muted-foreground', children
 }
 
 function Section({ title, children, mobileCollapsed = false }: { title: string; children: React.ReactNode; mobileCollapsed?: boolean }) {
+  const heading = <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">{title}</h3>
   if (!mobileCollapsed) {
     return (
       <div className="space-y-2.5">
-        <h3 className="text-xs font-medium text-muted-foreground px-0.5">{title}</h3>
+        {heading}
         {children}
       </div>
     )
@@ -665,13 +666,13 @@ function Section({ title, children, mobileCollapsed = false }: { title: string; 
     <>
       {/* Desktop: always open */}
       <div className="hidden sm:block space-y-2.5">
-        <h3 className="text-xs font-medium text-muted-foreground px-0.5">{title}</h3>
+        {heading}
         {children}
       </div>
       {/* Mobile: collapsible via native <details> */}
       <details className="sm:hidden">
         <summary className="list-none cursor-pointer flex items-center justify-between px-0.5 py-1 select-none [&::-webkit-details-marker]:hidden">
-          <h3 className="text-xs font-medium text-muted-foreground">{title}</h3>
+          {heading}
           {CHEVRON}
         </summary>
         <div className="mt-2 space-y-2.5">{children}</div>
@@ -719,7 +720,7 @@ function PredictionCard({ prediction }: { prediction: MatchupPrediction }) {
 
         {/* Rationale */}
         <div className="px-5 py-4 border-b border-border/60">
-          <p className="text-sm text-muted-foreground leading-relaxed">{prediction.rationale}</p>
+          <p className="text-sm text-foreground/80 leading-relaxed">{prediction.rationale}</p>
         </div>
 
         {/* Advantages + Risks */}

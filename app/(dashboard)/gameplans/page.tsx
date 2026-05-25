@@ -21,14 +21,16 @@ function DataQualityNote({ matchCount }: { matchCount: number }) {
 
 function WinBar({ probability, verdict }: { probability: number; verdict: string }) {
   const verdictLabel = verdict === 'favourable' ? 'Favourable' : verdict === 'tough' ? 'Tough' : 'Even'
+  const verdictColor = verdict === 'favourable' ? 'text-emerald-400' : verdict === 'tough' ? 'text-rose-400' : 'text-amber-400'
+  const barColor = verdict === 'favourable' ? 'bg-emerald-500/60' : verdict === 'tough' ? 'bg-rose-500/60' : 'bg-amber-500/60'
   return (
     <div className="space-y-1.5">
       <div className="flex items-end justify-between gap-2">
-        <span className="text-2xl font-semibold tabular-nums leading-none">{probability}%</span>
-        <span className="text-xs text-muted-foreground mb-0.5">{verdictLabel}</span>
+        <span className="text-3xl font-bold tabular-nums leading-none tracking-tight">{probability}%</span>
+        <span className={`text-[11px] font-semibold mb-0.5 ${verdictColor}`}>{verdictLabel}</span>
       </div>
-      <div className="h-1 rounded-full bg-muted overflow-hidden">
-        <div className={`h-full rounded-full ${probability >= 50 ? 'bg-zinc-500' : 'bg-zinc-400'}`} style={{ width: `${probability}%` }} />
+      <div className="h-1 rounded-full bg-muted/60 overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${probability}%` }} />
       </div>
     </div>
   )
@@ -94,33 +96,31 @@ function GameCard({
 
         {/* Condensed game plan */}
         {plan && (
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {/* ATTACK chain */}
-            <div>
-              <p className="text-xs text-muted-foreground mb-1.5">Attack</p>
-              <ol className="space-y-0.5">
-                {plan.primary_chain.steps.slice(0, 3).map((step, i) => (
-                  <li key={i} className="text-xs text-foreground/80 flex gap-1.5">
-                    <span className="text-muted-foreground/30 tabular-nums flex-shrink-0">{i + 1}.</span>
-                    <span className="line-clamp-1">{step}</span>
-                  </li>
-                ))}
-              </ol>
+            <div className="rounded-lg bg-foreground/[0.03] border border-border/30 px-3 py-2.5 space-y-1">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50 mb-1.5">Attack</p>
+              {plan.primary_chain.steps.slice(0, 3).map((step, i) => (
+                <div key={i} className="text-xs text-foreground/85 flex gap-2 items-baseline">
+                  <span className="text-[9px] font-black text-muted-foreground/25 tabular-nums flex-shrink-0 mt-px">{i + 1}</span>
+                  <span className="line-clamp-1 font-medium leading-snug">{step}</span>
+                </div>
+              ))}
             </div>
 
             {/* DANGER */}
             {plan.defensive_priorities[0] && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Danger</p>
-                <p className="text-xs text-rose-500 line-clamp-1">{plan.defensive_priorities[0].threat}</p>
+              <div className="rounded-lg border border-rose-500/20 bg-rose-950/20 px-3 py-2">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-rose-500/60 mb-1">Danger</p>
+                <p className="text-xs text-rose-400 font-medium line-clamp-1 leading-snug">{plan.defensive_priorities[0].threat}</p>
               </div>
             )}
 
             {/* MINDSET */}
             {plan.mental_cues[0] && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Mindset</p>
-                <p className="text-xs text-foreground/70 leading-snug line-clamp-1">{plan.mental_cues[0]}</p>
+              <div className="px-1">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40 mb-1">Mindset</p>
+                <p className="text-xs text-foreground/60 leading-snug line-clamp-1 italic">{plan.mental_cues[0]}</p>
               </div>
             )}
           </div>
@@ -128,21 +128,17 @@ function GameCard({
       </div>
 
       {/* Source footage footnote */}
-      <div className="px-4 pb-3 border-t border-border/30">
-        <p className="text-[10px] text-muted-foreground/40 mt-2.5 mb-0.5">Scout data</p>
-        {matchSources.length > 0 ? (
-          <p className="text-[10px] text-muted-foreground/60 truncate">
-            {matchSources[0]}{matchSources.length > 1 ? ` +${matchSources.length - 1} more` : ''}
-          </p>
-        ) : (
-          <p className="text-[10px] text-muted-foreground/50">
-            {matchCount === 0
-              ? 'No footage — AI prediction only'
-              : matchCount === 1
-              ? '1 match analysed'
-              : `${matchCount} matches analysed`}
-          </p>
-        )}
+      <div className="px-4 pb-3 pt-2.5 border-t border-border/20 flex items-center gap-1.5">
+        <span className="text-[9px] text-muted-foreground/30 font-medium uppercase tracking-widest flex-shrink-0">src</span>
+        <span className="text-[10px] text-muted-foreground/45 truncate">
+          {matchSources.length > 0
+            ? `${matchSources[0]}${matchSources.length > 1 ? ` +${matchSources.length - 1}` : ''}`
+            : matchCount === 0
+            ? 'AI prediction only'
+            : matchCount === 1
+            ? '1 match'
+            : `${matchCount} matches`}
+        </span>
       </div>
     </Link>
   )
