@@ -12,6 +12,15 @@ export const r2 = new S3Client({
   responseChecksumValidation: 'WHEN_REQUIRED',
 })
 
+export async function uploadBuffer(key: string, body: Buffer, contentType: string): Promise<void> {
+  await r2.send(new PutObjectCommand({
+    Bucket: process.env.R2_BUCKET_NAME!,
+    Key: key,
+    Body: body,
+    ContentType: contentType,
+  }))
+}
+
 export async function getPresignedUploadUrl(key: string, contentType: string): Promise<string> {
   const command = new PutObjectCommand({
     Bucket: process.env.R2_BUCKET_NAME!,

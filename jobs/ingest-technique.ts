@@ -1,3 +1,9 @@
+import { spawnSync } from 'child_process'
+import { mkdtempSync, rmSync, readFileSync, existsSync } from 'fs'
+import { join } from 'path'
+import { tmpdir } from 'os'
+import { eq } from 'drizzle-orm'
+import ytdl from '@distube/ytdl-core'
 import { generateObject } from 'ai'
 import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
@@ -6,6 +12,7 @@ import { google, GEMINI_VIDEO_MODEL, estimateCostUsd } from '../lib/ai/clients'
 import { TechniqueExtractionOutputSchema } from '../lib/ai/schemas/technique-extraction'
 import { buildExtractTechniqueSystemPrompt, buildExtractTechniqueUserPrompt, EXTRACT_TECHNIQUE_PROMPT_VERSION } from '../lib/ai/prompts/extract-technique'
 import { embedText } from '../lib/ai/embeddings'
+import { uploadBuffer, getPublicVideoUrl } from '../lib/storage/r2'
 
 export const ingestTechnique = inngest.createFunction(
   {
@@ -120,6 +127,53 @@ export const ingestTechnique = inngest.createFunction(
 
       return { id: record.id, status }
     })
+
+    // Extract a reference frame at the key moment and upload to R2
+    if (object.key_moment_seconds != null) {
+      const refImageUrl = await step.run('extract-reference-image', async () => {
+        try {
+          const info = await ytdl.getInfo(youtubeUrl)
+          const format = ytdl.chooseFormat(info.formats, {
+            quality: 'lowestvideo',
+            filter: f => !!f.url && f.hasVideo,
+          })
+          if (!format?.url) return null
+
+          const tmpDir = mkdtempSync(join(tmpdir(), 'rp-ref-'))
+          const outPath = join(tmpDir, 'frame.jpg')
+          try {
+            spawnSync('ffmpeg', [
+              '-loglevel', 'error',
+              '-ss', String(Math.floor(object.key_moment_seconds!)),
+              '-i', format.url,
+              '-frames:v', '1',
+              '-q:v', '3',
+              '-vf', 'scale=1280:-2',
+              outPath,
+            ], { timeout: 30_000 })
+
+            if (!existsSync(outPath)) return null
+
+            const buffer = readFileSync(outPath)
+            const r2Key = `technique-refs/${variantId.id}.jpg`
+            await uploadBuffer(r2Key, buffer, 'image/jpeg')
+            return await getPublicVideoUrl(r2Key)
+          } finally {
+            rmSync(tmpDir, { recursive: true, force: true })
+          }
+        } catch {
+          return null
+        }
+      })
+
+      if (refImageUrl) {
+        await step.run('save-reference-image', async () => {
+          await db.update(techniqueVariants)
+            .set({ referenceImageUrl: refImageUrl, updatedAt: new Date() })
+            .where(eq(techniqueVariants.id, variantId.id))
+        })
+      }
+    }
 
     return {
       variantId: variantId.id,

@@ -606,9 +606,11 @@ export const buildOpponentIntel = inngest.createFunction(
             }
           }
 
-          await db.update(tournamentOpponents)
-            .set({ ajpWins: wins, ajpLosses: losses })
-            .where(eq(tournamentOpponents.id, opponentId))
+          if (wins > 0 || losses > 0) {
+            await db.update(tournamentOpponents)
+              .set({ ajpWins: wins, ajpLosses: losses })
+              .where(eq(tournamentOpponents.id, opponentId))
+          }
           return { wins, losses }
         } catch { return { skipped: true } }
       })

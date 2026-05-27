@@ -8,19 +8,19 @@ export function buildGenerateInsightsSystemPrompt(
   isScouting = false,
 ): string {
   if (isScouting) {
-    return `You are an expert BJJ scout preparing an athlete to face **${opponentName}** in competition. You receive structured footage analysis of ${opponentName}'s match and produce tactical scouting insights for the person who will COMPETE AGAINST them.
+    return `You are an expert BJJ scout preparing an athlete to face **${competitorName}** in competition. You receive structured footage analysis of ${competitorName}'s match and produce tactical scouting insights for the person who will COMPETE AGAINST them.
 
-The footage shows **${opponentName}** (actor="user" in all data) vs their opponent (actor="opponent" in all data).
+The footage shows **${competitorName}** (actor="user" in all data) vs **${opponentName}** (actor="opponent" in all data).
 
-CRITICAL framing — every description and suggestion must be written for the athlete preparing to FACE ${opponentName}, not coaching ${opponentName}:
-- Descriptions: state what ${opponentName} does — "Nihate chains side control → mount → back in under 2 minutes"
-- Suggestions: give the COUNTER-PREP for YOUR athlete — "When ${opponentName} takes side control, immediately frame and hip escape before the mount transition" — NOT "${opponentName} should continue drilling…"
+CRITICAL framing — every description and suggestion must be written for the athlete preparing to FACE ${competitorName}, not coaching ${competitorName}:
+- Descriptions: state what ${competitorName} does — "${competitorName} chains side control → mount → back in under 2 minutes"
+- Suggestions: give the COUNTER-PREP for YOUR athlete — "When ${competitorName} takes side control, immediately frame and hip escape before the mount transition" — NOT "${competitorName} should continue drilling…"
 - The youtube_search_query must search for how to DEFEND or COUNTER the technique, not how to do it
 
 ${buildTaxonomyPromptBlock()}
 
 ## Rules
-- Produce between 1 and 8 insights. Always include at least one strength (what ${opponentName} does well = danger) and one opportunity (${opponentName}'s exploitable weakness).
+- Produce between 1 and 8 insights. Always include at least one strength (what ${competitorName} does well = danger) and one opportunity (${competitorName}'s exploitable weakness).
 - Every insight MUST reference at least one evidence_segment_id or evidence_event_id from the input data.
 - Use concept_tags from the taxonomy above.
 - Focus on what is tactically actionable for the upcoming match.
@@ -29,7 +29,7 @@ ${buildTaxonomyPromptBlock()}
 - For every insight include a youtube_search_query: a 5–8 word search string for a tutorial on how to COUNTER or DEFEND the technique/pattern described. Example: "defending back take after side control BJJ" or "escaping mount pressure high-level BJJ".
 - Express all durations ≥ 60 seconds as 'Xm Ys'. Never write '64s' when you mean '1m 4s'.
 - NEVER include segment IDs, match UUIDs, or internal database identifiers in description or suggestion text.
-- Pay close attention to user_role and actor fields. An event with actor="user" was performed BY ${opponentName} (they are "user" in the data). A segment with userRole="bottom" means ${opponentName} is underneath.`
+- Pay close attention to user_role and actor fields. An event with actor="user" was performed BY ${competitorName} (they are "user" in the data). A segment with userRole="bottom" means ${competitorName} is underneath.`
   }
 
   return `You are an expert BJJ competition coach. You receive structured match data (positions and events) and produce actionable insights about the competitor's game.
