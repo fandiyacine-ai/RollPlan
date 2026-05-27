@@ -743,6 +743,8 @@ export function ScoutingView({
   maxPositionTime,
   positionNames,
   backHref,
+  backLabel,
+  viewMode,
 }: {
   match: {
     id: string
@@ -762,6 +764,8 @@ export function ScoutingView({
   maxPositionTime: number
   positionNames: Record<string, string>
   backHref: string
+  backLabel?: string
+  viewMode?: 'scouting' | 'analysis'
 }) {
   const [currentTime, setCurrentTime] = useState(0)
   const [activeTab, setActiveTab] = useState<TabId>('brief')
@@ -790,6 +794,9 @@ export function ScoutingView({
       ? match.opponentLabel
       : 'Unknown Opponent'
 
+  const label = viewMode === 'analysis' ? 'Match Analysis' : 'Scouting'
+  const defaultBackLabel = viewMode === 'analysis' ? '← My Matches' : '← Scout Opponent'
+
   return (
     <div className="flex flex-col h-full max-w-[1400px] mx-auto w-full px-4 sm:px-6">
 
@@ -797,14 +804,14 @@ export function ScoutingView({
       <div className="flex items-start justify-between pb-3 border-b flex-shrink-0 gap-4">
         <div className="flex flex-col gap-0.5 min-w-0">
           <Link href={backHref} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-            ← Scout Opponent
+            {backLabel ?? defaultBackLabel}
           </Link>
           <div className="flex items-center gap-2.5 flex-wrap mt-0.5">
             <h1 className="text-lg font-bold">
               {match.competitorLabel ? `${match.competitorLabel} vs. ${opponentName}` : opponentName}
             </h1>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/25 flex-shrink-0 tracking-wide uppercase">
-              Scouting
+              {label}
             </span>
             {match.resultWinner && (
               <ResultBadge

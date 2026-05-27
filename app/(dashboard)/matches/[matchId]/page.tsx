@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
 import { MatchContent, type TimelineItem } from './match-content'
+import { ScoutingView } from './scouting-view'
 import { NarrateButton } from './narrate-button'
 import { ShareButton } from './share-button'
 import { CorrectResultButton } from './correct-result-button'
@@ -149,6 +150,33 @@ export default async function MatchDetailPage({
     ? `vs. ${knownOpponent}`
     : `${match.format === 'no_gi' ? 'No-Gi' : 'Gi'} ${match.context === 'sparring' ? 'Sparring' : match.context === 'drilling' ? 'Drilling' : 'Competition'}`
 
+  if (match.status === 'analysed') {
+    return (
+      <ScoutingView
+        match={{
+          id: match.id,
+          competitorLabel: match.competitorLabel,
+          opponentLabel: match.opponentLabel,
+          format: match.format,
+          context: match.context,
+          eventName: match.eventName,
+          resultWinner: match.resultWinner,
+          resultMethod: match.resultMethod,
+          resultTechnique: match.resultTechnique,
+        }}
+        videoUrl={video?.publicUrl ?? null}
+        insights={matchInsights}
+        timelineItems={timelineItems}
+        sortedPositions={sortedPositions}
+        maxPositionTime={maxPositionTime}
+        positionNames={POSITION_MAP}
+        backHref={backHref}
+        backLabel={backLabel}
+        viewMode={match.tournamentOpponentId ? 'scouting' : 'analysis'}
+      />
+    )
+  }
+
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Header */}
@@ -169,9 +197,6 @@ export default async function MatchDetailPage({
               )}
               {match.resultWinner && (
                 <MatchResultBadge winner={match.resultWinner} method={match.resultMethod} technique={match.resultTechnique} />
-              )}
-              {match.status === 'analysed' && (
-                <CorrectResultButton matchId={matchId} />
               )}
             </div>
             <p className="text-sm text-muted-foreground mt-1">
@@ -198,18 +223,6 @@ export default async function MatchDetailPage({
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_BADGE[match.status]}`}>
               {STATUS_LABEL[match.status] ?? match.status}
             </span>
-            {match.status === 'analysed' && (
-              <>
-                <ShareButton matchId={matchId} />
-                <Link
-                  href={`/matches/${matchId}/coach?back=${encodeURIComponent(backHref)}`}
-                  className={`${buttonVariants({ size: 'sm' })} gap-1.5`}
-                >
-                  Frame by Frame
-                  <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-white/20 leading-none tracking-wide">AI</span>
-                </Link>
-              </>
-            )}
           </div>
         </div>
       </div>
@@ -252,133 +265,6 @@ export default async function MatchDetailPage({
         <div className="rounded-lg border border-rose-800/50 bg-rose-950/40 p-4 text-sm text-rose-400">
           Analysis failed. Try uploading the match again.
         </div>
-      )}
-
-      {match.status === 'analysed' && (
-        <>
-          {/* Stats summary */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-lg border p-4">
-              <p className="text-xs text-muted-foreground">Match Time</p>
-              <p className="text-2xl font-bold mt-1">{formatTime(totalMatchTime)}</p>
-            </div>
-            <div className="rounded-lg border p-4">
-              <p className="text-xs text-muted-foreground">Segments</p>
-              <p className="text-2xl font-bold mt-1">{segments.length}</p>
-            </div>
-            <div className="rounded-lg border p-4">
-              <p className="text-xs text-muted-foreground">Notes</p>
-              <p className="text-2xl font-bold mt-1">{matchInsights.length}</p>
-            </div>
-          </div>
-
-          {/* Position breakdown */}
-          {sortedPositions.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                <svg className="w-3 h-3 opacity-50" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="6" cy="6" r="4.5"/><path d="M6 3.5v2.5l1.5 1"/></svg>
-                Time on Mat
-              </h2>
-              <div className="space-y-2.5">
-                {sortedPositions.map(([posId, stats]) => {
-                  const barPct = (stats.total / maxPositionTime) * 100
-                  const domPct = (stats.dominant / stats.total) * 100
-                  const infPct = (stats.inferior / stats.total) * 100
-                  const neuPct = Math.max(0, 100 - domPct - infPct)
-                  return (
-                    <div key={posId}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium">{POSITION_MAP[posId] ?? posId}</span>
-                        <span className="text-xs text-muted-foreground tabular-nums">{formatTime(stats.total)}</span>
-                      </div>
-                      <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                        <div className="h-full flex rounded-full overflow-hidden" style={{ width: `${barPct}%` }}>
-                          <div className="bg-emerald-500" style={{ width: `${domPct}%` }} />
-                          <div className="bg-zinc-600" style={{ width: `${neuPct}%` }} />
-                          <div className="bg-rose-400" style={{ width: `${infPct}%` }} />
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-              <div className="flex items-center gap-4 pt-1 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" /> In Control
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-zinc-600 inline-block" /> Neutral
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-sm bg-rose-400 inline-block" /> Under Pressure
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Match Report */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                <svg className="w-3 h-3 opacity-50" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="1.5" width="8" height="9" rx="1"/><path d="M4 4.5h4M4 6.5h4M4 8.5h2"/></svg>
-                Match Report
-              </h2>
-              <NarrateButton matchId={matchId} hasNarration={!!match.narration} />
-            </div>
-
-            {match.narration ? (
-              <div className="rounded-xl border bg-card p-5 space-y-4">
-                {match.narration.split('\n\n').filter(Boolean).map((chunk, i) => {
-                  const lines = chunk.split('\n')
-                  const firstLine = lines[0].trim()
-                  const isHeader = firstLine === firstLine.toUpperCase() && firstLine.length < 30 && /^[A-Z\s]+$/.test(firstLine)
-                  if (isHeader) {
-                    const body = lines.slice(1).join('\n').trim()
-                    return (
-                      <div key={i} className="space-y-1.5">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{firstLine}</p>
-                        {body && <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{body}</p>}
-                      </div>
-                    )
-                  }
-                  return <p key={i} className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{chunk}</p>
-                })}
-              </div>
-            ) : (
-              <div className="rounded-xl border border-dashed border-border/60 p-6 text-center">
-                <p className="text-sm text-muted-foreground">
-                  No match report yet — click &ldquo;Generate Match Report&rdquo; to get a coach&rsquo;s breakdown of this match.
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Admin: re-run full pipeline */}
-          {isAdmin(clerkUserId) && (
-            <div className="flex items-center gap-2 text-[10px] text-zinc-600">
-              <span>Admin:</span>
-              <ReanalyzeButton matchId={matchId} />
-            </div>
-          )}
-
-          {/* Video + Timeline + Coaching Notes */}
-          <MatchContent
-            videoUrl={video?.publicUrl ?? null}
-            matchInsights={matchInsights}
-            timelineItems={timelineItems}
-            matchId={match.id}
-            competitorLabel={match.tournamentOpponentId ? match.competitorLabel : null}
-            opponentLabel={match.tournamentOpponentId ? match.opponentLabel : null}
-            segments={segments.map((s) => ({
-              id: s.id,
-              startSeconds: s.startSeconds,
-              endSeconds: s.endSeconds,
-              userBbox: (s.userBbox as { x1: number; y1: number; x2: number; y2: number } | null) ?? null,
-              opponentBbox: (s.opponentBbox as { x1: number; y1: number; x2: number; y2: number } | null) ?? null,
-            }))}
-            spatialData={(match.spatialData as { roi: { x1: number; y1: number; x2: number; y2: number }; athlete: { x1: number; y1: number; x2: number; y2: number } } | null) ?? null}
-          />
-        </>
       )}
     </div>
   )
