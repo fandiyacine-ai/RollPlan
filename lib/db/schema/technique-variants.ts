@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, boolean } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, timestamp, boolean, jsonb } from 'drizzle-orm/pg-core'
 
 export const techniqueVariants = pgTable('technique_variants', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -15,12 +15,18 @@ export const techniqueVariants = pgTable('technique_variants', {
   visualCues: text('visual_cues').notNull(),  // what Gemini should look for (from narration + vision)
   counters: text('counters'),                 // what to do when receiving — for gameplans + chat
 
+  // Transcript and combined search text for semantic retrieval
+  transcript: text('transcript'),              // raw transcript/captions from source (if available)
+  searchText: text('search_text'),             // concat of name + visualCues + transcript for simple retrieval
+  embedding: jsonb('embedding').$type<number[] | null>(),
+
   // Reference image (stored in R2, sent to Gemini as visual anchor)
   referenceImageUrl: text('reference_image_url'),
 
   // Provenance
   sourceUrl: text('source_url'),             // YouTube URL of the instructional
   sourceLabel: text('source_label'),          // 'Gordon Ryan armbar series', etc.
+  sourceCategory: text('source_category').notNull().default('instructional'),    // 'instructional' | 'analysis'
   extractedByModel: text('extracted_by_model'), // which model extracted the visual cues
 
   // Workflow

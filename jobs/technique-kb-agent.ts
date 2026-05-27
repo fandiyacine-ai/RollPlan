@@ -42,6 +42,14 @@ const TRUSTED_CHANNELS = [
   'eddie bravo', 'rubber guard', 'oliver taza', 'kyle boehm',
 ]
 
+// Additional analyst / narrated-match channels to surface match breakdowns
+// (used when building a match-analysis KB in addition to pure instructionals)
+const ANALYSIS_CHANNELS = [
+  'bjj scout', 'bjjscout', 'flograppling', 'flo grappling',
+  'bjj analysis', 'match breakdown', 'grappling central', 'fight commentary',
+  'bjj breakdown', 'match review', 'jits insight', 'bjj talk',
+]
+
 // ── YouTube Data API search ───────────────────────────────────────────────────
 
 type YTVideo = {
@@ -170,14 +178,20 @@ function buildTools(state: { searchCount: number; queuedCount: number; queuedUrl
         const trusted = TRUSTED_CHANNELS
 
         return {
-          results: videos.map(v => ({
-            url: v.url,
-            title: v.title,
-            channel: v.channel,
-            description: v.description.slice(0, 200),
-            is_trusted_channel: trusted.some(t => v.channel.toLowerCase().includes(t)),
-            already_queued: state.queuedUrls.has(v.url),
-          })),
+          results: videos.map(v => {
+            const text = `${v.title} ${v.description}`.toLowerCase()
+            const is_trusted = trusted.some(t => v.channel.toLowerCase().includes(t))
+            const is_analysis = ANALYSIS_CHANNELS.some(a => text.includes(a) || v.channel.toLowerCase().includes(a))
+            return {
+              url: v.url,
+              title: v.title,
+              channel: v.channel,
+              description: v.description.slice(0, 200),
+              is_trusted_channel: is_trusted,
+              likely_narrated_analysis: is_analysis,
+              already_queued: state.queuedUrls.has(v.url),
+            }
+          }),
           searches_used: state.searchCount,
           searches_remaining: MAX_SEARCHES_PER_RUN - state.searchCount,
         }
@@ -191,8 +205,10 @@ function buildTools(state: { searchCount: number; queuedCount: number; queuedUrl
         technique_hint: z.string().describe('Short description, e.g. "armbar from mount"'),
         position_hint: z.string().optional().describe('Starting position ID, e.g. "mount"'),
         reason: z.string().describe('One sentence why you chose this video'),
+        sourceCategory: z.enum(['instructional', 'analysis']).optional(),
+        includeTranscript: z.boolean().optional(),
       }),
-      execute: async ({ url, technique_hint, position_hint, reason }: { url: string; technique_hint: string; position_hint?: string; reason: string }) => {
+      execute: async ({ url, technique_hint, position_hint, reason, sourceCategory, includeTranscript }: { url: string; technique_hint: string; position_hint?: string; reason: string; sourceCategory?: 'instructional' | 'analysis'; includeTranscript?: boolean }) => {
         if (state.queuedUrls.has(url)) {
           return { skipped: true, reason: 'already queued this run' }
         }
@@ -203,6 +219,10 @@ function buildTools(state: { searchCount: number; queuedCount: number; queuedUrl
         state.queuedUrls.add(url)
         state.queuedCount++
 
+        // Default to 'instructional' but allow the caller to tag 'analysis' videos.
+        const category = sourceCategory ?? 'instructional'
+        const transcript = includeTranscript ?? true
+
         await inngest.send({
           name: 'technique/ingest-requested',
           data: {
@@ -210,6 +230,8 @@ function buildTools(state: { searchCount: number; queuedCount: number; queuedUrl
             techniqueHint: technique_hint,
             positionHint: position_hint,
             requestedByUserId: 'kb-agent',
+            sourceCategory: category,
+            includeTranscript: transcript,
           },
         })
 

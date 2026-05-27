@@ -34,7 +34,18 @@ const EXTRACTION_CAP = 25
 export async function getTechniqueVariantsForExtraction(
   format: 'gi' | 'no_gi'
 ): Promise<TechniqueVariant[]> {
-  // Fetch general variants first (positionId IS NULL), then position-specific
+  // Prefer semantic retrieval if available — fallback to simple general+specific fetch
+  try {
+    const { semanticSearchVariants } = await import('./semantic-retrieval')
+    const q = format === 'gi'
+      ? 'gi bjj technique visual cues analysis'
+      : 'no gi bjj technique visual cues analysis'
+    const sem = await semanticSearchVariants(q, EXTRACTION_CAP, { format })
+    if (sem.length > 0) return sem as TechniqueVariant[]
+  } catch {
+    // fall through
+  }
+
   const general = await db.query.techniqueVariants.findMany({
     where: and(
       eq(techniqueVariants.status, 'active'),

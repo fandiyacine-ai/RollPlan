@@ -26,6 +26,11 @@ Replace the long-form article with structured cards: Attack priorities (top 3), 
 **Freemium paywall enforcement**
 Block `submitFootageUrls` / `importCommunityFootage` when `analysedThisMonth >= 10`. Show upgrade prompt inline (scout form disabled, message shown). Free tier limit exists in DB and is displayed on `/usage` — enforcement wall is the missing piece.
 
+**Technique KB evaluation metrics & A/B test plan**
+Define how we measure whether the KB is actually improving match analysis quality. Candidate metrics: detection recall/precision on match events, analysis completeness, and match-relevant insight accuracy. Plan an A/B experiment comparing current extraction prompt injection against the enriched KB with transcript/embedding-driven retrieval.
+
+See `TECHNIQUE_KB_QUALITY_PLAN.md` for concrete implementation steps and the full experiment design.
+
 **Post-tournament result recording**
 Add `userResult: 'win' | 'loss' | null` and `userResultMethod` to `tournamentOpponents`. Manual W/L entry UI on each opponent accordion card — appears after tournament date has passed. Works for any organisation (IBJJF, AJP, local comp). No Smoothcomp dependency.
 
@@ -88,6 +93,7 @@ Their incentive is real: athlete prep data is marketing data for them. Cold emai
 | Bracket import — import opponents from Smoothcomp bracket | 2026-05-20 | Selection dialog, dedup, footageStatus: pending |
 | Edit opponent (name + seeding notes) | 2026-05-20 | Pencil icon on each accordion card |
 | Footage nudge banner | 2026-05-20 | Amber banner when opponents have no footage |
+| Technique KB transcript + semantic retrieval | 2026-05-27 | Ingest pipeline now stores YouTube transcripts/searchText/embeddings and uses semantic retrieval for technique variant selection; KB agent can queue narrated analysis videos. |
 | Gameplan generating state + auto-refresh | 2026-05-20 | API writes 'generating' row; page polls every 5s |
 | Edit tournament button inside tournament layout | 2026-05-20 | Pencil icon next to tournament title |
 | Gameplan rating (thumbs up / down) | 2026-05-19 | Stored on gameplans.rating |
