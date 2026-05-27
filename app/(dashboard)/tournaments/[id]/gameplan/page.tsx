@@ -151,7 +151,7 @@ export default async function GameplanPage({
             <div className="flex items-center gap-2 min-w-0">
               {plan && <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-foreground/[0.06] text-foreground/60 border border-border/40 flex-shrink-0">AI</span>}
               <span className="text-sm font-semibold truncate">{activeOpponent.opponentLabel}</span>
-              <span className="text-[10px] text-muted-foreground/50 flex-shrink-0">{scoutedCount} match{scoutedCount !== 1 ? 'es' : ''}</span>
+              <ConfidenceMeta count={scoutedCount} />
             </div>
             <GenerateGameplanButton
               tournamentId={tournamentId}
@@ -177,10 +177,12 @@ export default async function GameplanPage({
                     Regenerating…
                   </span>
                 )}
-                <p className="text-xs text-muted-foreground">
-                  {scoutedCount} match{scoutedCount !== 1 ? 'es' : ''} scouted
-                  {existingGameplan && plan && !isGenerating ? ` · v${existingGameplan.version} · ${existingGameplan.createdAt.toLocaleDateString()}` : ''}
-                </p>
+                <ConfidenceMeta count={scoutedCount} />
+                {existingGameplan && plan && !isGenerating && (
+                  <span className="text-xs text-muted-foreground/50">
+                    v{existingGameplan.version} · {existingGameplan.createdAt.toLocaleDateString()}
+                  </span>
+                )}
               </div>
               {scoutedMatches.some(m => m.status === 'analysed' && m.resultWinner) && (
                 <div className="flex flex-wrap items-center gap-1.5 mt-2">
@@ -221,6 +223,9 @@ export default async function GameplanPage({
 
           {plan ? (
             <>
+              {scoutedCount <= 1 && (
+                <ConfidenceBanner count={scoutedCount} />
+              )}
               <GameplanDisplay
                 plan={plan}
                 drillRefs={(existingGameplan?.evidence as { drill_refs?: DrillRef[] } | null)?.drill_refs}
@@ -259,6 +264,44 @@ export default async function GameplanPage({
           )}
         </>
       )}
+    </div>
+  )
+}
+
+function ConfidenceDots({ count }: { count: number }) {
+  const filled = Math.min(count, 3)
+  return (
+    <span className="inline-flex items-center gap-0.5">
+      {[0, 1, 2].map(i => (
+        <span key={i} className={`w-1.5 h-1.5 rounded-full ${i < filled ? 'bg-foreground/50' : 'bg-muted-foreground/20'}`} />
+      ))}
+    </span>
+  )
+}
+
+function ConfidenceMeta({ count }: { count: number }) {
+  const label = count === 0 ? '0 matches' : count === 1 ? '1 match scouted' : `${count} matches scouted`
+  return (
+    <span className="flex items-center gap-1 flex-shrink-0">
+      <ConfidenceDots count={count} />
+      <span className="text-[10px] text-muted-foreground/50">{label}</span>
+    </span>
+  )
+}
+
+function ConfidenceBanner({ count }: { count: number }) {
+  if (count === 0) {
+    return (
+      <div className="rounded-lg border border-border/40 bg-muted/30 px-4 py-2.5 flex items-center gap-3">
+        <ConfidenceDots count={0} />
+        <p className="text-xs text-muted-foreground">No footage scouted — gameplan is based on AI defaults only. Scout footage to improve accuracy.</p>
+      </div>
+    )
+  }
+  return (
+    <div className="rounded-lg border border-border/40 bg-muted/30 px-4 py-2.5 flex items-center gap-3">
+      <ConfidenceDots count={1} />
+      <p className="text-xs text-muted-foreground">Based on 1 match — treat as directional. Scout more footage for a higher-confidence plan.</p>
     </div>
   )
 }

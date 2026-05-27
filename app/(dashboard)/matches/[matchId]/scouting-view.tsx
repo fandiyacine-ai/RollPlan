@@ -248,12 +248,20 @@ function NotesTab({ insights }: { insights: InsightRow[] }) {
             className="px-4 py-3.5 border-b border-border/40 last:border-0"
             style={{ borderLeft: `3px solid ${color}` }}
           >
-            <div className="flex items-center gap-2 mb-1.5">
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className="text-[11px] font-bold uppercase tracking-widest capitalize" style={{ color }}>
                 {insight.category}
               </span>
               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize ${SEV_PILL[insight.severity] ?? 'bg-zinc-500/15 text-zinc-400'}`}>
                 {insight.severity}
+              </span>
+              <span className="ml-auto flex items-center gap-0.5" title={`Confidence: ${Math.round(insight.confidence * 100)}%`}>
+                {[0, 1, 2].map(i => (
+                  <span
+                    key={i}
+                    className={`w-1 h-1 rounded-full ${i < Math.ceil(insight.confidence * 3) ? 'bg-foreground/40' : 'bg-muted-foreground/15'}`}
+                  />
+                ))}
               </span>
             </div>
             <p className="text-sm font-semibold leading-snug">{insight.description}</p>

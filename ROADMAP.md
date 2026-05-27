@@ -31,11 +31,6 @@ Define how we measure whether the KB is actually improving match analysis qualit
 
 See `TECHNIQUE_KB_QUALITY_PLAN.md` for concrete implementation steps and the full experiment design.
 
-**Post-tournament result recording**
-Add `userResult: 'win' | 'loss' | null` and `userResultMethod` to `tournamentOpponents`. Manual W/L entry UI on each opponent accordion card — appears after tournament date has passed. Works for any organisation (IBJJF, AJP, local comp). No Smoothcomp dependency.
-
-**Fix / repurpose sync button**
-Current "Sync results from bracket" is semantically broken — it updates scouted *footage* match results instead of Yacine's actual tournament results. Repurpose: write `userResult` on `tournamentOpponents` by finding Yacine's matches in the Smoothcomp bracket. Requires user's own Smoothcomp athlete ID stored in settings. Becomes an optional shortcut, not a core feature.
 
 ### P2 — Soon
 
@@ -94,6 +89,8 @@ Their incentive is real: athlete prep data is marketing data for them. Cold emai
 | Edit opponent (name + seeding notes) | 2026-05-20 | Pencil icon on each accordion card |
 | Footage nudge banner | 2026-05-20 | Amber banner when opponents have no footage |
 | Technique KB transcript + semantic retrieval | 2026-05-27 | Ingest pipeline now stores YouTube transcripts/searchText/embeddings and uses semantic retrieval for technique variant selection; KB agent can queue narrated analysis videos. |
+| Post-tournament result recording | 2026-05-27 | `userResult` / `userResultMethod` / `userResultTechnique` on `tournamentOpponents`; manual W/L widget on each opponent accordion card, visible after event date passes. |
+| Fix / repurpose Sync button | 2026-05-27 | `syncBracketResults` now writes `userResult` on `tournamentOpponents` from Smoothcomp bracket. `saveOpponentResult` action for manual W/L override. |
 | Gameplan generating state + auto-refresh | 2026-05-20 | API writes 'generating' row; page polls every 5s |
 | Edit tournament button inside tournament layout | 2026-05-20 | Pencil icon next to tournament title |
 | Gameplan rating (thumbs up / down) | 2026-05-19 | Stored on gameplans.rating |
