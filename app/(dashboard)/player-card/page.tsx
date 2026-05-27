@@ -462,69 +462,46 @@ export default async function PlayerCardPage() {
                 </div>
               )}
 
-              {/* Signature techniques */}
-              {(topMyTech.length >= 2 || topTheirTech.length >= 2) && (
-                <div className="rounded-xl border border-border/60 overflow-hidden bg-card">
+              {/* Top attacks — compact & actionable */}
+              {topMyTech.length >= 1 && (
+                <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
                   <div className="px-5 py-2.5 border-b border-border/60">
                     <h2 className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                       <svg className="w-3 h-3 opacity-50" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="6" cy="6" r="4.5"/><circle cx="6" cy="6" r="1.5"/></svg>
-                      Signature game
+                      Top attacks
                     </h2>
                   </div>
-                  <div className="grid grid-cols-2 divide-x divide-border/60">
-                    <div className="p-4 space-y-3">
-                      <p className="text-xs font-medium text-muted-foreground">Your weapons</p>
-                      {topMyTech.length > 0 ? topMyTech.map(([tech, count]) => (
-                        <div key={tech}>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm capitalize">{tech}</span>
-                            <span className="text-xs text-muted-foreground tabular-nums">{count}×</span>
-                          </div>
-                          <div className="h-1 rounded-full bg-muted overflow-hidden">
-                            <div className="h-full bg-foreground/40 rounded-full" style={{ width: `${(count / maxMyTech) * 100}%` }} />
-                          </div>
-                        </div>
-                      )) : <p className="text-xs text-muted-foreground">Not enough data yet</p>}
-                    </div>
-                    <div className="p-4 space-y-3">
-                      <p className="text-xs font-medium text-muted-foreground">Opponent threats</p>
-                      {topTheirTech.length > 0 ? topTheirTech.map(([tech, count]) => (
-                        <div key={tech}>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm capitalize">{tech}</span>
-                            <span className="text-xs text-muted-foreground tabular-nums">{count}×</span>
-                          </div>
-                          <div className="h-1 rounded-full bg-muted overflow-hidden">
-                            <div className="h-full bg-rose-500/50 rounded-full" style={{ width: `${(count / maxTheirTech) * 100}%` }} />
-                          </div>
-                        </div>
-                      )) : <p className="text-xs text-muted-foreground">Not enough data yet</p>}
-                    </div>
+                  <div className="px-5 py-3 space-y-2.5">
+                    {topMyTech.slice(0, 3).map(([tech, count]) => (
+                      <div key={tech} className="flex items-center justify-between">
+                        <span className="text-sm capitalize font-medium">{tech}</span>
+                        <span className="text-xs font-semibold text-emerald-400 tabular-nums">{count}×</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
 
-              {/* Time & Control */}
+              {/* Position breakdown — compact top 5 */}
               {sortedPositions.length > 0 && (
                 <div className="space-y-2">
                   <h2 className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                     <svg className="w-3 h-3 opacity-50" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="6" cy="6" r="4.5"/><path d="M6 3.5v2.5l1.5 1"/></svg>
-                    Time &amp; control
+                    Position breakdown
                   </h2>
-                  <div className="rounded-xl border bg-card px-4 py-3 space-y-3">
-                    {sortedPositions.slice(0, 10).map(([posId, stats]) => {
-                      const barPct = (stats.total / maxPositionTime) * 100
+                  <div className="rounded-xl border bg-card px-4 py-2.5 space-y-2">
+                    {sortedPositions.slice(0, 5).map(([posId, stats]) => {
                       const domPct = (stats.dominant / stats.total) * 100
                       const infPct = (stats.inferior / stats.total) * 100
                       const neuPct = Math.max(0, 100 - domPct - infPct)
                       return (
                         <div key={posId}>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm font-semibold">{POSITION_MAP[posId] ?? posId}</span>
-                            <span className="text-xs text-muted-foreground tabular-nums font-medium">{fmt(stats.total)}</span>
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="text-xs font-medium">{POSITION_MAP[posId] ?? posId}</span>
+                            <span className="text-xs text-muted-foreground tabular-nums">{fmt(stats.total)}</span>
                           </div>
-                          <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                            <div className="h-full flex rounded-full overflow-hidden" style={{ width: `${barPct}%` }}>
+                          <div className="h-1 rounded-full bg-muted overflow-hidden">
+                            <div className="h-full flex rounded-full overflow-hidden">
                               <div className="bg-emerald-500" style={{ width: `${domPct}%` }} />
                               <div className="bg-zinc-500/50" style={{ width: `${neuPct}%` }} />
                               <div className="bg-rose-500" style={{ width: `${infPct}%` }} />
@@ -534,10 +511,9 @@ export default async function PlayerCardPage() {
                       )
                     })}
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground font-medium">
-                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" /> In Control</span>
-                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-zinc-500/50 inline-block" /> Neutral</span>
-                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-rose-500 inline-block" /> Under Pressure</span>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium">
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" /> Control</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" /> Pressure</span>
                   </div>
                 </div>
               )}
@@ -627,27 +603,7 @@ export default async function PlayerCardPage() {
             </div>
           )}
 
-          {/* My Stats — compact key numbers */}
-          {ownAnalysedIds.length > 0 && (
-            <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
-              <div className="px-4 py-2.5 border-b border-border/60">
-                <h2 className="text-xs font-medium text-muted-foreground">My stats</h2>
-              </div>
-              <div className="divide-y divide-border/40">
-                {[
-                  { label: 'Control rate', value: `${controlPct}%`, accent: controlPct >= 55 ? 'text-emerald-400' : controlPct < 35 ? 'text-rose-400' : '' },
-                  { label: 'Under pressure', value: `${underPressurePct}%`, accent: underPressurePct >= 50 ? 'text-rose-400' : '' },
-                  { label: 'Total mat time', value: fmt(totalAnalyzedTime), accent: '' },
-                  { label: 'Sub attempts', value: String(subAttempts), accent: '' },
-                ].map(({ label, value, accent }) => (
-                  <div key={label} className="px-4 py-2.5 flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground">{label}</p>
-                    <p className={`text-xs font-semibold tabular-nums ${accent}`}>{value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+
 
           {/* Upcoming Tournaments */}
           <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
