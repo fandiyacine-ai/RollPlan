@@ -14,15 +14,6 @@ Nothing actively in progress.
 
 ### P1 — Build next
 
-**Match Day tab — "Game Day" surface**
-New top-level nav item. Lists all upcoming tournaments sorted by date with countdown. Tap tournament → see all opponents as scannable game cards (not full gameplans). Each card: 3 priority moves, 1 danger, confidence score, result prediction. Zero extra taps on match day. Mobile-first design — this is the hero screen for the native app.
-
-**AI confidence scores — transparency layer**
-Every gameplan and analysis insight shows a confidence indicator (●●● high / ●●○ medium / ●○○ low) driven by: number of matches scouted, recency of footage, competition vs training context. Gameplan header shows: "Based on 1 match from 2024 — treat as directional." Individual insight cards show their own confidence. Builds trust by being honest about AI limitations.
-
-**Gameplan format redesign — cards not prose**
-Replace the long-form article with structured cards: Attack priorities (top 3), Danger zones (top 2), Key scenario ("if he pulls guard, do X"), Ruleset reminders. Same AI output, different presentation. Scannable in 30 seconds on match day.
-
 **Freemium paywall enforcement**
 Block `submitFootageUrls` / `importCommunityFootage` when `analysedThisMonth >= 10`. Show upgrade prompt inline (scout form disabled, message shown). Free tier limit exists in DB and is displayed on `/usage` — enforcement wall is the missing piece.
 
@@ -37,17 +28,7 @@ See `TECHNIQUE_KB_QUALITY_PLAN.md` for concrete implementation steps and the ful
 **UX Agent (on-demand)**
 Domain-specific agent that knows BJJ competition prep, the athlete persona, and match-day pressure. Run it with `/ux-review` before any major UI release. It screenshots all key pages, maps the user journey against the 3 jobs-to-be-done (prep, match day, debrief), and outputs a prioritised list of gaps and fixes. System prompt includes: gi/no-gi context, bracket format, competition stress, what an athlete needs in 30 seconds vs 30 minutes.
 
-**Onboarding flow — first-time user**
-New users land on an empty player card with no guidance. Needs: step-by-step wizard (create tournament → add opponent → add footage), or at minimum a contextual empty state that drives the first action. Without this, any paid acquisition is wasted.
 
-**Player card redesign — prescriptive not descriptive**
-Replace "39% control rate" with "Your guard retention is your biggest gap — you get put on your back 60% of the time." Data stays the same; framing becomes actionable. Each stat card answers "so what?" and "what to drill."
-
-**User's own Smoothcomp profile in settings**
-Add Smoothcomp profile URL field to settings page. Parse and store `smoothcompAthleteId` for the user. Unlocks: (1) auto-sync post-tournament results from bracket, (2) smart bracket pre-selection (filter out self, pre-select only plausible opponents).
-
-**Smart bracket opponent pre-selection**
-When importing from bracket, pre-select only athletes in the same half of the elimination draw (the opponents Yacine could realistically face). Currently defaults to all athletes. Requires knowing user's own athlete position in the bracket.
 
 **Per-match result override on match detail page**
 Small "Correct result" UI on the match analysis page — dropdown Win/Loss + method. Stores directly to `resultWinner` / `resultMethod` on that match. For when the AI extracted the result wrong and you want to fix just one match without a full bracket sync.
@@ -88,9 +69,15 @@ Their incentive is real: athlete prep data is marketing data for them. Cold emai
 | Bracket import — import opponents from Smoothcomp bracket | 2026-05-20 | Selection dialog, dedup, footageStatus: pending |
 | Edit opponent (name + seeding notes) | 2026-05-20 | Pencil icon on each accordion card |
 | Footage nudge banner | 2026-05-20 | Amber banner when opponents have no footage |
+| Onboarding wizard | 2026-05-27 | Full-screen overlay for new users: choose tournament-prep or match-review path; catalog search, opponent + footage steps; `onboardingComplete` flag on users |
+| Game Day tab — /game-day | 2026-05-27 | Upcoming tournaments only; opponent briefing cards with attack chain, open with/watch out, win %, confidence dots; ⚡ in bottom tab bar |
+| AI confidence layer | 2026-05-27 | ●●● dots on gameplan header + low-confidence banner (≤1 match); per-insight dots in scouting view NotesTab |
 | Technique KB transcript + semantic retrieval | 2026-05-27 | Ingest pipeline now stores YouTube transcripts/searchText/embeddings and uses semantic retrieval for technique variant selection; KB agent can queue narrated analysis videos. |
 | Post-tournament result recording | 2026-05-27 | `userResult` / `userResultMethod` / `userResultTechnique` on `tournamentOpponents`; manual W/L widget on each opponent accordion card, visible after event date passes. |
 | Fix / repurpose Sync button | 2026-05-27 | `syncBracketResults` now writes `userResult` on `tournamentOpponents` from Smoothcomp bracket. `saveOpponentResult` action for manual W/L override. |
+| Player card — prescriptive redesign | 2026-05-27 | Control Rate verdict (Developing/Solid/Dominant) + tip; Priority gap callout with direct framing; Exposed positions show drill hints. |
+| Smoothcomp profile in settings | 2026-05-27 | URL field on settings page, athlete ID parsed and stored; used to auto-deselect user from bracket import dialog. |
+| Smart bracket pre-selection | 2026-05-27 | User's own entry auto-deselected and marked "That's you" in bracket import dialog. |
 | Gameplan generating state + auto-refresh | 2026-05-20 | API writes 'generating' row; page polls every 5s |
 | Edit tournament button inside tournament layout | 2026-05-20 | Pencil icon next to tournament title |
 | Gameplan rating (thumbs up / down) | 2026-05-19 | Stored on gameplans.rating |

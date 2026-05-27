@@ -19,6 +19,28 @@ export const dynamic = 'force-dynamic'
 
 const POSITION_MAP = Object.fromEntries(POSITIONS.map((p) => [p.id, p.name]))
 
+const POSITION_DRILL_HINTS: Record<string, string> = {
+  'guard_bottom':       'Hip escapes, guard recovery, sweeps from bottom',
+  'side_control_bottom':'Frames + bridge-and-roll, sit-out to turtle',
+  'mount_bottom':       'Upa escape, elbow-knee escape, create frames early',
+  'back_defending':     'Chin-to-chest defence, seat-belt strip, escape to guard',
+  'half_guard_bottom':  'Knee-shield, deep half entry, underhook battle',
+  'turtle':             'Granby roll, guard recovery, standing up safely',
+  'knee_on_belly':      'Elbow-knee escape, bridge into guard',
+  'north_south':        'Hip escape, swim to guard, underhook to half',
+  'closed_guard_bottom':'Break posture, sweep setups, submission entries',
+}
+
+function drillHint(posId: string): string | null {
+  return POSITION_DRILL_HINTS[posId] ?? null
+}
+
+function controlVerdict(pct: number): { label: string; colour: string; tip: string } {
+  if (pct >= 66) return { label: 'Dominant', colour: 'text-emerald-400', tip: 'You control the pace — maintain and attack.' }
+  if (pct >= 40) return { label: 'Solid', colour: 'text-amber-400', tip: 'Good base — work on converting control to finishes.' }
+  return { label: 'Developing', colour: 'text-rose-400', tip: 'Focus on holding top position longer before attacking.' }
+}
+
 const BELT_STYLE: Record<string, { bg: string; text: string }> = {
   white:  { bg: 'bg-zinc-200',    text: 'text-zinc-900' },
   blue:   { bg: 'bg-blue-600',    text: 'text-white' },
@@ -326,21 +348,29 @@ export default async function PlayerCardPage() {
               {ownAnalysedIds.length > 0 && (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {/* Control rate — most important, gets special treatment */}
-                  <div className="rounded-xl border border-border/60 bg-card p-4 space-y-2 col-span-2 sm:col-span-1">
-                    <p className="text-xs text-muted-foreground font-medium">Control Rate</p>
-                    <div className="flex items-end gap-2">
-                      <span className="text-3xl font-bold tabular-nums leading-none">{controlPct}%</span>
-                      {trendDelta != null && trendDelta !== 0 && (
-                        <span className={`text-xs font-medium mb-1 ${trendDelta > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                          {trendDelta > 0 ? '↑' : '↓'}{Math.abs(trendDelta)}
-                        </span>
-                      )}
-                    </div>
-                    <div className="h-1 rounded-full bg-muted overflow-hidden">
-                      <div className="h-full rounded-full bg-foreground/40 transition-all" style={{ width: `${controlPct}%` }} />
-                    </div>
-                    <p className="text-xs text-muted-foreground">{underPressurePct}% under pressure</p>
-                  </div>
+                  {(() => {
+                    const v = controlVerdict(controlPct)
+                    return (
+                      <div className="rounded-xl border border-border/60 bg-card p-4 space-y-2 col-span-2 sm:col-span-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-muted-foreground font-medium">Control Rate</p>
+                          <span className={`text-[10px] font-bold uppercase tracking-wide ${v.colour}`}>{v.label}</span>
+                        </div>
+                        <div className="flex items-end gap-2">
+                          <span className="text-3xl font-bold tabular-nums leading-none">{controlPct}%</span>
+                          {trendDelta != null && trendDelta !== 0 && (
+                            <span className={`text-xs font-medium mb-1 ${trendDelta > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                              {trendDelta > 0 ? '↑' : '↓'}{Math.abs(trendDelta)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="h-1 rounded-full bg-muted overflow-hidden">
+                          <div className="h-full rounded-full bg-foreground/40 transition-all" style={{ width: `${controlPct}%` }} />
+                        </div>
+                        <p className="text-[10px] text-muted-foreground/70 leading-snug">{v.tip}</p>
+                      </div>
+                    )
+                  })()}
                   {[
                     { label: 'Matches', value: String(ownAnalysedIds.length), sub: matchesSub },
                     { label: 'Mat Time', value: fmt(totalAnalyzedTime), sub: avgMatchDuration > 0 ? `avg ${fmt(avgMatchDuration)}` : undefined },
@@ -359,19 +389,15 @@ export default async function PlayerCardPage() {
               {exposedPositions.length > 0 && (() => {
                 const [posId, stats] = exposedPositions[0]
                 const pct = Math.round((stats.inferior / stats.total) * 100)
+                const posName = POSITION_MAP[posId] ?? posId
+                const hint = drillHint(posId)
                 return (
-                  <div className="rounded-xl border border-border/60 bg-card px-4 py-3 flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium text-muted-foreground mb-0.5">Top gap to close</p>
-                      <p className="text-sm font-semibold leading-snug">{POSITION_MAP[posId] ?? posId}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{pct}% of mat time under pressure here</p>
-                    </div>
-                    <Link
-                      href="/upload"
-                      className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                    >
-                      Drill it →
-                    </Link>
+                  <div className="rounded-xl border border-rose-500/20 bg-rose-500/[0.04] px-4 py-3 space-y-1">
+                    <p className="text-xs font-semibold text-rose-400 uppercase tracking-wide">Priority gap</p>
+                    <p className="text-sm font-semibold leading-snug">
+                      You get put in trouble in <span className="text-rose-400">{posName}</span> — {pct}% of the time there you&apos;re under pressure.
+                    </p>
+                    {hint && <p className="text-xs text-muted-foreground leading-snug">Drill: {hint}</p>}
                   </div>
                 )
               })()}
@@ -454,6 +480,7 @@ export default async function PlayerCardPage() {
                       <p className="text-xs font-medium text-rose-500">Exposed</p>
                       {exposedPositions.length > 0 ? exposedPositions.map(([id, s]) => {
                         const pct = Math.round((s.inferior / s.total) * 100)
+                        const hint = drillHint(id)
                         return (
                           <div key={id}>
                             <div className="flex items-center justify-between mb-1.5">
@@ -463,6 +490,7 @@ export default async function PlayerCardPage() {
                             <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                               <div className="h-full bg-rose-500 rounded-full" style={{ width: `${pct}%` }} />
                             </div>
+                            {hint && <p className="text-[10px] text-muted-foreground/50 mt-1 leading-snug">Drill: {hint}</p>}
                           </div>
                         )
                       }) : <p className="text-xs text-muted-foreground">Not enough data yet</p>}

@@ -17,6 +17,8 @@ export const users = pgTable('users', {
   tokenBudgetLimit: integer('token_budget_limit').notNull().default(500000),
   planTier: planTierEnum('plan_tier').notNull().default('free'),
   onboardingComplete: text('onboarding_complete').default('false'),
+  smoothcompAthleteId: text('smoothcomp_athlete_id'),
+  smoothcompProfileUrl: text('smoothcomp_profile_url'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 })

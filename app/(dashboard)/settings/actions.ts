@@ -22,9 +22,23 @@ export async function updateProfile(_prev: { error?: string }, formData: FormDat
     const goals = (formData.get('goals') as string | null)?.trim() || null
     const rawWeight = formData.get('weightClassKg') as string | null
     const weightClassKg = rawWeight && rawWeight !== '' ? parseInt(rawWeight, 10) : null
+    const rawSmootcompUrl = (formData.get('smoothcompProfileUrl') as string | null)?.trim() || null
 
     const belt = rawBelt && VALID_BELTS.includes(rawBelt as Belt) ? (rawBelt as Belt) : null
     const primaryStyle = rawStyle && VALID_STYLES.includes(rawStyle as Style) ? (rawStyle as Style) : null
+
+    let smoothcompAthleteId: string | null = null
+    let smoothcompProfileUrl: string | null = null
+    if (rawSmootcompUrl) {
+      try {
+        const parsed = new URL(rawSmootcompUrl)
+        const match = parsed.pathname.match(/\/athlete\/(\d+)/)
+        smoothcompAthleteId = match?.[1] ?? null
+        smoothcompProfileUrl = rawSmootcompUrl
+      } catch {
+        // invalid URL — ignore silently
+      }
+    }
 
     await db.update(users).set({
       belt,
@@ -32,6 +46,8 @@ export async function updateProfile(_prev: { error?: string }, formData: FormDat
       gym,
       goals,
       weightClassKg: weightClassKg && !isNaN(weightClassKg) ? weightClassKg : null,
+      smoothcompProfileUrl,
+      smoothcompAthleteId,
       updatedAt: new Date(),
     }).where(eq(users.id, userId))
 

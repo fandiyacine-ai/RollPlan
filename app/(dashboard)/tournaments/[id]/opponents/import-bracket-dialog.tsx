@@ -26,7 +26,7 @@ type State =
   | { phase: 'done'; count: number }
   | { phase: 'error'; message: string }
 
-export function ImportBracketDialog({ tournamentId, hasBracketUrl = true }: { tournamentId: string; hasBracketUrl?: boolean }) {
+export function ImportBracketDialog({ tournamentId, hasBracketUrl = true, userSmootcompAthleteId }: { tournamentId: string; hasBracketUrl?: boolean; userSmootcompAthleteId?: string | null }) {
   const [open, setOpen] = useState(false)
   const [state, setState] = useState<State>({ phase: 'idle' })
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -42,7 +42,7 @@ export function ImportBracketDialog({ tournamentId, hasBracketUrl = true }: { to
     } else if (!result.bracketIsPublished) {
       setState({ phase: 'unpublished' })
     } else {
-      setSelected(new Set(result.athletes.map(a => a.smoothcompAthleteId)))
+      setSelected(new Set(result.athletes.filter(a => a.smoothcompAthleteId !== userSmootcompAthleteId).map(a => a.smoothcompAthleteId)))
       setState({ phase: 'selecting', athletes: result.athletes })
     }
   }
@@ -73,8 +73,8 @@ export function ImportBracketDialog({ tournamentId, hasBracketUrl = true }: { to
       } else if (!result.bracketIsPublished) {
         setState({ phase: 'unpublished' })
       } else {
-        // Default: all athletes selected
-        setSelected(new Set(result.athletes.map(a => a.smoothcompAthleteId)))
+        // Default: all athletes selected except the user themselves
+        setSelected(new Set(result.athletes.filter(a => a.smoothcompAthleteId !== userSmootcompAthleteId).map(a => a.smoothcompAthleteId)))
         setState({ phase: 'selecting', athletes: result.athletes })
       }
     }
@@ -175,23 +175,31 @@ export function ImportBracketDialog({ tournamentId, hasBracketUrl = true }: { to
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground">
               {state.athletes.length} athlete{state.athletes.length !== 1 ? 's' : ''} found in your bracket.
-              {' '}<span className="font-medium text-foreground/70">Uncheck yourself</span> before importing.
+              {userSmootcompAthleteId && state.athletes.some(a => a.smoothcompAthleteId === userSmootcompAthleteId)
+                ? <> You've been <span className="font-medium text-foreground/70">automatically excluded</span>.</>
+                : <> <span className="font-medium text-foreground/70">Uncheck yourself</span> before importing.</>
+              }
             </p>
             <div className="space-y-1 max-h-60 overflow-y-auto">
-              {state.athletes.map(a => (
-                <label
-                  key={a.smoothcompAthleteId}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted/50 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selected.has(a.smoothcompAthleteId)}
-                    onChange={() => toggle(a.smoothcompAthleteId)}
-                    className="w-4 h-4 rounded border-border accent-foreground cursor-pointer"
-                  />
-                  <span className="text-sm font-medium">{a.name}</span>
-                </label>
-              ))}
+              {state.athletes.map(a => {
+                const isMe = userSmootcompAthleteId != null && a.smoothcompAthleteId === userSmootcompAthleteId
+                return (
+                  <label
+                    key={a.smoothcompAthleteId}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg ${isMe ? 'opacity-40 cursor-not-allowed' : 'hover:bg-muted/50 cursor-pointer'}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!isMe && selected.has(a.smoothcompAthleteId)}
+                      onChange={() => { if (!isMe) toggle(a.smoothcompAthleteId) }}
+                      disabled={isMe}
+                      className="w-4 h-4 rounded border-border accent-foreground cursor-pointer disabled:cursor-not-allowed"
+                    />
+                    <span className="text-sm font-medium">{a.name}</span>
+                    {isMe && <span className="ml-auto text-xs text-muted-foreground italic">That's you</span>}
+                  </label>
+                )
+              })}
             </div>
           </div>
         )}

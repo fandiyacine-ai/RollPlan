@@ -58,7 +58,7 @@ export const backfillReferenceImageOne = inngest.createFunction(
     id: 'backfill-reference-image-one',
     name: 'Backfill Reference Image (one variant)',
     triggers: [{ event: 'technique/backfill-frame.requested' }],
-    concurrency: { limit: 8 },
+    concurrency: { limit: 5 },
   },
   async ({ event, step }: { event: { data: { id: string; sourceUrl: string; keyMomentSeconds: number } }; step: any }) => {
     const { id, sourceUrl, keyMomentSeconds } = event.data

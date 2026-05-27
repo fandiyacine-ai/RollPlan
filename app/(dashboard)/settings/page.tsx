@@ -27,6 +27,7 @@ export default async function SettingsPage() {
         defaultWeightClassKg={user?.weightClassKg}
         defaultGym={user?.gym}
         defaultGoals={user?.goals}
+        defaultSmootcompProfileUrl={user?.smoothcompProfileUrl}
       />
 
       <div className="mt-16 pt-8 border-t border-border/60">

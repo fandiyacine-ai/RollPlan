@@ -1,5 +1,5 @@
 import { db } from '../../../../../lib/db'
-import { tournaments, tournamentOpponents, matches, videos, gameplans } from '../../../../../lib/db/schema'
+import { tournaments, tournamentOpponents, matches, videos, gameplans, users } from '../../../../../lib/db/schema'
 import { eq, inArray, isNull, and, notLike, like, sql } from 'drizzle-orm'
 import { AddOpponentForm } from './opponent-forms'
 import { OpponentAccordion } from './opponent-accordion'
@@ -38,6 +38,13 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
   const { id: tournamentId } = await params
 
   const userId = await getOrCreateDbUserId().catch(() => null)
+
+  const userSmootcompAthleteId = userId
+    ? await db.select({ smoothcompAthleteId: users.smoothcompAthleteId })
+        .from(users).where(eq(users.id, userId)).limit(1)
+        .then(r => r[0]?.smoothcompAthleteId ?? null)
+        .catch(() => null)
+    : null
 
   const tournamentRow = await db
     .select({
@@ -304,6 +311,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
           <ImportBracketDialog
             tournamentId={tournamentId}
             hasBracketUrl={!!tournamentRow?.smoothcompUrl?.includes('/bracket/')}
+            userSmootcompAthleteId={userSmootcompAthleteId}
           />
           <AddOpponentForm tournamentId={tournamentId} />
         </div>

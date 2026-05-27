@@ -55,9 +55,10 @@ type Props = {
   defaultWeightClassKg?: number | null
   defaultGym?: string | null
   defaultGoals?: string | null
+  defaultSmootcompProfileUrl?: string | null
 }
 
-export function SettingsForm({ defaultBelt, defaultStyle, defaultWeightClassKg, defaultGym, defaultGoals }: Props) {
+export function SettingsForm({ defaultBelt, defaultStyle, defaultWeightClassKg, defaultGym, defaultGoals, defaultSmootcompProfileUrl }: Props) {
   const [state, action, pending] = useActionState(updateProfile, {})
   const [category, setCategory] = useState<'adult' | 'kids'>(
     defaultBelt && KIDS_BELT_VALUES.includes(defaultBelt) ? 'kids' : 'adult'
@@ -184,6 +185,20 @@ export function SettingsForm({ defaultBelt, defaultStyle, defaultWeightClassKg, 
           placeholder="What are you working towards? The AI uses this when generating gameplans and coaching notes."
           className="w-full max-w-lg rounded-lg border border-border bg-background px-4 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
         />
+      </section>
+
+      {/* Smoothcomp profile */}
+      <section>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">Smoothcomp Profile</h2>
+        <p className="text-xs text-muted-foreground mb-4">Used to automatically exclude you from bracket imports and identify your matches.</p>
+        <input
+          name="smoothcompProfileUrl"
+          type="url"
+          defaultValue={defaultSmootcompProfileUrl ?? ''}
+          placeholder="https://smoothcomp.com/en/athlete/12345"
+          className="w-full max-w-md rounded-lg border border-border bg-background px-4 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+        <p className="text-xs text-muted-foreground mt-1.5">Go to your Smoothcomp profile page and paste the URL here.</p>
       </section>
 
       {/* Submit */}
