@@ -140,8 +140,9 @@ export default function AdminTechniquesPage() {
     setEditDraft({ name: v.name, eventId: v.eventId, positionId: v.positionId ?? '', format: v.format, visualCues: v.visualCues, counters: v.counters ?? '', adminNotes: v.adminNotes ?? '' })
   }
 
-  const filtered = variants.filter(v => filter === 'all' || v.status === filter)
-  const counts = { all: variants.length, draft: variants.filter(v => v.status === 'draft').length, active: variants.filter(v => v.status === 'active').length, rejected: variants.filter(v => v.status === 'rejected').length }
+  const variantsArray = Array.isArray(variants) ? variants : []
+  const filtered = variantsArray.filter(v => filter === 'all' || v.status === filter)
+  const counts = { all: variantsArray.length, draft: variantsArray.filter(v => v.status === 'draft').length, active: variantsArray.filter(v => v.status === 'active').length, rejected: variantsArray.filter(v => v.status === 'rejected').length }
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-6 max-w-5xl mx-auto space-y-8">
