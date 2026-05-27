@@ -39,13 +39,38 @@ export default function AdminTechniquesPage() {
   const [editDraft, setEditDraft] = useState<Partial<Variant>>({})
   const [saving, setSaving] = useState(false)
   const [filter, setFilter] = useState<'all' | 'draft' | 'active' | 'rejected'>('draft')
+  const [error, setError] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
-    const res = await fetch('/api/admin/techniques')
-    const data = await res.json()
-    setVariants(data)
-    setLoading(false)
+    setError('')
+
+    try {
+      let apiUrl = '/api/admin/techniques'
+      try {
+        if (typeof window !== 'undefined' && window.location.search.includes('dev=1')) {
+          apiUrl += '?dev=1'
+        }
+      } catch (e) {
+        // ignore
+      }
+
+      const res = await fetch(apiUrl)
+      if (!res.ok) {
+        const body = await res.text()
+        setError(`Failed to load technique variants (${res.status}): ${body || res.statusText}`)
+        setVariants([])
+        return
+      }
+
+      const data = await res.json()
+      setVariants(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error')
+      setVariants([])
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => { load() }, [load])
@@ -181,6 +206,8 @@ export default function AdminTechniquesPage() {
           </div>
         </div>
       </div>
+
+      {error && <p className="text-rose-400 text-sm">{error}</p>}
 
       {/* Filter tabs */}
       <div className="flex gap-1 border-b border-zinc-800">
