@@ -371,17 +371,25 @@ export default async function PlayerCardPage() {
                       </div>
                     )
                   })()}
-                  {[
-                    { label: 'Matches', value: String(ownAnalysedIds.length), sub: matchesSub },
-                    { label: 'Mat Time', value: fmt(totalAnalyzedTime), sub: avgMatchDuration > 0 ? `avg ${fmt(avgMatchDuration)}` : undefined },
-                    { label: 'Attacks', value: String(subAttempts), sub: 'sub attempts' },
-                  ].map(({ label, value, sub }) => (
-                    <div key={label} className="rounded-xl border border-border/60 bg-card p-4 space-y-1.5">
-                      <p className="text-xs text-muted-foreground font-medium">{label}</p>
-                      <p className="text-3xl font-bold tabular-nums leading-none">{value}</p>
-                      {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+                  <div className="rounded-xl border border-border/60 bg-card p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground font-medium">Matches</p>
+                      {matchesSub ? <p className="text-[10px] text-muted-foreground">{matchesSub}</p> : null}
                     </div>
-                  ))}
+                    <p className="text-3xl font-bold tabular-nums leading-none">{ownAnalysedIds.length}</p>
+                    <div className="border-t border-border/60 pt-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-muted-foreground font-medium">Mat Time</p>
+                        {avgMatchDuration > 0 ? <p className="text-[10px] text-muted-foreground">avg {fmt(avgMatchDuration)}</p> : null}
+                      </div>
+                      <p className="text-3xl font-bold tabular-nums leading-none">{fmt(totalAnalyzedTime)}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-border/60 bg-card p-4 space-y-1.5">
+                    <p className="text-xs text-muted-foreground font-medium">Attacks</p>
+                    <p className="text-3xl font-bold tabular-nums leading-none">{subAttempts}</p>
+                    <p className="text-xs text-muted-foreground">sub attempts</p>
+                  </div>
                 </div>
               )}
 

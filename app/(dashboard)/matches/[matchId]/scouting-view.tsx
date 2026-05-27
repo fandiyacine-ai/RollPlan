@@ -796,6 +796,7 @@ export function ScoutingView({
 
   const label = viewMode === 'analysis' ? 'Match Analysis' : 'Scouting'
   const defaultBackLabel = viewMode === 'analysis' ? '← My Matches' : '← Scout Opponent'
+  const visibleTabs = viewMode === 'analysis' ? TABS.filter(tab => tab.id !== 'prediction') : TABS
 
   return (
     <div className="flex flex-col h-full max-w-[1400px] mx-auto w-full px-4 sm:px-6">
@@ -870,7 +871,7 @@ export function ScoutingView({
         <div className="flex-1 flex flex-col overflow-hidden border border-border/60 rounded-xl bg-card">
           {/* Tab bar */}
           <div className="flex border-b border-border/60 flex-shrink-0 overflow-x-auto">
-            {TABS.map(tab => (
+            {visibleTabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
@@ -942,7 +943,7 @@ export function ScoutingView({
         {/* Tabs for the rest */}
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden border border-border/60 rounded-xl bg-card">
           <div className="flex border-b border-border/60 flex-shrink-0 overflow-x-auto">
-            {TABS.filter(t => t.id !== 'brief').map(tab => (
+            {visibleTabs.filter(t => t.id !== 'brief').map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id === activeTab ? 'timeline' : tab.id)}
