@@ -54,6 +54,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ queued: true, agent: true })
   }
 
+  // Backfill reference images for existing variants
+  if (body.action === 'backfill-frames') {
+    await inngest.send({ name: 'admin/backfill-reference-images.requested', data: {} })
+    return NextResponse.json({ queued: true, backfill: true })
+  }
+
   const { youtubeUrl, techniqueHint, positionHint } = body
   if (!youtubeUrl?.trim()) return NextResponse.json({ error: 'youtubeUrl required' }, { status: 400 })
 

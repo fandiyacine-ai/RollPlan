@@ -35,6 +35,8 @@ export default function AdminTechniquesPage() {
   const [ingestMsg, setIngestMsg] = useState('')
   const [agentRunning, setAgentRunning] = useState(false)
   const [agentMsg, setAgentMsg] = useState('')
+  const [backfilling, setBackfilling] = useState(false)
+  const [backfillMsg, setBackfillMsg] = useState('')
   const [editing, setEditing] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState<Partial<Variant>>({})
   const [saving, setSaving] = useState(false)
@@ -91,6 +93,25 @@ export default function AdminTechniquesPage() {
       }
     } finally {
       setAgentRunning(false)
+    }
+  }
+
+  const backfillFrames = async () => {
+    setBackfilling(true)
+    setBackfillMsg('')
+    try {
+      const res = await fetch('/api/admin/techniques', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'backfill-frames' }),
+      })
+      if (res.ok) {
+        setBackfillMsg('✓ Backfill started — Inngest will extract frames for all variants that have a Key moment timestamp. Check back in 10–20 min.')
+      } else {
+        setBackfillMsg('✗ Failed to start backfill')
+      }
+    } finally {
+      setBackfilling(false)
     }
   }
 
@@ -169,6 +190,24 @@ export default function AdminTechniquesPage() {
           </button>
         </div>
         {agentMsg && <p className="text-xs text-zinc-400">{agentMsg}</p>}
+      </div>
+
+      {/* Backfill reference images */}
+      <div className="rounded-xl border border-zinc-700 bg-zinc-900 p-5 space-y-3">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="font-semibold text-zinc-200">Backfill reference images</p>
+            <p className="text-xs text-zinc-500 mt-1">Extract a JPEG frame at the key moment for every variant that has a timestamp in its notes but no image yet. Runs in parallel — safe to re-run, already-populated records are skipped.</p>
+          </div>
+          <button
+            onClick={backfillFrames}
+            disabled={backfilling}
+            className="flex-shrink-0 px-4 py-2 bg-sky-700 hover:bg-sky-600 disabled:opacity-40 text-white rounded-lg text-sm font-semibold transition-colors"
+          >
+            {backfilling ? 'Starting…' : 'Run backfill'}
+          </button>
+        </div>
+        {backfillMsg && <p className="text-xs text-zinc-400">{backfillMsg}</p>}
       </div>
 
       {/* Ingest form */}

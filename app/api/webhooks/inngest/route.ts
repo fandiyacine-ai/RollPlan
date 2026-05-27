@@ -14,12 +14,13 @@ import { techniqueKbAgent } from '../../../../jobs/technique-kb-agent'
 import { rescanMatchesWithKb } from '../../../../jobs/rescan-matches-kb'
 import { backfillAthleteIntel } from '../../../../jobs/backfill-athlete-intel'
 import { buildOpponentIntel } from '../../../../jobs/build-opponent-intel'
+import { backfillReferenceImages, backfillReferenceImageOne } from '../../../../jobs/backfill-reference-images'
 
 export const maxDuration = 300
 
 const handlers = serve({
   client: inngest,
-  functions: [analyzeVideo, generateGameplan, scanUrl, smoothcompMonitorBracket, smoothcompProcessBracket, smoothcompDiscoverFootage, generateExecutionDebrief, syncTournamentCatalog, ingestTechnique, techniqueKbAgent, rescanMatchesWithKb, backfillAthleteIntel, buildOpponentIntel],
+  functions: [analyzeVideo, generateGameplan, scanUrl, smoothcompMonitorBracket, smoothcompProcessBracket, smoothcompDiscoverFootage, generateExecutionDebrief, syncTournamentCatalog, ingestTechnique, techniqueKbAgent, rescanMatchesWithKb, backfillAthleteIntel, buildOpponentIntel, backfillReferenceImages, backfillReferenceImageOne],
 })
 
 function safe(handler: (req: NextRequest) => Promise<Response>) {
