@@ -8,7 +8,6 @@ import { MatchContent, type TimelineItem } from './match-content'
 import { NarrateButton } from './narrate-button'
 import { ShareButton } from './share-button'
 import { CorrectResultButton } from './correct-result-button'
-import { ScoutingView } from './scouting-view'
 import { ReanalyzeButton } from './reanalyze-button'
 import { MarkUpgradeSeen } from './mark-upgrade-seen'
 import { POSITIONS } from '../../../../lib/taxonomy/positions'
@@ -150,44 +149,6 @@ export default async function MatchDetailPage({
     ? `vs. ${knownOpponent}`
     : `${match.format === 'no_gi' ? 'No-Gi' : 'Gi'} ${match.context === 'sparring' ? 'Sparring' : match.context === 'drilling' ? 'Drilling' : 'Competition'}`
 
-  // Scouting view: full-width two-panel layout for opponent footage
-  if (match.tournamentOpponentId && match.status === 'analysed') {
-    return (
-      <>
-        {/* Negate main's padding so ScoutingView fills the exact viewport below the nav (h-14 = 3.5rem).
-            -mb-24 cancels pb-24 on mobile; sm:-mb-6 cancels pb-6 on desktop. */}
-        <div className="-mx-6 -mt-6 -mb-24 sm:-mx-6 sm:-mt-6 sm:-mb-6 h-[calc(100svh-7.5rem)] sm:h-[calc(100svh-3.5rem)] overflow-hidden flex flex-col">
-          <ScoutingView
-            match={{
-              id: match.id,
-              competitorLabel: match.competitorLabel,
-              opponentLabel: match.opponentLabel,
-              format: match.format,
-              context: match.context,
-              eventName: match.eventName,
-              resultWinner: match.resultWinner,
-              resultMethod: match.resultMethod,
-              resultTechnique: match.resultTechnique,
-            }}
-            videoUrl={video?.publicUrl ?? null}
-            insights={matchInsights}
-            timelineItems={timelineItems}
-            sortedPositions={sortedPositions}
-            maxPositionTime={maxPositionTime}
-            positionNames={POSITION_MAP}
-            backHref={backHref}
-          />
-        </div>
-        {isAdmin(clerkUserId) && (
-          <div className="fixed bottom-4 right-4 z-50 bg-zinc-900/95 backdrop-blur border border-zinc-700 rounded-lg px-3 py-2 flex items-center gap-2 text-[10px]">
-            <span className="text-zinc-500">Admin</span>
-            <ReanalyzeButton matchId={matchId} />
-          </div>
-        )}
-      </>
-    )
-  }
-
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Header */}
@@ -201,6 +162,11 @@ export default async function MatchDetailPage({
               <h1 className="text-2xl font-bold">
                 {displayTitle}
               </h1>
+              {match.tournamentOpponentId && (
+                <span className="text-xs uppercase tracking-[0.2em] text-amber-300 border border-amber-500/20 bg-amber-500/5 rounded-full px-2 py-1">
+                  Opponent scouting
+                </span>
+              )}
               {match.resultWinner && (
                 <MatchResultBadge winner={match.resultWinner} method={match.resultMethod} technique={match.resultTechnique} />
               )}

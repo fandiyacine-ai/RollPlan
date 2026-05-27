@@ -25,6 +25,7 @@ export function buildNarrationUserPrompt(data: {
     opponentLabel: string
     competitorLabel: string | null
     date: string
+    isScouting?: boolean
   }
   timeline: Array<{
     type: 'position' | 'event'
@@ -53,6 +54,10 @@ export function buildNarrationUserPrompt(data: {
     .map(i => `[${i.category.toUpperCase()}] ${i.description} → ${i.suggestion}`)
     .join('\n')
 
+  const scoutingNotice = data.match.isScouting
+    ? `This is opponent scouting footage. Write the report as a tactical scouting breakdown of ${data.match.competitorLabel || 'the athlete'} for someone preparing to face them. Focus on what ${data.match.competitorLabel || 'they'} did well, what weaknesses can be exploited, and what to capitalize on.`
+    : `Write the report as a post-match coach summary for ${data.match.competitorLabel ? data.match.competitorLabel : 'the athlete'}, focusing on strengths, weaknesses, and drill targets based on this match.`
+
   return `Match: ${matchLine}
 ${data.match.competitorLabel ? `Athlete: ${data.match.competitorLabel}` : ''}
 
@@ -61,6 +66,8 @@ ${timelineText || 'No timeline data.'}
 
 COACHING NOTES
 ${insightsText || 'No coaching notes.'}
+
+${scoutingNotice}
 
 Write the match report now.`
 }

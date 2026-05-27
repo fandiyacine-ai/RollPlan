@@ -81,6 +81,7 @@ export async function POST(
           opponentLabel: match.opponentLabel,
           competitorLabel: match.competitorLabel,
           date: (match.recordedAt ?? match.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
+          isScouting: !!match.tournamentOpponentId,
         },
         timeline: timelineItems,
         insights: matchInsights.map(i => ({
