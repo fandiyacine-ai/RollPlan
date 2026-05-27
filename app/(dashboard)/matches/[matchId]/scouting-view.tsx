@@ -783,7 +783,7 @@ export function ScoutingView({
       : 'Unknown Opponent'
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full max-w-[1400px] mx-auto w-full px-4 sm:px-6">
 
       {/* ── Header ── */}
       <div className="flex items-start justify-between pb-3 border-b flex-shrink-0 gap-4">
