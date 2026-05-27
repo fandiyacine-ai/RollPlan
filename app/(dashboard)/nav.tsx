@@ -131,7 +131,8 @@ export function Nav({ usageSlot }: { usageSlot?: React.ReactNode }) {
   return (
     <>
     <Suspense fallback={null}><BottomTabBar /></Suspense>
-    <nav className="border-b border-border/60 px-4 sm:px-6 sticky top-0 z-40 bg-background/90 backdrop-blur-sm">
+    <nav className="border-b border-border/60 sticky top-0 z-40 bg-background/90 backdrop-blur-sm">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6">
       <div className="h-14 flex items-center justify-between">
         {/* Left: brand + desktop nav */}
         <div className="flex items-center gap-6 sm:gap-8">
@@ -238,6 +239,7 @@ export function Nav({ usageSlot }: { usageSlot?: React.ReactNode }) {
           </div>
         </div>
       )}
+      </div>
     </nav>
     </>
   )
