@@ -37,8 +37,8 @@ export default async function TournamentLayout({
     <div className="space-y-6 max-w-5xl">
       <div>
         <TournamentBackLink />
-        <div className="flex items-center gap-2.5">
-          <h1 className="text-2xl font-black tracking-tight uppercase truncate">{tournament.name}</h1>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <h1 className="text-2xl font-black tracking-tight uppercase truncate min-w-0">{tournament.name}</h1>
           <EditTournamentButton tournament={{
             id: tournament.id,
             name: tournament.name,

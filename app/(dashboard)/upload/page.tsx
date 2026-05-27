@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
@@ -974,6 +975,7 @@ export default function UploadPage() {
   return (
     <div className="max-w-xl space-y-6">
       <div>
+        <Link href="/matches" className="text-xs text-muted-foreground hover:text-foreground inline-block mb-3 transition-colors">← My Matches</Link>
         <h1 className="text-2xl font-bold">Analyse My Match</h1>
         <p className="text-sm text-muted-foreground mt-1">Your footage will be processed by <span className="font-medium text-foreground/70">Google Gemini AI</span>. You can delete it at any time.</p>
       </div>

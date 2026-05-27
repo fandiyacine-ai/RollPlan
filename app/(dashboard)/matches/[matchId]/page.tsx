@@ -156,7 +156,7 @@ export default async function MatchDetailPage({
       <>
         {/* Negate main's padding so ScoutingView fills the exact viewport below the nav (h-14 = 3.5rem).
             -mb-24 cancels pb-24 on mobile; sm:-mb-6 cancels pb-6 on desktop. */}
-        <div className="-mx-6 -mt-6 -mb-24 sm:-mx-6 sm:-mt-6 sm:-mb-6 h-[calc(100svh-3.5rem)] overflow-hidden flex flex-col">
+        <div className="-mx-6 -mt-6 -mb-24 sm:-mx-6 sm:-mt-6 sm:-mb-6 h-[calc(100svh-7.5rem)] sm:h-[calc(100svh-3.5rem)] overflow-hidden flex flex-col">
           <ScoutingView
             match={{
               id: match.id,

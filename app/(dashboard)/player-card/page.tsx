@@ -293,23 +293,32 @@ export default async function PlayerCardPage() {
               </div>
               <div className="space-y-3">
                 {[
-                  { step: '1', label: 'Create a tournament', sub: 'Name, date, and ruleset', href: '/tournaments', done: false },
+                  { step: '1', label: 'Create a tournament', sub: 'Name, date, and ruleset', href: '/tournaments', done: upcomingTournaments.length > 0 },
                   { step: '2', label: 'Add your opponent', sub: 'Name and division', href: '/tournaments', done: false },
                   { step: '3', label: 'Upload footage', sub: 'YouTube link or video file', href: '/upload', done: false },
                   { step: '4', label: 'Generate gameplan', sub: 'AI analyses the footage', href: '/gameplans', done: false },
                 ].map(item => (
                   <Link key={item.step} href={item.href} className="flex items-center gap-3 group hover:text-foreground transition-colors">
-                    <span className="w-6 h-6 rounded-full border border-border/60 bg-muted/40 text-[10px] font-bold text-muted-foreground flex items-center justify-center flex-shrink-0 group-hover:border-foreground/30 transition-colors">
-                      {item.step}
+                    <span className={`w-6 h-6 rounded-full border text-[10px] font-bold flex items-center justify-center flex-shrink-0 transition-colors ${item.done ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-500' : 'border-border/60 bg-muted/40 text-muted-foreground group-hover:border-foreground/30'}`}>
+                      {item.done ? '✓' : item.step}
                     </span>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium">{item.label}</p>
+                      <p className={`text-sm font-medium ${item.done ? 'line-through text-muted-foreground' : ''}`}>{item.label}</p>
                       <p className="text-xs text-muted-foreground">{item.sub}</p>
                     </div>
-                    <svg className="w-3.5 h-3.5 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors ml-auto flex-shrink-0" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2 6h8M7 3l3 3-3 3"/></svg>
+                    {!item.done && <svg className="w-3.5 h-3.5 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors ml-auto flex-shrink-0" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2 6h8M7 3l3 3-3 3"/></svg>}
                   </Link>
                 ))}
               </div>
+            </div>
+          ) : isProcessing && ownAnalysedIds.length === 0 ? (
+            <div className="rounded-xl border border-border/60 bg-card p-6 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex h-2 w-2 rounded-full bg-primary animate-pulse flex-shrink-0" />
+                <p className="text-sm font-semibold">Analysis in progress</p>
+              </div>
+              <p className="text-sm text-muted-foreground">Your footage is being analysed — your player card will appear here shortly. This usually takes 1–3 minutes.</p>
+              <Link href="/matches" className="text-xs text-foreground/70 hover:text-foreground underline underline-offset-2 transition-colors">View match status →</Link>
             </div>
           ) : (
             <>
