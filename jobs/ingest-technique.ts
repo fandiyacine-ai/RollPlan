@@ -135,15 +135,22 @@ export const ingestTechnique = inngest.createFunction(
           const info = await ytdl.getInfo(youtubeUrl)
           const format = ytdl.chooseFormat(info.formats, {
             quality: 'lowestvideo',
-            filter: f => !!f.url && f.hasVideo,
+            filter: (f: any) => !!f.url && f.hasVideo && (f.container === 'mp4' || f.container === 'webm'),
+          }) || ytdl.chooseFormat(info.formats, {
+            quality: 'lowestvideo',
+            filter: (f: any) => !!f.url && f.hasVideo,
           })
-          if (!format?.url) return null
+          if (!format?.url) {
+            console.error('[ingest-technique] no downloadable video format found for', youtubeUrl)
+            return null
+          }
 
           const tmpDir = mkdtempSync(join(tmpdir(), 'rp-ref-'))
           const outPath = join(tmpDir, 'frame.jpg')
           try {
-            spawnSync('ffmpeg', [
+            const result = spawnSync('ffmpeg', [
               '-loglevel', 'error',
+              '-y',
               '-ss', String(Math.floor(object.key_moment_seconds!)),
               '-i', format.url,
               '-frames:v', '1',
@@ -152,7 +159,10 @@ export const ingestTechnique = inngest.createFunction(
               outPath,
             ], { timeout: 30_000 })
 
-            if (!existsSync(outPath)) return null
+            if (result.status !== 0 || !existsSync(outPath)) {
+              console.error('[ingest-technique] ffmpeg failed', { youtubeUrl, status: result.status, stderr: result.stderr?.toString(), stdout: result.stdout?.toString() })
+              return null
+            }
 
             const buffer = readFileSync(outPath)
             const r2Key = `technique-refs/${variantId.id}.jpg`
@@ -161,7 +171,8 @@ export const ingestTechnique = inngest.createFunction(
           } finally {
             rmSync(tmpDir, { recursive: true, force: true })
           }
-        } catch {
+        } catch (err) {
+          console.error('[ingest-technique] failed to extract reference image', err)
           return null
         }
       })
@@ -170,6 +181,18 @@ export const ingestTechnique = inngest.createFunction(
         await step.run('save-reference-image', async () => {
           await db.update(techniqueVariants)
             .set({ referenceImageUrl: refImageUrl, updatedAt: new Date() })
+            .where(eq(techniqueVariants.id, variantId.id))
+        })
+      } else {
+        await step.run('record-ref-image-failure', async () => {
+          const existing = await db.query.techniqueVariants.findFirst({
+            columns: { adminNotes: true },
+            where: eq(techniqueVariants.id, variantId.id),
+          })
+          const failureNote = `Reference image extraction failed at ${new Date().toISOString()}`
+          const updatedNotes = existing?.adminNotes ? `${existing.adminNotes}\n${failureNote}` : failureNote
+          await db.update(techniqueVariants)
+            .set({ adminNotes: updatedNotes, updatedAt: new Date() })
             .where(eq(techniqueVariants.id, variantId.id))
         })
       }

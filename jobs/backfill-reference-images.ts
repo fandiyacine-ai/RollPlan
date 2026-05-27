@@ -68,15 +68,22 @@ export const backfillReferenceImageOne = inngest.createFunction(
         const info = await ytdl.getInfo(sourceUrl)
         const format = ytdl.chooseFormat(info.formats, {
           quality: 'lowestvideo',
+          filter: (f: any) => !!f.url && f.hasVideo && (f.container === 'mp4' || f.container === 'webm'),
+        }) || ytdl.chooseFormat(info.formats, {
+          quality: 'lowestvideo',
           filter: (f: any) => !!f.url && f.hasVideo,
         })
-        if (!format?.url) return null
+        if (!format?.url) {
+          console.error('[backfill-reference-images] no downloadable video format found for', sourceUrl)
+          return null
+        }
 
         const tmpDir = mkdtempSync(join(tmpdir(), 'rp-ref-'))
         const outPath = join(tmpDir, 'frame.jpg')
         try {
-          spawnSync('ffmpeg', [
+          const result = spawnSync('ffmpeg', [
             '-loglevel', 'error',
+            '-y',
             '-ss', String(Math.floor(keyMomentSeconds)),
             '-i', format.url,
             '-frames:v', '1',
@@ -85,7 +92,10 @@ export const backfillReferenceImageOne = inngest.createFunction(
             outPath,
           ], { timeout: 30_000 })
 
-          if (!existsSync(outPath)) return null
+          if (result.status !== 0 || !existsSync(outPath)) {
+            console.error('[backfill-reference-images] ffmpeg failed', { sourceUrl, status: result.status, stderr: result.stderr?.toString(), stdout: result.stdout?.toString() })
+            return null
+          }
 
           const buffer = readFileSync(outPath)
           const r2Key = `technique-refs/${id}.jpg`
@@ -94,7 +104,8 @@ export const backfillReferenceImageOne = inngest.createFunction(
         } finally {
           rmSync(tmpDir, { recursive: true, force: true })
         }
-      } catch {
+      } catch (err) {
+        console.error('[backfill-reference-images] failed to extract frame', err)
         return null
       }
     })
