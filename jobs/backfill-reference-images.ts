@@ -30,13 +30,12 @@ export const backfillReferenceImages = inngest.createFunction(
           and(isNull(t.referenceImageUrl), isNotNull(t.sourceUrl)),
         columns: { id: true, sourceUrl: true, adminNotes: true },
       })
-      return rows
-        .map(r => ({
-          id: r.id,
-          sourceUrl: r.sourceUrl!,
-          keyMomentSeconds: r.adminNotes ? parseKeyMomentSeconds(r.adminNotes) : null,
-        }))
-        .filter(r => r.keyMomentSeconds !== null)
+      return rows.map(r => ({
+        id: r.id,
+        sourceUrl: r.sourceUrl!,
+        // Fall back to 30s when Gemini returned null — any frame beats none
+        keyMomentSeconds: (r.adminNotes ? parseKeyMomentSeconds(r.adminNotes) : null) ?? 30,
+      }))
     })
 
     if (candidates.length === 0) return { dispatched: 0 }
