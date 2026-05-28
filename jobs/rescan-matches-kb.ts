@@ -187,6 +187,7 @@ export const rescanMatchesWithKb = inngest.createFunction(
             videoUrl: match.videoPublicUrl!,
             videoOptions: {
               resolution: 'MEDIUM' as const,
+              thinkingEffort: 'HIGH' as const,
               startSeconds: match.matchStartSeconds ?? undefined,
               endSeconds: match.matchEndSeconds ?? undefined,
             },

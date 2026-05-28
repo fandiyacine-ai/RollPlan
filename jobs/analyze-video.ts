@@ -184,6 +184,7 @@ export const analyzeVideo = inngest.createFunction(
             videoUrl: geminiFileUri,
             videoOptions: {
               resolution: 'MEDIUM' as const,
+              thinkingEffort: 'HIGH' as const,
               startSeconds: videoStartSeconds ?? undefined,
               endSeconds: videoEndSeconds ?? undefined,
             },
@@ -329,6 +330,7 @@ export const analyzeVideo = inngest.createFunction(
             videoUrl: geminiFileUri,
             videoOptions: {
               resolution: 'MEDIUM' as const,
+              thinkingEffort: 'HIGH' as const,
               startSeconds: videoStartSeconds ?? undefined,
               endSeconds: videoEndSeconds ?? undefined,
             },
@@ -483,6 +485,7 @@ export const analyzeVideo = inngest.createFunction(
             videoUrl: geminiFileUri,
             videoOptions: {
               resolution: 'MEDIUM' as const,
+              thinkingEffort: 'HIGH' as const,
               startSeconds: videoStartSeconds ?? undefined,
               endSeconds: videoEndSeconds ?? undefined,
             },
