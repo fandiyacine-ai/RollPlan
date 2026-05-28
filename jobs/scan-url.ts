@@ -860,8 +860,6 @@ export const scanUrl = inngest.createFunction(
 
         await db.update(matches).set({
           status: 'analysed',
-          // kbVersion=1 signals the technique library was applied during initial extraction.
-          // rescan-matches-kb increments it further when the KB agent re-scans.
           kbVersion: 1,
           ...(extractedResult ? {
             resultWinner: extractedResult.winner,
@@ -869,6 +867,16 @@ export const scanUrl = inngest.createFunction(
             resultTechnique: extractedResult.technique ?? null,
           } : {}),
         }).where(eq(matches.id, matchId))
+
+        // Auto-trigger KB targeted scan: Phase 1 detects clean, Phase 2 enriches
+        // using KB variants matched to the actual detected positions.
+        if (isYouTubeUrl(video.publicUrl)) {
+          await step.sendEvent(`trigger-kb-scan-${i}`, {
+            name: 'match/kb-rescan.requested' as const,
+            data: { matchId },
+          })
+        }
+
         return { matchId, status: 'analysed' }
       })
     }

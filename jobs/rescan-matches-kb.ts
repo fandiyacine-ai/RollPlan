@@ -297,3 +297,147 @@ export const rescanMatchesWithKb = inngest.createFunction(
     }
   }
 )
+
+// ── Per-match auto KB scan ────────────────────────────────────────────────────
+// Fired automatically after Phase 1 extraction completes for YouTube matches.
+// Phase 1 detects positions/events cleanly without KB noise.
+// This step then queries KB for the ACTUAL detected positions, derives suspicious
+// windows, and runs a targeted Gemini scan to catch missed submissions.
+
+function getLikelyEventTypes(positionId: string, userRole: string): string[] {
+  if (positionId === 'closed_guard' && userRole === 'top') return ['armbar', 'triangle', 'omoplata', 'kimura']
+  if (positionId === 'closed_guard' && userRole === 'bottom') return ['guard_pass', 'sweep']
+  if (positionId === 'mount' && userRole === 'top') return ['armbar', 'kimura', 'choke']
+  if (positionId === 'back_control' && userRole === 'top') return ['rear_naked_choke', 'choke']
+  if (positionId === 'half_guard' && userRole === 'top') return ['kimura', 'darce', 'north_south_choke']
+  return ['armbar', 'triangle', 'kimura', 'choke']
+}
+
+export const kbTargetedScanMatch = inngest.createFunction(
+  {
+    id: 'kb-targeted-scan-match',
+    name: 'KB Targeted Scan (per-match)',
+    triggers: [{ event: 'match/kb-rescan.requested' }],
+    concurrency: { limit: 4 },
+  },
+  async ({ event, step }: { event: { data: { matchId: string } }; step: any }) => {
+    const { matchId } = event.data
+
+    const matchData = await step.run('load-match', async () => {
+      const rows = await db
+        .select({
+          id: matches.id,
+          userId: matches.userId,
+          format: matches.format,
+          matchStartSeconds: matches.matchStartSeconds,
+          matchEndSeconds: matches.matchEndSeconds,
+          videoPublicUrl: videos.publicUrl,
+        })
+        .from(matches)
+        .innerJoin(videos, eq(matches.videoId, videos.id))
+        .where(eq(matches.id, matchId))
+
+      const row = rows[0]
+      if (!row || !row.videoPublicUrl || !isYouTubeUrl(row.videoPublicUrl)) return null
+
+      const [segs, evts] = await Promise.all([
+        db.query.positionSegments.findMany({
+          where: eq(positionSegments.matchId, matchId),
+          columns: { positionId: true, userRole: true, startSeconds: true, endSeconds: true },
+        }),
+        db.query.matchEvents.findMany({ where: eq(matchEvents.matchId, matchId) }),
+      ])
+
+      return { ...row, segments: segs, events: evts }
+    })
+
+    if (!matchData || matchData.segments.length === 0) return { skipped: 'no segments or not a YouTube match' }
+
+    const variants = await step.run('query-kb', async () =>
+      getTechniqueVariantsForPositions(
+        matchData.segments.map((s: any) => s.positionId),
+        matchData.format as 'gi' | 'no_gi'
+      )
+    )
+
+    if (variants.length === 0) return { skipped: 'no KB variants for detected positions' }
+
+    const techniqueBlock = formatVariantsAsPromptBlock(variants)
+    const variantPositions = new Set(variants.map((v: any) => v.positionId).filter(Boolean))
+    const hasGeneralVariants = variants.some((v: any) => !v.positionId)
+
+    const windows = matchData.segments
+      .filter((s: any) =>
+        (hasGeneralVariants || variantPositions.has(s.positionId)) &&
+        (s.endSeconds - s.startSeconds) >= 8
+      )
+      .map((s: any) => ({
+        start_seconds: s.startSeconds,
+        end_seconds: s.endSeconds,
+        reason: `${s.positionId} — user is ${s.userRole}`,
+        likely_event_types: getLikelyEventTypes(s.positionId, s.userRole),
+      }))
+
+    if (windows.length === 0) return { skipped: 'no windows long enough to scan' }
+
+    const scanObject = await step.run('gemini-targeted-scan', async () => {
+      const scanStart = Date.now()
+      const result = await geminiVideoObject(GEMINI_VIDEO_MODEL, {
+        system: buildScanSubmissionsSystemPrompt(techniqueBlock),
+        videoUrl: matchData.videoPublicUrl!,
+        videoOptions: {
+          resolution: 'HIGH' as const,
+          thinkingEffort: 'HIGH' as const,
+          startSeconds: matchData.matchStartSeconds ?? undefined,
+          endSeconds: matchData.matchEndSeconds ?? undefined,
+        },
+        userPrompt: buildScanSubmissionsUserPrompt(windows),
+        schema: SubmissionScanOutputSchema,
+      })
+      await db.insert(aiCallLogs).values({
+        userId: matchData.userId ?? null,
+        jobId: matchId,
+        model: GEMINI_VIDEO_MODEL,
+        promptVersion: SCAN_SUBMISSIONS_PROMPT_VERSION,
+        tokensIn: result.usage.inputTokens ?? 0,
+        tokensOut: result.usage.outputTokens ?? 0,
+        costUsdEstimate: estimateCostUsd(GEMINI_VIDEO_MODEL, result.usage.inputTokens ?? 0, result.usage.outputTokens ?? 0),
+        latencyMs: Date.now() - scanStart,
+        status: 'success',
+      })
+      return result.object
+    })
+
+    if (!scanObject?.events?.length) return { added: 0 }
+
+    const tsOffset = matchData.matchStartSeconds ?? 0
+    const newEvts = (scanObject.events as any[]).filter(ev =>
+      ev.confidence >= 0.65 &&
+      !(matchData.events as any[]).some(ex =>
+        ex.eventTypeId === ev.event_type_id &&
+        Math.abs(ex.timestampSeconds - (ev.timestamp_seconds + tsOffset)) <= 10
+      )
+    )
+
+    if (newEvts.length === 0) return { added: 0 }
+
+    await step.run('save-new-events', async () => {
+      await db.insert(matchEvents).values(
+        newEvts.map((ev: any) => ({
+          matchId,
+          timestampSeconds: ev.timestamp_seconds + tsOffset,
+          eventTypeId: ev.event_type_id,
+          actor: ev.actor,
+          outcome: ev.outcome ?? 'ongoing',
+          techniqueLabel: ev.technique_label ?? null,
+          confidence: ev.confidence,
+        }))
+      )
+      await db.update(matches)
+        .set({ kbVersion: sql`coalesce(kb_version, 0) + 1`, kbUpgradedAt: sql`now()` })
+        .where(eq(matches.id, matchId))
+    })
+
+    return { added: newEvts.length }
+  }
+)
