@@ -363,22 +363,18 @@ export const kbTargetedScanMatch = inngest.createFunction(
     if (variants.length === 0) return { skipped: 'no KB variants for detected positions' }
 
     const techniqueBlock = formatVariantsAsPromptBlock(variants)
-    const variantPositions = new Set(variants.map((v: any) => v.positionId).filter(Boolean))
-    const hasGeneralVariants = variants.some((v: any) => !v.positionId)
 
-    const windows = matchData.segments
-      .filter((s: any) =>
-        (hasGeneralVariants || variantPositions.has(s.positionId)) &&
-        (s.endSeconds - s.startSeconds) >= 8
-      )
-      .map((s: any) => ({
-        start_seconds: s.startSeconds,
-        end_seconds: s.endSeconds,
-        reason: `${s.positionId} — user is ${s.userRole}`,
-        likely_event_types: getLikelyEventTypes(s.positionId, s.userRole),
-      }))
-
-    if (windows.length === 0) return { skipped: 'no windows long enough to scan' }
+    // Use the full match window as one scan target — KB context tells Gemini WHAT to look
+    // for, and the prompt window tells it WHERE. Filtering by segment position misses events
+    // that happen during "transition" segments (e.g. armbar attempt mid-scramble).
+    const matchStart = matchData.matchStartSeconds ?? (matchData.segments[0]?.startSeconds ?? 0)
+    const matchEnd = matchData.matchEndSeconds ?? (matchData.segments[matchData.segments.length - 1]?.endSeconds ?? matchStart + 600)
+    const windows = [{
+      start_seconds: matchStart,
+      end_seconds: matchEnd,
+      reason: 'full match window — scan for any missed submissions',
+      likely_event_types: ['armbar', 'triangle', 'kimura', 'rear_naked_choke', 'guillotine', 'omoplata', 'heel_hook'],
+    }]
 
     const scanObject = await step.run('gemini-targeted-scan', async () => {
       const scanStart = Date.now()
