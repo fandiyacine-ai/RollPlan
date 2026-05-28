@@ -23,6 +23,7 @@ type FootageRow = {
   chunksTotal?: number | null
   chunksFailed?: number | null
   referenceImageUrl?: string | null
+  videoId?: string | null
 }
 
 type Opponent = {
@@ -515,6 +516,9 @@ export function OpponentAccordion({
                   )}
                   {m.rowType === 'video' && (
                     <DeleteFootageButton videoId={m.id} tournamentId={tournamentId} />
+                  )}
+                  {m.rowType === 'match' && m.videoId && (
+                    <DeleteFootageButton videoId={m.videoId} tournamentId={tournamentId} />
                   )}
                 </div>
               </div>

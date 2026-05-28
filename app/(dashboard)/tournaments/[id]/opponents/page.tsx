@@ -17,7 +17,7 @@ type MatchRow = {
   id: string; status: string; format: string | null; context: string | null
   eventName: string | null; opponentLabel: string | null; createdAt: Date; label: string | null; tournamentOpponentId: string | null
   resultWinner: string | null; resultMethod: string | null; resultTechnique: string | null
-  referenceImageUrl: string | null
+  referenceImageUrl: string | null; videoId: string | null
 }
 
 type VideoRow = {
@@ -151,6 +151,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
         resultMethod: matches.resultMethod,
         resultTechnique: matches.resultTechnique,
         referenceImageUrl: matches.referenceImageUrl,
+        videoId: matches.videoId,
       })
       .from(matches)
       .where(inArray(matches.tournamentOpponentId, opponentIds))
@@ -369,6 +370,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
                 ...m, rowType: 'match' as const, format: m.format ?? null, context: m.context ?? null, label: undefined,
                 resultWinner: m.resultWinner ?? null, resultMethod: m.resultMethod ?? null, resultTechnique: m.resultTechnique ?? null,
                 referenceImageUrl: m.referenceImageUrl ?? null,
+                videoId: m.videoId ?? null,
                 failureReason: null,
               }))}
               pendingVideos={(pendingVideosByOpponent[opp.id] ?? [])
