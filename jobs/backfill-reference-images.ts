@@ -3,9 +3,9 @@ import { mkdtempSync, rmSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { eq } from 'drizzle-orm'
-import ytdl from '@distube/ytdl-core'
 import ffmpegStaticPath from 'ffmpeg-static'
-const ffmpegBin: string = ffmpegStaticPath ?? 'ffmpeg'
+// Prefer system ffmpeg (installed by nixpacks in production); fall back to ffmpeg-static for local dev
+const ffmpegBin: string = (ffmpegStaticPath && existsSync(ffmpegStaticPath)) ? ffmpegStaticPath : 'ffmpeg'
 import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
 import { techniqueVariants } from '../lib/db/schema'
@@ -69,21 +69,25 @@ export const backfillReferenceImageOne = inngest.createFunction(
       const tmpDir = mkdtempSync(join(tmpdir(), 'rp-ref-'))
       const outPath = join(tmpDir, 'frame.jpg')
       try {
-        // Pipe ytdl stream directly into ffmpeg stdin so YouTube's streaming URL
-        // auth tokens stay intact — passing the URL to ffmpeg directly fails because
-        // YouTube rejects requests from a different user-agent/IP.
-        const stream = ytdl(sourceUrl, {
-          quality: 'lowestvideo',
-          filter: (f: any) => f.hasVideo,
-        })
-
+        // yt-dlp handles YouTube anti-bot better than ytdl.
+        // Download only a ~30s section around the key moment to avoid fetching the full video.
+        const sectionStart = Math.max(0, Math.floor(keyMomentSeconds) - 2)
+        const sectionEnd = sectionStart + 30
         const stderrChunks: Buffer[] = []
 
         await new Promise<void>((resolve, reject) => {
+          const ytdlp = spawn('yt-dlp', [
+            '--no-playlist',
+            '-f', 'bestvideo[height<=480]/bestvideo',
+            '--download-sections', `*${sectionStart}-${sectionEnd}`,
+            '-o', '-',
+            '--quiet',
+            sourceUrl,
+          ])
           const ff = spawn(ffmpegBin, [
             '-y',
             '-loglevel', 'error',
-            '-ss', String(Math.floor(keyMomentSeconds)),
+            '-ss', String(Math.max(0, Math.floor(keyMomentSeconds) - sectionStart)),
             '-i', 'pipe:0',
             '-frames:v', '1',
             '-q:v', '3',
@@ -92,24 +96,24 @@ export const backfillReferenceImageOne = inngest.createFunction(
           ])
 
           ff.stderr.on('data', (d: Buffer) => stderrChunks.push(d))
+          ytdlp.stderr.on('data', (d: Buffer) => stderrChunks.push(d))
 
-          // EPIPE is expected once ffmpeg extracts its frame and closes stdin early
           ff.stdin.on('error', (err: NodeJS.ErrnoException) => {
             if (err.code !== 'EPIPE') reject(err)
           })
 
-          stream.on('error', (err) => { ff.kill(); reject(err) })
-          stream.pipe(ff.stdin)
+          ytdlp.on('error', (err) => { ff.kill(); reject(err) })
+          ytdlp.stdout.pipe(ff.stdin)
 
-          // 50s hard timeout — the Inngest step will also enforce its own limit
-          const timer = setTimeout(() => { ff.kill(); reject(new Error('extraction timeout')) }, 50_000)
+          const timer = setTimeout(() => { ytdlp.kill(); ff.kill(); reject(new Error('extraction timeout')) }, 90_000)
 
           ff.on('close', (code) => {
             clearTimeout(timer)
+            ytdlp.kill()
             if (code === 0) resolve()
             else reject(new Error(`ffmpeg exited ${code}: ${Buffer.concat(stderrChunks).toString()}`))
           })
-          ff.on('error', (err) => { clearTimeout(timer); reject(err) })
+          ff.on('error', (err) => { clearTimeout(timer); ytdlp.kill(); reject(err) })
         })
 
         if (!existsSync(outPath)) {
