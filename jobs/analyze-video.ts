@@ -24,6 +24,75 @@ const CONFUSION_PRONE = new Set([
   'turtle', 'north_south', 'half_guard', 'butterfly_guard', 'knee_on_belly',
 ])
 
+// Positions where submission attempts are frequent enough to scan unconditionally —
+// even when Claude's statistical review didn't flag a specific anomaly.
+// minWindowSeconds: minimum consolidated window length that triggers a scan.
+const PROACTIVE_SCAN_CONFIG: Record<string, { minWindowSeconds: number; attacks: string[] }> = {
+  back_control:    { minWindowSeconds: 5, attacks: ['rear_naked_choke', 'triangle', 'choke_other'] },
+  mount:           { minWindowSeconds: 5, attacks: ['armbar', 'triangle', 'choke_other', 'ezekiel_choke'] },
+  closed_guard:    { minWindowSeconds: 5, attacks: ['triangle', 'armbar', 'kimura', 'omoplata', 'guillotine'] },
+  half_guard:      { minWindowSeconds: 5, attacks: ['kimura', 'darce', 'heel_hook'] },
+  butterfly_guard: { minWindowSeconds: 5, attacks: ['guillotine', 'armbar'] },
+  inside_sankaku:  { minWindowSeconds: 5, attacks: ['heel_hook', 'kneebar'] },
+  fifty_fifty:     { minWindowSeconds: 5, attacks: ['heel_hook', 'toe_hold'] },
+  ashi_garami:     { minWindowSeconds: 5, attacks: ['heel_hook', 'toe_hold'] },
+  single_leg_x:    { minWindowSeconds: 5, attacks: ['heel_hook', 'kneebar'] },
+  k_guard:         { minWindowSeconds: 5, attacks: ['heel_hook'] },
+  north_south:     { minWindowSeconds: 5, attacks: ['north_south_choke', 'kimura', 'triangle'] },
+  turtle:          { minWindowSeconds: 5, attacks: ['rear_naked_choke', 'clock_choke', 'darce'] },
+  crucifix:        { minWindowSeconds: 5, attacks: ['armbar', 'twister', 'choke_other'] },
+  side_control:    { minWindowSeconds: 8, attacks: ['kimura', 'choke_other', 'paper_cutter_choke'] },
+}
+
+// Full set of submission event IDs for coverage checks
+const SUBMISSION_EVENT_IDS = new Set([
+  'armbar', 'kimura', 'omoplata', 'wrist_lock', 'bicep_slicer', 'joint_lock_other',
+  'triangle', 'rear_naked_choke', 'guillotine', 'darce', 'anaconda_choke',
+  'north_south_choke', 'ezekiel_choke', 'von_flue_choke', 'twister',
+  'baseball_bat_choke', 'clock_choke', 'paper_cutter_choke', 'choke_other',
+  'heel_hook', 'kneebar', 'toe_hold', 'calf_slicer', 'leg_lock_other',
+])
+
+type PositionSeg = { positionId: string; startSeconds: number; endSeconds: number }
+type ScanWindow  = { start_seconds: number; end_seconds: number; reason: string; likely_event_types: string[] }
+
+// Merge consecutive segments of the same position into a single window.
+// Gaps <= GAP_TOLERANCE seconds are bridged (brief scrambles/transitions between the same position).
+function consolidatePositionWindows(segments: PositionSeg[], positionId: string, minSeconds: number): ScanWindow[] {
+  const GAP_TOLERANCE = 3
+  const matching = segments.filter(s => s.positionId === positionId).sort((a, b) => a.startSeconds - b.startSeconds)
+  if (matching.length === 0) return []
+
+  const windows: ScanWindow[] = []
+  let winStart = matching[0].startSeconds
+  let winEnd   = matching[0].endSeconds
+  const cfg = PROACTIVE_SCAN_CONFIG[positionId]!
+
+  for (let i = 1; i < matching.length; i++) {
+    const seg = matching[i]
+    if (seg.startSeconds - winEnd <= GAP_TOLERANCE) {
+      winEnd = Math.max(winEnd, seg.endSeconds)
+    } else {
+      if (winEnd - winStart >= minSeconds) {
+        windows.push({ start_seconds: winStart, end_seconds: winEnd, reason: `Proactive: ${positionId} held ${Math.round(winEnd - winStart)}s — checking for ${cfg.attacks.join(', ')}`, likely_event_types: cfg.attacks })
+      }
+      winStart = seg.startSeconds
+      winEnd   = seg.endSeconds
+    }
+  }
+  if (winEnd - winStart >= minSeconds) {
+    windows.push({ start_seconds: winStart, end_seconds: winEnd, reason: `Proactive: ${positionId} held ${Math.round(winEnd - winStart)}s — checking for ${cfg.attacks.join(', ')}`, likely_event_types: cfg.attacks })
+  }
+  return windows
+}
+
+// True if >50% of window A is covered by window B — used to deduplicate proactive vs Claude windows.
+function windowCoveredBy(a: { start_seconds: number; end_seconds: number }, b: { start_seconds: number; end_seconds: number }): boolean {
+  const overlap = Math.max(0, Math.min(a.end_seconds, b.end_seconds) - Math.max(a.start_seconds, b.start_seconds))
+  const len = a.end_seconds - a.start_seconds
+  return len > 0 && overlap / len > 0.5
+}
+
 async function markFailed(matchId: string, videoId: string) {
   await db.update(matches).set({ status: 'failed' }).where(eq(matches.id, matchId))
   await db.update(videos).set({ status: 'failed' }).where(eq(videos.id, videoId))
@@ -318,18 +387,18 @@ export const analyzeVideo = inngest.createFunction(
       return { corrections, reviewed: toVerify.length }
     })
 
-    // ── Level 2 review: Claude flags gaps → Gemini re-scans ──────────────────
+    // ── Level 2 review: Claude flags gaps + proactive position scan → Gemini re-scans ──
     await step.run('review-events-claude', async () => {
       const [allSegments, allEvents] = await Promise.all([
         db.query.positionSegments.findMany({ where: eq(positionSegments.matchId, matchId) }),
         db.query.matchEvents.findMany({ where: eq(matchEvents.matchId, matchId) }),
       ])
 
-      const start = Date.now()
-      let reviewResult: Awaited<ReturnType<typeof generateObject<typeof EventReviewOutputSchema>>>
-
+      // ── 1. Claude statistical review (best-effort — proactive scan runs regardless) ──
+      const reviewStart = Date.now()
+      let suspicious: Array<{ start_seconds: number; end_seconds: number; reason: string; likely_event_types: string[]; priority: 'high' | 'medium' }> = []
       try {
-        reviewResult = await generateObject({
+        const reviewResult = await generateObject({
           model: anthropic(CLAUDE_SYNTHESIS_MODEL),
           schema: EventReviewOutputSchema,
           maxRetries: 0,
@@ -350,33 +419,48 @@ export const analyzeVideo = inngest.createFunction(
             })),
           }),
         })
+        suspicious = reviewResult.object.suspicious_windows
+        await db.insert(aiCallLogs).values({
+          userId: matchUserId ?? null,
+          jobId: matchId,
+          model: CLAUDE_SYNTHESIS_MODEL,
+          promptVersion: REVIEW_EVENTS_PROMPT_VERSION,
+          tokensIn: reviewResult.usage.inputTokens ?? 0,
+          tokensOut: reviewResult.usage.outputTokens ?? 0,
+          costUsdEstimate: estimateCostUsd(CLAUDE_SYNTHESIS_MODEL, reviewResult.usage.inputTokens ?? 0, reviewResult.usage.outputTokens ?? 0),
+          latencyMs: Date.now() - reviewStart,
+          status: 'success',
+        })
       } catch {
-        return { suspicious: 0, error: 'review_failed' }
+        // Claude review failed — proactive scan still runs below
       }
 
-      const { object, usage } = reviewResult
-      const suspicious = object.suspicious_windows
+      // ── 2. Proactive windows: scan every high-attack position unconditionally ──
+      // Skip windows that already have a submission event recorded inside them.
+      const existingSubTimes = allEvents
+        .filter(e => SUBMISSION_EVENT_IDS.has(e.eventTypeId))
+        .map(e => e.timestampSeconds)
 
-      await db.insert(aiCallLogs).values({
-        userId: matchUserId ?? null,
-        jobId: matchId,
-        model: CLAUDE_SYNTHESIS_MODEL,
-        promptVersion: REVIEW_EVENTS_PROMPT_VERSION,
-        tokensIn: usage.inputTokens ?? 0,
-        tokensOut: usage.outputTokens ?? 0,
-        costUsdEstimate: estimateCostUsd(CLAUDE_SYNTHESIS_MODEL, usage.inputTokens ?? 0, usage.outputTokens ?? 0),
-        latencyMs: Date.now() - start,
-        status: 'success',
-      })
+      const proactiveWindows: ScanWindow[] = []
+      const segs: PositionSeg[] = allSegments.map(s => ({ positionId: s.positionId, startSeconds: s.startSeconds, endSeconds: s.endSeconds }))
+      for (const [posId, cfg] of Object.entries(PROACTIVE_SCAN_CONFIG)) {
+        for (const win of consolidatePositionWindows(segs, posId, cfg.minWindowSeconds)) {
+          const alreadyCovered = existingSubTimes.some(t => t >= win.start_seconds && t <= win.end_seconds)
+          if (!alreadyCovered) proactiveWindows.push(win)
+        }
+      }
 
-      if (suspicious.length === 0) return { suspicious: 0 }
+      // ── 3. Merge Claude + proactive, deduplicate, cap at 8 windows ──────────
+      // Order: Claude high-priority → proactive → Claude medium-priority
+      const claudeHigh = suspicious.filter(w => w.priority === 'high')
+      const claudeMed  = suspicious.filter(w => w.priority === 'medium')
+      const allClaudeWindows = [...claudeHigh, ...claudeMed]
+      const dedupedProactive = proactiveWindows.filter(pw => !allClaudeWindows.some(cw => windowCoveredBy(pw, cw)))
+      const scanWindows = [...claudeHigh, ...dedupedProactive, ...claudeMed].slice(0, 8)
 
-      // Cap to top-3 highest-priority windows to control Gemini cost (high before medium)
-      const topWindows = suspicious
-        .sort((a, b) => (a.priority === 'high' ? -1 : 1) - (b.priority === 'high' ? -1 : 1))
-        .slice(0, 3)
+      if (scanWindows.length === 0) return { suspicious: suspicious.length, proactive: 0, scanned: 0, added: 0 }
 
-      // Fetch position-specific technique variants now that we know which positions appeared
+      // ── 4. Fetch position-specific technique KB variants ──────────────────
       const positionIds = allSegments.map(s => s.positionId)
       const match2 = await db.query.matches.findFirst({ where: eq(matches.id, matchId) })
       const positionVariants = match2
@@ -384,7 +468,7 @@ export const analyzeVideo = inngest.createFunction(
         : []
       const positionTechniqueBlock = formatVariantsAsPromptBlock(positionVariants)
 
-      // ── Gemini targeted re-scan of flagged windows ────────────────────────
+      // ── 5. Gemini targeted re-scan ─────────────────────────────────────────
       const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
       const scanStart = Date.now()
       let scanObject: Awaited<ReturnType<typeof geminiVideoObject<typeof SubmissionScanOutputSchema>>>['object']
@@ -399,7 +483,7 @@ export const analyzeVideo = inngest.createFunction(
               startSeconds: videoStartSeconds ?? undefined,
               endSeconds: videoEndSeconds ?? undefined,
             },
-            userPrompt: buildScanSubmissionsUserPrompt(topWindows),
+            userPrompt: buildScanSubmissionsUserPrompt(scanWindows),
             schema: SubmissionScanOutputSchema,
           })
           scanObject = result.object
@@ -408,7 +492,7 @@ export const analyzeVideo = inngest.createFunction(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const scanContent: any[] = [
             { type: 'file', data: new URL(geminiFileUri) as any, mediaType: (video?.contentType ?? 'video/mp4') as `${string}/${string}` },
-            { type: 'text', text: buildScanSubmissionsUserPrompt(topWindows) },
+            { type: 'text', text: buildScanSubmissionsUserPrompt(scanWindows) },
           ]
           const result = await generateObject({
             model: google(GEMINI_VIDEO_MODEL),
@@ -421,7 +505,7 @@ export const analyzeVideo = inngest.createFunction(
           scanUsage = { inputTokens: result.usage.inputTokens ?? 0, outputTokens: result.usage.outputTokens ?? 0 }
         }
       } catch {
-        return { suspicious: suspicious.length, scanned: 0, error: 'scan_failed' }
+        return { suspicious: suspicious.length, proactive: dedupedProactive.length, scanned: 0, error: 'scan_failed' }
       }
 
       await db.insert(aiCallLogs).values({
@@ -436,9 +520,9 @@ export const analyzeVideo = inngest.createFunction(
         status: 'success',
       })
 
-      if (scanObject.events.length === 0) return { suspicious: suspicious.length, scanned: 0, added: 0 }
+      if (scanObject.events.length === 0) return { suspicious: suspicious.length, proactive: dedupedProactive.length, scanned: 0, added: 0 }
 
-      // Deduplicate against existing events (skip if same type within ±10s)
+      // ── 6. Deduplicate against existing events (±10s same type = skip) ───
       const existingEvents = await db.query.matchEvents.findMany({ where: eq(matchEvents.matchId, matchId) })
       const newEvents = scanObject.events.filter(ev =>
         ev.confidence >= 0.65 &&
@@ -463,7 +547,7 @@ export const analyzeVideo = inngest.createFunction(
         )
       }
 
-      return { suspicious: suspicious.length, scanned: scanObject.events.length, added: newEvents.length }
+      return { suspicious: suspicious.length, proactive: dedupedProactive.length, scanned: scanObject.events.length, added: newEvents.length }
     })
 
     await step.run('generate-insights', async () => {
