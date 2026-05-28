@@ -342,6 +342,35 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
   const strongQueryUrls = new Set<string>()
   let candidateUrls: string[] = []
 
+  // 0. Direct Smoothcomp athlete search — most reliable, doesn't depend on search engine indexing.
+  // smoothcomp.com/en/user?search={name} is Firebase-rendered; use a headless browser.
+  try {
+    const { chromium } = await import('playwright')
+    const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] })
+    try {
+      const ctx = await browser.newContext({ userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36', locale: 'en-US' })
+      const page = await ctx.newPage()
+      await page.goto(`https://smoothcomp.com/en/user?search=${encodeURIComponent(name)}`, { waitUntil: 'load', timeout: 30000 })
+      await page.waitForTimeout(3000)
+      const profileLinks = await page.evaluate(() => {
+        const links: string[] = []
+        document.querySelectorAll('a[href*="/profile/"]').forEach(el => {
+          const href = (el as HTMLAnchorElement).href
+          if (/smoothcomp\.com\/[a-z]+\/profile\/\d+/.test(href)) links.push(href)
+        })
+        return [...new Set(links)]
+      })
+      for (const url of profileLinks) {
+        if (!candidateUrls.includes(url)) {
+          candidateUrls.push(url)
+          strongQueryUrls.add(url)  // Direct search result — treat as strong
+        }
+      }
+    } finally {
+      await browser.close()
+    }
+  } catch { /* Playwright unavailable or page load failed — fall through to search engines */ }
+
   // 1. Brave — run all query variants and collect unique URLs across all of them.
   // Don't stop at first-query results: a shorter/alternate-spelling query may find the profile
   // when the full stored name fails (e.g. "Zakriya" stored vs "Zakariya" registered).
