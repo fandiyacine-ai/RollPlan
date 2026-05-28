@@ -756,6 +756,7 @@ export function ScoutingView({
     resultWinner: string | null
     resultMethod: string | null
     resultTechnique: string | null
+    kbVersion?: number | null
   }
   videoUrl: string | null
   insights: InsightRow[]
@@ -814,6 +815,15 @@ export function ScoutingView({
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/25 flex-shrink-0 tracking-wide uppercase">
               {label}
             </span>
+            {(match.kbVersion ?? 0) >= 1 && (
+              <span
+                className="flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20 flex-shrink-0"
+                title={match.kbVersion && match.kbVersion > 1 ? `Technique library applied · upgraded ${match.kbVersion - 1}×` : 'Technique library applied during analysis'}
+              >
+                <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a1 1 0 0 1 .894.553l1.618 3.276 3.614.525a1 1 0 0 1 .554 1.706L11.97 9.695l.617 3.6a1 1 0 0 1-1.451 1.054L8 12.617l-3.136 1.732a1 1 0 0 1-1.45-1.054l.616-3.6L1.32 7.06a1 1 0 0 1 .554-1.706l3.614-.525L7.106 1.553A1 1 0 0 1 8 1z"/></svg>
+                Technique library
+              </span>
+            )}
             {match.resultWinner && (
               <ResultBadge
                 winner={match.resultWinner}

@@ -747,6 +747,9 @@ export const scanUrl = inngest.createFunction(
 
         await db.update(matches).set({
           status: 'analysed',
+          // kbVersion=1 signals the technique library was applied during initial extraction.
+          // rescan-matches-kb increments it further when the KB agent re-scans.
+          kbVersion: 1,
           ...(extractedResult ? {
             resultWinner: extractedResult.winner,
             resultMethod: extractedResult.method,

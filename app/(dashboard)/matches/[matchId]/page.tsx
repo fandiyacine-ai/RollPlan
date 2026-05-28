@@ -163,6 +163,7 @@ export default async function MatchDetailPage({
           resultWinner: match.resultWinner,
           resultMethod: match.resultMethod,
           resultTechnique: match.resultTechnique,
+          kbVersion: match.kbVersion,
         }}
         videoUrl={video?.publicUrl ?? null}
         insights={matchInsights}
