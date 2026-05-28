@@ -139,6 +139,29 @@ export default async function PlayerCardPage() {
       : Promise.resolve([]),
   ])
 
+  // ── Get-started checklist DB checks ──
+  const hasAnyOpponent = dbUser ? (await db
+    .select({ id: tournamentOpponents.id })
+    .from(tournamentOpponents)
+    .innerJoin(tournaments, eq(tournamentOpponents.tournamentId, tournaments.id))
+    .where(eq(tournaments.userId, dbUser.id))
+    .limit(1)).length > 0 : false
+
+  const hasAnyFootage = dbUser ? (await db
+    .select({ id: videos.id })
+    .from(videos)
+    .innerJoin(tournamentOpponents, eq(videos.tournamentOpponentId, tournamentOpponents.id))
+    .innerJoin(tournaments, eq(tournamentOpponents.tournamentId, tournaments.id))
+    .where(and(eq(tournaments.userId, dbUser.id), eq(videos.sourceType, 'opponent')))
+    .limit(1)).length > 0 : false
+
+  const hasAnyGameplan = dbUser ? (await db
+    .select({ id: gameplans.id })
+    .from(gameplans)
+    .innerJoin(tournaments, eq(gameplans.tournamentId, tournaments.id))
+    .where(eq(tournaments.userId, dbUser.id))
+    .limit(1)).length > 0 : false
+
   // ── Upcoming tournaments for sidebar ──
   const upcomingTournaments = dbUser ? await db
     .select({
@@ -316,9 +339,9 @@ export default async function PlayerCardPage() {
               <div className="space-y-3">
                 {[
                   { step: '1', label: 'Create a tournament', sub: 'Name, date, and ruleset', href: '/tournaments', done: upcomingTournaments.length > 0 },
-                  { step: '2', label: 'Add your opponent', sub: 'Name and division', href: '/tournaments', done: false },
-                  { step: '3', label: 'Upload footage', sub: 'YouTube link or video file', href: '/upload', done: false },
-                  { step: '4', label: 'Generate gameplan', sub: 'AI analyses the footage', href: '/gameplans', done: false },
+                  { step: '2', label: 'Add your opponent', sub: 'Name and division', href: '/tournaments', done: hasAnyOpponent },
+                  { step: '3', label: 'Upload footage', sub: 'YouTube link or video file', href: '/upload', done: hasAnyFootage },
+                  { step: '4', label: 'Generate gameplan', sub: 'AI analyses the footage', href: '/gameplans', done: hasAnyGameplan },
                 ].map(item => (
                   <Link key={item.step} href={item.href} className="flex items-center gap-3 group hover:text-foreground transition-colors">
                     <span className={`w-6 h-6 rounded-full border text-[10px] font-bold flex items-center justify-center flex-shrink-0 transition-colors ${item.done ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-500' : 'border-border/60 bg-muted/40 text-muted-foreground group-hover:border-foreground/30'}`}>
