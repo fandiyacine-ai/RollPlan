@@ -142,6 +142,7 @@ export const scanUrl = inngest.createFunction(
         })
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
+        console.error('[scan-url] Gemini error (raw):', err)
         const isYT = isYouTubeUrl(video.publicUrl)
 
         const failAndThrow = async (reason: string) => {
@@ -670,6 +671,7 @@ export const scanUrl = inngest.createFunction(
             })
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err)
+            console.error('[scan-url] insights error (raw):', err)
             if (
               msg.includes('overloaded') ||
               msg.includes('529') ||
