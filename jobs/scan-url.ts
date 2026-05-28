@@ -455,9 +455,19 @@ export const scanUrl = inngest.createFunction(
 
               // Scan timestamps are already absolute ("seconds from video start" per the prompt).
               // Use them directly — no chunk offset needed.
+              //
+              // Cross-boundary guard: if the match end is within 5 min of the chunk boundary,
+              // Gemini never saw the real outcome screen (it was cut off). In that case we
+              // anchor the extraction window on match_start + MAX_MATCH_DURATION so the clip
+              // extends past the chunk boundary and captures the real outcome screen.
+              const chunkEndSeconds = endSeconds ?? Infinity
+              const scanEnd = found.outcome_screen_seconds ?? found.end_seconds
+              const crossesBoundary = !skipScan && scanEnd > chunkEndSeconds - 300
               const outcomeAbsolute = skipScan
                 ? (endSeconds ?? 999999)
-                : (found.outcome_screen_seconds ?? found.end_seconds)
+                : crossesBoundary
+                  ? found.start_seconds + MAX_MATCH_DURATION
+                  : scanEnd
 
               clipStart = Math.max(0, outcomeAbsolute - MAX_MATCH_DURATION)
               const clipEnd = skipScan ? (endSeconds ?? undefined) : outcomeAbsolute + OUTCOME_TAIL
