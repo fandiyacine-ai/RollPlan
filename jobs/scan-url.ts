@@ -76,8 +76,9 @@ export const scanUrl = inngest.createFunction(
   }) => {
     const { videoId, userId, athleteName, format, sourceType, eventName, appearanceHint, tournamentOpponentId, skipScan, startSeconds, endSeconds, chunkIndex, chunkTotal, chunkVideoIds, matchesFoundSoFar, consecutiveEmptyChunks, ytTimestampHint } = event.data
 
-    const CHUNK_SECS = 20 * 60  // 20-minute windows — ~60 frames at 0.05fps
-    const NUM_CHUNKS = 20       // covers up to 6h40m (handles full competition day streams)
+    const CHUNK_SECS = 20 * 60   // 20-minute windows — ~60 frames at 0.05fps
+    const CHUNK_OVERLAP = 5 * 60 // 5-min overlap so matches near a boundary appear fully in the next chunk
+    const NUM_CHUNKS = 20        // covers up to ~5h50m effective with overlap (handles full competition day)
 
     // null return value signals "needs chunking" — handled after the step
     const scanStepResult: FoundMatch[] | null = skipScan
@@ -325,16 +326,32 @@ export const scanUrl = inngest.createFunction(
       // Step A: create match record in its own memoised step — if extraction is retried,
       // Inngest replays this step's result without re-inserting, preventing ghost match records.
       const matchId = await step.run(`create-match-${i}`, async () => {
-        // Deduplication safety net: if a non-failed match already exists for THIS
-        // video + opponent label, return its ID rather than creating a duplicate.
-        // Scoped to videoId so that deleting footage and re-submitting a new video
-        // always triggers a fresh extraction rather than reusing stale match data.
+        // Dedup 1 — within-job retry safety: same video + opponent label.
+        // Prevents duplicate records when Inngest replays this step on a transient error.
         {
           const existing = await db.query.matches.findFirst({
             where: (m, { and, eq, ne }) => and(
               eq(m.videoId, videoId),
               eq(m.opponentLabel, found.opponent_name || 'unknown'),
               ne(m.status, 'failed'),
+            ),
+          })
+          if (existing) return existing.id
+        }
+
+        // Dedup 2 — cross-chunk overlap: different chunk videoIds may both detect the
+        // same match when the CHUNK_OVERLAP window covers the match boundary. If a
+        // non-failed match already exists for this opponent with a start time within
+        // MAX_MATCH_DURATION (8 min) of what we just found, it's the same match.
+        if (tournamentOpponentId) {
+          const MAX_MATCH_DURATION_SECS = 8 * 60
+          const existing = await db.query.matches.findFirst({
+            where: (m, { and, eq, ne, gte, lte }) => and(
+              eq(m.tournamentOpponentId, tournamentOpponentId),
+              eq(m.opponentLabel, found.opponent_name || 'unknown'),
+              ne(m.status, 'failed'),
+              gte(m.matchStartSeconds, found.start_seconds - MAX_MATCH_DURATION_SECS),
+              lte(m.matchStartSeconds, found.start_seconds + MAX_MATCH_DURATION_SECS),
             ),
           })
           if (existing) return existing.id
@@ -626,7 +643,14 @@ export const scanUrl = inngest.createFunction(
               matchEndSeconds: matches.matchEndSeconds,
             }).from(matches).where(eq(matches.id, matchId)).then(r => r[0])
             if (matchRow?.matchStartSeconds != null) {
-              const windowStart = matchRow.matchStartSeconds - 5
+              // Floor: use the earlier of clipStart and matchStartSeconds.
+              // When a match is detected at a chunk boundary (start == chunkEnd),
+              // matchStartSeconds is wrong — the real match starts earlier in the
+              // previous chunk. clipStart is always a safe lower bound.
+              const windowStart = Math.min(
+                clipStart > 0 ? clipStart : matchRow.matchStartSeconds,
+                matchRow.matchStartSeconds
+              ) - 5
               const windowEnd = clipEnd !== undefined
                 ? clipEnd + 30
                 : (matchRow.matchEndSeconds ?? matchRow.matchStartSeconds + 600) + 30
@@ -937,8 +961,8 @@ export const scanUrl = inngest.createFunction(
           eventName,
           appearanceHint,
           tournamentOpponentId,
-          startSeconds: endSeconds,           // current chunk end = next chunk start
-          endSeconds: endSeconds! + CHUNK_SECS,
+          startSeconds: endSeconds! - CHUNK_OVERLAP,  // overlap the last 5 min so boundary-spanning matches appear fully in the next chunk
+          endSeconds: endSeconds! - CHUNK_OVERLAP + CHUNK_SECS,
           chunkIndex: nextIndex,
           chunkTotal,
           chunkVideoIds,
