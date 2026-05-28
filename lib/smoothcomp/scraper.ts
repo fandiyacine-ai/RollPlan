@@ -350,8 +350,7 @@ export async function scrapeAthleteProfile(profileUrl: string): Promise<ScAthlet
     const isPrivate =
       bodyText.includes('private profile') ||
       bodyText.includes('profile is private') ||
-      bodyText.includes('hidden profile') ||
-      (await page.$('[class*="private"]').catch(() => null)) !== null
+      bodyText.includes('hidden profile')
 
     if (isPrivate) {
       return { athleteId, name: '', isPublic: false, pastCompetitions: [], photoUrl: null }
