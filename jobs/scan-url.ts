@@ -106,9 +106,6 @@ export const scanUrl = inngest.createFunction(
             },
             userPrompt: buildScanUrlUserPrompt(athleteName, appearanceHint),
             schema: UrlScanOutputSchema,
-            // Thinking helps the model reason about multi-match streams — distinguishing
-            // which outcome screen belongs to which match before committing to boundaries.
-            thinkingBudget: 2048,
           })
           scanResult = result.object
           scanUsage = result.usage
@@ -431,7 +428,6 @@ export const scanUrl = inngest.createFunction(
                 }),
                 schema: MatchExtractionOutputSchema,
                 referenceImageBase64: athleteImageBase64 || undefined,
-                thinkingBudget: 4096,
               })
               // Extraction timestamps are absolute from video origin — no shift needed.
               extractObject = result.object
