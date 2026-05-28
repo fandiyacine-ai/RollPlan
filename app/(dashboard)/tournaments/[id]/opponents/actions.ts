@@ -186,16 +186,22 @@ export async function submitScoutUrls(
       const ytTimestampHint = isYouTubeUrl(url) ? parseYouTubeTimestamp(url) : 0
       const storedUrl = isYouTubeUrl(url) ? normalizeYouTubeUrl(url) : url
 
-      // Prevent duplicate scans: skip if this URL is already queued or analysed for this opponent
-      const existing = await db
+      // Prevent duplicate scans: skip if this URL is already analysed for this opponent.
+      // Stuck records (uploaded/processing) are deleted so the user can re-submit without
+      // needing to manually clean up after a cancelled or failed Inngest run.
+      const existingRows = await db
         .select({ id: videos.id, status: videos.status })
         .from(videos)
         .where(and(eq(videos.publicUrl, storedUrl), eq(videos.tournamentOpponentId, opponentId)))
-        .limit(1)
-        .then(r => r[0] ?? null)
-      if (existing && existing.status !== 'failed') {
+      const analysedRow = existingRows.find(r => r.status === 'analysed')
+      if (analysedRow) {
         skippedUrls.push(url)
         continue
+      }
+      // Delete any stuck/failed rows for this URL+opponent before inserting fresh
+      const staleIds = existingRows.map(r => r.id)
+      if (staleIds.length > 0) {
+        await db.delete(videos).where(inArray(videos.id, staleIds))
       }
 
       // URL dedup: if this YouTube URL was already analysed for ANY opponent cross-user,
