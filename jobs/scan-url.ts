@@ -354,11 +354,14 @@ export const scanUrl = inngest.createFunction(
           // Scan timestamps are absolute from video origin — store directly, no chunk offset needed.
           matchStartSeconds: skipScan ? (startSeconds ?? 0) : Math.round(found.start_seconds),
           matchEndSeconds: skipScan ? (endSeconds ?? null) : Math.round(found.end_seconds),
-          // Walkovers are complete immediately — no extraction needed
+          // Walkovers are complete immediately — no extraction needed.
+          // For non-walkovers, don't pre-populate the result from the scan step:
+          // the scan result is low-confidence and would show a wrong badge during extraction.
+          // The authoritative result comes from the extraction step.
           status: found.is_walkover ? 'analysed' : 'processing',
-          resultWinner: result ? (result.winner_is_tracked_athlete ? 'user' : 'opponent') : null,
-          resultMethod: result?.method ?? null,
-          resultTechnique: result?.technique ?? null,
+          resultWinner: found.is_walkover && result ? (result.winner_is_tracked_athlete ? 'user' : 'opponent') : null,
+          resultMethod: found.is_walkover ? (result?.method ?? null) : null,
+          resultTechnique: found.is_walkover ? (result?.technique ?? null) : null,
         }).returning()
         return match.id
       })
