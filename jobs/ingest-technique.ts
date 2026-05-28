@@ -179,12 +179,13 @@ export const ingestTechnique = inngest.createFunction(
             rmSync(tmpDir, { recursive: true, force: true })
           }
         } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err)
           console.error('[ingest-technique] failed to extract reference image', err)
-          return null
+          return { error: msg.slice(0, 300) }
         }
       })
 
-      if (refImageUrl) {
+      if (refImageUrl && typeof refImageUrl === 'string') {
         await step.run('save-reference-image', async () => {
           await db.update(techniqueVariants)
             .set({ referenceImageUrl: refImageUrl, updatedAt: new Date() })
@@ -196,7 +197,10 @@ export const ingestTechnique = inngest.createFunction(
             columns: { adminNotes: true },
             where: eq(techniqueVariants.id, variantId.id),
           })
-          const failureNote = `Reference image extraction failed at ${new Date().toISOString()}`
+          const errMsg = refImageUrl && typeof refImageUrl === 'object' && 'error' in refImageUrl
+            ? ` — ${(refImageUrl as { error: string }).error}`
+            : ''
+          const failureNote = `Ref image failed at ${new Date().toISOString()}${errMsg}`
           const updatedNotes = existing?.adminNotes ? `${existing.adminNotes}\n${failureNote}` : failureNote
           await db.update(techniqueVariants)
             .set({ adminNotes: updatedNotes, updatedAt: new Date() })
