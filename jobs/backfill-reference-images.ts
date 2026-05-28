@@ -120,8 +120,8 @@ export const backfillReferenceImageOne = inngest.createFunction(
         await uploadBuffer(r2Key, buffer, 'image/jpeg')
         return await getPublicVideoUrl(r2Key)
       } catch (err) {
-        console.error('[backfill-reference-images] extract-frame failed', { sourceUrl, err })
-        return null
+        // Throw so Inngest retries the step instead of silently skipping
+        throw err
       } finally {
         rmSync(tmpDir, { recursive: true, force: true })
       }

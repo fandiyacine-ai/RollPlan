@@ -1,5 +1,5 @@
-import { spawnSync } from 'child_process'
-import { mkdtempSync, rmSync, readFileSync, existsSync } from 'fs'
+import { spawn } from 'child_process'
+import { mkdtempSync, rmSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { eq } from 'drizzle-orm'
@@ -132,37 +132,42 @@ export const ingestTechnique = inngest.createFunction(
     if (object.key_moment_seconds != null) {
       const refImageUrl = await step.run('extract-reference-image', async () => {
         try {
-          const info = await ytdl.getInfo(youtubeUrl)
-          const format = ytdl.chooseFormat(info.formats, {
-            quality: 'lowestvideo',
-            filter: (f: any) => !!f.url && f.hasVideo && (f.container === 'mp4' || f.container === 'webm'),
-          }) || ytdl.chooseFormat(info.formats, {
-            quality: 'lowestvideo',
-            filter: (f: any) => !!f.url && f.hasVideo,
-          })
-          if (!format?.url) {
-            console.error('[ingest-technique] no downloadable video format found for', youtubeUrl)
-            return null
-          }
-
           const tmpDir = mkdtempSync(join(tmpdir(), 'rp-ref-'))
           const outPath = join(tmpDir, 'frame.jpg')
           try {
-            const result = spawnSync('ffmpeg', [
-              '-loglevel', 'error',
-              '-y',
-              '-ss', String(Math.floor(object.key_moment_seconds!)),
-              '-i', format.url,
-              '-frames:v', '1',
-              '-q:v', '3',
-              '-vf', 'scale=1280:-2',
-              outPath,
-            ], { timeout: 30_000 })
+            const stream = ytdl(youtubeUrl, {
+              quality: 'lowestvideo',
+              filter: (f: any) => f.hasVideo,
+            })
 
-            if (result.status !== 0 || !existsSync(outPath)) {
-              console.error('[ingest-technique] ffmpeg failed', { youtubeUrl, status: result.status, stderr: result.stderr?.toString(), stdout: result.stdout?.toString() })
-              return null
-            }
+            const stderrChunks: Buffer[] = []
+            await new Promise<void>((resolve, reject) => {
+              const ff = spawn('ffmpeg', [
+                '-y',
+                '-loglevel', 'error',
+                '-ss', String(Math.floor(object.key_moment_seconds!)),
+                '-i', 'pipe:0',
+                '-frames:v', '1',
+                '-q:v', '3',
+                '-vf', 'scale=1280:-2',
+                outPath,
+              ])
+
+              ff.stderr.on('data', (d: Buffer) => stderrChunks.push(d))
+              ff.stdin.on('error', (err: NodeJS.ErrnoException) => {
+                if (err.code !== 'EPIPE') reject(err)
+              })
+              stream.on('error', (err: Error) => { ff.kill(); reject(err) })
+              stream.pipe(ff.stdin)
+
+              const timer = setTimeout(() => { ff.kill(); reject(new Error('extraction timeout')) }, 50_000)
+              ff.on('close', (code: number | null) => {
+                clearTimeout(timer)
+                if (code === 0) resolve()
+                else reject(new Error(`ffmpeg exited ${code}: ${Buffer.concat(stderrChunks).toString()}`))
+              })
+              ff.on('error', (err: Error) => { clearTimeout(timer); reject(err) })
+            })
 
             const buffer = readFileSync(outPath)
             const r2Key = `technique-refs/${variantId.id}.jpg`
