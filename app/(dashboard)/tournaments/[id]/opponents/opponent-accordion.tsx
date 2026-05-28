@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { ScoutForm, DeleteOpponentButton, EditOpponentButton, RescanVideoButton, RetriggerIntelButton } from './opponent-forms'
+import { ScoutForm, DeleteOpponentButton, EditOpponentButton, RescanVideoButton, RetriggerIntelButton, DeleteFootageButton } from './opponent-forms'
 import { importCommunityFootage, saveOpponentResult } from './actions'
 
 type FootageRow = {
@@ -484,24 +484,29 @@ export function OpponentAccordion({
                   )}
                   <span className="text-xs text-muted-foreground flex-shrink-0">{fmtDate(m.createdAt)}</span>
                 </div>
-                {m.status === 'analysed' && (
-                  <Link
-                    href={`/matches/${m.id}?back=/tournaments/${tournamentId}/opponents`}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                  >
-                    View →
-                  </Link>
-                )}
-                {m.status === 'failed' && (
-                  <div className="flex items-center gap-2 flex-shrink-0 min-w-0">
-                    <span className="text-xs text-rose-400 max-w-xs truncate" title={m.failureReason ?? undefined}>
-                      {m.failureReason ?? 'Analysis failed'}
-                    </span>
-                    {m.rowType === 'video' && (
-                      <RescanVideoButton videoId={m.id} tournamentId={tournamentId} />
-                    )}
-                  </div>
-                )}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {m.status === 'analysed' && (
+                    <Link
+                      href={`/matches/${m.id}?back=/tournaments/${tournamentId}/opponents`}
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      View →
+                    </Link>
+                  )}
+                  {m.status === 'failed' && (
+                    <>
+                      <span className="text-xs text-rose-400 max-w-xs truncate" title={m.failureReason ?? undefined}>
+                        {m.failureReason ?? 'Analysis failed'}
+                      </span>
+                      {m.rowType === 'video' && (
+                        <RescanVideoButton videoId={m.id} tournamentId={tournamentId} />
+                      )}
+                    </>
+                  )}
+                  {m.rowType === 'video' && (
+                    <DeleteFootageButton videoId={m.id} tournamentId={tournamentId} />
+                  )}
+                </div>
               </div>
             )
           })}

@@ -391,6 +391,19 @@ export async function saveOpponentResult(
   }
 }
 
+export async function deleteFootage(videoId: string, tournamentId: string): Promise<{ error?: string }> {
+  try {
+    await getOrCreateDbUserId()
+    // Delete chunks first, then parent — matches cascade from videos
+    await db.delete(videos).where(like(videos.r2Key, `chunk/${videoId}/%`))
+    await db.delete(videos).where(eq(videos.id, videoId))
+    revalidatePath(`/tournaments/${tournamentId}/opponents`)
+    return {}
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 export async function deleteOpponent(opponentId: string, tournamentId: string): Promise<{ error?: string }> {
   try {
     // gameplans.opponentId has no onDelete clause — delete it first or the FK blocks the delete.

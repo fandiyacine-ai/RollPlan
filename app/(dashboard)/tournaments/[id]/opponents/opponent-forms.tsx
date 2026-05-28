@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { addOpponent, submitScoutUrls, deleteOpponent, updateOpponent, rescanVideo, retriggerIntel } from './actions'
+import { addOpponent, submitScoutUrls, deleteOpponent, updateOpponent, rescanVideo, retriggerIntel, deleteFootage } from './actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -282,6 +282,52 @@ export function RetriggerIntelButton({ opponentId, tournamentId }: { opponentId:
         <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
       </svg>
       {pending ? 'Queuing…' : polling ? 'Scanning…' : 'Re-run intel'}
+    </button>
+  )
+}
+
+export function DeleteFootageButton({ videoId, tournamentId }: { videoId: string; tournamentId: string }) {
+  const router = useRouter()
+  const [pending, setPending] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+
+  if (confirming) {
+    return (
+      <span className="flex items-center gap-1.5 flex-shrink-0">
+        <span className="text-xs text-muted-foreground">Remove footage?</span>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={async () => {
+            setPending(true)
+            await deleteFootage(videoId, tournamentId)
+            router.refresh()
+          }}
+          className="text-xs px-2 py-0.5 rounded border border-rose-800/50 bg-rose-950/30 text-rose-400 hover:bg-rose-950/50 transition-colors disabled:opacity-50"
+        >
+          {pending ? 'Removing…' : 'Yes, remove'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setConfirming(false)}
+          className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+        >
+          Cancel
+        </button>
+      </span>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setConfirming(true)}
+      className="p-1 rounded text-muted-foreground/30 hover:text-rose-400 hover:bg-rose-950/20 transition-colors flex-shrink-0"
+      title="Remove footage"
+    >
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+      </svg>
     </button>
   )
 }
