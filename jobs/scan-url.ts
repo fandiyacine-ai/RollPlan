@@ -351,9 +351,10 @@ export const scanUrl = inngest.createFunction(
           eventName: eventName ?? null,
           userNotes: found.round_or_bracket ?? null,
           tournamentOpponentId: tournamentOpponentId ?? null,
-          // Scan timestamps are absolute from video origin — store directly, no chunk offset needed.
-          matchStartSeconds: skipScan ? (startSeconds ?? 0) : Math.round(found.start_seconds),
-          matchEndSeconds: skipScan ? (endSeconds ?? null) : Math.round(found.end_seconds),
+          // Gemini returns timestamps RELATIVE to the clip/chunk start it was given.
+          // Add the chunk's startSeconds offset to convert to absolute video timestamps.
+          matchStartSeconds: skipScan ? (startSeconds ?? 0) : Math.round(found.start_seconds) + (startSeconds ?? 0),
+          matchEndSeconds: skipScan ? (endSeconds ?? null) : Math.round(found.end_seconds) + (startSeconds ?? 0),
           // Walkovers are complete immediately — no extraction needed.
           // For non-walkovers, don't pre-populate the result from the scan step:
           // the scan result is low-confidence and would show a wrong badge during extraction.
@@ -469,11 +470,12 @@ export const scanUrl = inngest.createFunction(
               const MAX_MATCH_DURATION = 8 * 60  // 8 min — covers most AJP/IBJJF matches while keeping frame count manageable
               const OUTCOME_TAIL = 120            // 2 min after outcome screen
 
-              // Scan timestamps are absolute from video origin — use directly, no chunk offset needed.
-              // Use outcome_screen_seconds as the primary anchor; fall back to end_seconds
+              // Scan timestamps are relative to the chunk clip start — add the chunk offset to get
+              // the absolute video position needed for the extraction clip window.
+              const chunkScanOffset = startSeconds ?? 0
               const outcomeAbsolute = skipScan
                 ? (endSeconds ?? 999999)
-                : (found.outcome_screen_seconds ?? found.end_seconds)
+                : (found.outcome_screen_seconds ?? found.end_seconds) + chunkScanOffset
 
               clipStart = Math.max(0, outcomeAbsolute - MAX_MATCH_DURATION)
               const clipEnd = skipScan ? (endSeconds ?? undefined) : outcomeAbsolute + OUTCOME_TAIL
