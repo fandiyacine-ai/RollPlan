@@ -426,6 +426,9 @@ export const scanUrl = inngest.createFunction(
           const isYT = isYouTubeUrl(video.publicUrl)
           let extractObject: MatchExtractionOutput
           let extractUsage: { inputTokens: number; outputTokens: number }
+          // Gemini returns timestamps relative to the clip's startOffset, not the video origin.
+          // Track clipStart here so we can shift all segment/event timestamps to absolute positions.
+          let clipStart = 0
 
           // Inject technique KB into the extraction prompt so Gemini can detect known patterns
           const kbVariants = await getTechniqueVariantsForExtraction(format as 'gi' | 'no_gi')
@@ -453,7 +456,7 @@ export const scanUrl = inngest.createFunction(
                 ? (endSeconds ?? 999999)
                 : (found.outcome_screen_seconds ?? found.end_seconds)
 
-              const clipStart = Math.max(0, outcomeAbsolute - MAX_MATCH_DURATION)
+              clipStart = Math.max(0, outcomeAbsolute - MAX_MATCH_DURATION)
               const clipEnd = skipScan ? (endSeconds ?? undefined) : outcomeAbsolute + OUTCOME_TAIL
 
               // Where in the clip the outcome screen is expected (for the extraction prompt hint)
@@ -568,8 +571,8 @@ export const scanUrl = inngest.createFunction(
             await tx.insert(positionSegments).values(
               extractObject.positions.map((p) => ({
                 matchId,
-                startSeconds: toSecs(p.start_seconds),
-                endSeconds: toSecs(p.end_seconds),
+                startSeconds: toSecs(p.start_seconds) + clipStart,
+                endSeconds: toSecs(p.end_seconds) + clipStart,
                 positionId: p.position_id,
                 userRole: p.user_role,
                 dominance: p.dominance,
@@ -582,7 +585,7 @@ export const scanUrl = inngest.createFunction(
               await tx.insert(matchEvents).values(
                 extractObject.events.map((e) => ({
                   matchId,
-                  timestampSeconds: toSecs(e.timestamp_seconds),
+                  timestampSeconds: toSecs(e.timestamp_seconds) + clipStart,
                   eventTypeId: e.event_type_id,
                   actor: e.actor,
                   outcome: e.outcome,
