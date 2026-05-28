@@ -161,7 +161,7 @@ export async function submitScoutUrls(
     if (urls.length > 10) return { error: 'Maximum 10 URLs per submission' }
 
     const opponent = await db.query.tournamentOpponents.findFirst({
-      columns: { id: true, opponentLabel: true, profilePhotoUrl: true },
+      columns: { id: true, opponentLabel: true },
       where: (t, { eq }) => eq(t.id, opponentId),
     })
     if (!opponent) return { error: 'Opponent not found' }
@@ -267,7 +267,6 @@ export async function submitScoutUrls(
             tournamentOpponentId: opponentId,
             appearanceHint,
             ytTimestampHint: ytTimestampHint || undefined,
-            profilePhotoUrl: opponent.profilePhotoUrl ?? undefined,
           },
         })
       } catch {

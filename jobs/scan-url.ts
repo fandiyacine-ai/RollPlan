@@ -71,10 +71,10 @@ export const scanUrl = inngest.createFunction(
     concurrency: { limit: 8 },
   },
   async ({ event, step }: {
-    event: { data: { videoId: string; userId?: string; athleteName: string; format: string; sourceType: string; eventName?: string; appearanceHint?: string; athleteImageBase64?: string; profilePhotoUrl?: string; tournamentOpponentId?: string; skipScan?: boolean; startSeconds?: number; endSeconds?: number; chunkIndex?: number; chunkTotal?: number; chunkVideoIds?: string[]; matchesFoundSoFar?: number; consecutiveEmptyChunks?: number; ytTimestampHint?: number } }
+    event: { data: { videoId: string; userId?: string; athleteName: string; format: string; sourceType: string; eventName?: string; appearanceHint?: string; tournamentOpponentId?: string; skipScan?: boolean; startSeconds?: number; endSeconds?: number; chunkIndex?: number; chunkTotal?: number; chunkVideoIds?: string[]; matchesFoundSoFar?: number; consecutiveEmptyChunks?: number; ytTimestampHint?: number } }
     step: any
   }) => {
-    const { videoId, userId, athleteName, format, sourceType, eventName, appearanceHint, athleteImageBase64: legacyImageBase64, profilePhotoUrl, tournamentOpponentId, skipScan, startSeconds, endSeconds, chunkIndex, chunkTotal, chunkVideoIds, matchesFoundSoFar, consecutiveEmptyChunks, ytTimestampHint } = event.data
+    const { videoId, userId, athleteName, format, sourceType, eventName, appearanceHint, tournamentOpponentId, skipScan, startSeconds, endSeconds, chunkIndex, chunkTotal, chunkVideoIds, matchesFoundSoFar, consecutiveEmptyChunks, ytTimestampHint } = event.data
 
     const CHUNK_SECS = 20 * 60  // 20-minute windows — ~60 frames at 0.05fps
     const NUM_CHUNKS = 20       // covers up to 6h40m (handles full competition day streams)
@@ -285,7 +285,6 @@ export const scanUrl = inngest.createFunction(
           sourceType,
           eventName,
           appearanceHint,
-          profilePhotoUrl,
           tournamentOpponentId,
           startSeconds: urlOffset,
           endSeconds: urlOffset + CHUNK_SECS,
@@ -434,22 +433,6 @@ export const scanUrl = inngest.createFunction(
           // Track clipStart here so we can shift all segment/event timestamps to absolute positions.
           let clipStart = 0
 
-          // Resolve profile photo → base64 for Gemini visual hint.
-          // Fetch happens here (inside the job) so the form submit is never blocked by network I/O.
-          // Fall back to the legacy in-event base64 for any runs already in flight.
-          let resolvedPhotoBase64: string | undefined = legacyImageBase64 || undefined
-          if (!resolvedPhotoBase64 && profilePhotoUrl) {
-            try {
-              const photoRes = await fetch(profilePhotoUrl, {
-                headers: { 'User-Agent': 'Mozilla/5.0' },
-                signal: AbortSignal.timeout(8000),
-              })
-              if (photoRes.ok) {
-                resolvedPhotoBase64 = Buffer.from(await photoRes.arrayBuffer()).toString('base64')
-              }
-            } catch { /* best-effort — extraction proceeds without photo hint */ }
-          }
-
           // Inject technique KB into the extraction prompt so Gemini can detect known patterns
           const kbVariants = await getTechniqueVariantsForExtraction(format as 'gi' | 'no_gi')
           const techniqueContext = formatVariantsAsPromptBlock(kbVariants)
@@ -505,7 +488,6 @@ export const scanUrl = inngest.createFunction(
                   userSide: found.user_side ?? undefined,
                 }),
                 schema: MatchExtractionOutputSchema,
-                profilePhotoBase64: resolvedPhotoBase64,
               })
               // Extraction timestamps are absolute from video origin — no shift needed.
               extractObject = result.object
@@ -933,7 +915,6 @@ export const scanUrl = inngest.createFunction(
           sourceType,
           eventName,
           appearanceHint,
-          profilePhotoUrl,
           tournamentOpponentId,
           startSeconds: endSeconds,           // current chunk end = next chunk start
           endSeconds: endSeconds! + CHUNK_SECS,

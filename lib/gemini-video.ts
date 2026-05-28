@@ -68,11 +68,9 @@ export async function geminiVideoObject<T extends z.ZodTypeAny>(
     schema: T
     /** Annotated frame where the target athlete is boxed with "⬅ YOU" — strong identity anchor */
     referenceImageBase64?: string
-    /** Unverified profile photo (e.g. from Smoothcomp) — soft visual hint, may not match */
-    profilePhotoBase64?: string
   }
 ): Promise<{ object: z.infer<T>; usage: { inputTokens: number; outputTokens: number } }> {
-  const { system, videoUrl, videoOptions, userPrompt, schema, referenceImageBase64, profilePhotoBase64 } = params
+  const { system, videoUrl, videoOptions, userPrompt, schema, referenceImageBase64 } = params
 
   const filePart: Record<string, unknown> = {
     fileData: { mimeType: 'video/mp4', fileUri: cleanYouTubeUrl(videoUrl) },
@@ -94,10 +92,6 @@ export async function geminiVideoObject<T extends z.ZodTypeAny>(
   const thinkingBudget = videoOptions?.thinkingEffort ? THINKING_BUDGET[videoOptions.thinkingEffort] : null
 
   const userParts: unknown[] = []
-  if (profilePhotoBase64) {
-    userParts.push({ inlineData: { mimeType: 'image/jpeg', data: profilePhotoBase64 } })
-    userParts.push({ text: '↑ SOFT VISUAL HINT — this may be a profile photo of the athlete you are looking for. Use it only as a loose visual aid. If the image does not clearly show a person, looks like a placeholder, or does not match anyone visible in the video, disregard it entirely and rely solely on the athlete name for identification.' })
-  }
   if (referenceImageBase64) {
     userParts.push({ inlineData: { mimeType: 'image/jpeg', data: referenceImageBase64 } })
     userParts.push({ text: '↑ IDENTITY REFERENCE FRAME. The red "⬅ YOU" box marks the ONLY athlete to label as "user" for the ENTIRE match. The other athlete is ALWAYS "opponent". Use this annotated frame as your identity anchor — do not swap these roles at any point.' })
