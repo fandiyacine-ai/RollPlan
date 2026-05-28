@@ -59,6 +59,8 @@ export const scanUrl = inngest.createFunction(
     name: 'Scan URL for Matches',
     retries: 10,
     triggers: [{ event: 'url/submitted' }],
+    // Cap simultaneous Gemini calls — prevents quota exhaustion when multiple videos scan in parallel
+    concurrency: { limit: 3 },
   },
   async ({ event, step }: {
     event: { data: { videoId: string; userId?: string; athleteName: string; format: string; sourceType: string; eventName?: string; appearanceHint?: string; athleteImageBase64?: string; tournamentOpponentId?: string; skipScan?: boolean; startSeconds?: number; endSeconds?: number; chunkIndex?: number; chunkTotal?: number; chunkVideoIds?: string[]; matchesFoundSoFar?: number; consecutiveEmptyChunks?: number; ytTimestampHint?: number } }
@@ -162,7 +164,7 @@ export const scanUrl = inngest.createFunction(
         if (msg.includes('Resource has been exhausted') || msg.includes('RESOURCE_EXHAUSTED')) {
           if (isYT) {
             if (chunkIndex !== undefined) {
-              throw new RetryAfterError('Gemini quota temporarily exhausted in chunk — retrying.', '5m')
+              throw new RetryAfterError('Gemini quota temporarily exhausted in chunk — retrying.', '15m')
             }
             await db.update(videos).set({ status: 'processing' }).where(eq(videos.id, videoId))
             return null
@@ -197,11 +199,11 @@ export const scanUrl = inngest.createFunction(
           msg.includes('UNAVAILABLE')
         ) {
           if (chunkIndex !== undefined) {
-            throw new RetryAfterError('Gemini transient error in chunk scan — retrying.', '3m')
+            throw new RetryAfterError('Gemini transient error in chunk scan — retrying.', '10m')
           }
           // For non-chunk scans, leave video in 'processing' so UI shows scanning, not failed
           await db.update(videos).set({ status: 'processing' }).where(eq(videos.id, videoId))
-          throw new RetryAfterError('Gemini transient error during scan — retrying.', '3m')
+          throw new RetryAfterError('Gemini transient error during scan — retrying.', '10m')
         }
         await db.update(videos).set({ status: 'failed', failureReason: msg }).where(eq(videos.id, videoId))
         // For chunk jobs, mark parent failed so it doesn't stay stuck in 'processing'
@@ -481,7 +483,7 @@ export const scanUrl = inngest.createFunction(
               msg.includes('Unexpected token') ||
               msg.includes('JSON input')
             ) {
-              throw new RetryAfterError('Gemini returned an incomplete response — retrying.', '3m')
+              throw new RetryAfterError('Gemini returned an incomplete response — retrying.', '10m')
             }
             await db.update(matches).set({ status: 'failed' }).where(eq(matches.id, matchId))
             throw err
@@ -679,7 +681,7 @@ export const scanUrl = inngest.createFunction(
               msg.includes('Unexpected end of JSON') ||
               msg.includes('JSON input')
             ) {
-              throw new RetryAfterError('Transient error during insights — retrying.', '3m')
+              throw new RetryAfterError('Transient error during insights — retrying.', '10m')
             }
             await db.update(matches).set({ status: 'failed' }).where(eq(matches.id, matchId))
             throw err
