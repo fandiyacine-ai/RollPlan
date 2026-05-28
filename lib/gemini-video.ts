@@ -94,7 +94,7 @@ export async function geminiVideoObject<T extends z.ZodTypeAny>(
   const userParts: unknown[] = []
   if (referenceImageBase64) {
     userParts.push({ inlineData: { mimeType: 'image/jpeg', data: referenceImageBase64 } })
-    userParts.push({ text: '↑ IDENTITY REFERENCE FRAME. The red "⬅ YOU" box marks the ONLY athlete to label as "user" for the ENTIRE match. The other athlete is ALWAYS "opponent". Use this annotated frame as your identity anchor — do not swap these roles at any point.' })
+    userParts.push({ text: '↑ IDENTITY REFERENCE FRAME. This is a still captured at match start. The tracked competitor ("user") is visible here — memorise their exact appearance: gi/shorts colour, build, hair. Track this exact person as "user" for the ENTIRE match. The other athlete is ALWAYS "opponent". Do not swap these roles at any point.' })
   }
   userParts.push(filePart)
   userParts.push({ text: userPrompt })

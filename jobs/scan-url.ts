@@ -399,7 +399,9 @@ export const scanUrl = inngest.createFunction(
         const tmpDir = mkdtempSync(join(tmpdir(), 'rp-matchref-'))
         const outPath = join(tmpDir, 'frame.jpg')
         try {
-          const stream = ytdl(video.publicUrl, { quality: 'lowestvideo', filter: (f: any) => f.hasVideo })
+          // Use a capped-480p stream for the reference frame — enough for Gemini to distinguish
+          // jersey colour and build without the ytdl 'lowestvideo' often returning a tiny thumbnail stream.
+          const stream = ytdl(video.publicUrl, { filter: (f: any) => f.hasVideo && (!f.height || f.height <= 480) })
           const stderrChunks: Buffer[] = []
           await new Promise<void>((resolve, reject) => {
             const ff = spawn(ffmpegBin, [
@@ -506,6 +508,22 @@ export const scanUrl = inngest.createFunction(
                 ...(clipStart > 0 ? { startSeconds: clipStart } : {}),
                 ...(clipEnd !== undefined ? { endSeconds: clipEnd } : {}),
               }
+              // Feed the reference frame captured in step B1 as an identity anchor.
+              // Best-effort: extraction proceeds without it if fetch fails or URL is missing.
+              let referenceImageBase64: string | undefined
+              try {
+                const matchForRef = await db.query.matches.findFirst({
+                  columns: { referenceImageUrl: true },
+                  where: eq(matches.id, matchId),
+                })
+                if (matchForRef?.referenceImageUrl) {
+                  const imgRes = await fetch(matchForRef.referenceImageUrl)
+                  if (imgRes.ok) {
+                    referenceImageBase64 = Buffer.from(await imgRes.arrayBuffer()).toString('base64')
+                  }
+                }
+              } catch { /* best-effort */ }
+
               const result = await geminiVideoObject(GEMINI_URL_SCAN_MODEL, {
                 system: buildExtractMatchSystemPrompt(techniqueContext),
                 videoUrl: video.publicUrl,
@@ -521,6 +539,7 @@ export const scanUrl = inngest.createFunction(
                   userSide: found.user_side ?? undefined,
                 }),
                 schema: MatchExtractionOutputSchema,
+                referenceImageBase64,
               })
               // Extraction timestamps are absolute from video origin — no shift needed.
               extractObject = result.object
