@@ -448,16 +448,16 @@ export function ScoutForm({
     }
 
     setPending(true); setError(null)
-    try {
-      const fd = new FormData()
-      fd.set('urls', urls.join('\n'))
-      fd.set('format', format)
-      fd.set('appearanceHint', buildAppearanceHint(appearanceColor, startingSide, notes))
-      await submitScoutUrls(tournamentId, opponentId, fd)
-      setOpen(false); setDone(true); router.refresh()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Submission failed')
+    const fd = new FormData()
+    fd.set('urls', urls.join('\n'))
+    fd.set('format', format)
+    fd.set('appearanceHint', buildAppearanceHint(appearanceColor, startingSide, notes))
+    const result = await submitScoutUrls(tournamentId, opponentId, fd)
+    if (result.error) {
+      setError(result.error)
       setPending(false)
+    } else {
+      setOpen(false); setDone(true); router.refresh()
     }
   }
 
@@ -515,16 +515,16 @@ export function ScoutForm({
     const urls = sessionUrls.split('\n').map(u => u.trim()).filter(Boolean)
     if (urls.length === 0) { setError('At least one URL is required'); return }
     setPending(true); setError(null)
-    try {
-      const fd = new FormData()
-      fd.set('urls', urls.join('\n'))
-      fd.set('format', format)
-      fd.set('appearanceHint', buildAppearanceHint(appearanceColor, startingSide, notes))
-      await submitScoutUrls(tournamentId, opponentId, fd)
-      setOpen(false); setDone(true); router.refresh()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Submission failed')
+    const fd = new FormData()
+    fd.set('urls', urls.join('\n'))
+    fd.set('format', format)
+    fd.set('appearanceHint', buildAppearanceHint(appearanceColor, startingSide, notes))
+    const result = await submitScoutUrls(tournamentId, opponentId, fd)
+    if (result.error) {
+      setError(result.error)
       setPending(false)
+    } else {
+      setOpen(false); setDone(true); router.refresh()
     }
   }
 

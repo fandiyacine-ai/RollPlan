@@ -145,126 +145,140 @@ export async function rescanVideo(videoId: string, tournamentId: string): Promis
   }
 }
 
-export async function submitScoutUrls(tournamentId: string, opponentId: string, formData: FormData) {
-  const rawUrls = (formData.get('urls') as string) ?? ''
-  const urls = rawUrls
-    .split('\n')
-    .map(u => u.trim())
-    .filter(u => u.length > 0)
+export async function submitScoutUrls(
+  tournamentId: string,
+  opponentId: string,
+  formData: FormData,
+): Promise<{ error?: string }> {
+  try {
+    const rawUrls = (formData.get('urls') as string) ?? ''
+    const urls = rawUrls
+      .split('\n')
+      .map(u => u.trim())
+      .filter(u => u.length > 0)
 
-  if (urls.length === 0) throw new Error('At least one URL is required')
-  if (urls.length > 10) throw new Error('Maximum 10 URLs per submission')
+    if (urls.length === 0) return { error: 'At least one URL is required' }
+    if (urls.length > 10) return { error: 'Maximum 10 URLs per submission' }
 
-  const opponent = await db.query.tournamentOpponents.findFirst({
-    where: (t, { eq }) => eq(t.id, opponentId),
-  })
-  if (!opponent) throw new Error('Opponent not found')
-
-  const athleteName = opponent.opponentLabel
-  const format = (formData.get('format') as string) || 'gi'
-  const appearanceHint = (formData.get('appearanceHint') as string)?.trim() || undefined
-
-  const userId = await getOrCreateDbUserId()
-
-  const usage = await checkMonthlyLimit(userId)
-  if (!usage.allowed) {
-    throw new Error(`You've used all ${usage.limit} free analyses for this month. Upgrade to continue.`)
-  }
-
-  const skippedUrls: string[] = []
-
-  for (const url of urls) {
-    try { new URL(url) } catch { throw new Error(`Invalid URL: ${url}`) }
-
-    // Extract &t= timestamp BEFORE normalization strips it — used as chunk offset hint
-    const ytTimestampHint = isYouTubeUrl(url) ? parseYouTubeTimestamp(url) : 0
-    const storedUrl = isYouTubeUrl(url) ? normalizeYouTubeUrl(url) : url
-
-    // Prevent duplicate scans: skip if this URL is already queued or analysed for this opponent
-    const existing = await db.query.videos.findFirst({
-      where: (v) => and(eq(v.publicUrl, storedUrl), eq(v.tournamentOpponentId, opponentId)),
+    const opponent = await db.query.tournamentOpponents.findFirst({
+      columns: { id: true, opponentLabel: true },
+      where: (t, { eq }) => eq(t.id, opponentId),
     })
-    if (existing && existing.status !== 'failed') {
-      skippedUrls.push(url)
-      continue
+    if (!opponent) return { error: 'Opponent not found' }
+
+    const athleteName = opponent.opponentLabel
+    const format = (formData.get('format') as string) || 'gi'
+    const appearanceHint = (formData.get('appearanceHint') as string)?.trim() || undefined
+
+    const userId = await getOrCreateDbUserId()
+
+    const usage = await checkMonthlyLimit(userId)
+    if (!usage.allowed) {
+      return { error: `You've used all ${usage.limit} free analyses for this month. Upgrade to continue.` }
     }
 
-    // URL dedup: if this YouTube URL was already analysed for ANY opponent cross-user,
-    // clone the results silently — no Gemini call needed.
-    if (isYouTubeUrl(storedUrl)) {
-      const priorVideo = await db.query.videos.findFirst({
-        // Exclude orphaned videos (tournamentOpponentId = null) — these are from deleted opponents
-        // and their analysis results may be stale or wrong. Only clone from active opponent videos.
-        where: (v) => and(eq(v.publicUrl, storedUrl), eq(v.status, 'analysed'), isNotNull(v.tournamentOpponentId)),
-      })
-      if (priorVideo) {
-        // Check if the prior video actually has analysed matches — if 0 matches, the athlete
-        // wasn't found in that video, so cloning would produce a dead 'processing' stub.
-        // Fall through to a fresh scan instead.
-        const priorMatchCount = await db.select({ id: matches.id })
-          .from(matches)
-          .where(and(eq(matches.videoId, priorVideo.id), eq(matches.status, 'analysed')))
+    const skippedUrls: string[] = []
+
+    for (const url of urls) {
+      try { new URL(url) } catch { return { error: `Invalid URL: ${url}` } }
+
+      // Extract &t= timestamp BEFORE normalization strips it — used as chunk offset hint
+      const ytTimestampHint = isYouTubeUrl(url) ? parseYouTubeTimestamp(url) : 0
+      const storedUrl = isYouTubeUrl(url) ? normalizeYouTubeUrl(url) : url
+
+      // Prevent duplicate scans: skip if this URL is already queued or analysed for this opponent
+      const existing = await db
+        .select({ id: videos.id, status: videos.status })
+        .from(videos)
+        .where(and(eq(videos.publicUrl, storedUrl), eq(videos.tournamentOpponentId, opponentId)))
+        .limit(1)
+        .then(r => r[0] ?? null)
+      if (existing && existing.status !== 'failed') {
+        skippedUrls.push(url)
+        continue
+      }
+
+      // URL dedup: if this YouTube URL was already analysed for ANY opponent cross-user,
+      // clone the results silently — no Gemini call needed.
+      if (isYouTubeUrl(storedUrl)) {
+        const priorVideo = await db
+          .select({ id: videos.id })
+          .from(videos)
+          .where(and(eq(videos.publicUrl, storedUrl), eq(videos.status, 'analysed'), isNotNull(videos.tournamentOpponentId)))
           .limit(1)
-          .then(r => r.length)
+          .then(r => r[0] ?? null)
+        if (priorVideo) {
+          // Check if the prior video actually has analysed matches — if 0 matches, the athlete
+          // wasn't found in that video, so cloning would produce a dead 'processing' stub.
+          // Fall through to a fresh scan instead.
+          const priorMatchCount = await db.select({ id: matches.id })
+            .from(matches)
+            .where(and(eq(matches.videoId, priorVideo.id), eq(matches.status, 'analysed')))
+            .limit(1)
+            .then(r => r.length)
 
-        if (priorMatchCount > 0) {
-          const [stubVideo] = await db.insert(videos).values({
-            userId,
-            r2Key: `url/${Date.now()}-${Math.random().toString(36).slice(2)}`,
-            originalFilename: storedUrl,
-            contentType: 'video/mp4',
-            sizeBytes: 0,
-            sourceType: 'opponent',
-            publicUrl: storedUrl,
-            status: 'processing',
-            tournamentOpponentId: opponentId,
-          }).returning()
+          if (priorMatchCount > 0) {
+            const [stubVideo] = await db.insert(videos).values({
+              userId,
+              r2Key: `url/${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              originalFilename: storedUrl,
+              contentType: 'video/mp4',
+              sizeBytes: 0,
+              sourceType: 'opponent',
+              publicUrl: storedUrl,
+              status: 'processing',
+              tournamentOpponentId: opponentId,
+            }).returning()
 
-          await cloneVideoMatches(priorVideo.id, stubVideo.id, opponentId, userId)
-          continue
+            await cloneVideoMatches(priorVideo.id, stubVideo.id, opponentId, userId)
+            continue
+          }
+          // priorMatchCount === 0: athlete not found in prior scan — do a fresh scan below
         }
-        // priorMatchCount === 0: athlete not found in prior scan — do a fresh scan below
+      }
+
+      const [video] = await db.insert(videos).values({
+        userId,
+        r2Key: `url/${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        originalFilename: storedUrl,
+        contentType: 'video/mp4',
+        sizeBytes: 0,
+        sourceType: 'opponent',
+        publicUrl: storedUrl,
+        status: 'uploaded',
+        tournamentOpponentId: opponentId,
+      }).returning()
+
+      try {
+        await inngest.send({
+          name: 'url/submitted',
+          data: {
+            videoId: video.id,
+            userId,
+            athleteName,
+            format,
+            sourceType: 'opponent',
+            tournamentOpponentId: opponentId,
+            appearanceHint,
+            ytTimestampHint: ytTimestampHint || undefined,
+          },
+        })
+      } catch {
+        // Inngest not configured — record created but scan won't start
       }
     }
 
-    const [video] = await db.insert(videos).values({
-      userId,
-      r2Key: `url/${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      originalFilename: storedUrl,
-      contentType: 'video/mp4',
-      sizeBytes: 0,
-      sourceType: 'opponent',
-      publicUrl: storedUrl,
-      status: 'uploaded',
-      tournamentOpponentId: opponentId,
-    }).returning()
-
-    try {
-      await inngest.send({
-        name: 'url/submitted',
-        data: {
-          videoId: video.id,
-          userId,
-          athleteName,
-          format,
-          sourceType: 'opponent',
-          tournamentOpponentId: opponentId,
-          appearanceHint,
-          ytTimestampHint: ytTimestampHint || undefined,
-        },
-      })
-    } catch {
-      // Inngest not configured — record created but scan won't start
+    if (skippedUrls.length > 0 && skippedUrls.length === urls.length) {
+      return {
+        error: `${skippedUrls.length === 1 ? 'This URL has' : 'All URLs have'} already been submitted for ${athleteName}. Delete the existing footage first if you want to re-scan.`,
+      }
     }
-  }
 
-  if (skippedUrls.length > 0 && skippedUrls.length === urls.length) {
-    throw new Error(
-      `${skippedUrls.length === 1 ? 'This URL has' : 'All URLs have'} already been submitted for ${athleteName}. Delete the existing footage first if you want to re-scan.`
-    )
+    revalidatePath(`/tournaments/${tournamentId}/opponents`)
+    return {}
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Submission failed' }
   }
-
-  revalidatePath(`/tournaments/${tournamentId}/opponents`)
 }
 
 // Scrape the tournament's Smoothcomp bracket and populate the user's result

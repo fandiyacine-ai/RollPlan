@@ -41,9 +41,11 @@ export async function GET(req: NextRequest) {
 // POST /api/admin/techniques — trigger ingest from YouTube URL, or run the KB agent
 export async function POST(req: NextRequest) {
   const bypass = isDevBypassRequest(req)
+  let adminUserId: string | null = null
   if (!bypass) {
     const { userId } = await auth()
     if (!isAdmin(userId)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    adminUserId = userId
   }
 
   const body = await req.json()
@@ -65,7 +67,7 @@ export async function POST(req: NextRequest) {
 
   await inngest.send({
     name: 'technique/ingest-requested',
-    data: { youtubeUrl, techniqueHint, positionHint, requestedByUserId: bypass ? 'dev-bypass' : undefined },
+    data: { youtubeUrl, techniqueHint, positionHint, requestedByUserId: bypass ? 'dev-bypass' : adminUserId! },
   })
 
   return NextResponse.json({ queued: true })
