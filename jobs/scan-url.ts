@@ -4,7 +4,6 @@ import { spawn } from 'child_process'
 import { mkdtempSync, rmSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import ytdl from '@distube/ytdl-core'
 import ffmpegStaticPath from 'ffmpeg-static'
 const ffmpegBin: string = ffmpegStaticPath ?? 'ffmpeg'
 import { inngest } from '../lib/inngest'
@@ -399,25 +398,36 @@ export const scanUrl = inngest.createFunction(
         const tmpDir = mkdtempSync(join(tmpdir(), 'rp-matchref-'))
         const outPath = join(tmpDir, 'frame.jpg')
         try {
-          // Use a capped-480p stream for the reference frame — enough for Gemini to distinguish
-          // jersey colour and build without the ytdl 'lowestvideo' often returning a tiny thumbnail stream.
-          const stream = ytdl(video.publicUrl, { filter: (f: any) => f.hasVideo && (!f.height || f.height <= 480) })
+          // yt-dlp handles YouTube's anti-bot measures better than ytdl.
+          // Download only a ~30s section around seekSecs so we don't fetch the whole video.
+          const sectionStart = Math.max(0, Math.floor(seekSecs) - 2)
+          const sectionEnd = sectionStart + 30
+          const videoUrl = video.publicUrl as string
           const stderrChunks: Buffer[] = []
           await new Promise<void>((resolve, reject) => {
+            const ytdlp = spawn('yt-dlp', [
+              '--no-playlist',
+              '-f', 'bestvideo[height<=480]/bestvideo',
+              '--download-sections', `*${sectionStart}-${sectionEnd}`,
+              '-o', '-',
+              '--quiet',
+              videoUrl,
+            ])
             const ff = spawn(ffmpegBin, [
               '-y', '-loglevel', 'error',
-              '-ss', String(Math.floor(seekSecs)),
+              '-ss', String(Math.max(0, Math.floor(seekSecs) - sectionStart)),
               '-i', 'pipe:0',
               '-frames:v', '1', '-q:v', '4', '-vf', 'scale=960:-2',
               outPath,
             ])
             ff.stderr.on('data', (d: Buffer) => stderrChunks.push(d))
+            ytdlp.stderr.on('data', (d: Buffer) => stderrChunks.push(d))
             ff.stdin.on('error', (err: NodeJS.ErrnoException) => { if (err.code !== 'EPIPE') reject(err) })
-            stream.on('error', (err: Error) => { ff.kill(); reject(err) })
-            stream.pipe(ff.stdin)
-            const timer = setTimeout(() => { ff.kill(); reject(new Error('frame extraction timeout')) }, 60_000)
-            ff.on('close', (code) => { clearTimeout(timer); code === 0 ? resolve() : reject(new Error(`ffmpeg ${code}: ${Buffer.concat(stderrChunks)}`)) })
-            ff.on('error', (err: Error) => { clearTimeout(timer); reject(err) })
+            ytdlp.on('error', (err: Error) => { ff.kill(); reject(err) })
+            ytdlp.stdout.pipe(ff.stdin)
+            const timer = setTimeout(() => { ytdlp.kill(); ff.kill(); reject(new Error('frame extraction timeout')) }, 90_000)
+            ff.on('close', (code) => { clearTimeout(timer); ytdlp.kill(); code === 0 ? resolve() : reject(new Error(`ffmpeg ${code}: ${Buffer.concat(stderrChunks)}`)) })
+            ff.on('error', (err: Error) => { clearTimeout(timer); ytdlp.kill(); reject(err) })
           })
           if (!existsSync(outPath)) return { skipped: true }
           const buffer = readFileSync(outPath)

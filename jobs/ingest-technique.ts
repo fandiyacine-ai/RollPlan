@@ -3,7 +3,6 @@ import { mkdtempSync, rmSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { eq } from 'drizzle-orm'
-import ytdl from '@distube/ytdl-core'
 import ffmpegStaticPath from 'ffmpeg-static'
 // nixpacks installs system ffmpeg — prefer it; fall back to ffmpeg-static for local dev
 const ffmpegBin: string = ffmpegStaticPath ?? 'ffmpeg'
@@ -138,16 +137,25 @@ export const ingestTechnique = inngest.createFunction(
           const tmpDir = mkdtempSync(join(tmpdir(), 'rp-ref-'))
           const outPath = join(tmpDir, 'frame.jpg')
           try {
-            const stream = ytdl(youtubeUrl, {
-              filter: (f: any) => f.hasVideo && (!f.height || f.height <= 480),
-            })
-
+            // yt-dlp handles YouTube anti-bot better than ytdl.
+            // Download only a ~30s section around the key moment to avoid fetching the full video.
+            const seekSecs = Math.floor(object.key_moment_seconds!)
+            const sectionStart = Math.max(0, seekSecs - 2)
+            const sectionEnd = sectionStart + 30
             const stderrChunks: Buffer[] = []
             await new Promise<void>((resolve, reject) => {
+              const ytdlp = spawn('yt-dlp', [
+                '--no-playlist',
+                '-f', 'bestvideo[height<=480]/bestvideo',
+                '--download-sections', `*${sectionStart}-${sectionEnd}`,
+                '-o', '-',
+                '--quiet',
+                youtubeUrl,
+              ])
               const ff = spawn(ffmpegBin, [
                 '-y',
                 '-loglevel', 'error',
-                '-ss', String(Math.floor(object.key_moment_seconds!)),
+                '-ss', String(Math.max(0, seekSecs - sectionStart)),
                 '-i', 'pipe:0',
                 '-frames:v', '1',
                 '-q:v', '3',
@@ -156,19 +164,21 @@ export const ingestTechnique = inngest.createFunction(
               ])
 
               ff.stderr.on('data', (d: Buffer) => stderrChunks.push(d))
+              ytdlp.stderr.on('data', (d: Buffer) => stderrChunks.push(d))
               ff.stdin.on('error', (err: NodeJS.ErrnoException) => {
                 if (err.code !== 'EPIPE') reject(err)
               })
-              stream.on('error', (err: Error) => { ff.kill(); reject(err) })
-              stream.pipe(ff.stdin)
+              ytdlp.on('error', (err: Error) => { ff.kill(); reject(err) })
+              ytdlp.stdout.pipe(ff.stdin)
 
-              const timer = setTimeout(() => { ff.kill(); reject(new Error('extraction timeout')) }, 50_000)
+              const timer = setTimeout(() => { ytdlp.kill(); ff.kill(); reject(new Error('extraction timeout')) }, 90_000)
               ff.on('close', (code: number | null) => {
                 clearTimeout(timer)
+                ytdlp.kill()
                 if (code === 0) resolve()
                 else reject(new Error(`ffmpeg exited ${code}: ${Buffer.concat(stderrChunks).toString()}`))
               })
-              ff.on('error', (err: Error) => { clearTimeout(timer); reject(err) })
+              ff.on('error', (err: Error) => { clearTimeout(timer); ytdlp.kill(); reject(err) })
             })
 
             const buffer = readFileSync(outPath)
