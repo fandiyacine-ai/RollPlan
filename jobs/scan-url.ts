@@ -432,6 +432,11 @@ export const scanUrl = inngest.createFunction(
           // Gemini returns timestamps relative to the clip's startOffset, not the video origin.
           // Track clipStart here so we can shift all segment/event timestamps to absolute positions.
           let clipStart = 0
+          // Hoisted so the trim step below can use clipEnd as its upper window bound.
+          // For cross-boundary matches matchEndSeconds in DB is the scan's truncated value
+          // (≈ chunk boundary), not the real match end — using it as the trim ceiling would
+          // delete all events from the second half of the match.
+          let clipEnd: number | undefined = undefined
 
           // Inject technique KB into the extraction prompt so Gemini can detect known patterns
           const kbVariants = await getTechniqueVariantsForExtraction(format as 'gi' | 'no_gi')
@@ -470,14 +475,14 @@ export const scanUrl = inngest.createFunction(
                   : scanEnd
 
               clipStart = Math.max(0, outcomeAbsolute - MAX_MATCH_DURATION)
-              const clipEnd = skipScan ? (endSeconds ?? undefined) : outcomeAbsolute + OUTCOME_TAIL
+              clipEnd = skipScan ? (endSeconds ?? undefined) : outcomeAbsolute + OUTCOME_TAIL
 
               // Where in the clip the outcome screen is expected (for the extraction prompt hint)
               const outcomeOffsetInClip = outcomeAbsolute - clipStart
 
               const videoOptions = {
                 fps: 0.5,
-                resolution: 'LOW' as const,
+                resolution: 'MEDIUM' as const,
                 thinkingEffort: 'HIGH' as const,
                 ...(clipStart > 0 ? { startSeconds: clipStart } : {}),
                 ...(clipEnd !== undefined ? { endSeconds: clipEnd } : {}),
@@ -610,6 +615,9 @@ export const scanUrl = inngest.createFunction(
 
           // Trim segments/events outside the match window to remove noise from other athletes
           // that appear in the clip before or after the tracked match.
+          // Use clipEnd as the ceiling when available — matchEndSeconds comes from the scan step
+          // and may be truncated at the chunk boundary for cross-boundary matches, which would
+          // incorrectly delete events from the second half of those matches.
           {
             const matchRow = await db.select({
               matchStartSeconds: matches.matchStartSeconds,
@@ -617,7 +625,9 @@ export const scanUrl = inngest.createFunction(
             }).from(matches).where(eq(matches.id, matchId)).then(r => r[0])
             if (matchRow?.matchStartSeconds != null) {
               const windowStart = matchRow.matchStartSeconds - 5
-              const windowEnd = (matchRow.matchEndSeconds ?? matchRow.matchStartSeconds + 600) + 30
+              const windowEnd = clipEnd !== undefined
+                ? clipEnd + 30
+                : (matchRow.matchEndSeconds ?? matchRow.matchStartSeconds + 600) + 30
               await db.delete(positionSegments).where(
                 and(
                   eq(positionSegments.matchId, matchId),

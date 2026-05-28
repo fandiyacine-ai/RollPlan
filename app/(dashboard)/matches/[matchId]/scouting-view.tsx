@@ -853,7 +853,7 @@ export function ScoutingView({
               <div className="aspect-video">
                 <iframe
                   ref={iframeRef}
-                  src={`https://www.youtube.com/embed/${ytId}?enablejsapi=1`}
+                  src={`https://www.youtube.com/embed/${ytId}?enablejsapi=1&hd=1`}
                   className="w-full h-full"
                   allow="autoplay; encrypted-media"
                   allowFullScreen
