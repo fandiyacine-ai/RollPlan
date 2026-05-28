@@ -24,6 +24,9 @@ import { createNotification } from '../lib/db/notifications'
 import { buildExtractMatchSystemPrompt, buildExtractMatchUserPrompt, EXTRACT_MATCH_PROMPT_VERSION } from '../lib/ai/prompts/extract-match'
 import { buildVerifyPositionsSystemPrompt, buildVerifyPositionsUserPrompt, VERIFY_POSITIONS_PROMPT_VERSION } from '../lib/ai/prompts/verify-positions'
 import { buildGenerateInsightsSystemPrompt, GENERATE_INSIGHTS_PROMPT_VERSION } from '../lib/ai/prompts/generate-insights'
+import { buildScanSubmissionsSystemPrompt, buildScanSubmissionsUserPrompt, SCAN_SUBMISSIONS_PROMPT_VERSION } from '../lib/ai/prompts/scan-submissions'
+import { SubmissionScanOutputSchema } from '../lib/ai/schemas/submission-scan'
+import { getTechniqueVariantsForPositions, formatVariantsAsPromptBlock } from '../lib/ai/technique-retrieval'
 
 // Gemini returns timestamps in MM.SS decimal format (e.g. 38.32 = 38 min 32 sec = 2312s).
 // Used for both scan results and extraction segment timestamps.
@@ -858,24 +861,72 @@ export const scanUrl = inngest.createFunction(
           }
         }
 
+        // Phase 2 — KB targeted scan (inline, best-effort)
+        // Runs before status=analysed so the match is only "done" when both phases complete.
+        // A Phase 2 failure is caught and never blocks the match from completing.
+        let kbEventsAdded = 0
+        if (isYouTubeUrl(video.publicUrl)) {
+          try {
+            const allSegs = await db.query.positionSegments.findMany({ where: eq(positionSegments.matchId, matchId), columns: { positionId: true } })
+            const kbVariants = await getTechniqueVariantsForPositions(allSegs.map(s => s.positionId), format as 'gi' | 'no_gi')
+            if (kbVariants.length > 0) {
+              const techniqueBlock = formatVariantsAsPromptBlock(kbVariants)
+              const matchRow = await db.query.matches.findFirst({ where: eq(matches.id, matchId), columns: { matchStartSeconds: true, matchEndSeconds: true } })
+              const mStart = matchRow?.matchStartSeconds ?? 0
+              const mEnd = matchRow?.matchEndSeconds ?? mStart + 600
+              const kbScanResult = await geminiVideoObject(GEMINI_URL_SCAN_MODEL, {
+                system: buildScanSubmissionsSystemPrompt(techniqueBlock),
+                videoUrl: video.publicUrl,
+                videoOptions: { resolution: 'HIGH' as const, thinkingEffort: 'HIGH' as const, startSeconds: mStart, endSeconds: mEnd },
+                userPrompt: buildScanSubmissionsUserPrompt([{
+                  start_seconds: mStart,
+                  end_seconds: mEnd,
+                  reason: 'full match — scan for missed submissions',
+                  likely_event_types: ['armbar', 'triangle', 'kimura', 'rear_naked_choke', 'guillotine', 'omoplata', 'heel_hook'],
+                }]),
+                schema: SubmissionScanOutputSchema,
+              })
+              const existingEvts = await db.query.matchEvents.findMany({ where: eq(matchEvents.matchId, matchId) })
+              const newKbEvts = (kbScanResult.object.events ?? []).filter((ev: any) =>
+                ev.confidence >= 0.65 &&
+                !existingEvts.some(ex => ex.eventTypeId === ev.event_type_id && Math.abs(ex.timestampSeconds - ev.timestamp_seconds) <= 10)
+              )
+              if (newKbEvts.length > 0) {
+                await db.insert(matchEvents).values(newKbEvts.map((ev: any) => ({
+                  matchId,
+                  timestampSeconds: ev.timestamp_seconds,
+                  eventTypeId: ev.event_type_id,
+                  actor: ev.actor,
+                  outcome: ev.outcome ?? 'ongoing',
+                  techniqueLabel: ev.technique_label ?? null,
+                  confidence: ev.confidence,
+                })))
+                kbEventsAdded = newKbEvts.length
+              }
+              await db.insert(aiCallLogs).values({
+                userId: userId ?? null,
+                jobId: matchId,
+                model: GEMINI_URL_SCAN_MODEL,
+                promptVersion: SCAN_SUBMISSIONS_PROMPT_VERSION,
+                tokensIn: kbScanResult.usage.inputTokens ?? 0,
+                tokensOut: kbScanResult.usage.outputTokens ?? 0,
+                costUsdEstimate: estimateCostUsd(GEMINI_URL_SCAN_MODEL, kbScanResult.usage.inputTokens ?? 0, kbScanResult.usage.outputTokens ?? 0),
+                latencyMs: 0,
+                status: 'success',
+              })
+            }
+          } catch { /* Phase 2 failure never blocks match completion */ }
+        }
+
         await db.update(matches).set({
           status: 'analysed',
-          kbVersion: 1,
+          kbVersion: kbEventsAdded > 0 ? 2 : 1,
           ...(extractedResult ? {
             resultWinner: extractedResult.winner,
             resultMethod: extractedResult.method,
             resultTechnique: extractedResult.technique ?? null,
           } : {}),
         }).where(eq(matches.id, matchId))
-
-        // Auto-trigger KB targeted scan: Phase 1 detects clean, Phase 2 enriches
-        // using KB variants matched to the actual detected positions.
-        if (isYouTubeUrl(video.publicUrl)) {
-          await step.sendEvent(`trigger-kb-scan-${i}`, {
-            name: 'match/kb-rescan.requested' as const,
-            data: { matchId },
-          })
-        }
 
         return { matchId, status: 'analysed' }
       })
