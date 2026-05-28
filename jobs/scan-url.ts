@@ -701,6 +701,21 @@ export const scanUrl = inngest.createFunction(
           const segments = await db.query.positionSegments.findMany({ where: eq(positionSegments.matchId, matchId) })
           const events = await db.query.matchEvents.findMany({ where: eq(matchEvents.matchId, matchId) })
 
+          // Nothing survived trimming — mark done without insights rather than sending an
+          // empty payload that causes the model to return evidence-less insights (Zod rejects those).
+          if (segments.length === 0 && events.length === 0) {
+            await db.update(matches).set({
+              status: 'analysed',
+              kbVersion: 1,
+              ...(extractedResult ? {
+                resultWinner: extractedResult.winner,
+                resultMethod: extractedResult.method,
+                resultTechnique: extractedResult.technique ?? null,
+              } : {}),
+            }).where(eq(matches.id, matchId))
+            return { matchId, status: 'analysed' }
+          }
+
           const matchData = {
             segments: segments.map((s) => ({
               id: s.id, start_seconds: s.startSeconds, end_seconds: s.endSeconds,
