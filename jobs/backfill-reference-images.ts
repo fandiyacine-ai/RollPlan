@@ -4,6 +4,7 @@ import { join } from 'path'
 import { tmpdir } from 'os'
 import { eq } from 'drizzle-orm'
 import ytdl from '@distube/ytdl-core'
+import ffmpegPath from 'ffmpeg-static'
 import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
 import { techniqueVariants } from '../lib/db/schema'
@@ -78,7 +79,7 @@ export const backfillReferenceImageOne = inngest.createFunction(
         const stderrChunks: Buffer[] = []
 
         await new Promise<void>((resolve, reject) => {
-          const ff = spawn('ffmpeg', [
+          const ff = spawn(ffmpegPath!, [
             '-y',
             '-loglevel', 'error',
             '-ss', String(Math.floor(keyMomentSeconds)),

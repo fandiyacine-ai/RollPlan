@@ -193,7 +193,7 @@ export function SettingsForm({ defaultBelt, defaultStyle, defaultWeightClassKg, 
         <p className="text-xs text-muted-foreground mb-4">Used to automatically exclude you from bracket imports and identify your matches.</p>
         <input
           name="smoothcompProfileUrl"
-          type="url"
+          type="text"
           defaultValue={defaultSmootcompProfileUrl ?? ''}
           placeholder="https://smoothcomp.com/en/athlete/12345"
           className="w-full max-w-md rounded-lg border border-border bg-background px-4 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"

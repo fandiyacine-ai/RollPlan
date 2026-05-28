@@ -9,7 +9,7 @@ export default function HomePage() {
       {/* Nav */}
       <nav className="px-6 h-14 flex items-center justify-between border-b border-border/60 sticky top-0 z-40 bg-background/90 backdrop-blur-sm">
         <span className="text-xl font-extrabold tracking-tight [font-family:var(--font-brand)]">
-          Frame<span className="text-muted-foreground font-bold">Matters</span>
+          Roll<span className="text-muted-foreground font-bold">Plan</span>
         </span>
         <div className="flex items-center gap-2">
           <Link href="/sign-in" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}>
@@ -169,7 +169,7 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="border-t px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
         <span className="font-extrabold tracking-tight text-foreground [font-family:var(--font-brand)]">
-          Frame<span className="text-muted-foreground font-bold">Matters</span>
+          Roll<span className="text-muted-foreground font-bold">Plan</span>
         </span>
         <div className="flex items-center gap-5">
           <Link href="/faq" className="hover:text-foreground transition-colors">FAQ</Link>

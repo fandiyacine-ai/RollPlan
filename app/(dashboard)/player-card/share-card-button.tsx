@@ -28,7 +28,7 @@ export function ShareCardButton({ data }: { data: ShareCardData }) {
       })
       const a = document.createElement('a')
       a.href = dataUrl
-      a.download = `${data.name.replace(/\s+/g, '-').toLowerCase()}-framematters.png`
+      a.download = `${data.name.replace(/\s+/g, '-').toLowerCase()}-rollplan.png`
       a.click()
     } finally {
       setDownloading(false)

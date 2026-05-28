@@ -4,6 +4,7 @@ import { join } from 'path'
 import { tmpdir } from 'os'
 import { eq } from 'drizzle-orm'
 import ytdl from '@distube/ytdl-core'
+import ffmpegPath from 'ffmpeg-static'
 import { generateObject } from 'ai'
 import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
@@ -142,7 +143,7 @@ export const ingestTechnique = inngest.createFunction(
 
             const stderrChunks: Buffer[] = []
             await new Promise<void>((resolve, reject) => {
-              const ff = spawn('ffmpeg', [
+              const ff = spawn(ffmpegPath!, [
                 '-y',
                 '-loglevel', 'error',
                 '-ss', String(Math.floor(object.key_moment_seconds!)),
