@@ -10,7 +10,7 @@ const ffmpegBin: string = ffmpegStaticPath ?? 'ffmpeg'
 import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
 import { videos, matches, positionSegments, matchEvents, insights, aiCallLogs, tournamentOpponents } from '../lib/db/schema'
-import { eq, inArray, and, ne, not, sql } from 'drizzle-orm'
+import { eq, inArray, and, ne, not, sql, or, lt, gt } from 'drizzle-orm'
 import { uploadBuffer, getPublicVideoUrl } from '../lib/storage/r2'
 import { google, anthropic, GEMINI_URL_SCAN_MODEL, CLAUDE_SYNTHESIS_MODEL, estimateCostUsd } from '../lib/ai/clients'
 import { geminiVideoObject, isYouTubeUrl } from '../lib/gemini-video'
@@ -595,6 +595,31 @@ export const scanUrl = inngest.createFunction(
               )
             }
           })
+
+          // Trim segments/events outside the match window to remove noise from other athletes
+          // that appear in the clip before or after the tracked match.
+          {
+            const matchRow = await db.select({
+              matchStartSeconds: matches.matchStartSeconds,
+              matchEndSeconds: matches.matchEndSeconds,
+            }).from(matches).where(eq(matches.id, matchId)).then(r => r[0])
+            if (matchRow?.matchStartSeconds != null) {
+              const windowStart = matchRow.matchStartSeconds - 5
+              const windowEnd = (matchRow.matchEndSeconds ?? matchRow.matchStartSeconds + 600) + 30
+              await db.delete(positionSegments).where(
+                and(
+                  eq(positionSegments.matchId, matchId),
+                  or(lt(positionSegments.startSeconds, windowStart), gt(positionSegments.endSeconds, windowEnd))
+                )
+              )
+              await db.delete(matchEvents).where(
+                and(
+                  eq(matchEvents.matchId, matchId),
+                  or(lt(matchEvents.timestampSeconds, windowStart), gt(matchEvents.timestampSeconds, windowEnd))
+                )
+              )
+            }
+          }
 
           await db.insert(aiCallLogs).values({
             userId: userId ?? null,
