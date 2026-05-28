@@ -1,8 +1,8 @@
-import { spawnSync } from 'child_process'
+import { spawn } from 'child_process'
 import { mkdtempSync, rmSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import { isNull, isNotNull, like, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import ytdl from '@distube/ytdl-core'
 import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
@@ -64,49 +64,66 @@ export const backfillReferenceImageOne = inngest.createFunction(
     const { id, sourceUrl, keyMomentSeconds } = event.data
 
     const refImageUrl = await step.run('extract-frame', async () => {
+      const tmpDir = mkdtempSync(join(tmpdir(), 'rp-ref-'))
+      const outPath = join(tmpDir, 'frame.jpg')
       try {
-        const info = await ytdl.getInfo(sourceUrl)
-        const format = ytdl.chooseFormat(info.formats, {
+        // Pipe ytdl stream directly into ffmpeg stdin so YouTube's streaming URL
+        // auth tokens stay intact — passing the URL to ffmpeg directly fails because
+        // YouTube rejects requests from a different user-agent/IP.
+        const stream = ytdl(sourceUrl, {
           quality: 'lowestvideo',
-          filter: (f: any) => !!f.url && f.hasVideo && (f.container === 'mp4' || f.container === 'webm'),
-        }) || ytdl.chooseFormat(info.formats, {
-          quality: 'lowestvideo',
-          filter: (f: any) => !!f.url && f.hasVideo,
+          filter: (f: any) => f.hasVideo,
         })
-        if (!format?.url) {
-          console.error('[backfill-reference-images] no downloadable video format found for', sourceUrl)
-          return null
-        }
 
-        const tmpDir = mkdtempSync(join(tmpdir(), 'rp-ref-'))
-        const outPath = join(tmpDir, 'frame.jpg')
-        try {
-          const result = spawnSync('ffmpeg', [
-            '-loglevel', 'error',
+        const stderrChunks: Buffer[] = []
+
+        await new Promise<void>((resolve, reject) => {
+          const ff = spawn('ffmpeg', [
             '-y',
+            '-loglevel', 'error',
             '-ss', String(Math.floor(keyMomentSeconds)),
-            '-i', format.url,
+            '-i', 'pipe:0',
             '-frames:v', '1',
             '-q:v', '3',
             '-vf', 'scale=1280:-2',
             outPath,
-          ], { timeout: 30_000 })
+          ])
 
-          if (result.status !== 0 || !existsSync(outPath)) {
-            console.error('[backfill-reference-images] ffmpeg failed', { sourceUrl, status: result.status, stderr: result.stderr?.toString(), stdout: result.stdout?.toString() })
-            return null
-          }
+          ff.stderr.on('data', (d: Buffer) => stderrChunks.push(d))
 
-          const buffer = readFileSync(outPath)
-          const r2Key = `technique-refs/${id}.jpg`
-          await uploadBuffer(r2Key, buffer, 'image/jpeg')
-          return await getPublicVideoUrl(r2Key)
-        } finally {
-          rmSync(tmpDir, { recursive: true, force: true })
+          // EPIPE is expected once ffmpeg extracts its frame and closes stdin early
+          ff.stdin.on('error', (err: NodeJS.ErrnoException) => {
+            if (err.code !== 'EPIPE') reject(err)
+          })
+
+          stream.on('error', (err) => { ff.kill(); reject(err) })
+          stream.pipe(ff.stdin)
+
+          // 50s hard timeout — the Inngest step will also enforce its own limit
+          const timer = setTimeout(() => { ff.kill(); reject(new Error('extraction timeout')) }, 50_000)
+
+          ff.on('close', (code) => {
+            clearTimeout(timer)
+            if (code === 0) resolve()
+            else reject(new Error(`ffmpeg exited ${code}: ${Buffer.concat(stderrChunks).toString()}`))
+          })
+          ff.on('error', (err) => { clearTimeout(timer); reject(err) })
+        })
+
+        if (!existsSync(outPath)) {
+          console.error('[backfill-reference-images] ffmpeg succeeded but output missing', sourceUrl)
+          return null
         }
+
+        const buffer = readFileSync(outPath)
+        const r2Key = `technique-refs/${id}.jpg`
+        await uploadBuffer(r2Key, buffer, 'image/jpeg')
+        return await getPublicVideoUrl(r2Key)
       } catch (err) {
-        console.error('[backfill-reference-images] failed to extract frame', err)
+        console.error('[backfill-reference-images] extract-frame failed', { sourceUrl, err })
         return null
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true })
       }
     })
 
