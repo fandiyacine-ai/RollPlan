@@ -22,7 +22,6 @@ import { buildScanUrlSystemPrompt, buildScanUrlUserPrompt, SCAN_URL_PROMPT_VERSI
 import { ocrScanYouTube } from '../lib/scan/frame-ocr'
 import { createNotification } from '../lib/db/notifications'
 import { buildExtractMatchSystemPrompt, buildExtractMatchUserPrompt, EXTRACT_MATCH_PROMPT_VERSION } from '../lib/ai/prompts/extract-match'
-import { getTechniqueVariantsForExtraction, formatVariantsAsPromptBlock } from '../lib/ai/technique-retrieval'
 import { buildVerifyPositionsSystemPrompt, buildVerifyPositionsUserPrompt, VERIFY_POSITIONS_PROMPT_VERSION } from '../lib/ai/prompts/verify-positions'
 import { buildGenerateInsightsSystemPrompt, GENERATE_INSIGHTS_PROMPT_VERSION } from '../lib/ai/prompts/generate-insights'
 
@@ -470,10 +469,6 @@ export const scanUrl = inngest.createFunction(
           // delete all events from the second half of the match.
           let clipEnd: number | undefined = undefined
 
-          // Inject technique KB into the extraction prompt so Gemini can detect known patterns
-          const kbVariants = await getTechniqueVariantsForExtraction(format as 'gi' | 'no_gi')
-          const techniqueContext = formatVariantsAsPromptBlock(kbVariants)
-
           try {
             if (isYT) {
               // Trim the YouTube video to a padded window around this match. Gemini reports timestamps
@@ -514,7 +509,7 @@ export const scanUrl = inngest.createFunction(
 
               const videoOptions = {
                 fps: 0.5,
-                resolution: 'MEDIUM' as const,
+                resolution: 'HIGH' as const,
                 thinkingEffort: 'HIGH' as const,
                 ...(clipStart > 0 ? { startSeconds: clipStart } : {}),
                 ...(clipEnd !== undefined ? { endSeconds: clipEnd } : {}),
@@ -536,7 +531,7 @@ export const scanUrl = inngest.createFunction(
               } catch { /* best-effort */ }
 
               const result = await geminiVideoObject(GEMINI_URL_SCAN_MODEL, {
-                system: buildExtractMatchSystemPrompt(techniqueContext),
+                system: buildExtractMatchSystemPrompt(),
                 videoUrl: video.publicUrl,
                 videoOptions,
                 userPrompt: buildExtractMatchUserPrompt({
@@ -560,7 +555,7 @@ export const scanUrl = inngest.createFunction(
                 model: google(GEMINI_URL_SCAN_MODEL),
                 schema: MatchExtractionOutputSchema,
                 maxRetries: 0,
-                system: buildExtractMatchSystemPrompt(techniqueContext),
+                system: buildExtractMatchSystemPrompt(),
                 messages: [{
                   role: 'user',
                   content: [

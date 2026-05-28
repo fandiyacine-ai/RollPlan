@@ -1,6 +1,6 @@
 import { buildTaxonomyPromptBlock } from '../../taxonomy'
 
-export const EXTRACT_MATCH_PROMPT_VERSION = 'v7'
+export const EXTRACT_MATCH_PROMPT_VERSION = 'v8'
 
 export const BJJ_POSITION_VISUAL_GUIDE = `## Visual Identification Guide — Commonly Confused Positions
 
@@ -87,6 +87,7 @@ Record a submission event as soon as you observe the isolating grip or positiona
 
 Visual signals for each type:
 - **armbar**: top or bottom athlete isolates ONE opponent arm across their centreline — one hand gripping the wrist, other arm or body controlling the elbow. They may lean back or extend. Key moment: the moment the arm is pulled away from the opponent's body and aligned with the attacker's hips. Record even if the opponent bridges out immediately.
+  - **Armbar from closed guard (very common)**: the guard player (on their back) breaks one of the top athlete's arms across, pins the elbow with their chest/armpit, swings their hips out to the side, and throws a leg over the head to extend. Watch for: guard player pulling one arm across their centreline, hip escape to the side, leg swinging over. Record this even if the top player stacks and escapes immediately.
 - **triangle**: athlete's legs close in a figure-four around the opponent's head and one arm — one leg crossing behind the neck, the other locking behind the first knee. Record when the leg crosses behind the head/neck.
 - **kimura**: figure-four double grip on the opponent's wrist with the elbow bent — same-side hand grips attacker's own wrist behind the opponent's wrist. Record when the double grip is established.
 - **omoplata**: athlete's leg wraps over the opponent's shoulder/tricep from guard, threatening the shoulder. Record when the leg locks across the shoulder.
@@ -105,6 +106,7 @@ Apply the self-review checklist above before finalising your output. Then apply 
 1. If you recorded 3 or more mount_taken events: verify that at least one submission attempt event exists within that window. If the top athlete's hands moved toward the opponent's arm at any point, record the armbar attempt.
 2. If the match ended by submission (method="submission"): confirm there is a corresponding successful submission event near the end of the match. If missing, add it.
 3. If back_control was held for 15+ seconds total: confirm at least one choke attempt is recorded. If not, re-examine those back_control segments.
+4. If closed_guard was held for 15+ seconds with the user on TOP (user_role=top): re-examine that window specifically for armbar and triangle attempts by the bottom athlete (opponent). Guard players routinely attack with armbars and triangles — check whether the opponent pulled any arm across their centreline or swung a leg over at any point.
 
 Output ONLY valid JSON matching the required schema. No prose outside the JSON.
 
