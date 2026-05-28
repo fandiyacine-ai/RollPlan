@@ -725,14 +725,35 @@ export const buildOpponentIntel = inngest.createFunction(
         }
 
         const fedUrl = `https://smoothcomp.com/en/profile/${profiles[0].athleteId}`
+
+        // Try to fetch the profile photo from Smoothcomp's og:image meta tag
+        let profilePhotoUrl: string | null = null
+        try {
+          const profileHtml = await fetch(fedUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'text/html' },
+            signal: AbortSignal.timeout(10000),
+          }).then(r => r.text())
+          const ogMatch = profileHtml.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+            ?? profileHtml.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)
+          if (ogMatch?.[1] && !ogMatch[1].includes('default') && !ogMatch[1].includes('placeholder')) {
+            profilePhotoUrl = ogMatch[1]
+          }
+        } catch { /* photo fetch is best-effort */ }
+
         if (wins > 0 || losses > 0) {
           await db.update(tournamentOpponents)
-            .set({ smoothcompWins: wins, smoothcompLosses: losses, smoothcompFedUrl: fedUrl })
+            .set({
+              smoothcompWins: wins, smoothcompLosses: losses, smoothcompFedUrl: fedUrl,
+              ...(profilePhotoUrl ? { profilePhotoUrl } : {}),
+            })
             .where(eq(tournamentOpponents.id, opponentId))
         } else {
           // Profile found but data not public — save URL so UI can show "Private" instead of "N/A"
           await db.update(tournamentOpponents)
-            .set({ smoothcompFedUrl: fedUrl })
+            .set({
+              smoothcompFedUrl: fedUrl,
+              ...(profilePhotoUrl ? { profilePhotoUrl } : {}),
+            })
             .where(eq(tournamentOpponents.id, opponentId))
         }
         return { wins, losses }

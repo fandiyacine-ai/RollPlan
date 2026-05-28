@@ -67,5 +67,7 @@ export const tournamentOpponents = pgTable('tournament_opponents', {
   ibjjfBestResult: text('ibjjf_best_result'),
   // Tracks the lifecycle of the background intel scan. null = never completed, 'running' = in progress, 'done' = completed at least once
   intelStatus: text('intel_status'),
+  // Profile photo URL fetched from Smoothcomp — used as visual anchor for athlete identification in video scans
+  profilePhotoUrl: text('profile_photo_url'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })

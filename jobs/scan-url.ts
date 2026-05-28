@@ -1,9 +1,17 @@
 import { generateObject } from 'ai'
 import { NonRetriableError, RetryAfterError } from 'inngest'
+import { spawn } from 'child_process'
+import { mkdtempSync, rmSync, readFileSync, existsSync } from 'fs'
+import { join } from 'path'
+import { tmpdir } from 'os'
+import ytdl from '@distube/ytdl-core'
+import ffmpegStaticPath from 'ffmpeg-static'
+const ffmpegBin: string = ffmpegStaticPath ?? 'ffmpeg'
 import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
 import { videos, matches, positionSegments, matchEvents, insights, aiCallLogs, tournamentOpponents } from '../lib/db/schema'
 import { eq, inArray, and, ne, not, sql } from 'drizzle-orm'
+import { uploadBuffer, getPublicVideoUrl } from '../lib/storage/r2'
 import { google, anthropic, GEMINI_URL_SCAN_MODEL, CLAUDE_SYNTHESIS_MODEL, estimateCostUsd } from '../lib/ai/clients'
 import { geminiVideoObject, isYouTubeUrl } from '../lib/gemini-video'
 import { UrlScanOutputSchema, FoundMatch } from '../lib/ai/schemas/url-scan'
@@ -358,7 +366,51 @@ export const scanUrl = inngest.createFunction(
       // Walkovers: no grappling occurred, skip extraction entirely
       if (found.is_walkover) continue
 
-      // Step B: extract + analyse — idempotency guards mean retries safely skip already-done work
+      // Step B1: extract reference frame for visual confirmation (YouTube only, best-effort)
+      await step.run(`extract-ref-frame-${i}`, async () => {
+        const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
+        if (!video?.publicUrl || !isYouTubeUrl(video.publicUrl)) return { skipped: true }
+        const match = await db.query.matches.findFirst({ where: eq(matches.id, matchId) })
+        if (!match || match.referenceImageUrl) return { skipped: true }
+
+        const seekSecs = match.matchStartSeconds ?? 0
+        const tmpDir = mkdtempSync(join(tmpdir(), 'rp-matchref-'))
+        const outPath = join(tmpDir, 'frame.jpg')
+        try {
+          const stream = ytdl(video.publicUrl, { quality: 'lowestvideo', filter: (f: any) => f.hasVideo })
+          const stderrChunks: Buffer[] = []
+          await new Promise<void>((resolve, reject) => {
+            const ff = spawn(ffmpegBin, [
+              '-y', '-loglevel', 'error',
+              '-ss', String(Math.floor(seekSecs)),
+              '-i', 'pipe:0',
+              '-frames:v', '1', '-q:v', '4', '-vf', 'scale=960:-2',
+              outPath,
+            ])
+            ff.stderr.on('data', (d: Buffer) => stderrChunks.push(d))
+            ff.stdin.on('error', (err: NodeJS.ErrnoException) => { if (err.code !== 'EPIPE') reject(err) })
+            stream.on('error', (err: Error) => { ff.kill(); reject(err) })
+            stream.pipe(ff.stdin)
+            const timer = setTimeout(() => { ff.kill(); reject(new Error('frame extraction timeout')) }, 60_000)
+            ff.on('close', (code) => { clearTimeout(timer); code === 0 ? resolve() : reject(new Error(`ffmpeg ${code}: ${Buffer.concat(stderrChunks)}`)) })
+            ff.on('error', (err: Error) => { clearTimeout(timer); reject(err) })
+          })
+          if (!existsSync(outPath)) return { skipped: true }
+          const buffer = readFileSync(outPath)
+          const r2Key = `match-refs/${matchId}.jpg`
+          await uploadBuffer(r2Key, buffer, 'image/jpeg')
+          const refUrl = await getPublicVideoUrl(r2Key)
+          await db.update(matches).set({ referenceImageUrl: refUrl }).where(eq(matches.id, matchId))
+          return { refUrl }
+        } catch (err) {
+          console.error('[scan-url] reference frame extraction failed (non-fatal):', err)
+          return { skipped: true }
+        } finally {
+          rmSync(tmpDir, { recursive: true, force: true })
+        }
+      })
+
+      // Step B2: extract + analyse — idempotency guards mean retries safely skip already-done work
       await step.run(`extract-match-${i}`, async () => {
         const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
         if (!video?.publicUrl) throw new Error('Video has no public URL')
@@ -429,7 +481,7 @@ export const scanUrl = inngest.createFunction(
                   userSide: found.user_side ?? undefined,
                 }),
                 schema: MatchExtractionOutputSchema,
-                referenceImageBase64: athleteImageBase64 || undefined,
+                profilePhotoBase64: athleteImageBase64 || undefined,
               })
               // Extraction timestamps are absolute from video origin — no shift needed.
               extractObject = result.object

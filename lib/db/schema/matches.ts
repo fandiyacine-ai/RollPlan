@@ -37,6 +37,8 @@ export const matches = pgTable('matches', {
   // and to validate that frame-by-frame timestamps fall within the expected window.
   matchStartSeconds: integer('match_start_seconds'),
   matchEndSeconds: integer('match_end_seconds'),
+  // Frame extracted from the video at matchStartSeconds — stored in R2, used for visual confirmation
+  referenceImageUrl: text('reference_image_url'),
   kbVersion: integer('kb_version').notNull().default(0),
   kbUpgradedAt: timestamp('kb_upgraded_at'),
   kbUpgradeSeenAt: timestamp('kb_upgrade_seen_at'),

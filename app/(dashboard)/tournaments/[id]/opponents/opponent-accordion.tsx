@@ -22,6 +22,7 @@ type FootageRow = {
   chunksDone?: number | null
   chunksTotal?: number | null
   chunksFailed?: number | null
+  referenceImageUrl?: string | null
 }
 
 type Opponent = {
@@ -475,6 +476,15 @@ export function OpponentAccordion({
             return (
               <div key={m.id} className="px-4 py-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0 flex-1">
+                  {m.referenceImageUrl && m.rowType === 'match' && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={m.referenceImageUrl}
+                      alt="Match reference frame"
+                      className="w-14 h-9 object-cover rounded flex-shrink-0 border border-border/40 opacity-80"
+                      title="Frame extracted at match start — visual confirmation of which match was detected"
+                    />
+                  )}
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${STATUS_CHIP[ns] ?? STATUS_CHIP.pending}`}>
                     {STATUS_LABEL[ns] ?? m.status}
                   </span>
