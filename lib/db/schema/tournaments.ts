@@ -65,5 +65,7 @@ export const tournamentOpponents = pgTable('tournament_opponents', {
   ibjjfLosses: integer('ibjjf_losses'),
   ibjjfProfileUrl: text('ibjjf_profile_url'),
   ibjjfBestResult: text('ibjjf_best_result'),
+  // Tracks the lifecycle of the background intel scan. null = never completed, 'running' = in progress, 'done' = completed at least once
+  intelStatus: text('intel_status'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })

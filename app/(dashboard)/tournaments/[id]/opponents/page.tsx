@@ -68,7 +68,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
     : false
   const showPostEventBanner = eventDatePassed && !tournamentRow?.outcome
 
-  let opponents: { id: string; tournamentId: string; opponentLabel: string; playerCardId: string | null; seedingNotes: string | null; createdAt: Date; footageStatus: string; ajpAthleteId: string | null; ajpProfileUrl: string | null; smoothcompAthleteId: string | null; smoothcompProfileUrl: string | null; userResult: string | null; userResultMethod: string | null; ajpWins: number | null; ajpLosses: number | null; smoothcompWins: number | null; smoothcompLosses: number | null; smoothcompFedUrl: string | null; ibjjfWins: number | null; ibjjfLosses: number | null; ibjjfProfileUrl: string | null; ibjjfBestResult: string | null }[]
+  let opponents: { id: string; tournamentId: string; opponentLabel: string; playerCardId: string | null; seedingNotes: string | null; createdAt: Date; footageStatus: string; ajpAthleteId: string | null; ajpProfileUrl: string | null; smoothcompAthleteId: string | null; smoothcompProfileUrl: string | null; userResult: string | null; userResultMethod: string | null; ajpWins: number | null; ajpLosses: number | null; smoothcompWins: number | null; smoothcompLosses: number | null; smoothcompFedUrl: string | null; ibjjfWins: number | null; ibjjfLosses: number | null; ibjjfProfileUrl: string | null; ibjjfBestResult: string | null; intelStatus: string | null }[]
   try {
     opponents = await db
       .select({
@@ -94,6 +94,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
         ibjjfLosses: tournamentOpponents.ibjjfLosses,
         ibjjfProfileUrl: tournamentOpponents.ibjjfProfileUrl,
         ibjjfBestResult: tournamentOpponents.ibjjfBestResult,
+        intelStatus: tournamentOpponents.intelStatus,
       })
       .from(tournamentOpponents)
       .where(eq(tournamentOpponents.tournamentId, tournamentId))
@@ -215,16 +216,11 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
     return acc
   }, {})
 
-  const twentyMinutesAgo = new Date(Date.now() - 20 * 60 * 1000)
   const hasActiveScans = allMatches.some(m => m.status === 'processing' || m.status === 'pending' || m.status === 'uploaded')
     || allPendingVideos.some(v => v.status === 'processing' || v.status === 'pending' || v.status === 'uploaded')
     || opponents.some(o => o.footageStatus === 'pending' || o.footageStatus === 'auto_queued')
-    // Keep polling while a recently-added opponent still has any platform missing
-    // (job runs AJP → SC → IBJJF sequentially; AJP landing first must not stop the poll)
-    || opponents.some(o =>
-        new Date(o.createdAt) > twentyMinutesAgo &&
-        (o.ajpWins === null || o.smoothcompWins === null || o.ibjjfBestResult === null)
-      )
+    // Keep polling while intel scan is in progress or hasn't started yet
+    || opponents.some(o => o.intelStatus === null || o.intelStatus === 'running')
 
   // Opponents with no footage and no active scans — need user action
   const opponentsNeedingFootage = opponents.filter(o => {
@@ -365,7 +361,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
           {opponents.map((opp) => (
             <OpponentAccordion
               key={opp.id}
-              opponent={{ ...opp, footageStatus: opp.footageStatus ?? 'manual', userResult: opp.userResult ?? null, userResultMethod: opp.userResultMethod ?? null, ajpWins: opp.ajpWins ?? null, ajpLosses: opp.ajpLosses ?? null, ajpProfileUrl: opp.ajpProfileUrl ?? null, smoothcompWins: opp.smoothcompWins ?? null, smoothcompLosses: opp.smoothcompLosses ?? null, smoothcompFedUrl: opp.smoothcompFedUrl ?? null, ibjjfWins: opp.ibjjfWins ?? null, ibjjfLosses: opp.ibjjfLosses ?? null, ibjjfProfileUrl: opp.ibjjfProfileUrl ?? null, ibjjfBestResult: opp.ibjjfBestResult ?? null }}
+              opponent={{ ...opp, footageStatus: opp.footageStatus ?? 'manual', userResult: opp.userResult ?? null, userResultMethod: opp.userResultMethod ?? null, ajpWins: opp.ajpWins ?? null, ajpLosses: opp.ajpLosses ?? null, ajpProfileUrl: opp.ajpProfileUrl ?? null, smoothcompWins: opp.smoothcompWins ?? null, smoothcompLosses: opp.smoothcompLosses ?? null, smoothcompFedUrl: opp.smoothcompFedUrl ?? null, ibjjfWins: opp.ibjjfWins ?? null, ibjjfLosses: opp.ibjjfLosses ?? null, ibjjfProfileUrl: opp.ibjjfProfileUrl ?? null, ibjjfBestResult: opp.ibjjfBestResult ?? null, intelStatus: opp.intelStatus ?? null }}
               eventDatePassed={eventDatePassed}
               matches={(matchesByOpponent[opp.id] ?? []).map(m => ({
                 ...m, rowType: 'match' as const, format: m.format ?? null, context: m.context ?? null, label: undefined,

@@ -152,9 +152,39 @@ async function geminiGroundedSearch(query: string, domain: string): Promise<stri
   } catch { return [] }
 }
 
-// Multi-engine search for AJP athlete profile — Brave → Gemini+Google Search grounding
+// Multi-engine search for AJP athlete profile — direct AJP search → Brave → Gemini+Google
 // Profile URL gives the athlete ID directly; event URL triggers participants POST fallback.
 async function findAjpAthleteIdByName(name: string): Promise<string | null> {
+  // 0. Direct AJP athlete directory search — most reliable, doesn't depend on search engine indexing.
+  // ajptour.com uses the same Firebase/Smoothcomp platform so the /en/user?search page works identically.
+  try {
+    const { chromium } = await import('playwright')
+    const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] })
+    try {
+      const ctx = await browser.newContext({
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        locale: 'en-US',
+      })
+      const page = await ctx.newPage()
+      await page.goto(`https://ajptour.com/en/user?search=${encodeURIComponent(name)}`, { waitUntil: 'load', timeout: 30000 })
+      await page.waitForTimeout(3000)
+      const profileLinks = await page.evaluate(() => {
+        const links: string[] = []
+        document.querySelectorAll('a[href*="/profile/"]').forEach(el => {
+          const href = (el as HTMLAnchorElement).href
+          if (/ajptour\.com\/[a-z]+\/profile\/\d+/.test(href)) links.push(href)
+        })
+        return [...new Set(links)]
+      })
+      for (const url of profileLinks) {
+        const m = url.match(/ajptour\.com\/[a-z]{0,5}\/profile\/(\d+)/)
+        if (m && await verifyAjpProfileName(m[1], name)) return m[1]
+      }
+    } finally {
+      await browser.close()
+    }
+  } catch { /* Playwright unavailable or page load failed — fall through to search engines */ }
+
   // 1. Brave Search API (JSON, no bot issues — but AJP not always indexed)
   // Collect URLs across all query variants — same logic as findSmoothcompProfiles
   const apiKey = process.env.BRAVE_API_KEY
@@ -523,6 +553,12 @@ export const buildOpponentIntel = inngest.createFunction(
   }) => {
     const { opponentId, athleteName } = event.data
 
+    await step.run('mark-running', () =>
+      db.update(tournamentOpponents)
+        .set({ intelStatus: 'running' })
+        .where(eq(tournamentOpponents.id, opponentId))
+    )
+
     const opponent = await step.run('load-opponent', () =>
       db.query.tournamentOpponents.findFirst({
         where: eq(tournamentOpponents.id, opponentId),
@@ -809,6 +845,12 @@ export const buildOpponentIntel = inngest.createFunction(
       }
       return dbUpdate
     })
+
+    await step.run('mark-done', () =>
+      db.update(tournamentOpponents)
+        .set({ intelStatus: 'done' })
+        .where(eq(tournamentOpponents.id, opponentId))
+    )
 
     return { ajpAthleteId: ajpAthleteId ?? null }
   }

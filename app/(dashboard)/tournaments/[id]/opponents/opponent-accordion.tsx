@@ -41,6 +41,7 @@ type Opponent = {
   ibjjfLosses: number | null
   ibjjfProfileUrl: string | null
   ibjjfBestResult: string | null
+  intelStatus: string | null
 }
 
 const PLATFORM_BADGE_CLASS: Record<string, string> = {
@@ -563,7 +564,14 @@ export function OpponentAccordion({
               <span className="text-[11px] text-muted-foreground/60">—</span>
             </span>
           )}
-          <RetriggerIntelButton opponentId={opponent.id} tournamentId={tournamentId} />
+          {opponent.intelStatus === 'done' ? (
+            <RetriggerIntelButton opponentId={opponent.id} tournamentId={tournamentId} />
+          ) : (
+            <span className="flex items-center gap-1.5 text-[10px] text-blue-400/80">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse flex-shrink-0" />
+              Fetching intel…
+            </span>
+          )}
         </div>
 
       {/* Post-event result row — always visible when event date has passed */}
