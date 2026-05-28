@@ -214,12 +214,12 @@ export const rescanMatchesWithKb = inngest.createFunction(
 
         if (!scanObject?.events?.length) return { added: 0 }
 
-        // Deduplicate against existing events — skip if same type within ±10s
+        // Gemini returns absolute timestamps — do NOT add tsOffset
         const newEvts = scanObject.events.filter((ev: any) =>
           ev.confidence >= 0.65 &&
           !allEvents.some((ex: any) =>
             ex.eventTypeId === ev.event_type_id &&
-            Math.abs(ex.timestampSeconds - (ev.timestamp_seconds + tsOffset)) <= 10
+            Math.abs(ex.timestampSeconds - ev.timestamp_seconds) <= 10
           )
         )
 
@@ -227,14 +227,14 @@ export const rescanMatchesWithKb = inngest.createFunction(
 
         const now = new Date().toISOString()
         const summary = newEvts
-          .map((ev: any) => `${ev.technique_label ?? ev.event_type_id} at ${Math.floor((ev.timestamp_seconds + tsOffset) / 60)}:${String(Math.floor((ev.timestamp_seconds + tsOffset) % 60)).padStart(2, '0')}`)
+          .map((ev: any) => `${ev.technique_label ?? ev.event_type_id} at ${Math.floor(ev.timestamp_seconds / 60)}:${String(Math.floor(ev.timestamp_seconds % 60)).padStart(2, '0')}`)
           .join(', ')
 
         await db.transaction(async (tx) => {
           await tx.insert(matchEvents).values(
             newEvts.map((ev: any) => ({
               matchId: match.id,
-              timestampSeconds: ev.timestamp_seconds + tsOffset,
+              timestampSeconds: ev.timestamp_seconds,
               eventTypeId: ev.event_type_id,
               actor: ev.actor,
               outcome: ev.outcome ?? 'ongoing',
@@ -410,12 +410,13 @@ export const kbTargetedScanMatch = inngest.createFunction(
 
     if (!scanObject?.events?.length) return { added: 0 }
 
-    const tsOffset = matchData.matchStartSeconds ?? 0
+    // Gemini returns absolute timestamps from video start (even when startOffset is used),
+    // so do NOT add matchStartSeconds — the values are already in absolute video position.
     const newEvts = (scanObject.events as any[]).filter(ev =>
       ev.confidence >= 0.65 &&
       !(matchData.events as any[]).some(ex =>
         ex.eventTypeId === ev.event_type_id &&
-        Math.abs(ex.timestampSeconds - (ev.timestamp_seconds + tsOffset)) <= 10
+        Math.abs(ex.timestampSeconds - ev.timestamp_seconds) <= 10
       )
     )
 
@@ -425,7 +426,7 @@ export const kbTargetedScanMatch = inngest.createFunction(
       await db.insert(matchEvents).values(
         newEvts.map((ev: any) => ({
           matchId,
-          timestampSeconds: ev.timestamp_seconds + tsOffset,
+          timestampSeconds: ev.timestamp_seconds,
           eventTypeId: ev.event_type_id,
           actor: ev.actor,
           outcome: ev.outcome ?? 'ongoing',
