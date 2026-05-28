@@ -139,8 +139,7 @@ export const ingestTechnique = inngest.createFunction(
           const outPath = join(tmpDir, 'frame.jpg')
           try {
             const stream = ytdl(youtubeUrl, {
-              quality: 'lowestvideo',
-              filter: (f: any) => f.hasVideo,
+              filter: (f: any) => f.hasVideo && (!f.height || f.height <= 480),
             })
 
             const stderrChunks: Buffer[] = []
