@@ -4,7 +4,9 @@ import { join } from 'path'
 import { tmpdir } from 'os'
 import { eq } from 'drizzle-orm'
 import ytdl from '@distube/ytdl-core'
-import ffmpegPath from 'ffmpeg-static'
+import ffmpegStaticPath from 'ffmpeg-static'
+// nixpacks installs system ffmpeg — prefer it; fall back to ffmpeg-static for local dev
+const ffmpegBin: string = ffmpegStaticPath ?? 'ffmpeg'
 import { generateObject } from 'ai'
 import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
@@ -143,7 +145,7 @@ export const ingestTechnique = inngest.createFunction(
 
             const stderrChunks: Buffer[] = []
             await new Promise<void>((resolve, reject) => {
-              const ff = spawn(ffmpegPath!, [
+              const ff = spawn(ffmpegBin, [
                 '-y',
                 '-loglevel', 'error',
                 '-ss', String(Math.floor(object.key_moment_seconds!)),
