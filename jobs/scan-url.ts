@@ -100,6 +100,7 @@ export const scanUrl = inngest.createFunction(
             videoUrl: video.publicUrl,
             videoOptions: {
               fps: 0.1,
+              resolution: 'LOW' as const,
               ...(startSeconds !== undefined ? { startSeconds } : {}),
               ...(endSeconds !== undefined ? { endSeconds } : {}),
             },
@@ -409,7 +410,8 @@ export const scanUrl = inngest.createFunction(
               const outcomeOffsetInClip = outcomeAbsolute - clipStart
 
               const videoOptions = {
-                fps: 0.5, // 0.5fps gives 1 frame/2s — sufficient for BJJ position analysis, halves token usage vs 1fps
+                fps: 0.5,
+                resolution: 'LOW' as const,
                 ...(clipStart > 0 ? { startSeconds: clipStart } : {}),
                 ...(clipEnd !== undefined ? { endSeconds: clipEnd } : {}),
               }

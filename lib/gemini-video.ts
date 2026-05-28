@@ -6,6 +6,7 @@ export interface VideoOptions {
   fps?: number
   startSeconds?: number
   endSeconds?: number
+  resolution?: 'LOW' | 'MEDIUM' | 'HIGH'
 }
 
 export function isYouTubeUrl(url: string): boolean {
@@ -85,6 +86,10 @@ export async function geminiVideoObject<T extends z.ZodTypeAny>(
     if (Object.keys(vm).length > 0) filePart.videoMetadata = vm
   }
 
+  const mediaResolution = videoOptions?.resolution
+    ? `MEDIA_RESOLUTION_${videoOptions.resolution}`
+    : undefined
+
   const userParts: unknown[] = []
   if (referenceImageBase64) {
     userParts.push({ inlineData: { mimeType: 'image/jpeg', data: referenceImageBase64 } })
@@ -99,10 +104,8 @@ export async function geminiVideoObject<T extends z.ZodTypeAny>(
     generationConfig: {
       responseMimeType: 'application/json',
       responseSchema: buildGeminiSchema(schema),
-      // Gemini 2.5 Flash supports internal chain-of-thought before outputting JSON.
-      // A non-zero budget gives the model time to reason about complex multi-match
-      // streams before committing to boundaries and outcome assignments.
       ...(thinkingBudget > 0 ? { thinkingConfig: { thinkingBudget } } : {}),
+      ...(mediaResolution ? { mediaResolution } : {}),
     },
   }
 

@@ -183,6 +183,7 @@ export const analyzeVideo = inngest.createFunction(
             system: buildExtractMatchSystemPrompt(techniquePromptBlock),
             videoUrl: geminiFileUri,
             videoOptions: {
+              resolution: 'LOW' as const,
               startSeconds: videoStartSeconds ?? undefined,
               endSeconds: videoEndSeconds ?? undefined,
             },
@@ -327,6 +328,7 @@ export const analyzeVideo = inngest.createFunction(
             system: buildVerifyPositionsSystemPrompt(),
             videoUrl: geminiFileUri,
             videoOptions: {
+              resolution: 'LOW' as const,
               startSeconds: videoStartSeconds ?? undefined,
               endSeconds: videoEndSeconds ?? undefined,
             },
@@ -480,6 +482,7 @@ export const analyzeVideo = inngest.createFunction(
             system: buildScanSubmissionsSystemPrompt(positionTechniqueBlock),
             videoUrl: geminiFileUri,
             videoOptions: {
+              resolution: 'LOW' as const,
               startSeconds: videoStartSeconds ?? undefined,
               endSeconds: videoEndSeconds ?? undefined,
             },
