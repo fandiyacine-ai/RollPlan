@@ -167,21 +167,6 @@ export async function submitScoutUrls(
     if (!opponent) return { error: 'Opponent not found' }
 
     const athleteName = opponent.opponentLabel
-
-    // Encode the profile photo as base64 if available — passed to Gemini as a visual anchor
-    let profilePhotoBase64: string | undefined
-    if (opponent.profilePhotoUrl) {
-      try {
-        const photoRes = await fetch(opponent.profilePhotoUrl, {
-          headers: { 'User-Agent': 'Mozilla/5.0' },
-          signal: AbortSignal.timeout(8000),
-        })
-        if (photoRes.ok) {
-          const buf = Buffer.from(await photoRes.arrayBuffer())
-          profilePhotoBase64 = buf.toString('base64')
-        }
-      } catch { /* best-effort — scan proceeds without photo anchor */ }
-    }
     const format = (formData.get('format') as string) || 'gi'
     const appearanceHint = (formData.get('appearanceHint') as string)?.trim() || undefined
 
@@ -282,7 +267,7 @@ export async function submitScoutUrls(
             tournamentOpponentId: opponentId,
             appearanceHint,
             ytTimestampHint: ytTimestampHint || undefined,
-            athleteImageBase64: profilePhotoBase64,
+            profilePhotoUrl: opponent.profilePhotoUrl ?? undefined,
           },
         })
       } catch {
