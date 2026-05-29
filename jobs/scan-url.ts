@@ -390,6 +390,7 @@ export const scanUrl = inngest.createFunction(
           // are already absolute video positions. Do NOT add the chunk offset here.
           matchStartSeconds: skipScan ? (startSeconds ?? 0) : Math.round(found.start_seconds),
           matchEndSeconds: skipScan ? (endSeconds ?? null) : Math.round(found.end_seconds),
+          userSide: found.user_side ?? null,
           // Walkovers are complete immediately — no extraction needed.
           // For non-walkovers, don't pre-populate the result from the scan step:
           // the scan result is low-confidence and would show a wrong badge during extraction.
@@ -887,7 +888,7 @@ export const scanUrl = inngest.createFunction(
               const kbScanResult = await geminiVideoObject(GEMINI_URL_SCAN_MODEL, {
                 system: buildScanSubmissionsSystemPrompt(techniqueBlock),
                 videoUrl: video.publicUrl,
-                videoOptions: { fps: 2, resolution: 'HIGH' as const, thinkingEffort: 'HIGH' as const, startSeconds: mStart, endSeconds: mEnd },
+                videoOptions: { fps: 4, resolution: 'HIGH' as const, thinkingEffort: 'HIGH' as const, startSeconds: mStart, endSeconds: mEnd },
                 userPrompt: buildScanSubmissionsUserPrompt(allWindows),
                 schema: SubmissionScanOutputSchema,
               })

@@ -36,6 +36,13 @@
       "when": 1779624205620,
       "tag": "0004_athlete_competition_history",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1780082613081,
+      "tag": "0005_nice_wolfsbane",
+      "breakpoints": true
     }
   ]
 }

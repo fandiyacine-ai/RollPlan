@@ -39,6 +39,7 @@ export const matches = pgTable('matches', {
   matchEndSeconds: integer('match_end_seconds'),
   // Frame extracted from the video at matchStartSeconds — stored in R2, used for visual confirmation
   referenceImageUrl: text('reference_image_url'),
+  userSide: text('user_side'),  // 'left' | 'right' — which side of scoreboard the tracked athlete was on; used for identity anchor audit
   kbVersion: integer('kb_version').notNull().default(0),
   kbUpgradedAt: timestamp('kb_upgraded_at'),
   kbUpgradeSeenAt: timestamp('kb_upgrade_seen_at'),
