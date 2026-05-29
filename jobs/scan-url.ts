@@ -113,7 +113,7 @@ export const scanUrl = inngest.createFunction(
             videoUrl: video.publicUrl,
             videoOptions: {
               fps: 0.1,
-              resolution: 'LOW' as const,
+              resolution: 'MEDIUM' as const,
               thinkingEffort: 'HIGH' as const,
               ...(startSeconds !== undefined ? { startSeconds } : {}),
               ...(endSeconds !== undefined ? { endSeconds } : {}),
