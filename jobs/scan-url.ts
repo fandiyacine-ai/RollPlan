@@ -1,12 +1,17 @@
 import { generateObject } from 'ai'
 import { NonRetriableError, RetryAfterError } from 'inngest'
-import { spawn } from 'child_process'
+import { spawn, execFileSync } from 'child_process'
 import { mkdtempSync, rmSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import ffmpegStaticPath from 'ffmpeg-static'
 // Prefer system ffmpeg (installed by nixpacks in production); fall back to ffmpeg-static for local dev
 const ffmpegBin: string = (ffmpegStaticPath && existsSync(ffmpegStaticPath)) ? ffmpegStaticPath : 'ffmpeg'
+// Resolve yt-dlp path at startup — nixpacks nix store may not be on Node's spawn PATH
+function resolveBinPath(name: string): string {
+  try { return execFileSync('which', [name], { encoding: 'utf8' }).trim() } catch { return name }
+}
+const ytdlpBin = resolveBinPath('yt-dlp')
 import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
 import { videos, matches, positionSegments, matchEvents, insights, aiCallLogs, tournamentOpponents } from '../lib/db/schema'
@@ -424,7 +429,7 @@ export const scanUrl = inngest.createFunction(
           const videoUrl = video.publicUrl as string
           const stderrChunks: Buffer[] = []
           await new Promise<void>((resolve, reject) => {
-            const ytdlp = spawn('yt-dlp', [
+            const ytdlp = spawn(ytdlpBin, [
               '--no-playlist',
               '-f', 'bestvideo[height<=480]/bestvideo',
               '--download-sections', `*${sectionStart}-${sectionEnd}`,
