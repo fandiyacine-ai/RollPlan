@@ -1,4 +1,4 @@
-export const SCAN_SUBMISSIONS_PROMPT_VERSION = 'v1'
+export const SCAN_SUBMISSIONS_PROMPT_VERSION = 'v2'
 
 function fmt(s: number): string {
   const m = Math.floor(s / 60)
@@ -32,6 +32,7 @@ You will be given specific time windows to examine. For each window, focus ONLY 
 **heel_hook / kneebar / leg_lock_other** — Any leg entanglement where the joint (knee, heel, ankle) is being leveraged.
 
 ## Rules
+- Scan the FULL duration of each window from start to end. Do NOT stop after finding the first event — there may be multiple submission attempts in the same window. Report EVERY distinct event you observe.
 - Only report events you can CLEARLY see. Do not fabricate.
 - A failed attempt (escaped in 1–2 seconds) is still a real event — use outcome="escaped".
 - If you see nothing in the window, return an empty events array.

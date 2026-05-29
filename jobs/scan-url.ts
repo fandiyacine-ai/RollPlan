@@ -28,7 +28,7 @@ import { buildScanSubmissionsSystemPrompt, buildScanSubmissionsUserPrompt, SCAN_
 import { buildReviewEventsSystemPrompt, buildReviewEventsUserPrompt, REVIEW_EVENTS_PROMPT_VERSION } from '../lib/ai/prompts/review-events'
 import { SubmissionScanOutputSchema } from '../lib/ai/schemas/submission-scan'
 import { EventReviewOutputSchema } from '../lib/ai/schemas/event-review'
-import { getTechniqueVariantsForPositions, formatVariantsAsPromptBlock } from '../lib/ai/technique-retrieval'
+import { getTechniqueVariantsForPositions, getTechniqueVariantsForExtraction, formatVariantsAsPromptBlock } from '../lib/ai/technique-retrieval'
 
 // Gemini returns timestamps in MM.SS decimal format (e.g. 38.32 = 38 min 32 sec = 2312s).
 // Used for both scan results and extraction segment timestamps.
@@ -855,8 +855,10 @@ export const scanUrl = inngest.createFunction(
             } catch { /* audit failure is non-blocking */ }
 
             // ── Level B: Merge Claude-flagged windows with KB-derived windows ──
-            // KB windows: full match window when KB variants exist for the positions seen
-            const kbVariants = await getTechniqueVariantsForPositions(allSegs.map(s => s.positionId), format as 'gi' | 'no_gi')
+            // Load ALL active KB variants (not position-filtered) so the full library is
+            // searched regardless of what Phase 1 detected. Position filtering risks missing
+            // techniques in positions Phase 1 under-sampled at low fps.
+            const kbVariants = await getTechniqueVariantsForExtraction(format as 'gi' | 'no_gi')
             const matchRow = await db.query.matches.findFirst({ where: eq(matches.id, matchId), columns: { matchStartSeconds: true, matchEndSeconds: true } })
             const mStart = matchRow?.matchStartSeconds ?? 0
             const mEnd = matchRow?.matchEndSeconds ?? mStart + 600
