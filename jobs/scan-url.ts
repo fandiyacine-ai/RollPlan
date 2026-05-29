@@ -104,6 +104,19 @@ export const scanUrl = inngest.createFunction(
       const start = Date.now()
       let scanResult: { matches: FoundMatch[]; athlete_found: boolean; scan_notes: string }
 
+      // When we know exactly who to look for (scouting a specific opponent),
+      // pass the opponent name to the scan prompt. The targeted prompt requires
+      // BOTH names on the SAME active scoreboard, dramatically reducing false
+      // positives from bracket graphics where the athlete's name appears alone.
+      let knownOpponentName: string | undefined
+      if (tournamentOpponentId) {
+        const opponent = await db.query.tournamentOpponents.findFirst({
+          where: eq(tournamentOpponents.id, tournamentOpponentId),
+          columns: { opponentLabel: true },
+        })
+        knownOpponentName = opponent?.opponentLabel ?? undefined
+      }
+
       try {
         let scanUsage: { inputTokens: number; outputTokens: number }
 
@@ -118,7 +131,7 @@ export const scanUrl = inngest.createFunction(
               ...(startSeconds !== undefined ? { startSeconds } : {}),
               ...(endSeconds !== undefined ? { endSeconds } : {}),
             },
-            userPrompt: buildScanUrlUserPrompt(athleteName, appearanceHint),
+            userPrompt: buildScanUrlUserPrompt(athleteName, appearanceHint, knownOpponentName),
             schema: UrlScanOutputSchema,
           })
           scanResult = result.object
@@ -133,7 +146,7 @@ export const scanUrl = inngest.createFunction(
               role: 'user',
               content: [
                 videoFilePart(video.publicUrl, video.contentType),
-                { type: 'text', text: buildScanUrlUserPrompt(athleteName, appearanceHint) },
+                { type: 'text', text: buildScanUrlUserPrompt(athleteName, appearanceHint, knownOpponentName) },
               ],
             }],
           })

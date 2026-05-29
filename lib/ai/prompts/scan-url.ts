@@ -1,4 +1,4 @@
-export const SCAN_URL_PROMPT_VERSION = 'v10'
+export const SCAN_URL_PROMPT_VERSION = 'v11'
 
 export function buildScanUrlSystemPrompt(): string {
   return `You are an expert BJJ tournament stream analyst. Your task is to watch a competition recording and find all matches involving a specific athlete.
