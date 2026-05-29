@@ -536,9 +536,12 @@ export const buildOpponentIntel = inngest.createFunction(
     triggers: [{ event: 'opponent-intel/build.run' }],
     retries: 1,
     rateLimit: { limit: 10, period: '1m' },
-    // Prevent concurrent runs for the same opponent — Re-run button spamming
-    // or duplicate events would otherwise race and overwrite each other's DB writes.
-    concurrency: { limit: 1, key: 'event.data.opponentId' },
+    concurrency: [
+      // Prevent concurrent runs for the same opponent (dedup / re-run protection)
+      { limit: 1, key: 'event.data.opponentId' },
+      // Global cap — each run launches Chromium (~300 MB); >3 simultaneous = OOM risk
+      { limit: 3 },
+    ],
   },
   async ({ event, step }: {
     event: {

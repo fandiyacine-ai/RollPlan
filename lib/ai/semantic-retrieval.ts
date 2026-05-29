@@ -18,6 +18,9 @@ export async function semanticSearchVariants(query: string, limit = 25, options:
     ? and(eq(techniqueVariants.status, 'active'), FORMAT_FILTER(options.format))
     : eq(techniqueVariants.status, 'active')
 
+  // Cap rows fetched from DB — prevents loading unbounded embeddings into V8 heap
+  // as the KB grows. 300 is enough for cosine scoring to find the top-limit results.
+  const DB_CAP = 300
   const rows = await db.query.techniqueVariants.findMany({
     where: whereClause,
     columns: {
@@ -35,6 +38,7 @@ export async function semanticSearchVariants(query: string, limit = 25, options:
       searchText: true,
       embedding: true,
     },
+    limit: DB_CAP,
   })
 
   let queryEmbedding: number[] | null = null

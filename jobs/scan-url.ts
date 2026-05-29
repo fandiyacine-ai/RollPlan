@@ -9,7 +9,7 @@ import ffmpegStaticPath from 'ffmpeg-static'
 const ffmpegBin: string = (ffmpegStaticPath && existsSync(ffmpegStaticPath)) ? ffmpegStaticPath : 'ffmpeg'
 // Resolve yt-dlp path at startup — nixpacks nix store may not be on Node's spawn PATH
 function resolveBinPath(name: string): string {
-  try { return execFileSync('which', [name], { encoding: 'utf8' }).trim() } catch { return name }
+  try { return execFileSync('which', [name], { encoding: 'utf8', timeout: 3000 }).trim() } catch { return name }
 }
 const ytdlpBin = resolveBinPath('yt-dlp')
 import { inngest } from '../lib/inngest'
