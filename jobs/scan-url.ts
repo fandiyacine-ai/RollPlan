@@ -474,6 +474,11 @@ export const scanUrl = inngest.createFunction(
         let extractedResult: MatchExtractionOutput['match_result'] | undefined
 
         if (existingSegments.length === 0) {
+          // Inject KB technique visual cues into the extraction prompt — same as May 27 working state.
+          // Gives Gemini explicit descriptions of what each technique looks like before it watches the match.
+          const kbForExtraction = await getTechniqueVariantsForExtraction(format as 'gi' | 'no_gi')
+          const techniqueContext = kbForExtraction.length > 0 ? formatVariantsAsPromptBlock(kbForExtraction) : undefined
+
           // Extract positions + events
           const extractStart = Date.now()
           const isYT = isYouTubeUrl(video.publicUrl)
@@ -550,7 +555,7 @@ export const scanUrl = inngest.createFunction(
               } catch { /* best-effort */ }
 
               const result = await geminiVideoObject(GEMINI_URL_SCAN_MODEL, {
-                system: buildExtractMatchSystemPrompt(),
+                system: buildExtractMatchSystemPrompt(techniqueContext),
                 videoUrl: video.publicUrl,
                 videoOptions,
                 userPrompt: buildExtractMatchUserPrompt({
@@ -574,7 +579,7 @@ export const scanUrl = inngest.createFunction(
                 model: google(GEMINI_URL_SCAN_MODEL),
                 schema: MatchExtractionOutputSchema,
                 maxRetries: 0,
-                system: buildExtractMatchSystemPrompt(),
+                system: buildExtractMatchSystemPrompt(techniqueContext),
                 messages: [{
                   role: 'user',
                   content: [
