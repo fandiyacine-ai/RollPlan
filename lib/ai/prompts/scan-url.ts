@@ -1,4 +1,4 @@
-export const SCAN_URL_PROMPT_VERSION = 'v11'
+export const SCAN_URL_PROMPT_VERSION = 'v12'
 
 export function buildScanUrlSystemPrompt(): string {
   return `You are an expert BJJ tournament stream analyst. Your task is to watch a competition recording and find all matches involving a specific athlete.
@@ -91,6 +91,8 @@ When you find a valid active scoreboard for the tracked athlete's match:
 - This is used downstream to anchor identity in video analysis — be precise
 
 In AJP, Smoothcomp, and IBJJF overlays, the scoreboard is split into two columns. The name on the LEFT column starts on the LEFT side of the mat; the name on the RIGHT column starts on the RIGHT side of the mat.
+
+CRITICAL — user_side changes between matches: An athlete's scoreboard position (left or right) is assigned fresh for EACH match by tournament software. The same athlete can be on the LEFT in one match and the RIGHT in the next depending on bracket seeding and mat assignment. You MUST independently read user_side from the active scoreboard for EACH match you record. Do NOT carry over the position from a previous match in this video.
 
 ## Name matching — CRITICAL
 - Scoreboards (Smoothcomp, IBJJF, AJP) display names in ALL CAPS. "DARIO MIKEL" = "Dario Mikel". Match names case-insensitively.
