@@ -25,7 +25,9 @@ import { buildExtractMatchSystemPrompt, buildExtractMatchUserPrompt, EXTRACT_MAT
 import { buildVerifyPositionsSystemPrompt, buildVerifyPositionsUserPrompt, VERIFY_POSITIONS_PROMPT_VERSION } from '../lib/ai/prompts/verify-positions'
 import { buildGenerateInsightsSystemPrompt, GENERATE_INSIGHTS_PROMPT_VERSION } from '../lib/ai/prompts/generate-insights'
 import { buildScanSubmissionsSystemPrompt, buildScanSubmissionsUserPrompt, SCAN_SUBMISSIONS_PROMPT_VERSION } from '../lib/ai/prompts/scan-submissions'
+import { buildReviewEventsSystemPrompt, buildReviewEventsUserPrompt, REVIEW_EVENTS_PROMPT_VERSION } from '../lib/ai/prompts/review-events'
 import { SubmissionScanOutputSchema } from '../lib/ai/schemas/submission-scan'
+import { EventReviewOutputSchema } from '../lib/ai/schemas/event-review'
 import { getTechniqueVariantsForPositions, formatVariantsAsPromptBlock } from '../lib/ai/technique-retrieval'
 
 // Gemini returns timestamps in MM.SS decimal format (e.g. 38.32 = 38 min 32 sec = 2312s).
@@ -778,31 +780,101 @@ export const scanUrl = inngest.createFunction(
           }
         }
 
-        // Phase 2 — KB targeted scan (inline, best-effort)
-        // Runs BEFORE insights so the brief is generated with all events (Phase 1 + KB).
-        // A Phase 2 failure is caught and never blocks the match from completing.
+        // Phase 2 — Two-level submission detection (inline, best-effort)
+        // Runs BEFORE insights so the brief includes Phase 2 events.
+        // Level A: Claude audits position timeline for statistical gaps → flagged windows
+        // Level B: Gemini re-scans only flagged windows (+ KB-relevant windows if any)
+        // Any failure is caught and never blocks match completion.
         let kbEventsAdded = 0
         if (isYouTubeUrl(video.publicUrl)) {
           try {
-            const allSegs = await db.query.positionSegments.findMany({ where: eq(positionSegments.matchId, matchId), columns: { positionId: true } })
+            const [allSegs, allEvts] = await Promise.all([
+              db.query.positionSegments.findMany({ where: eq(positionSegments.matchId, matchId) }),
+              db.query.matchEvents.findMany({ where: eq(matchEvents.matchId, matchId) }),
+            ])
+
+            // ── Level A: Claude statistical audit ──────────────────────────
+            const { generateObject } = await import('ai')
+            const { anthropic: anthropicClient } = await import('../lib/ai/clients')
+
+            let flaggedWindows: Array<{
+              start_seconds: number
+              end_seconds: number
+              reason: string
+              likely_event_types: string[]
+            }> = []
+
+            try {
+              const reviewStart = Date.now()
+              const { object: reviewObj, usage: reviewUsage } = await generateObject({
+                model: anthropicClient(CLAUDE_SYNTHESIS_MODEL),
+                schema: EventReviewOutputSchema,
+                maxRetries: 0,
+                system: buildReviewEventsSystemPrompt(),
+                prompt: buildReviewEventsUserPrompt({
+                  segments: allSegs.map(s => ({
+                    start_seconds: s.startSeconds,
+                    end_seconds: s.endSeconds,
+                    position_id: s.positionId,
+                    user_role: s.userRole,
+                    dominance: s.dominance,
+                  })),
+                  events: allEvts.map(e => ({
+                    timestamp_seconds: e.timestampSeconds,
+                    event_type_id: e.eventTypeId,
+                    actor: e.actor,
+                    outcome: e.outcome,
+                  })),
+                }),
+              })
+              await db.insert(aiCallLogs).values({
+                userId: userId ?? null,
+                jobId: matchId,
+                model: CLAUDE_SYNTHESIS_MODEL,
+                promptVersion: REVIEW_EVENTS_PROMPT_VERSION,
+                tokensIn: reviewUsage.inputTokens ?? 0,
+                tokensOut: reviewUsage.outputTokens ?? 0,
+                costUsdEstimate: estimateCostUsd(CLAUDE_SYNTHESIS_MODEL, reviewUsage.inputTokens ?? 0, reviewUsage.outputTokens ?? 0),
+                latencyMs: Date.now() - reviewStart,
+                status: 'success',
+              })
+              flaggedWindows = reviewObj.suspicious_windows ?? []
+            } catch { /* audit failure is non-blocking */ }
+
+            // ── Level B: Merge Claude-flagged windows with KB-derived windows ──
+            // KB windows: full match window when KB variants exist for the positions seen
             const kbVariants = await getTechniqueVariantsForPositions(allSegs.map(s => s.positionId), format as 'gi' | 'no_gi')
+            const matchRow = await db.query.matches.findFirst({ where: eq(matches.id, matchId), columns: { matchStartSeconds: true, matchEndSeconds: true } })
+            const mStart = matchRow?.matchStartSeconds ?? 0
+            const mEnd = matchRow?.matchEndSeconds ?? mStart + 600
+
+            // Always scan the full match if we have KB context OR if Claude flagged windows.
+            // When both exist, send all windows so Gemini has complete context.
+            const allWindows = [...flaggedWindows]
             if (kbVariants.length > 0) {
-              const techniqueBlock = formatVariantsAsPromptBlock(kbVariants)
-              const matchRow = await db.query.matches.findFirst({ where: eq(matches.id, matchId), columns: { matchStartSeconds: true, matchEndSeconds: true } })
-              const mStart = matchRow?.matchStartSeconds ?? 0
-              const mEnd = matchRow?.matchEndSeconds ?? mStart + 600
+              // Add full match as a fallback window if Claude flagged nothing (or as extra coverage)
+              const covered = allWindows.some(w => w.end_seconds - w.start_seconds > 120)
+              if (!covered) {
+                allWindows.push({
+                  start_seconds: mStart,
+                  end_seconds: mEnd,
+                  reason: 'full match — KB technique context available',
+                  likely_event_types: ['armbar', 'triangle', 'kimura', 'rear_naked_choke', 'guillotine', 'omoplata', 'heel_hook'],
+                })
+              }
+            }
+
+            if (allWindows.length > 0) {
+              const techniqueBlock = kbVariants.length > 0 ? formatVariantsAsPromptBlock(kbVariants) : undefined
+              const scanStart = Date.now()
               const kbScanResult = await geminiVideoObject(GEMINI_URL_SCAN_MODEL, {
                 system: buildScanSubmissionsSystemPrompt(techniqueBlock),
                 videoUrl: video.publicUrl,
                 videoOptions: { resolution: 'HIGH' as const, thinkingEffort: 'HIGH' as const, startSeconds: mStart, endSeconds: mEnd },
-                userPrompt: buildScanSubmissionsUserPrompt([{
-                  start_seconds: mStart,
-                  end_seconds: mEnd,
-                  reason: 'full match — scan for missed submissions',
-                  likely_event_types: ['armbar', 'triangle', 'kimura', 'rear_naked_choke', 'guillotine', 'omoplata', 'heel_hook'],
-                }]),
+                userPrompt: buildScanSubmissionsUserPrompt(allWindows),
                 schema: SubmissionScanOutputSchema,
               })
+
               const existingEvts = await db.query.matchEvents.findMany({ where: eq(matchEvents.matchId, matchId) })
               const newKbEvts = (kbScanResult.object.events ?? []).filter((ev: any) =>
                 ev.confidence >= 0.65 &&
@@ -828,7 +900,7 @@ export const scanUrl = inngest.createFunction(
                 tokensIn: kbScanResult.usage.inputTokens ?? 0,
                 tokensOut: kbScanResult.usage.outputTokens ?? 0,
                 costUsdEstimate: estimateCostUsd(GEMINI_URL_SCAN_MODEL, kbScanResult.usage.inputTokens ?? 0, kbScanResult.usage.outputTokens ?? 0),
-                latencyMs: 0,
+                latencyMs: Date.now() - scanStart,
                 status: 'success',
               })
             }
