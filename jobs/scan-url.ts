@@ -526,7 +526,7 @@ export const scanUrl = inngest.createFunction(
               const outcomeOffsetInClip = outcomeAbsolute - clipStart
 
               const videoOptions = {
-                fps: 0.5,
+                fps: 1,
                 resolution: 'HIGH' as const,
                 thinkingEffort: 'HIGH' as const,
                 ...(clipStart > 0 ? { startSeconds: clipStart } : {}),
@@ -861,17 +861,19 @@ export const scanUrl = inngest.createFunction(
             const mStart = matchRow?.matchStartSeconds ?? 0
             const mEnd = matchRow?.matchEndSeconds ?? mStart + 600
 
-            // Always scan the full match if we have KB context OR if Claude flagged windows.
-            // When both exist, send all windows so Gemini has complete context.
+            // Phase 2 always runs for scouting footage (tournamentOpponentId set) to catch
+            // submissions regardless of KB coverage or Claude audit results.
+            // For own-footage, only run if KB variants exist or Claude flagged windows.
             const allWindows = [...flaggedWindows]
-            if (kbVariants.length > 0) {
-              // Add full match as a fallback window if Claude flagged nothing (or as extra coverage)
+            const shouldRunPhase2 = tournamentOpponentId || kbVariants.length > 0 || flaggedWindows.length > 0
+            if (shouldRunPhase2) {
+              // Ensure full match is covered — add it if no large window already present
               const covered = allWindows.some(w => w.end_seconds - w.start_seconds > 120)
               if (!covered) {
                 allWindows.push({
                   start_seconds: mStart,
                   end_seconds: mEnd,
-                  reason: 'full match — KB technique context available',
+                  reason: kbVariants.length > 0 ? 'full match — KB technique context available' : 'full match — scouting scan',
                   likely_event_types: ['armbar', 'triangle', 'kimura', 'rear_naked_choke', 'guillotine', 'omoplata', 'heel_hook'],
                 })
               }
@@ -883,7 +885,7 @@ export const scanUrl = inngest.createFunction(
               const kbScanResult = await geminiVideoObject(GEMINI_URL_SCAN_MODEL, {
                 system: buildScanSubmissionsSystemPrompt(techniqueBlock),
                 videoUrl: video.publicUrl,
-                videoOptions: { resolution: 'HIGH' as const, thinkingEffort: 'HIGH' as const, startSeconds: mStart, endSeconds: mEnd },
+                videoOptions: { fps: 2, resolution: 'HIGH' as const, thinkingEffort: 'HIGH' as const, startSeconds: mStart, endSeconds: mEnd },
                 userPrompt: buildScanSubmissionsUserPrompt(allWindows),
                 schema: SubmissionScanOutputSchema,
               })
