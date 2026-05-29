@@ -7,11 +7,11 @@ import ffmpegStaticPath from 'ffmpeg-static'
 import { existsSync as ffmpegExists } from 'fs'
 // nixpacks installs system ffmpeg — prefer it; fall back to ffmpeg-static for local dev
 const ffmpegBin: string = (ffmpegStaticPath && ffmpegExists(ffmpegStaticPath)) ? ffmpegStaticPath : 'ffmpeg'
-import { generateObject } from 'ai'
 import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
 import { techniqueVariants, aiCallLogs } from '../lib/db/schema'
-import { google, GEMINI_VIDEO_MODEL, estimateCostUsd } from '../lib/ai/clients'
+import { GEMINI_VIDEO_MODEL, estimateCostUsd } from '../lib/ai/clients'
+import { geminiVideoObject } from '../lib/gemini-video'
 import { TechniqueExtractionOutputSchema } from '../lib/ai/schemas/technique-extraction'
 import { buildExtractTechniqueSystemPrompt, buildExtractTechniqueUserPrompt, EXTRACT_TECHNIQUE_PROMPT_VERSION } from '../lib/ai/prompts/extract-technique'
 import { embedText } from '../lib/ai/embeddings'
@@ -52,25 +52,16 @@ export const ingestTechnique = inngest.createFunction(
     const { object, usage } = await step.run('extract-technique-gemini', async () => {
       const start = Date.now()
 
-      // Gemini can process YouTube URLs directly — include transcript as an extra text part
-      const contentParts: any[] = []
-      contentParts.push({
-        type: 'file',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        data: new URL(youtubeUrl) as any,
-        mediaType: 'video/mp4',
-      })
-      if (transcript) {
-        contentParts.push({ type: 'text', text: `TRANSCRIPT:\n${transcript.substring(0, 60_000)}` })
-      }
-      contentParts.push({ type: 'text', text: buildExtractTechniqueUserPrompt({ techniqueHint, positionHint }) })
+      // Prepend transcript to user prompt when available so Gemini has speaker audio context
+      const userPrompt = transcript
+        ? `TRANSCRIPT:\n${transcript.substring(0, 60_000)}\n\n${buildExtractTechniqueUserPrompt({ techniqueHint, positionHint })}`
+        : buildExtractTechniqueUserPrompt({ techniqueHint, positionHint })
 
-      const result = await generateObject({
-        model: google(GEMINI_VIDEO_MODEL),
-        schema: TechniqueExtractionOutputSchema,
-        maxRetries: 0,
+      const result = await geminiVideoObject(GEMINI_VIDEO_MODEL, {
         system: buildExtractTechniqueSystemPrompt(),
-        messages: [{ role: 'user', content: contentParts }],
+        videoUrl: youtubeUrl,
+        userPrompt,
+        schema: TechniqueExtractionOutputSchema,
       })
 
       await db.insert(aiCallLogs).values({
