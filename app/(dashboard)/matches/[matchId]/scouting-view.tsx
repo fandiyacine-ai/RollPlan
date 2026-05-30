@@ -996,7 +996,7 @@ export function ScoutingView({
           <div className={`flex-1 min-h-0 ${activeTab === 'ask' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'}`}>
             <div className={activeTab === 'brief' ? '' : 'hidden'}>
               <BriefTab insights={insights} />
-              {viewMode === 'scouting' && <RecordsComparison opponentLabel={opponentName} opponentIntel={opponentIntel} userIntel={userIntel} />}
+              {viewMode === 'scouting' && <RecordsComparison opponentLabel={match.competitorLabel ?? opponentName} opponentIntel={opponentIntel} userIntel={userIntel} />}
             </div>
             <div className={activeTab === 'timeline' ? '' : 'hidden'}>
               <TimelineTab

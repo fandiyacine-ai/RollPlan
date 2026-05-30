@@ -136,14 +136,17 @@ export default async function MatchDetailPage({
       durationSeconds: s.endSeconds - s.startSeconds,
       segmentId: s.id,
     })),
-    ...events.map(e => ({
-      type: 'event' as const,
-      time: e.timestampSeconds,
-      actor: e.actor,
-      eventName: EVENT_MAP[e.eventTypeId] ?? e.techniqueLabel ?? e.eventTypeId,
-      techniqueLabel: e.techniqueLabel,
-      outcome: e.outcome,
-    })),
+    ...events.map(e => {
+      const mappedName = EVENT_MAP[e.eventTypeId]
+      return {
+        type: 'event' as const,
+        time: e.timestampSeconds,
+        actor: e.actor,
+        eventName: mappedName ?? e.techniqueLabel ?? e.eventTypeId,
+        techniqueLabel: mappedName ? e.techniqueLabel : null,
+        outcome: e.outcome,
+      }
+    }),
   ].sort((a, b) => a.time - b.time)
 
   const displayDate = match.recordedAt ?? match.createdAt
