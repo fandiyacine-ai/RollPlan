@@ -15,12 +15,13 @@ import { rescanMatchesWithKb, kbTargetedScanMatch } from '../../../../jobs/resca
 import { backfillAthleteIntel } from '../../../../jobs/backfill-athlete-intel'
 import { buildOpponentIntel } from '../../../../jobs/build-opponent-intel'
 import { backfillReferenceImages, backfillReferenceImageOne } from '../../../../jobs/backfill-reference-images'
+import { fetchUserIntel } from '../../../../jobs/fetch-user-intel'
 
 export const maxDuration = 300
 
 const handlers = serve({
   client: inngest,
-  functions: [analyzeVideo, generateGameplan, scanUrl, smoothcompMonitorBracket, smoothcompProcessBracket, smoothcompDiscoverFootage, generateExecutionDebrief, syncTournamentCatalog, ingestTechnique, techniqueKbAgent, rescanMatchesWithKb, kbTargetedScanMatch, backfillAthleteIntel, buildOpponentIntel, backfillReferenceImages, backfillReferenceImageOne],
+  functions: [analyzeVideo, generateGameplan, scanUrl, smoothcompMonitorBracket, smoothcompProcessBracket, smoothcompDiscoverFootage, generateExecutionDebrief, syncTournamentCatalog, ingestTechnique, techniqueKbAgent, rescanMatchesWithKb, kbTargetedScanMatch, backfillAthleteIntel, buildOpponentIntel, backfillReferenceImages, backfillReferenceImageOne, fetchUserIntel],
 })
 
 function safe(handler: (req: NextRequest) => Promise<Response>) {

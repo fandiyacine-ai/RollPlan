@@ -3,6 +3,7 @@ import { users } from '../../../lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { getOrCreateDbUserId } from '../../../lib/db/get-user'
 import { SettingsForm } from './settings-form'
+import { CompetitionRecordSection } from './competition-record'
 import Link from 'next/link'
 
 export const metadata = { title: 'Settings — RollPlan' }
@@ -30,7 +31,21 @@ export default async function SettingsPage() {
         defaultSmootcompProfileUrl={user?.smoothcompProfileUrl}
       />
 
-      <div className="mt-16 pt-8 border-t border-border/60">
+      <div className="mt-12">
+        <CompetitionRecordSection
+          ajpWins={user?.ajpWins ?? null}
+          ajpLosses={user?.ajpLosses ?? null}
+          ajpProfileUrl={user?.ajpProfileUrl ?? null}
+          smoothcompWins={user?.smoothcompWins ?? null}
+          smoothcompLosses={user?.smoothcompLosses ?? null}
+          smoothcompFedUrl={user?.smoothcompFedUrl ?? null}
+          ibjjfBestResult={user?.ibjjfBestResult ?? null}
+          ibjjfProfileUrl={user?.ibjjfProfileUrl ?? null}
+          intelStatus={user?.intelStatus ?? null}
+        />
+      </div>
+
+      <div className="mt-10 pt-8 border-t border-border/60">
         <p className="text-xs text-muted-foreground">
           Have questions?{' '}
           <Link href="/faq" className="underline underline-offset-2 hover:text-foreground">

@@ -1,5 +1,5 @@
 import { db } from '../../../../lib/db'
-import { matches, videos, positionSegments, matchEvents, insights, tournamentOpponents } from '../../../../lib/db/schema'
+import { matches, videos, positionSegments, matchEvents, insights, tournamentOpponents, users } from '../../../../lib/db/schema'
 import { eq, asc } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -93,6 +93,13 @@ export default async function MatchDetailPage({
     ? await db.query.tournamentOpponents.findFirst({ where: eq(tournamentOpponents.id, match.tournamentOpponentId) })
     : null
 
+  const userRow = match.tournamentOpponentId && match.userId
+    ? await db.query.users.findFirst({
+        where: eq(users.id, match.userId),
+        columns: { ajpWins: true, ajpLosses: true, ajpProfileUrl: true, smoothcompWins: true, smoothcompLosses: true, smoothcompFedUrl: true, ibjjfBestResult: true, ibjjfProfileUrl: true },
+      })
+    : null
+
   const [segments, events, matchInsights] = await Promise.all([
     db.select().from(positionSegments).where(eq(positionSegments.matchId, matchId)).orderBy(asc(positionSegments.startSeconds)),
     db.select().from(matchEvents).where(eq(matchEvents.matchId, matchId)).orderBy(asc(matchEvents.timestampSeconds)),
@@ -174,6 +181,26 @@ export default async function MatchDetailPage({
         backHref={backHref}
         backLabel={backLabel}
         viewMode={match.tournamentOpponentId ? 'scouting' : 'analysis'}
+        opponentIntel={tournamentOpponentRow ? {
+          ajpWins: tournamentOpponentRow.ajpWins ?? null,
+          ajpLosses: tournamentOpponentRow.ajpLosses ?? null,
+          ajpProfileUrl: tournamentOpponentRow.ajpProfileUrl ?? null,
+          smoothcompWins: tournamentOpponentRow.smoothcompWins ?? null,
+          smoothcompLosses: tournamentOpponentRow.smoothcompLosses ?? null,
+          smoothcompFedUrl: tournamentOpponentRow.smoothcompFedUrl ?? null,
+          ibjjfBestResult: tournamentOpponentRow.ibjjfBestResult ?? null,
+          ibjjfProfileUrl: tournamentOpponentRow.ibjjfProfileUrl ?? null,
+        } : null}
+        userIntel={userRow ? {
+          ajpWins: userRow.ajpWins ?? null,
+          ajpLosses: userRow.ajpLosses ?? null,
+          ajpProfileUrl: userRow.ajpProfileUrl ?? null,
+          smoothcompWins: userRow.smoothcompWins ?? null,
+          smoothcompLosses: userRow.smoothcompLosses ?? null,
+          smoothcompFedUrl: userRow.smoothcompFedUrl ?? null,
+          ibjjfBestResult: userRow.ibjjfBestResult ?? null,
+          ibjjfProfileUrl: userRow.ibjjfProfileUrl ?? null,
+        } : null}
       />
     )
   }

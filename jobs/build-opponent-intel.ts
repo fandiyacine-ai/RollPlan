@@ -35,7 +35,7 @@ type AjpEvent = {
   registrations: AjpRegistration[]
 }
 
-type AjpEventsPage = {
+export type AjpEventsPage = {
   current_page: number
   last_page: number
   data: AjpEvent[]
@@ -43,12 +43,12 @@ type AjpEventsPage = {
 
 // Strip diacritics for comparison: "Mäki" → "Maki", "João" → "Joao".
 // Athletes often register on platforms without accents even if their legal name has them.
-function normalizeName(name: string): string {
+export function normalizeName(name: string): string {
   return name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 }
 
 // Middle names are optional: first+last must match, middle is bonus.
-function nameMatchThreshold(parts: string[]): number {
+export function nameMatchThreshold(parts: string[]): number {
   if (parts.length <= 2) return parts.length
   if (parts.length === 3) return 2  // middle name optional
   return Math.ceil(parts.length * 2 / 3)
@@ -154,7 +154,7 @@ async function geminiGroundedSearch(query: string, domain: string): Promise<stri
 
 // Multi-engine search for AJP athlete profile — direct AJP search → Brave → Gemini+Google
 // Profile URL gives the athlete ID directly; event URL triggers participants POST fallback.
-async function findAjpAthleteIdByName(name: string): Promise<string | null> {
+export async function findAjpAthleteIdByName(name: string): Promise<string | null> {
   // 0. Direct AJP athlete directory search — most reliable, doesn't depend on search engine indexing.
   // ajptour.com uses the same Firebase/Smoothcomp platform so the /en/user?search page works identically.
   try {
@@ -325,7 +325,7 @@ async function checkSmoothcompProfile(athleteId: string, expectedName: string, t
   } catch { return 'rejected' }
 }
 
-async function verifySmoothcompProfileName(athleteId: string, expectedName: string, trustIfEmpty = false): Promise<boolean> {
+export async function verifySmoothcompProfileName(athleteId: string, expectedName: string, trustIfEmpty = false): Promise<boolean> {
   const result = await checkSmoothcompProfile(athleteId, expectedName, trustIfEmpty)
   return result !== 'rejected'
 }
@@ -364,7 +364,7 @@ function nameSearchQueries(name: string, domain: string): string[] {
 
 // Multi-engine search for Smoothcomp profiles — Brave → Gemini
 // Only searches smoothcomp.com (main domain)
-async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: string; athleteId: string }>> {
+export async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: string; athleteId: string }>> {
   // Track which URLs were found by "strong" queries (containing the athlete's first name).
   // Private profiles are only trusted as a last resort if found by a strong query —
   // last-name-only queries can match ghost profiles or unrelated athletes.
@@ -498,7 +498,7 @@ async function findSmoothcompProfiles(name: string): Promise<Array<{ baseUrl: st
   return []
 }
 
-async function fetchSmoothcompEventsPage(baseUrl: string, athleteId: string, page: number): Promise<AjpEventsPage> {
+export async function fetchSmoothcompEventsPage(baseUrl: string, athleteId: string, page: number): Promise<AjpEventsPage> {
   const resp = await fetch(`${baseUrl}/en/profile/${athleteId}/events?page=${page}`, {
     headers: {
       Accept: 'application/json, text/plain, */*',
@@ -512,7 +512,7 @@ async function fetchSmoothcompEventsPage(baseUrl: string, athleteId: string, pag
   return resp.json() as Promise<AjpEventsPage>
 }
 
-async function fetchAjpEventsPage(athleteId: string, page: number): Promise<AjpEventsPage> {
+export async function fetchAjpEventsPage(athleteId: string, page: number): Promise<AjpEventsPage> {
   const resp = await fetch(
     `https://ajptour.com/en/profile/${athleteId}/events?page=${page}`,
     {

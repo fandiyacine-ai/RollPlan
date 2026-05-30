@@ -163,6 +163,80 @@ function BriefTab({ insights, large = false }: { insights: InsightRow[]; large?:
   )
 }
 
+// ─── Records comparison widget (shown in Brief tab for scouting matches) ───────
+
+type IntelRecord = {
+  ajpWins: number | null; ajpLosses: number | null; ajpProfileUrl: string | null
+  smoothcompWins: number | null; smoothcompLosses: number | null; smoothcompFedUrl: string | null
+  ibjjfBestResult: string | null; ibjjfProfileUrl: string | null
+}
+
+function RecordColumn({ label, intel }: { label: string; intel: IntelRecord | null | undefined }) {
+  const hasData = intel && (intel.ajpWins !== null || intel.smoothcompWins !== null || intel.ibjjfBestResult)
+  const MEDAL_COLOR: Record<string, string> = { Gold: 'text-yellow-400', Silver: 'text-zinc-300', Bronze: 'text-amber-500' }
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground/50 mb-2">{label}</p>
+      {!hasData ? (
+        <p className="text-[11px] text-muted-foreground/40 italic">No record found</p>
+      ) : (
+        <>
+          {intel.ajpWins !== null && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[8px] font-bold px-1 py-px rounded border bg-orange-900/50 text-orange-300 border-orange-700/40">AJP</span>
+              <span className="text-xs tabular-nums">
+                <span className="font-bold text-emerald-400">{intel.ajpWins}W</span>
+                <span className="text-muted-foreground/50 mx-0.5">–</span>
+                <span className="font-bold text-rose-400">{intel.ajpLosses ?? 0}L</span>
+              </span>
+            </div>
+          )}
+          {intel.smoothcompWins !== null && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[8px] font-bold px-1 py-px rounded border bg-sky-900/50 text-sky-300 border-sky-700/40">SC</span>
+              <span className="text-xs tabular-nums">
+                <span className="font-bold text-emerald-400">{intel.smoothcompWins}W</span>
+                <span className="text-muted-foreground/50 mx-0.5">–</span>
+                <span className="font-bold text-rose-400">{intel.smoothcompLosses ?? 0}L</span>
+              </span>
+            </div>
+          )}
+          {intel.ibjjfBestResult && intel.ibjjfBestResult.split('|').slice(0, 2).map((m, i) => {
+            const medalLabel = m.split(' – ')[0] ?? ''
+            return (
+              <div key={i} className="flex items-center gap-1.5">
+                <span className="text-[8px] font-bold px-1 py-px rounded border bg-violet-900/50 text-violet-300 border-violet-700/40">IBJJF</span>
+                <span className={`text-xs font-semibold truncate ${MEDAL_COLOR[medalLabel] ?? 'text-muted-foreground'}`}>{m}</span>
+              </div>
+            )
+          })}
+        </>
+      )}
+    </div>
+  )
+}
+
+function RecordsComparison({ opponentLabel, opponentIntel, userIntel }: {
+  opponentLabel: string
+  opponentIntel: IntelRecord | null | undefined
+  userIntel: IntelRecord | null | undefined
+}) {
+  const hasAny = (intel: IntelRecord | null | undefined) =>
+    intel && (intel.ajpWins !== null || intel.smoothcompWins !== null || intel.ibjjfBestResult)
+  if (!hasAny(opponentIntel) && !hasAny(userIntel)) return null
+
+  return (
+    <div className="border-t border-border/40 px-4 py-3">
+      <p className="text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground/40 mb-3">Competition Records</p>
+      <div className="grid grid-cols-2 gap-4">
+        <RecordColumn label={opponentLabel} intel={opponentIntel} />
+        <RecordColumn label="You" intel={userIntel} />
+      </div>
+    </div>
+  )
+}
+
 // ─── Tab: Timeline ────────────────────────────────────────────────────────────
 
 const DOM_DOT: Record<string, string> = { dominant: 'bg-emerald-500', inferior: 'bg-rose-500', neutral: 'bg-zinc-500' }
@@ -745,6 +819,8 @@ export function ScoutingView({
   backHref,
   backLabel,
   viewMode,
+  opponentIntel,
+  userIntel,
 }: {
   match: {
     id: string
@@ -767,6 +843,8 @@ export function ScoutingView({
   backHref: string
   backLabel?: string
   viewMode?: 'scouting' | 'analysis'
+  opponentIntel?: IntelRecord | null
+  userIntel?: IntelRecord | null
 }) {
   const [currentTime, setCurrentTime] = useState(0)
   const [activeTab, setActiveTab] = useState<TabId>('brief')
@@ -916,7 +994,10 @@ export function ScoutingView({
 
           {/* Tab content — AskTab stays mounted to preserve chat state and active fetches */}
           <div className={`flex-1 min-h-0 ${activeTab === 'ask' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'}`}>
-            <div className={activeTab === 'brief' ? '' : 'hidden'}><BriefTab insights={insights} /></div>
+            <div className={activeTab === 'brief' ? '' : 'hidden'}>
+              <BriefTab insights={insights} />
+              {viewMode === 'scouting' && <RecordsComparison opponentLabel={opponentName} opponentIntel={opponentIntel} userIntel={userIntel} />}
+            </div>
             <div className={activeTab === 'timeline' ? '' : 'hidden'}>
               <TimelineTab
                 items={timelineItems}
@@ -948,6 +1029,7 @@ export function ScoutingView({
         {/* Brief — capped so tab panel always gets ≥50% of remaining space */}
         <div className="flex-shrink-0 rounded-xl border border-border/60 bg-card max-h-[42vh] overflow-y-auto">
           <BriefTab insights={insights} large />
+          {viewMode === 'scouting' && <RecordsComparison opponentLabel={opponentName} opponentIntel={opponentIntel} userIntel={userIntel} />}
         </div>
 
         {/* Tabs for the rest */}

@@ -5,6 +5,8 @@ import { db } from '../../../lib/db'
 import { users } from '../../../lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { getOrCreateDbUserId } from '../../../lib/db/get-user'
+import { currentUser } from '@clerk/nextjs/server'
+import { inngest } from '../../../lib/inngest'
 
 type Belt = 'white' | 'blue' | 'purple' | 'brown' | 'black' | 'grey' | 'yellow' | 'orange' | 'green'
 type Style = 'gi' | 'no_gi' | 'both'
@@ -54,6 +56,25 @@ export async function updateProfile(_prev: { error?: string }, formData: FormDat
     revalidatePath('/settings')
     revalidatePath('/player-card')
     return { success: true }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export async function fetchUserIntelAction(): Promise<{ error?: string; queued?: boolean }> {
+  try {
+    const userId = await getOrCreateDbUserId()
+    const clerkUser = await currentUser()
+    if (!clerkUser) return { error: 'Not signed in' }
+
+    const firstName = clerkUser.firstName ?? ''
+    const lastName = clerkUser.lastName ?? ''
+    const athleteName = `${firstName} ${lastName}`.trim()
+    if (!athleteName) return { error: 'Add your name in your Clerk profile first' }
+
+    await inngest.send({ name: 'user/fetch-intel', data: { userId, athleteName } })
+    revalidatePath('/settings')
+    return { queued: true }
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) }
   }

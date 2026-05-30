@@ -52,6 +52,10 @@ const FAQ = [
     a: 'The Gameplan page combines your profile (belt, style, goals) with the opponent scouted data to generate a competition-day gameplan: your go-to attacks, opponent weapons to defend, and mat-side mental cues. Generate it once you have scouted footage ready. The page auto-refreshes while generating — no need to manually reload.',
   },
   {
+    q: 'What is Competition Day?',
+    a: 'Competition Day is your match-morning command centre. It shows all your upcoming tournaments with a countdown, and for each opponent a compact briefing card: the key attack to open with, the danger to watch, your attack chain, and win probability — all visible in one glance without opening individual gameplans. It\'s designed to be readable with one hand, standing in a sports hall, under pressure.',
+  },
+  {
     q: 'Can I compare my gameplan against my actual match result?',
     a: 'Yes. After a gameplan is generated, a "Post-match review" section appears at the bottom of the Gameplan page. Click "Link my match result" to connect one of your own analysed matches — it stores the link so you can quickly jump between the gameplan and the match data.',
   },
@@ -86,6 +90,14 @@ const FAQ = [
   {
     q: 'What counts against my usage quota?',
     a: 'Each analysed match counts towards your monthly limit. The free tier allows 10 analysed matches per calendar month — the counter resets on the 1st of each month. Failed analyses and pending jobs do not count. You can see your current usage in the nav bar.',
+  },
+  {
+    q: 'Is there a mobile app?',
+    a: 'A native iOS and Android app is in the works. The goal: film your match at the academy, analyse on the way home, and pull up your opponent gameplan standing in the arena — all from your phone. For now, RollPlan works well in any mobile browser. Sign up and we\'ll notify you when the app launches.',
+  },
+  {
+    q: 'Is RollPlan in beta?',
+    a: 'Yes — RollPlan is in active beta. Core features work reliably but you may encounter rough edges, and AI analysis isn\'t perfect. If something goes wrong, the "Re-scan" button resets a failed video and the "Wrong result?" and "Wrong?" correction tools let you fix AI mistakes inline. Found a bug or have feedback? Email feedback@rollplan.app — we read every message.',
   },
 ]
 

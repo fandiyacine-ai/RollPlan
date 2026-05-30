@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -8,9 +9,12 @@ export default function HomePage() {
 
       {/* Nav */}
       <nav className="px-6 h-14 flex items-center justify-between border-b border-border/60 sticky top-0 z-40 bg-background/90 backdrop-blur-sm">
-        <span className="text-xl font-extrabold tracking-tight [font-family:var(--font-brand)]">
-          Roll<span className="text-muted-foreground font-bold">Plan</span>
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xl font-extrabold tracking-tight [font-family:var(--font-brand)]">
+            Roll<span className="text-muted-foreground font-bold">Plan</span>
+          </span>
+          <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70 border border-border/50 rounded px-1.5 py-0.5 leading-none">Beta</span>
+        </div>
         <div className="flex items-center gap-2">
           <Link href="/sign-in" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}>
             Sign In
@@ -22,31 +26,41 @@ export default function HomePage() {
       </nav>
 
       {/* Hero */}
-      <section className="flex flex-col items-center justify-center px-6 pt-20 pb-16 text-center">
-        <div className="max-w-2xl space-y-6">
-          <div className="inline-flex items-center gap-2 text-xs text-muted-foreground border rounded-full px-4 py-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Powered by Google Gemini AI
+      <section className="px-6 pt-16 pb-12">
+        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+          {/* Left: text */}
+          <div className="space-y-6 text-center lg:text-left">
+            <div className="inline-flex items-center gap-2 text-xs text-muted-foreground border rounded-full px-4 py-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Powered by Google Gemini AI
+            </div>
+
+            <h1 className="text-5xl sm:text-6xl font-black tracking-tight leading-none">
+              Every frame tells<br />
+              <span className="text-muted-foreground">the truth.</span>
+            </h1>
+
+            <p className="text-base text-muted-foreground leading-relaxed max-w-lg mx-auto lg:mx-0">
+              RollPlan turns your BJJ footage into a full analysis — every position,
+              transition, and turning point traced to the exact timestamp.
+              No more guessing what went wrong.
+            </p>
+
+            <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
+              <Link href="/sign-up" className={cn(buttonVariants({ size: 'lg' }))}>
+                Analyse My Game
+              </Link>
+              <Link href="/sign-up" className={cn(buttonVariants({ variant: 'outline', size: 'lg' }))}>
+                Scout an Opponent
+              </Link>
+            </div>
           </div>
 
-          <h1 className="text-5xl sm:text-6xl font-black tracking-tight leading-none">
-            Every frame tells<br />
-            <span className="text-muted-foreground">the truth.</span>
-          </h1>
-
-          <p className="text-base text-muted-foreground leading-relaxed max-w-lg mx-auto">
-            RollPlan turns your BJJ footage into a full analysis — every position,
-            transition, and turning point traced to the exact timestamp.
-            No more guessing what went wrong.
-          </p>
-
-          <div className="flex flex-wrap gap-3 justify-center">
-            <Link href="/sign-up" className={cn(buttonVariants({ size: 'lg' }))}>
-              Analyse My Game
-            </Link>
-            <Link href="/sign-up" className={cn(buttonVariants({ variant: 'outline', size: 'lg' }))}>
-              Scout an Opponent
-            </Link>
+          {/* Right: logo */}
+          <div className="hidden lg:flex justify-center">
+            <div className="bg-white rounded-3xl shadow-2xl p-8">
+              <Image src="/RollPlan-logo.png" alt="RollPlan AI BJJ Analyser" width={300} height={300} priority />
+            </div>
           </div>
         </div>
       </section>
@@ -163,6 +177,26 @@ export default function HomePage() {
           <Link href="/sign-up" className={cn(buttonVariants({ size: 'lg' }))}>
             Get started — it&apos;s free
           </Link>
+        </div>
+      </section>
+
+      {/* Mobile app teaser */}
+      <section className="px-6 pb-16 max-w-3xl mx-auto w-full">
+        <div className="rounded-2xl border border-dashed border-border/60 bg-card/40 p-8 sm:p-10 flex flex-col sm:flex-row items-center gap-6">
+          <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-foreground/5 flex items-center justify-center">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="text-foreground/70">
+              <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>
+            </svg>
+          </div>
+          <div className="flex-1 text-center sm:text-left space-y-1.5">
+            <div className="flex items-center gap-2 justify-center sm:justify-start">
+              <p className="font-bold text-sm">Mobile app coming soon</p>
+              <span className="text-[9px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 border border-amber-500/40 rounded px-1.5 py-0.5 leading-none">Soon</span>
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              RollPlan for iOS and Android. Film at the academy, analyse on the way home, and check your gameplan standing in the arena.
+            </p>
+          </div>
         </div>
       </section>
 
