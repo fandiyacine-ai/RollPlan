@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import { users, tournaments } from '@/lib/db/schema'
 import { and, eq, gte, sql } from 'drizzle-orm'
@@ -23,6 +24,7 @@ export async function getPreparingStats(): Promise<{ athleteCount: number }> {
 export async function completeOnboarding() {
   const userId = await getOrCreateDbUserId()
   await db.update(users).set({ onboardingComplete: 'true' }).where(eq(users.id, userId))
+  revalidatePath('/', 'layout')
 }
 
 export async function onboardingCreateTournament(formData: FormData) {

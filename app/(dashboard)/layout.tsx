@@ -55,6 +55,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <>
             <Link href="/admin/usage" className="hover:text-muted-foreground transition-colors">Usage ↗</Link>
             <Link href="/admin/techniques" className="hover:text-muted-foreground transition-colors">Techniques ↗</Link>
+            <Link href="/admin/feedback" className="hover:text-muted-foreground transition-colors">Feedback ↗</Link>
           </>
         )}
       </footer>
