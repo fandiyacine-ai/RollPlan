@@ -18,6 +18,7 @@ import { EventReviewOutputSchema } from '../lib/ai/schemas/event-review'
 import { SubmissionScanOutputSchema } from '../lib/ai/schemas/submission-scan'
 import { getTechniqueVariantsForExtraction, getTechniqueVariantsForPositions, formatVariantsAsPromptBlock } from '../lib/ai/technique-retrieval'
 import { isYouTubeUrl, geminiVideoObject } from '../lib/gemini-video'
+import { createNotification } from '../lib/db/notifications'
 
 const CONFUSION_PRONE = new Set([
   'closed_guard', 'back_control', 'mount', 'side_control',
@@ -620,8 +621,18 @@ export const analyzeVideo = inngest.createFunction(
     })
 
     await step.run('mark-analysed', async () => {
+      const m = await db.query.matches.findFirst({ where: eq(matches.id, matchId) })
       await db.update(matches).set({ status: 'analysed' }).where(eq(matches.id, matchId))
       await db.update(videos).set({ status: 'analysed' }).where(eq(videos.id, videoId))
+      if (m?.userId) {
+        await createNotification(
+          m.userId,
+          'video_analysed',
+          'Match analysis ready',
+          'Your footage has been analysed — tap to review insights and timeline.',
+          `/matches/${matchId}`,
+        )
+      }
     })
 
     await step.run('cleanup-gemini-file', async () => {

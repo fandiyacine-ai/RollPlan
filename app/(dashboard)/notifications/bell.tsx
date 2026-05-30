@@ -53,7 +53,7 @@ function NotificationIcon({ type }: { type: string }) {
   )
 }
 
-function NotificationRow({ item }: { item: NotificationItem }) {
+function NotificationRow({ item, onClose }: { item: NotificationItem; onClose: () => void }) {
   const isUnread = !item.readAt
   const inner = (
     <div className={`flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors ${isUnread ? 'bg-blue-50/50 dark:bg-blue-950/10' : ''}`}>
@@ -76,7 +76,7 @@ function NotificationRow({ item }: { item: NotificationItem }) {
   )
 
   if (item.linkUrl) {
-    return <Link href={item.linkUrl} className="block">{inner}</Link>
+    return <Link href={item.linkUrl} className="block" onClick={onClose}>{inner}</Link>
   }
   return inner
 }
@@ -165,7 +165,7 @@ export function NotificationBell() {
             ) : (
               <div className="divide-y divide-border/30">
                 {items.map(item => (
-                  <NotificationRow key={item.id} item={item} />
+                  <NotificationRow key={item.id} item={item} onClose={() => setOpen(false)} />
                 ))}
               </div>
             )}

@@ -285,7 +285,7 @@ export const rescanMatchesWithKb = inngest.createFunction(
           ? `${total} new event${total > 1 ? 's' : ''} detected with improved technique library coverage.`
           : `${total} new events detected across ${names}.`
 
-        await createNotification(userId, 'kb_upgrade', title, body, '/matches')
+        await createNotification(userId, 'kb_upgrade', title, body, '/gameplans')
       }
     })
 

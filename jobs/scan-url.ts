@@ -1056,12 +1056,13 @@ export const scanUrl = inngest.createFunction(
     // Notify user when their own non-chunked match analysis is done
     if (!tournamentOpponentId && userId && chunkIndex === undefined) {
       await step.run('notify-video-analysed', async () => {
+        const match = await db.query.matches.findFirst({ where: eq(matches.videoId, videoId) })
         await createNotification(
           userId,
           'video_analysed',
           'Match analysis ready',
           `Your footage has been analysed and matches are ready to review.`,
-          '/matches',
+          match ? `/matches/${match.id}` : '/matches',
         )
       })
     }
@@ -1129,7 +1130,7 @@ export const scanUrl = inngest.createFunction(
               'video_analysed',
               'Match analysis ready',
               `${found.length} match${found.length > 1 ? 'es' : ''} found and ready to review.`,
-              '/matches',
+              found.length === 1 ? `/matches/${found[0].id}` : '/matches',
             )
           }
         }
