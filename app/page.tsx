@@ -3,6 +3,7 @@ import Image from 'next/image'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
+
 export default function HomePage() {
   return (
     <main className="flex min-h-screen flex-col bg-background text-foreground">
@@ -10,9 +11,7 @@ export default function HomePage() {
       {/* Nav */}
       <nav className="px-6 h-14 flex items-center justify-between border-b border-border/60 sticky top-0 z-40 bg-background/90 backdrop-blur-sm">
         <div className="flex items-center gap-2">
-          <span className="text-xl font-extrabold tracking-tight [font-family:var(--font-brand)]">
-            Roll<span className="text-muted-foreground font-bold">Plan</span>
-          </span>
+          <Image src="/RollPlan-logo.png" alt="RollPlan" width={120} height={32} className="h-8 w-auto" priority />
           <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70 border border-border/50 rounded px-1.5 py-0.5 leading-none">Beta</span>
         </div>
         <div className="flex items-center gap-2">
@@ -27,40 +26,30 @@ export default function HomePage() {
 
       {/* Hero */}
       <section className="px-6 pt-16 pb-12">
-        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
-          {/* Left: text */}
-          <div className="space-y-6 text-center lg:text-left">
-            <div className="inline-flex items-center gap-2 text-xs text-muted-foreground border rounded-full px-4 py-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Powered by Google Gemini AI
-            </div>
-
-            <h1 className="text-5xl sm:text-6xl font-black tracking-tight leading-none">
-              Every frame tells<br />
-              <span className="text-muted-foreground">the truth.</span>
-            </h1>
-
-            <p className="text-base text-muted-foreground leading-relaxed max-w-lg mx-auto lg:mx-0">
-              RollPlan turns your BJJ footage into a full analysis — every position,
-              transition, and turning point traced to the exact timestamp.
-              No more guessing what went wrong.
-            </p>
-
-            <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
-              <Link href="/sign-up" className={cn(buttonVariants({ size: 'lg' }))}>
-                Analyse My Game
-              </Link>
-              <Link href="/sign-up" className={cn(buttonVariants({ variant: 'outline', size: 'lg' }))}>
-                Scout an Opponent
-              </Link>
-            </div>
+        <div className="max-w-2xl mx-auto space-y-6 text-center">
+          <div className="inline-flex items-center gap-2 text-xs text-muted-foreground border rounded-full px-4 py-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            Powered by Google Gemini AI
           </div>
 
-          {/* Right: logo */}
-          <div className="hidden lg:flex justify-center">
-            <div className="bg-white rounded-3xl shadow-2xl p-8">
-              <Image src="/RollPlan-logo.png" alt="RollPlan AI BJJ Analyser" width={300} height={300} priority />
-            </div>
+          <h1 className="text-5xl sm:text-6xl font-black tracking-tight leading-none">
+            Every frame tells<br />
+            <span className="text-muted-foreground">the truth.</span>
+          </h1>
+
+          <p className="text-base text-muted-foreground leading-relaxed max-w-lg mx-auto">
+            RollPlan turns your BJJ footage into a full analysis — every position,
+            transition, and turning point traced to the exact timestamp.
+            No more guessing what went wrong.
+          </p>
+
+          <div className="flex flex-wrap gap-3 justify-center">
+            <Link href="/sign-up" className={cn(buttonVariants({ size: 'lg' }))}>
+              Analyse My Game
+            </Link>
+            <Link href="/sign-up" className={cn(buttonVariants({ variant: 'outline', size: 'lg' }))}>
+              Scout an Opponent
+            </Link>
           </div>
         </div>
       </section>
@@ -202,9 +191,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="border-t px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
-        <span className="font-extrabold tracking-tight text-foreground [font-family:var(--font-brand)]">
-          Roll<span className="text-muted-foreground font-bold">Plan</span>
-        </span>
+        <Image src="/RollPlan-logo.png" alt="RollPlan" width={100} height={28} className="h-7 w-auto" />
         <div className="flex items-center gap-5">
           <Link href="/faq" className="hover:text-foreground transition-colors">FAQ</Link>
           <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>

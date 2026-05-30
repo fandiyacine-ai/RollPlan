@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { UserButton } from '@clerk/nextjs'
 import { ThemeToggle } from './theme-toggle'
@@ -147,7 +148,7 @@ export function Nav({ usageSlot }: { usageSlot?: React.ReactNode }) {
         {/* Left: brand + desktop nav */}
         <div className="flex items-center gap-6 sm:gap-8">
           <Link href="/" className="flex items-center gap-2 group shrink-0">
-            <span className="text-xl font-extrabold tracking-tight [font-family:var(--font-brand)]">Roll<span className="text-muted-foreground font-bold">Plan</span></span>
+            <Image src="/RollPlan-logo.png" alt="RollPlan" width={120} height={32} className="h-8 w-auto" />
             <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70 border border-border/50 rounded px-1.5 py-0.5 leading-none hidden sm:inline">Beta</span>
           </Link>
 
