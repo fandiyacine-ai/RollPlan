@@ -31,8 +31,8 @@ export default function ContactPage() {
             }
             title="Support"
             description="Bug reports, billing questions, anything broken — we'll get back to you within 24 hours."
-            cta="support@rollplan.app"
-            href="mailto:support@rollplan.app"
+            cta="support@rollplan.ai"
+            href="mailto:support@rollplan.ai"
           />
           <ContactCard
             icon={
@@ -42,8 +42,8 @@ export default function ContactPage() {
             }
             title="Feedback & feature requests"
             description="Using RollPlan and have an idea? We&apos;re actively building — your input shapes what ships next."
-            cta="feedback@rollplan.app"
-            href="mailto:feedback@rollplan.app"
+            cta="feedback@rollplan.ai"
+            href="mailto:feedback@rollplan.ai"
           />
         </div>
 
