@@ -203,43 +203,27 @@ export const analyzeVideo = inngest.createFunction(
           object = result.object
           usage = result.usage
         } else {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const extractContent: any[] = []
-
-          // Technique reference images — visual anchors for submission detection
-          for (const variant of techniqueVariants) {
-            if (variant.referenceImageUrl) {
-              extractContent.push({ type: 'image', image: variant.referenceImageUrl })
-              extractContent.push({ type: 'text', text: `↑ TECHNIQUE REFERENCE: ${variant.name}. ${variant.visualCues.slice(0, 200)}` })
-            }
-          }
-
-          if (athleteImageBase64) {
-            extractContent.push({ type: 'image', image: `data:image/jpeg;base64,${athleteImageBase64}` })
-            extractContent.push({ type: 'text', text: '↑ IDENTITY REFERENCE FRAME. The red "⬅ YOU" box marks the ONLY athlete to label as "user" for the ENTIRE match. The other athlete is ALWAYS "opponent". Use this annotated frame as your identity anchor — do not swap these roles at any point.' })
-          }
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          extractContent.push({ type: 'file', data: new URL(geminiFileUri) as any, mediaType: video.contentType as `${string}/${string}` })
-          extractContent.push({
-            type: 'text',
-            text: buildExtractMatchUserPrompt({
+          // Use geminiVideoObject (thinking HIGH + MEDIUM resolution) — same quality path
+          // as the YouTube extraction branch. The Gemini Files API URI works as fileUri here.
+          const result = await geminiVideoObject(GEMINI_VIDEO_MODEL, {
+            system: buildExtractMatchSystemPrompt(techniquePromptBlock),
+            videoUrl: geminiFileUri,
+            videoOptions: {
+              resolution: 'MEDIUM' as const,
+              thinkingEffort: 'HIGH' as const,
+            },
+            userPrompt: buildExtractMatchUserPrompt({
               competitorDescription: match.competitorLabel ?? 'the main competitor',
               appearanceHint: appearanceHint || undefined,
               format: match.format,
               ruleset: match.ruleset,
               durationSeconds: video.durationSeconds ?? undefined,
             }),
-          })
-
-          const result = await generateObject({
-            model: google(GEMINI_VIDEO_MODEL),
             schema: MatchExtractionOutputSchema,
-            maxRetries: 0,
-            system: buildExtractMatchSystemPrompt(techniquePromptBlock),
-            messages: [{ role: 'user', content: extractContent }],
+            referenceImageBase64: athleteImageBase64 || undefined,
           })
           object = result.object
-          usage = { inputTokens: result.usage.inputTokens ?? 0, outputTokens: result.usage.outputTokens ?? 0 }
+          usage = result.usage
         }
       } catch (err: unknown) {
         await markFailed(matchId, videoId)
