@@ -103,8 +103,8 @@ export const analyzeVideo = inngest.createFunction(
     id: 'analyze-video',
     name: 'Analyse Match Video',
     triggers: [{ event: 'video/uploaded' }],
-    // Prevent cascade OOM: two simultaneous Gemini analysis calls can push V8 heap to 4 GB
-    concurrency: { limit: 2 },
+    // Cap simultaneous Gemini calls — Railway Pro has 24 GB RAM; 4 concurrent jobs fit safely
+    concurrency: { limit: 4 },
   },
   async ({ event, step }: { event: { data: { videoId: string; matchId: string; appearanceHint?: string; athleteImageBase64?: string } }; step: any }) => {
     const { videoId, matchId, appearanceHint, athleteImageBase64 } = event.data

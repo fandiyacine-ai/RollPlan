@@ -76,8 +76,8 @@ export const scanUrl = inngest.createFunction(
     name: 'Scan URL for Matches',
     retries: 10,
     triggers: [{ event: 'url/submitted' }],
-    // Cap simultaneous Gemini calls — prevents quota exhaustion and cascade OOM on server restart
-    concurrency: { limit: 2 },
+    // Cap simultaneous Gemini calls — Railway Pro has 24 GB RAM; 4 concurrent jobs fit safely
+    concurrency: { limit: 4 },
   },
   async ({ event, step }: {
     event: { data: { videoId: string; userId?: string; athleteName: string; format: string; sourceType: string; eventName?: string; appearanceHint?: string; tournamentOpponentId?: string; skipScan?: boolean; startSeconds?: number; endSeconds?: number; chunkIndex?: number; chunkTotal?: number; chunkVideoIds?: string[]; matchesFoundSoFar?: number; consecutiveEmptyChunks?: number; ytTimestampHint?: number } }
