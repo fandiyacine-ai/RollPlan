@@ -11,7 +11,7 @@ export default function HomePage() {
       {/* Nav */}
       <nav className="px-6 h-14 flex items-center justify-between border-b border-border/60 sticky top-0 z-40 bg-background/90 backdrop-blur-sm">
         <div className="flex items-center gap-2">
-          <Image src="/RollPlan-logo.png" alt="RollPlan" width={120} height={32} className="h-8 w-auto" priority />
+          <Image src="/RollPlan-logo.png" alt="RollPlan" width={160} height={40} className="h-10 w-auto" priority />
           <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70 border border-border/50 rounded px-1.5 py-0.5 leading-none">Beta</span>
         </div>
         <div className="flex items-center gap-2">

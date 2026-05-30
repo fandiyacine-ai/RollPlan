@@ -148,7 +148,7 @@ export function Nav({ usageSlot }: { usageSlot?: React.ReactNode }) {
         {/* Left: brand + desktop nav */}
         <div className="flex items-center gap-6 sm:gap-8">
           <Link href="/" className="flex items-center gap-2 group shrink-0">
-            <Image src="/RollPlan-logo.png" alt="RollPlan" width={120} height={32} className="h-8 w-auto" />
+            <Image src="/RollPlan-logo.png" alt="RollPlan" width={160} height={40} className="h-10 w-auto" />
             <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70 border border-border/50 rounded px-1.5 py-0.5 leading-none hidden sm:inline">Beta</span>
           </Link>
 
