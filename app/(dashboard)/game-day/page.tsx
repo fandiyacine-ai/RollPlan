@@ -163,12 +163,12 @@ export default async function GameDayPage() {
   if (upcomingTournaments.length === 0) {
     return (
       <div className="max-w-xl space-y-5">
-        <h1 className="text-2xl font-bold">Game Day</h1>
+        <h1 className="text-2xl font-bold">Competition Day</h1>
         <div className="rounded-xl border border-dashed p-12 text-center space-y-2">
           <p className="font-semibold">No upcoming tournaments</p>
           <p className="text-sm text-muted-foreground">
             <Link href="/tournaments" className="underline hover:no-underline">Create a tournament</Link>{' '}
-            to start preparing your game day plan.
+            to start preparing your competition day plan.
           </p>
         </div>
       </div>
@@ -221,7 +221,7 @@ export default async function GameDayPage() {
     <div className="max-w-2xl space-y-8">
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold mb-0.5">Game Day</h1>
+        <h1 className="text-2xl font-bold mb-0.5">Competition Day</h1>
         <p className="text-sm text-muted-foreground">Your match-day briefings</p>
       </div>
 

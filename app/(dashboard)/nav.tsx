@@ -13,7 +13,7 @@ const NAV = [
   { href: '/matches', label: 'My Matches' },
   { href: '/tournaments', label: 'Tournaments' },
   { href: '/gameplans', label: 'Gameplans' },
-  { href: '/game-day', label: 'Game Day' },
+  { href: '/game-day', label: 'Competition Day' },
 ]
 
 const TAB_NAV = [
@@ -55,7 +55,7 @@ const TAB_NAV = [
   },
   {
     href: '/game-day',
-    label: 'Game Day',
+    label: 'Competition Day',
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
