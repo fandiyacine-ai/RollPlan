@@ -973,7 +973,7 @@ function SharedFields({
 export default function UploadPage() {
   const [tab, setTab] = useState<Tab>('file')
   return (
-    <div className="max-w-xl space-y-6">
+    <div className="max-w-xl mx-auto space-y-6">
       <div>
         <Link href="/matches" className="text-xs text-muted-foreground hover:text-foreground inline-block mb-3 transition-colors">← My Matches</Link>
         <h1 className="text-2xl font-bold">Analyse My Match</h1>

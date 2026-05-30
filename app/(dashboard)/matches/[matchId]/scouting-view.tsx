@@ -793,7 +793,7 @@ export function ScoutingView({
   const opponentName =
     match.opponentLabel && match.opponentLabel.toLowerCase() !== 'unknown'
       ? match.opponentLabel
-      : 'Unknown Opponent'
+      : 'Opponent'
 
   const label = viewMode === 'analysis' ? 'Match Analysis' : 'Scouting'
   const defaultBackLabel = viewMode === 'analysis' ? '← My Matches' : '← Scout Opponent'
@@ -898,7 +898,7 @@ export function ScoutingView({
                 {tab.ai ? (
                   <span className="flex items-center gap-1.5">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
-                      <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
+                      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
                     </svg>
                     {tab.label}
                   </span>

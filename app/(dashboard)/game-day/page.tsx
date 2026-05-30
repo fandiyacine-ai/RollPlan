@@ -244,7 +244,7 @@ export default async function GameDayPage() {
                 )}
               </div>
               {days !== null && (
-                <div className={`flex-shrink-0 text-right ${isToday ? 'text-rose-400' : days <= 7 ? 'text-rose-400' : days <= 30 ? 'text-amber-400' : 'text-muted-foreground'}`}>
+                <div className={`flex-shrink-0 text-right ${isToday ? 'text-rose-400' : days <= 3 ? 'text-rose-400' : days <= 30 ? 'text-amber-400' : 'text-muted-foreground'}`}>
                   <p className={`font-bold tabular-nums ${isToday ? 'text-2xl' : 'text-xl'}`}>
                     {isToday ? 'Today!' : `${days}d`}
                   </p>

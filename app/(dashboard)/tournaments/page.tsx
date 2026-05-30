@@ -122,7 +122,7 @@ export default async function TournamentsPage() {
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {days !== null && days >= 0 && days <= 60 && (
                       <span className={`text-xs font-bold tabular-nums ${
-                        days === 0 ? 'text-rose-400' : days <= 7 ? 'text-rose-400' : days <= 30 ? 'text-amber-400' : 'text-muted-foreground'
+                        days === 0 ? 'text-rose-400' : days <= 3 ? 'text-rose-400' : days <= 30 ? 'text-amber-400' : 'text-muted-foreground'
                       }`}>
                         {days === 0 ? 'Today!' : `${days}d`}
                       </span>

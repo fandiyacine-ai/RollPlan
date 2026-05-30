@@ -38,7 +38,7 @@ function drillHint(posId: string): string | null {
 function controlVerdict(pct: number): { label: string; colour: string; tip: string } {
   if (pct >= 66) return { label: 'Dominant', colour: 'text-emerald-400', tip: 'You control the pace — maintain and attack.' }
   if (pct >= 40) return { label: 'Solid', colour: 'text-amber-400', tip: 'Good base — work on converting control to finishes.' }
-  return { label: 'Developing', colour: 'text-rose-400', tip: 'Focus on holding top position longer before attacking.' }
+  return { label: 'Developing', colour: 'text-amber-400', tip: 'Focus on holding top position longer before attacking.' }
 }
 
 const BELT_STYLE: Record<string, { bg: string; text: string }> = {
@@ -698,7 +698,7 @@ export default async function PlayerCardPage() {
                         <p className="text-sm font-medium leading-snug line-clamp-2">{t.name}</p>
                         {days !== null && days >= 0 && (
                           <span className={`text-[10px] font-bold tabular-nums flex-shrink-0 mt-0.5 ${
-                            days === 0 ? 'text-rose-400' : days <= 7 ? 'text-rose-400' : days <= 30 ? 'text-amber-400' : 'text-muted-foreground'
+                            days === 0 ? 'text-rose-400' : days <= 3 ? 'text-rose-400' : days <= 30 ? 'text-amber-400' : 'text-muted-foreground'
                           }`}>
                             {days === 0 ? 'Today!' : `${days}d`}
                           </span>

@@ -145,7 +145,7 @@ export default async function MatchDetailPage({
     : null
 
   const displayTitle = match.tournamentOpponentId
-    ? `${match.competitorLabel || 'You'} vs. ${knownOpponent ?? 'Unknown'}`
+    ? `${match.competitorLabel || 'You'} vs. ${knownOpponent ?? tournamentOpponentRow?.opponentLabel ?? 'Opponent'}`
     : knownOpponent
     ? `vs. ${knownOpponent}`
     : `${match.format === 'no_gi' ? 'No-Gi' : 'Gi'} ${match.context === 'sparring' ? 'Sparring' : match.context === 'drilling' ? 'Drilling' : 'Competition'}`
