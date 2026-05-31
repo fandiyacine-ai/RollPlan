@@ -134,8 +134,8 @@ export default function AboutPage() {
           <div className="space-y-2">
             <h2 className="text-xl font-bold">Still in beta — and still building.</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              If you compete in BJJ — gi or no-gi, blue belt to black, local open to world championship — this is for you.
-              Free to start. No credit card. Upload your first match and have a full breakdown in under five minutes.
+              If you compete in BJJ — or you&apos;re a parent whose kid does — gi or no-gi, local open to world championship,
+              this is for you. Free to start. No credit card. Upload your first match and have a full breakdown in under five minutes.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">

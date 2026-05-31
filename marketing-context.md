@@ -25,8 +25,8 @@ RollPlan analyses Brazilian Jiu-Jitsu match videos using Google Gemini AI. Uploa
 
 **Target competitor profile:**
 - Competes at IBJJF, AJP, ADCC-style, EBI, local open events
-- Any belt from blue to black (primary focus: purple–brown belt competitors who are serious but don't have access to a full coaching staff)
-- Ages 18–40
+- Any belt, any age — adult competitors and youth competitors (kids division); parents of competing kids are also a key user group (managing prep for a child whose parent doesn't train themselves)
+- Primary focus: competitors who are serious but don't have access to a full coaching staff
 - Trains 3–5 sessions/week minimum
 - Has competition footage (YouTube, self-recorded, event streams)
 - Cares about improving and preparing specifically for upcoming events
