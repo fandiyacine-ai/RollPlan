@@ -193,6 +193,7 @@ export default function HomePage() {
       <footer className="border-t px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
         <span className="font-extrabold tracking-tight text-foreground [font-family:var(--font-brand)]">Roll<span className="text-muted-foreground font-bold">Plan</span></span>
         <div className="flex items-center gap-5">
+          <Link href="/about" className="hover:text-foreground transition-colors">About</Link>
           <Link href="/faq" className="hover:text-foreground transition-colors">FAQ</Link>
           <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
         </div>
