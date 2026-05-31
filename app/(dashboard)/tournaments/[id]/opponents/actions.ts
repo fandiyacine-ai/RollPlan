@@ -120,6 +120,11 @@ export async function rescanVideo(videoId: string, tournamentId: string): Promis
     const ruleset = tournament?.ruleset ?? 'ibjjf'
     const format: 'gi' | 'no_gi' = ['adcc', 'ebi', 'nogi', 'no_gi'].includes(ruleset) ? 'no_gi' : 'gi'
 
+    // Delete all existing matches for this video so the scan job doesn't hit the
+    // idempotency guard and re-uses the old (poor) analysis. Cascade deletes
+    // position_segments, match_events, and insights for those matches automatically.
+    await db.delete(matches).where(eq(matches.videoId, videoId))
+
     // Reset parent video
     await db.update(videos).set({ status: 'uploaded', failureReason: null }).where(eq(videos.id, videoId))
 
