@@ -542,8 +542,13 @@ export const scanUrl = inngest.createFunction(
               clipStart = Math.max(0, outcomeAbsolute - MAX_MATCH_DURATION)
               clipEnd = skipScan ? (endSeconds ?? undefined) : outcomeAbsolute + OUTCOME_TAIL
 
-              // Where in the clip the outcome screen is expected (for the extraction prompt hint)
-              const outcomeOffsetInClip = outcomeAbsolute - clipStart
+              // Where in the clip the outcome screen is expected (for the extraction prompt hint).
+              // When crossesBoundary=true, outcomeAbsolute is an estimate (start_seconds +
+              // MAX_MATCH_DURATION) — not a real scan value. Passing it as a hint tells the
+              // extraction model "don't analyse matches ending before 8 min", which silently
+              // excludes any match shorter than that. Omit the hint so Gemini finds the actual
+              // outcome screen itself using athlete names as the anchor.
+              const outcomeOffsetInClip = crossesBoundary ? undefined : (outcomeAbsolute - clipStart)
 
               const videoOptions = {
                 fps: 1,
@@ -578,7 +583,8 @@ export const scanUrl = inngest.createFunction(
                   appearanceHint: appearanceHint || undefined,
                   format: format as 'gi' | 'no_gi',
                   ruleset: 'ibjjf',
-                  // Tell extraction where the outcome screen is — model works backwards from there
+                  // Tell extraction where the outcome screen is — model works backwards from there.
+                  // Omitted when crossesBoundary=true (outcomeOffsetInClip is undefined there).
                   outcomeScreenSeconds: skipScan ? undefined : outcomeOffsetInClip,
                   userSide: found.user_side ?? undefined,
                 }),
