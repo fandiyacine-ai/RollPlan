@@ -3,6 +3,7 @@ import { Inter, Space_Grotesk } from 'next/font/google'
 import { ClerkProvider } from '@clerk/nextjs'
 import { ThemeProvider } from 'next-themes'
 import { Toaster } from 'sonner'
+import { PostHogProvider } from './providers/posthog-provider'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -19,8 +20,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <html lang="en" suppressHydrationWarning className={spaceGrotesk.variable}>
         <body className={inter.className}>
           <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-            {children}
-            <Toaster position="bottom-right" richColors />
+            <PostHogProvider>
+              {children}
+              <Toaster position="bottom-right" richColors />
+            </PostHogProvider>
           </ThemeProvider>
         </body>
       </html>

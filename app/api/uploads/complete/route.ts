@@ -5,6 +5,7 @@ import { getPublicVideoUrl } from '../../../../lib/storage/r2'
 import { inngest } from '../../../../lib/inngest'
 import { getOrCreateDbUserId } from '../../../../lib/db/get-user'
 import { checkMonthlyLimit } from '../../../../lib/db/usage'
+import { captureServerEvent } from '../../../../lib/posthog-server'
 import { and, eq } from 'drizzle-orm'
 
 export const maxDuration = 30
@@ -86,6 +87,7 @@ export async function POST(req: NextRequest) {
       // Inngest not configured — upload succeeded but analysis won't start
     }
 
+    captureServerEvent(userId, 'video_uploaded', { format, source_type: sourceType, has_opponent: !!tournamentOpponentId })
     return NextResponse.json({ videoId, matchId: match.id })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)

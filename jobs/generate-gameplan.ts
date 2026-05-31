@@ -10,6 +10,7 @@ import { buildGameplanSystemPrompt, buildGameplanUserPrompt, GENERATE_GAMEPLAN_P
 import { buildPredictionSystemPrompt, buildPredictionUserPrompt, GENERATE_PREDICTION_PROMPT_VERSION } from '../lib/ai/prompts/generate-prediction'
 import { createNotification } from '../lib/db/notifications'
 import { getTechniqueVariantsByEvents, formatVariantsAsPromptBlock, formatVariantsAsCounterGuide } from '../lib/ai/technique-retrieval'
+import { captureServerEvent } from '../lib/posthog-server'
 
 type MatchStats = {
   matchCount: number
@@ -279,6 +280,12 @@ export const generateGameplan = inngest.createFunction(
           `Your gameplan for ${gameplanData.tournament.name} is ready to review.`,
           `/tournaments/${tournamentId}/gameplan?opponent=${opponentId}`,
         )
+        captureServerEvent(userId, 'gameplan_generated', {
+          tournament_id: tournamentId,
+          opponent_id: opponentId,
+          opponent_match_count: gameplanData.opponentMatches.length,
+          user_match_count: gameplanData.yourMatches.length,
+        })
       })
     }
 

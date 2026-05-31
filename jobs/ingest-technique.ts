@@ -1,12 +1,15 @@
-import { spawn } from 'child_process'
-import { mkdtempSync, rmSync, readFileSync } from 'fs'
+import { spawn, execFileSync } from 'child_process'
+import { mkdtempSync, rmSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { eq } from 'drizzle-orm'
 import ffmpegStaticPath from 'ffmpeg-static'
-import { existsSync as ffmpegExists } from 'fs'
 // nixpacks installs system ffmpeg — prefer it; fall back to ffmpeg-static for local dev
-const ffmpegBin: string = (ffmpegStaticPath && ffmpegExists(ffmpegStaticPath)) ? ffmpegStaticPath : 'ffmpeg'
+const ffmpegBin: string = (ffmpegStaticPath && existsSync(ffmpegStaticPath)) ? ffmpegStaticPath : 'ffmpeg'
+function resolveBinPath(name: string): string {
+  try { return execFileSync('which', [name], { encoding: 'utf8', timeout: 3000 }).trim() } catch { return name }
+}
+const ytdlpBin = resolveBinPath('yt-dlp')
 import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
 import { techniqueVariants, aiCallLogs } from '../lib/db/schema'
@@ -136,7 +139,7 @@ export const ingestTechnique = inngest.createFunction(
             const sectionEnd = sectionStart + 30
             const stderrChunks: Buffer[] = []
             await new Promise<void>((resolve, reject) => {
-              const ytdlp = spawn('yt-dlp', [
+              const ytdlp = spawn(ytdlpBin, [
                 '--no-playlist',
                 '-f', 'bestvideo[height<=480]/bestvideo',
                 '--download-sections', `*${sectionStart}-${sectionEnd}`,

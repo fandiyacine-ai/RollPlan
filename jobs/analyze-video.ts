@@ -19,6 +19,7 @@ import { SubmissionScanOutputSchema } from '../lib/ai/schemas/submission-scan'
 import { getTechniqueVariantsForExtraction, getTechniqueVariantsForPositions, formatVariantsAsPromptBlock } from '../lib/ai/technique-retrieval'
 import { isYouTubeUrl, geminiVideoObject } from '../lib/gemini-video'
 import { createNotification } from '../lib/db/notifications'
+import { captureServerEvent } from '../lib/posthog-server'
 
 const CONFUSION_PRONE = new Set([
   'closed_guard', 'back_control', 'mount', 'side_control',
@@ -632,6 +633,12 @@ export const analyzeVideo = inngest.createFunction(
           'Your footage has been analysed — tap to review insights and timeline.',
           `/matches/${matchId}`,
         )
+        captureServerEvent(m.userId, 'match_analysed', {
+          match_id: matchId,
+          format: m.format,
+          context: m.context,
+          is_scouting: !!m.tournamentOpponentId,
+        })
       }
     })
 

@@ -365,18 +365,27 @@ export const scanUrl = inngest.createFunction(
         // same match when the CHUNK_OVERLAP window covers the match boundary. If a
         // non-failed match already exists for this opponent with a start time within
         // MAX_MATCH_DURATION (8 min) of what we just found, it's the same match.
-        if (tournamentOpponentId) {
+        // Uses case-insensitive name comparison so "Samuel Koskinen" vs "SAMUEL KOSKINEN"
+        // are treated as the same opponent.
+        {
           const MAX_MATCH_DURATION_SECS = 8 * 60
-          const existing = await db.query.matches.findFirst({
-            where: (m, { and, eq, ne, gte, lte }) => and(
-              eq(m.tournamentOpponentId, tournamentOpponentId),
-              eq(m.opponentLabel, found.opponent_name || 'unknown'),
-              ne(m.status, 'failed'),
-              gte(m.matchStartSeconds, found.start_seconds - MAX_MATCH_DURATION_SECS),
-              lte(m.matchStartSeconds, found.start_seconds + MAX_MATCH_DURATION_SECS),
-            ),
-          })
-          if (existing) return existing.id
+          const scopeFilter = tournamentOpponentId
+            ? eq(matches.tournamentOpponentId, tournamentOpponentId)
+            : chunkVideoIds
+              ? inArray(matches.videoId, chunkVideoIds)
+              : null
+          if (scopeFilter) {
+            const [existing] = await db.select({ id: matches.id }).from(matches).where(
+              and(
+                scopeFilter,
+                sql`LOWER(${matches.opponentLabel}) = LOWER(${found.opponent_name || 'unknown'})`,
+                ne(matches.status, 'failed'),
+                sql`${matches.matchStartSeconds} >= ${found.start_seconds - MAX_MATCH_DURATION_SECS}`,
+                sql`${matches.matchStartSeconds} <= ${found.start_seconds + MAX_MATCH_DURATION_SECS}`,
+              )
+            ).limit(1)
+            if (existing) return existing.id
+          }
         }
 
         const result = found.match_result
