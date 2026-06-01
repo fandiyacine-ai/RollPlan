@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useCallback } from 'react'
+import React, { useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { CorrectResultButton } from './correct-result-button'
 import { ShareButton } from './share-button'
@@ -698,21 +698,53 @@ const SUGGESTED_QUESTIONS = [
   'How do they react under pressure?',
 ]
 
-function AskTab({ matchId, currentTime, opponentName }: { matchId: string; currentTime: number; opponentName: string }) {
+function AskTab({ matchId, currentTime, opponentName, videoRef }: {
+  matchId: string
+  currentTime: number
+  opponentName: string
+  videoRef?: React.RefObject<HTMLVideoElement | null>
+}) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [sendFrame, setSendFrame] = useState(true)
   const endRef = useRef<HTMLDivElement>(null)
+
+  // Only works for uploaded videos — YouTube embeds are cross-origin
+  const canCapture = !!videoRef
+
+  function captureFrame(): string | null {
+    const el = videoRef?.current
+    if (!el || el.readyState < 2) return null
+    try {
+      const maxW = 1280
+      const scale = Math.min(1, maxW / el.videoWidth)
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(el.videoWidth * scale)
+      canvas.height = Math.round(el.videoHeight * scale)
+      canvas.getContext('2d')?.drawImage(el, 0, 0, canvas.width, canvas.height)
+      return canvas.toDataURL('image/jpeg', 0.75)
+    } catch {
+      return null
+    }
+  }
 
   const send = useCallback(async (text: string) => {
     if (!text.trim() || loading) return
+    const frameDataUrl = canCapture && sendFrame ? captureFrame() : null
     setMessages(prev => [...prev, { role: 'user', text }])
     setLoading(true)
     try {
       const res = await fetch('/api/coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ matchId, message: text, currentTimestampSeconds: currentTime, mode: 'scouting' }),
+        body: JSON.stringify({
+          matchId,
+          message: text,
+          currentTimestampSeconds: currentTime,
+          mode: 'scouting',
+          ...(frameDataUrl ? { frameDataUrl } : {}),
+        }),
       })
       if (!res.ok || !res.body) {
         setMessages(prev => [...prev, { role: 'coach', text: 'Something went wrong. Try again.' }])
@@ -732,7 +764,8 @@ function AskTab({ matchId, currentTime, opponentName }: { matchId: string; curre
       setLoading(false)
       setTimeout(() => endRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
     }
-  }, [matchId, currentTime, loading])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchId, currentTime, loading, sendFrame, canCapture])
 
   return (
     <div className="flex flex-col h-full">
@@ -740,6 +773,11 @@ function AskTab({ matchId, currentTime, opponentName }: { matchId: string; curre
       <div className="flex-1 overflow-y-auto min-h-0 p-4">
         {messages.length === 0 ? (
           <div className="space-y-4 pt-1">
+            {canCapture && (
+              <p className="text-xs text-muted-foreground/50">
+                Pause at any frame — ask the AI exactly what happened.
+              </p>
+            )}
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-violet-400">
                 <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
@@ -774,10 +812,23 @@ function AskTab({ matchId, currentTime, opponentName }: { matchId: string; curre
         )}
       </div>
 
+      {/* Frame toggle — only for uploaded videos (YouTube is cross-origin) */}
+      {canCapture && (
+        <label className="flex items-center gap-2 px-3 pt-2 text-xs text-muted-foreground cursor-pointer select-none flex-shrink-0">
+          <input
+            type="checkbox"
+            checked={sendFrame}
+            onChange={e => setSendFrame(e.target.checked)}
+            className="w-3.5 h-3.5 accent-violet-500 rounded border-border"
+          />
+          Frame sent with each question
+        </label>
+      )}
+
       {/* Input */}
       <form
         onSubmit={e => { e.preventDefault(); send(input); setInput('') }}
-        className="flex items-center gap-2 px-3 py-2.5 border-t border-border/60 flex-shrink-0"
+        className="flex items-center gap-2 px-3 py-2.5 border-t border-border/60 flex-shrink-0 mt-2"
       >
         <input
           value={input}
@@ -1018,7 +1069,7 @@ export function ScoutingView({
             </div>
             <div className={activeTab === 'prediction' ? '' : 'hidden'}><PredictionTab insights={insights} opponentName={opponentName} /></div>
             <div className={`${activeTab === 'ask' ? 'flex flex-col h-full' : 'hidden'}`}>
-              <AskTab matchId={match.id} currentTime={currentTime} opponentName={opponentName} />
+              <AskTab matchId={match.id} currentTime={currentTime} opponentName={opponentName} videoRef={ytId ? undefined : videoRef} />
             </div>
           </div>
         </div>
@@ -1067,7 +1118,7 @@ export function ScoutingView({
             <div className={activeTab === 'stats' ? '' : 'hidden'}><StatsTab sortedPositions={sortedPositions} maxPositionTime={maxPositionTime} positionNames={positionNames} timelineItems={timelineItems} scoutedName={match.opponentLabel?.split(' ')[0] ?? undefined} /></div>
             <div className={activeTab === 'prediction' ? '' : 'hidden'}><PredictionTab insights={insights} opponentName={opponentName} /></div>
             <div className={`${activeTab === 'ask' ? 'flex flex-col h-full' : 'hidden'}`}>
-              <AskTab matchId={match.id} currentTime={currentTime} opponentName={opponentName} />
+              <AskTab matchId={match.id} currentTime={currentTime} opponentName={opponentName} videoRef={ytId ? undefined : videoRef} />
             </div>
           </div>
         </div>
