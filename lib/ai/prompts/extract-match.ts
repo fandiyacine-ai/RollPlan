@@ -1,6 +1,6 @@
 import { buildTaxonomyPromptBlock } from '../../taxonomy'
 
-export const EXTRACT_MATCH_PROMPT_VERSION = 'v9'
+export const EXTRACT_MATCH_PROMPT_VERSION = 'v10'
 
 export const BJJ_POSITION_VISUAL_GUIDE = `## Visual Identification Guide — Commonly Confused Positions
 
@@ -107,6 +107,7 @@ Apply the self-review checklist above before finalising your output. Then apply 
 2. If the match ended by submission (method="submission"): confirm there is a corresponding successful submission event near the end of the match. If missing, add it.
 3. If back_control was held for 15+ seconds total: confirm at least one choke attempt is recorded. If not, re-examine those back_control segments.
 4. If closed_guard was held for 15+ seconds with the user on TOP (user_role=top): re-examine that window specifically for armbar and triangle attempts by the bottom athlete (opponent). Guard players routinely attack with armbars and triangles — check whether the opponent pulled any arm across their centreline or swung a leg over at any point.
+5. If closed_guard was held for 15+ seconds with the user on BOTTOM (user_role=bottom): re-examine that window specifically for armbar, triangle, kimura, and omoplata attempts by the USER. The user is the guard player; check whether they pulled one of the top athlete's arms across their centreline, opened their guard to swing a leg over the head (armbar), or caught a figure-four grip (kimura). These are the most common attacks from this position and are frequently missed. Record each attempt even if the top player escaped immediately.
 
 Output ONLY valid JSON matching the required schema. No prose outside the JSON.
 
