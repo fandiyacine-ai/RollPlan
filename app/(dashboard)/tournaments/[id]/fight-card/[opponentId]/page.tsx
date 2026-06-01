@@ -346,7 +346,7 @@ export default async function FightCardPage({
 
           {/* User stats */}
           <div className="p-4 space-y-3">
-            <p className="text-[7px] font-black uppercase tracking-[0.3em] text-emerald-500/50">Your game</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-emerald-400/80">Your game</p>
 
             {/* Game style bar */}
             {userTotalSecs > 0 && (
@@ -354,18 +354,18 @@ export default async function FightCardPage({
             )}
 
             {ownTotal > 0 && (
-              <div className="flex items-center gap-3 pt-1">
-                <span className="text-xs font-bold text-emerald-400">{pct(ownWins, ownTotal)}</span>
-                <span className="text-[10px] text-muted-foreground/35">win rate</span>
-                <span className="text-[10px] text-muted-foreground/20">·</span>
-                <span className="text-xs font-bold text-foreground/70">{ownTotal}</span>
-                <span className="text-[10px] text-muted-foreground/35">matches</span>
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-sm font-bold text-emerald-400">{pct(ownWins, ownTotal)}</span>
+                <span className="text-[11px] text-muted-foreground/60">win rate</span>
+                <span className="text-muted-foreground/30">·</span>
+                <span className="text-sm font-bold text-foreground/80">{ownTotal}</span>
+                <span className="text-[11px] text-muted-foreground/60">matches</span>
               </div>
             )}
 
             {userTopPositions.length > 0 && (
-              <div className="pt-1 border-t border-border/20 space-y-1.5">
-                <p className="text-[7px] font-black uppercase tracking-[0.2em] text-muted-foreground/25">Dominates from</p>
+              <div className="pt-2 border-t border-border/30 space-y-1.5">
+                <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/55">Dominates from</p>
                 {userTopPositions.slice(0, 2).map(p => (
                   <StatRow key={p.positionId} label={fmtPos(p.positionId)} value={`${Math.round(p.secs)}s`} dim />
                 ))}
@@ -373,12 +373,12 @@ export default async function FightCardPage({
             )}
 
             {userAttacks.length > 0 && (
-              <div className="pt-1 border-t border-border/20 space-y-1.5">
-                <p className="text-[7px] font-black uppercase tracking-[0.2em] text-muted-foreground/25">Attacks</p>
+              <div className="pt-2 border-t border-border/30 space-y-1.5">
+                <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/55">Attacks</p>
                 {userAttacks.slice(0, 3).map(a => (
-                  <p key={a.label} className="text-[11px] text-foreground/65">
+                  <p key={a.label} className="text-[12px] text-foreground/80">
                     <span className="font-semibold">{a.label}</span>
-                    <span className="text-[9px] ml-1 text-muted-foreground/30">×{a.count}</span>
+                    <span className="text-[10px] ml-1.5 text-muted-foreground/55">×{a.count}</span>
                   </p>
                 ))}
               </div>
@@ -390,7 +390,7 @@ export default async function FightCardPage({
 
           {/* Opponent stats */}
           <div className="p-4 space-y-3">
-            <p className="text-[7px] font-black uppercase tracking-[0.3em] text-rose-500/50 text-right">Their game</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-rose-400/80 text-right">Their game</p>
 
             {/* Game style bar */}
             {oppTotalSecs > 0 && (
@@ -402,30 +402,30 @@ export default async function FightCardPage({
               <div className="flex flex-col items-end gap-1 pt-1">
                 {ajpRecord && (
                   <div className="flex items-center gap-2">
-                    <span className="text-[9px] text-muted-foreground/30 uppercase tracking-wider">AJP</span>
-                    <span className="text-xs font-bold text-rose-400">{ajpRecord.split(' ')[0]}</span>
-                    <span className="text-xs font-bold text-foreground/40">{ajpRecord.split(' ')[1]}</span>
+                    <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-medium">AJP</span>
+                    <span className="text-sm font-bold text-rose-400">{ajpRecord.split(' ')[0]}</span>
+                    <span className="text-sm font-bold text-foreground/60">{ajpRecord.split(' ')[1]}</span>
                   </div>
                 )}
                 {scRecord && (
                   <div className="flex items-center gap-2">
-                    <span className="text-[9px] text-muted-foreground/30 uppercase tracking-wider">SC</span>
-                    <span className="text-xs font-bold text-rose-400">{scRecord.split(' ')[0]}</span>
-                    <span className="text-xs font-bold text-foreground/40">{scRecord.split(' ')[1]}</span>
+                    <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-medium">SC</span>
+                    <span className="text-sm font-bold text-rose-400">{scRecord.split(' ')[0]}</span>
+                    <span className="text-sm font-bold text-foreground/60">{scRecord.split(' ')[1]}</span>
                   </div>
                 )}
                 {opponent.ibjjfBestResult && (
                   <div className="flex items-center gap-2">
-                    <span className="text-[9px] text-muted-foreground/30 uppercase tracking-wider">IBJJF</span>
-                    <span className="text-[10px] text-muted-foreground/50">{opponent.ibjjfBestResult}</span>
+                    <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-medium">IBJJF</span>
+                    <span className="text-[11px] text-muted-foreground/70">{opponent.ibjjfBestResult}</span>
                   </div>
                 )}
               </div>
             )}
 
             {oppTopPositions.length > 0 && (
-              <div className="pt-1 border-t border-border/20 space-y-1.5">
-                <p className="text-[7px] font-black uppercase tracking-[0.2em] text-muted-foreground/25 text-right">Dominates from</p>
+              <div className="pt-2 border-t border-border/30 space-y-1.5">
+                <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/55 text-right">Dominates from</p>
                 {oppTopPositions.slice(0, 2).map(p => (
                   <StatRow key={p.positionId} label={fmtPos(p.positionId)} value={`${Math.round(p.secs)}s`} dim right />
                 ))}
@@ -433,11 +433,11 @@ export default async function FightCardPage({
             )}
 
             {oppAttacks.length > 0 && (
-              <div className="pt-1 border-t border-border/20 space-y-1.5">
-                <p className="text-[7px] font-black uppercase tracking-[0.2em] text-muted-foreground/25 text-right">Attacks</p>
+              <div className="pt-2 border-t border-border/30 space-y-1.5">
+                <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/55 text-right">Attacks</p>
                 {oppAttacks.slice(0, 3).map(a => (
-                  <p key={a.label} className="text-[11px] text-foreground/65 text-right">
-                    <span className="text-[9px] mr-1 text-muted-foreground/30">×{a.count}</span>
+                  <p key={a.label} className="text-[12px] text-foreground/80 text-right">
+                    <span className="text-[10px] mr-1.5 text-muted-foreground/55">×{a.count}</span>
                     <span className="font-semibold">{a.label}</span>
                   </p>
                 ))}
@@ -445,7 +445,7 @@ export default async function FightCardPage({
             )}
 
             {scoutedMatches.length === 0 && (
-              <p className="text-[10px] text-muted-foreground/30 text-right italic">No footage scouted yet</p>
+              <p className="text-[11px] text-muted-foreground/50 text-right italic">No footage scouted yet</p>
             )}
           </div>
         </div>
@@ -586,19 +586,19 @@ export default async function FightCardPage({
 
 function GameStyleBar({ topPct, right = false }: { topPct: number; right?: boolean }) {
   const label = topPct >= 65 ? 'Top player' : topPct >= 50 ? 'Balanced' : topPct >= 35 ? 'Guard-heavy' : 'Guard player'
-  const fillClass = right ? 'bg-rose-500/50' : 'bg-emerald-500/50'
-  const bgClass = right ? 'bg-rose-500/[0.08]' : 'bg-emerald-500/[0.08]'
-  const labelClass = right ? 'text-rose-400/60' : 'text-emerald-400/60'
+  const fillClass = right ? 'bg-rose-500/60' : 'bg-emerald-500/60'
+  const bgClass = right ? 'bg-rose-500/[0.12]' : 'bg-emerald-500/[0.12]'
+  const labelClass = right ? 'text-rose-400' : 'text-emerald-400'
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5">
       <div className={`flex items-center justify-between ${right ? 'flex-row-reverse' : ''}`}>
-        <span className="text-[7px] font-black uppercase tracking-[0.18em] text-muted-foreground/25">Game style</span>
-        <span className={`text-[9px] font-bold ${labelClass}`}>{label}</span>
+        <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/55">Game style</span>
+        <span className={`text-[11px] font-bold ${labelClass}`}>{label}</span>
       </div>
-      <div className={`h-1.5 w-full rounded-full ${bgClass} overflow-hidden`}>
+      <div className={`h-2 w-full rounded-full ${bgClass} overflow-hidden`}>
         <div className={`h-full rounded-full ${fillClass}`} style={{ width: `${topPct}%` }} />
       </div>
-      <div className={`flex items-center justify-between text-[7px] text-muted-foreground/20 ${right ? 'flex-row-reverse' : ''}`}>
+      <div className={`flex items-center justify-between text-[9px] text-muted-foreground/45 ${right ? 'flex-row-reverse' : ''}`}>
         <span>top game ←</span>
         <span>→ guard</span>
       </div>
@@ -620,7 +620,7 @@ function StatRow({
   accent?: 'emerald' | 'rose'
 }) {
   const valueClass = dim
-    ? 'text-muted-foreground/45'
+    ? 'text-foreground/70'
     : accent === 'emerald'
       ? 'text-emerald-400'
       : accent === 'rose'
@@ -629,8 +629,8 @@ function StatRow({
 
   return (
     <div className={`flex items-baseline gap-2 ${right ? 'flex-row-reverse' : ''}`}>
-      <span className={`text-xs font-bold tabular-nums ${valueClass}`}>{value}</span>
-      <span className="text-[10px] text-muted-foreground/35 leading-none">{label}</span>
+      <span className={`text-sm font-bold tabular-nums ${valueClass}`}>{value}</span>
+      <span className="text-[11px] text-muted-foreground/65 leading-none">{label}</span>
     </div>
   )
 }
