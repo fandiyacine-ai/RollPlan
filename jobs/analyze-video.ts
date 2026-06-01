@@ -250,9 +250,20 @@ export const analyzeVideo = inngest.createFunction(
       // Add the stream offset so all stored timestamps are absolute within the video.
       const tsOffset = isYouTube ? (videoStartSeconds ?? 0) : 0
 
+      // For R2 uploads the full video is sent to Gemini, which may return events
+      // from adjacent matches. Clamp to a generous window around this match.
+      let filteredPositions = object.positions
+      let filteredEvents = object.events
+      if (!isYouTube && match.matchStartSeconds != null && match.matchEndSeconds != null) {
+        const lo = match.matchStartSeconds - 30
+        const hi = match.matchEndSeconds + 60
+        filteredPositions = filteredPositions.filter(p => p.start_seconds >= lo && p.end_seconds <= hi)
+        filteredEvents = filteredEvents.filter(e => e.timestamp_seconds >= lo && e.timestamp_seconds <= hi)
+      }
+
       await db.transaction(async (tx) => {
         await tx.insert(positionSegments).values(
-          object.positions.map((p) => ({
+          filteredPositions.map((p) => ({
             matchId,
             startSeconds: p.start_seconds + tsOffset,
             endSeconds: p.end_seconds + tsOffset,
@@ -264,9 +275,9 @@ export const analyzeVideo = inngest.createFunction(
             opponentBbox: p.opponent_bbox ?? null,
           }))
         )
-        if (object.events.length > 0) {
+        if (filteredEvents.length > 0) {
           await tx.insert(matchEvents).values(
-            object.events.map((e) => ({
+            filteredEvents.map((e) => ({
               matchId,
               timestampSeconds: e.timestamp_seconds + tsOffset,
               eventTypeId: e.event_type_id,
@@ -291,7 +302,7 @@ export const analyzeVideo = inngest.createFunction(
         status: 'success',
       })
 
-      return { segmentCount: object.positions.length, eventCount: object.events.length, matchUserId: match.userId }
+      return { segmentCount: filteredPositions.length, eventCount: filteredEvents.length, matchUserId: match.userId }
     })
 
     await step.run('verify-positions', async () => {
