@@ -8,6 +8,7 @@ import { getOrCreateDbUserId } from '@/lib/db/get-user'
 import { currentUser } from '@clerk/nextjs/server'
 import type { GameplanOutput } from '@/lib/ai/schemas/gameplan'
 import { GenerateGameplanButton } from '../../gameplan/generate-button'
+import { ShareButton, type ShareCardData } from './share-card'
 
 export const dynamic = 'force-dynamic'
 
@@ -205,6 +206,22 @@ export default async function FightCardPage({
   const ajpRecord = careerRecord(opponent.ajpWins, opponent.ajpLosses)
   const scRecord = careerRecord(opponent.smoothcompWins, opponent.smoothcompLosses)
 
+  function fmtDate(d: string) {
+    try { return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) }
+    catch { return d }
+  }
+
+  function detectFedTags(name: string): string[] {
+    const n = name.toUpperCase()
+    const tags: string[] = []
+    if (n.includes('AJP') || n.includes('ABU DHABI') || n.includes('ADCC')) tags.push('AJP')
+    if (n.includes('IBJJF') || n.includes('WORLD') || n.includes('EUROPEAN') || n.includes('COPA') || n.includes('PANS')) tags.push('IBJJF')
+    if (n.includes('NAGA')) tags.push('NAGA')
+    return tags
+  }
+
+  const fedTags = detectFedTags(tournament.name)
+
   const POSITION_LABEL: Record<string, string> = {
     closed_guard: 'Closed guard', half_guard: 'Half guard', open_guard: 'Open guard',
     butterfly_guard: 'Butterfly', back_control: 'Back control', mount: 'Mount',
@@ -231,24 +248,28 @@ export default async function FightCardPage({
           <div className="absolute inset-y-0 right-0 w-1.5 bg-gradient-to-b from-rose-400 to-rose-600" />
 
           {/* Meta row */}
-          <div className="relative border-b border-white/[0.07] px-7 py-2.5 flex items-center justify-between">
-            <span className="text-[8px] font-black uppercase tracking-[0.35em] text-white/20">Fight Card</span>
-            <div className="flex items-center gap-2">
-              {tournament.ruleset && (
-                <span className="bg-white/[0.07] border border-white/[0.09] rounded px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest text-white/40">
-                  {tournament.ruleset}
-                </span>
-              )}
-              {tournament.division && (
-                <span className="text-[10px] text-white/30 font-medium">{tournament.division}</span>
-              )}
-              {tournament.weightClass && (
-                <>
-                  <span className="text-white/20 text-[10px]">·</span>
-                  <span className="text-[10px] text-white/30 font-medium">{tournament.weightClass}</span>
-                </>
-              )}
+          <div className="relative border-b border-white/[0.07] px-7 py-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[8px] font-black uppercase tracking-[0.35em] text-white/20">Fight Card</span>
+              <div className="flex items-center gap-1.5">
+                {fedTags.map(tag => (
+                  <span key={tag} className="bg-white/[0.07] border border-white/[0.09] rounded px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest text-white/40">{tag}</span>
+                ))}
+                {tournament.ruleset && (
+                  <span className="bg-white/[0.07] border border-white/[0.09] rounded px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest text-white/40">
+                    {tournament.ruleset}
+                  </span>
+                )}
+              </div>
             </div>
+            <p className="text-[12px] font-bold text-white/75 leading-snug">{tournament.name}</p>
+            {(tournament.eventDate || tournament.division || tournament.weightClass) && (
+              <div className="flex items-center gap-2 mt-1">
+                {tournament.eventDate && <span className="text-[10px] text-white/35">{fmtDate(tournament.eventDate)}</span>}
+                {tournament.division && <><span className="text-white/20">·</span><span className="text-[10px] text-white/35">{tournament.division}</span></>}
+                {tournament.weightClass && <><span className="text-white/20">·</span><span className="text-[10px] text-white/35">{tournament.weightClass}</span></>}
+              </div>
+            )}
           </div>
 
           {/* Athletes */}
@@ -260,6 +281,13 @@ export default async function FightCardPage({
               <p className="font-display text-5xl sm:text-6xl uppercase leading-[0.88] tracking-wide text-white truncate">
                 {userName}
               </p>
+              {ownTotal > 0 && (
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-sm font-bold text-emerald-400">{ownWins}W</span>
+                  <span className="text-sm font-bold text-white/30">{ownTotal - ownWins}L</span>
+                  <span className="text-[9px] text-white/20 uppercase tracking-wider">on RollPlan</span>
+                </div>
+              )}
             </div>
 
             {/* VS badge */}
@@ -288,6 +316,24 @@ export default async function FightCardPage({
                   </div>
                 )}
               </div>
+              {(ajpRecord || scRecord) && (
+                <div className="flex items-center justify-end gap-2 mt-2">
+                  {ajpRecord && (
+                    <>
+                      <span className="text-[9px] text-white/20 uppercase tracking-wider">AJP</span>
+                      <span className="text-sm font-bold text-rose-400">{ajpRecord.split(' ')[0]}</span>
+                      <span className="text-sm font-bold text-white/30">{ajpRecord.split(' ')[1]}</span>
+                    </>
+                  )}
+                  {!ajpRecord && scRecord && (
+                    <>
+                      <span className="text-[9px] text-white/20 uppercase tracking-wider">SC</span>
+                      <span className="text-sm font-bold text-rose-400">{scRecord.split(' ')[0]}</span>
+                      <span className="text-sm font-bold text-white/30">{scRecord.split(' ')[1]}</span>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -356,21 +402,49 @@ export default async function FightCardPage({
           </div>
         </div>
 
-        {/* Footer actions */}
-        <div className="border-t border-border/30 grid grid-cols-[1fr_1px_1fr]">
-          <Link
-            href={`/upload?context=own&back=/tournaments/${tournamentId}/fight-card/${opponentId}`}
-            className="px-5 py-3 text-xs text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/[0.04] transition-colors font-medium"
-          >
-            + Add your footage
-          </Link>
-          <div className="bg-border/30" />
-          <Link
-            href={`/tournaments/${tournamentId}/opponents`}
-            className="px-5 py-3 text-xs text-muted-foreground hover:text-rose-400 hover:bg-rose-500/[0.04] transition-colors font-medium text-right"
-          >
-            + Scout footage →
-          </Link>
+        {/* Footer — powered by + share + actions */}
+        <div className="border-t border-border/30">
+          {/* Powered by + share */}
+          <div className="px-5 py-2.5 flex items-center justify-between border-b border-border/20">
+            <span className="text-[8px] font-bold uppercase tracking-[0.2em] text-muted-foreground/25">
+              Powered by <span className="text-muted-foreground/40">RollPlan.AI</span>
+            </span>
+            <ShareButton data={{
+              userName,
+              opponentName: opponent.opponentLabel,
+              opponentPhotoUrl: opponent.profilePhotoUrl,
+              tournamentName: tournament.name,
+              eventDate: tournament.eventDate,
+              ruleset: tournament.ruleset,
+              division: tournament.division,
+              weightClass: tournament.weightClass,
+              ownTotal,
+              ownWins,
+              scoutedMatches: scoutedMatches.length,
+              oppAjpRecord: ajpRecord,
+              oppScRecord: scRecord,
+              oppIbjjfBest: opponent.ibjjfBestResult,
+              openWith: card?.open_with,
+              watchOut: card?.watch_out,
+              attackChain: card?.attack_chain,
+            }} />
+          </div>
+          {/* Action links */}
+          <div className="grid grid-cols-[1fr_1px_1fr]">
+            <Link
+              href={`/upload?context=own&back=/tournaments/${tournamentId}/fight-card/${opponentId}`}
+              className="px-5 py-3 text-xs text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/[0.04] transition-colors font-medium"
+            >
+              + Add your footage
+            </Link>
+            <div className="bg-border/30" />
+            <Link
+              href={`/tournaments/${tournamentId}/opponents`}
+              className="px-5 py-3 text-xs text-muted-foreground hover:text-rose-400 hover:bg-rose-500/[0.04] transition-colors font-medium text-right"
+            >
+              + Scout footage →
+            </Link>
+          </div>
         </div>
       </div>
 
