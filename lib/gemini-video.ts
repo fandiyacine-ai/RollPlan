@@ -68,12 +68,18 @@ export async function geminiVideoObject<T extends z.ZodTypeAny>(
     schema: T
     /** Annotated frame where the target athlete is boxed with "⬅ YOU" — strong identity anchor */
     referenceImageBase64?: string
+    /**
+     * MIME type for the video. Defaults to 'video/mp4'.
+     * For Gemini Files API URIs, this MUST match the mimeType used at upload time —
+     * the API will reject requests where these don't match.
+     */
+    mimeType?: string
   }
 ): Promise<{ object: z.infer<T>; usage: { inputTokens: number; outputTokens: number } }> {
-  const { system, videoUrl, videoOptions, userPrompt, schema, referenceImageBase64 } = params
+  const { system, videoUrl, videoOptions, userPrompt, schema, referenceImageBase64, mimeType = 'video/mp4' } = params
 
   const filePart: Record<string, unknown> = {
-    fileData: { mimeType: 'video/mp4', fileUri: cleanYouTubeUrl(videoUrl) },
+    fileData: { mimeType, fileUri: cleanYouTubeUrl(videoUrl) },
   }
 
   if (videoOptions) {

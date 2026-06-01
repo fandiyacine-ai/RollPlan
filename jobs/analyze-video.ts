@@ -207,9 +207,11 @@ export const analyzeVideo = inngest.createFunction(
         } else {
           // Use geminiVideoObject (thinking HIGH + MEDIUM resolution) — same quality path
           // as the YouTube extraction branch. The Gemini Files API URI works as fileUri here.
+          // mimeType MUST match what was passed to uploadVideoToGemini — Gemini rejects mismatches.
           const result = await geminiVideoObject(GEMINI_VIDEO_MODEL, {
             system: buildExtractMatchSystemPrompt(techniquePromptBlock),
             videoUrl: geminiFileUri,
+            mimeType: video.contentType ?? 'video/mp4',
             videoOptions: {
               resolution: 'MEDIUM' as const,
               thinkingEffort: 'HIGH' as const,
@@ -228,12 +230,14 @@ export const analyzeVideo = inngest.createFunction(
           usage = result.usage
         }
       } catch (err: unknown) {
-        await markFailed(matchId, videoId)
         const msg = err instanceof Error ? err.message : String(err)
-        // Schema validation failure means Gemini couldn't find a BJJ match in the video
+        // Schema validation failure means Gemini couldn't find a BJJ match in the video — not retryable
         if (msg.includes('did not match schema') || msg.includes('too_small')) {
+          await markFailed(matchId, videoId)
           throw new NonRetriableError('Video does not appear to contain a BJJ match. Please upload match footage.')
         }
+        // For all other errors: let Inngest retry without marking the video as failed yet.
+        // markFailed is only called on non-retriable outcomes so the UI doesn't show a false failure.
         throw err
       }
 
@@ -337,7 +341,7 @@ export const analyzeVideo = inngest.createFunction(
               role: 'user',
               content: [
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                { type: 'file', data: new URL(geminiFileUri) as any, mediaType: 'video/mp4' },
+                { type: 'file', data: new URL(geminiFileUri) as any, mediaType: 'video/mp4' as `${string}/${string}` },
                 { type: 'text', text: verifyPrompt },
               ],
             }],
