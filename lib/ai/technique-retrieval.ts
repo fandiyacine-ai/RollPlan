@@ -28,24 +28,23 @@ const COLS = {
 // All active variants (general + position-specific), format-filtered.
 // General variants (positionId IS NULL) appear first so they anchor the model's
 // pattern recognition before position-specific details follow.
-// Cap raised to 25 — KB is now large enough that capping too low starves Gemini.
-const EXTRACTION_CAP = 25
+//
+// Semantic search is intentionally NOT used here. Extraction needs broad coverage —
+// the model must see visual cues for every technique it might encounter, not a
+// narrow slice ranked against a generic query. With 400+ KB entries, a semantic
+// query like "gi bjj technique visual cues" would only surface ~25 entries chosen
+// by embedding similarity, leaving most of the KB invisible to the extraction pass.
+//
+// Cap at 500: comfortably covers the current KB (~440 entries) with headroom for
+// growth. Each variant is ~150–300 tokens; at 500 entries that's ~75k–150k tokens
+// of additional context — well within Gemini 2.5's window and acceptable in cost
+// (~$0.10–0.20 per extraction at Pro pricing). Prefer full coverage over arbitrary
+// truncation since missed visual cues = missed detections.
+const EXTRACTION_CAP = 500
 
 export async function getTechniqueVariantsForExtraction(
   format: 'gi' | 'no_gi'
 ): Promise<TechniqueVariant[]> {
-  // Prefer semantic retrieval if available — fallback to simple general+specific fetch
-  try {
-    const { semanticSearchVariants } = await import('./semantic-retrieval')
-    const q = format === 'gi'
-      ? 'gi bjj technique visual cues analysis'
-      : 'no gi bjj technique visual cues analysis'
-    const sem = await semanticSearchVariants(q, EXTRACTION_CAP, { format })
-    if (sem.length > 0) return sem as TechniqueVariant[]
-  } catch {
-    // fall through
-  }
-
   const general = await db.query.techniqueVariants.findMany({
     where: and(
       eq(techniqueVariants.status, 'active'),
@@ -70,8 +69,10 @@ export async function getTechniqueVariantsForExtraction(
 // ─── Targeted rescan (Phase 2 — after positions are known) ───────────────────
 // Fetch variants for positions that ACTUALLY APPEARED in this match, plus general
 // variants (positionId IS NULL) so the model always has universal context.
-// Cap raised to 30 — KB is now large enough to warrant deeper injection.
-const RESCAN_CAP = 30
+// Cap at 200: rescan is already filtered to positions that appeared in the match,
+// so this is inherently narrower than extraction. 200 covers all variants for a
+// typical match's 5–8 positions without blowing token budgets.
+const RESCAN_CAP = 200
 
 export async function getTechniqueVariantsForPositions(
   positionIds: string[],   // positions extracted from the match
