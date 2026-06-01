@@ -65,7 +65,6 @@ export default async function FightCardPage({
   const scoutedMatchIds = scoutedMatches.map(m => m.id)
 
   // ── Opponent position stats ───────────────────────────────────────────────────
-  // Opponent is "on top" when the tracked athlete is on bottom (userRole = 'bottom')
   let oppTopSecs = 0
   let oppTotalSecs = 0
   let oppTopPositions: Array<{ positionId: string; secs: number }> = []
@@ -203,7 +202,6 @@ export default async function FightCardPage({
 
   const card = plan?.match_card ?? null
 
-  // Combined career record display
   const ajpRecord = careerRecord(opponent.ajpWins, opponent.ajpLosses)
   const scRecord = careerRecord(opponent.smoothcompWins, opponent.smoothcompLosses)
 
@@ -220,66 +218,93 @@ export default async function FightCardPage({
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-5 max-w-3xl">
 
-      {/* Fight card header */}
-      <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
+      {/* ── Fight Card ────────────────────────────────────────────────────────── */}
+      <div className="rounded-2xl overflow-hidden border border-white/[0.08] shadow-2xl shadow-black/40">
 
-        {/* Title bar */}
-        <div className="border-b border-border/40 px-5 py-3 flex items-center justify-between gap-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/50">Fight Card</p>
-          <div className="flex items-center gap-2 text-[11px] text-muted-foreground/60 font-medium">
-            {tournament.ruleset && (
-              <span className="bg-muted/40 rounded px-1.5 py-0.5 uppercase text-[9px] font-bold tracking-wider">
-                {tournament.ruleset}
-              </span>
-            )}
-            {tournament.division && <span>{tournament.division}</span>}
-            {tournament.weightClass && <span>{tournament.weightClass}</span>}
-          </div>
-        </div>
+        {/* Hero — broadcast-style dark header */}
+        <div className="relative bg-[oklch(0.13_0.01_255)] overflow-hidden">
 
-        {/* VS row */}
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-5 py-6">
-          {/* User side */}
-          <div className="space-y-1 min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-emerald-500/70">You</p>
-            <p className="font-black text-lg sm:text-xl tracking-tight leading-none truncate">{userName}</p>
-          </div>
+          {/* Side accent strips */}
+          <div className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-emerald-400 to-emerald-600" />
+          <div className="absolute inset-y-0 right-0 w-1.5 bg-gradient-to-b from-rose-400 to-rose-600" />
 
-          {/* VS */}
-          <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
-            <span className="text-[10px] font-black tracking-[0.2em] text-muted-foreground/30 uppercase">vs</span>
-          </div>
-
-          {/* Opponent side */}
-          <div className="space-y-1 min-w-0 text-right">
-            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-rose-500/70">Opponent</p>
-            <div className="flex items-center justify-end gap-2 min-w-0">
-              {opponent.profilePhotoUrl && (
-                <div className="w-8 h-8 rounded-full overflow-hidden border border-border/40 flex-shrink-0 order-2">
-                  <Image
-                    src={opponent.profilePhotoUrl}
-                    alt={opponent.opponentLabel}
-                    width={32}
-                    height={32}
-                    className="object-cover w-full h-full"
-                  />
-                </div>
+          {/* Meta row */}
+          <div className="relative border-b border-white/[0.07] px-7 py-2.5 flex items-center justify-between">
+            <span className="text-[8px] font-black uppercase tracking-[0.35em] text-white/20">Fight Card</span>
+            <div className="flex items-center gap-2">
+              {tournament.ruleset && (
+                <span className="bg-white/[0.07] border border-white/[0.09] rounded px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest text-white/40">
+                  {tournament.ruleset}
+                </span>
               )}
-              <p className="font-black text-lg sm:text-xl tracking-tight leading-none truncate">{opponent.opponentLabel}</p>
+              {tournament.division && (
+                <span className="text-[10px] text-white/30 font-medium">{tournament.division}</span>
+              )}
+              {tournament.weightClass && (
+                <>
+                  <span className="text-white/20 text-[10px]">·</span>
+                  <span className="text-[10px] text-white/30 font-medium">{tournament.weightClass}</span>
+                </>
+              )}
             </div>
           </div>
+
+          {/* Athletes */}
+          <div className="relative grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-7 py-8 sm:py-10">
+
+            {/* User side */}
+            <div className="min-w-0">
+              <p className="text-[7px] font-black uppercase tracking-[0.35em] text-emerald-400/60 mb-1.5">You</p>
+              <p className="font-display text-5xl sm:text-6xl uppercase leading-[0.88] tracking-wide text-white truncate">
+                {userName}
+              </p>
+            </div>
+
+            {/* VS badge */}
+            <div className="flex-shrink-0">
+              <div className="w-10 h-10 rounded-full border border-white/[0.12] bg-white/[0.04] flex items-center justify-center">
+                <span className="text-[8px] font-black tracking-[0.15em] text-white/30 uppercase">vs</span>
+              </div>
+            </div>
+
+            {/* Opponent side */}
+            <div className="min-w-0 text-right">
+              <p className="text-[7px] font-black uppercase tracking-[0.35em] text-rose-400/60 mb-1.5">Opponent</p>
+              <div className="flex items-end justify-end gap-3 min-w-0">
+                <p className="font-display text-5xl sm:text-6xl uppercase leading-[0.88] tracking-wide text-white truncate">
+                  {opponent.opponentLabel}
+                </p>
+                {opponent.profilePhotoUrl && (
+                  <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-rose-500/30 flex-shrink-0 mb-0.5">
+                    <Image
+                      src={opponent.profilePhotoUrl}
+                      alt={opponent.opponentLabel}
+                      width={40}
+                      height={40}
+                      className="object-cover w-full h-full"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Subtle gradient fade at bottom of hero */}
+          <div className="absolute bottom-0 inset-x-0 h-6 bg-gradient-to-t from-card/20 to-transparent pointer-events-none" />
         </div>
 
-        {/* Stats row */}
-        <div className="grid grid-cols-[1fr_auto_1fr] border-t border-border/30">
+        {/* Stats panel */}
+        <div className="grid grid-cols-[1fr_1px_1fr] bg-card">
+
           {/* User stats */}
-          <div className="p-4 space-y-2.5">
-            <StatRow label="Matches" value={ownTotal > 0 ? String(ownTotal) : '—'} />
+          <div className="p-4 space-y-2">
+            <p className="text-[7px] font-black uppercase tracking-[0.3em] text-emerald-500/50 mb-3">Your record</p>
+            <StatRow label="Matches" value={ownTotal > 0 ? String(ownTotal) : '—'} accent="emerald" />
             {ownTotal > 0 && (
               <>
-                <StatRow label="Win rate" value={pct(ownWins, ownTotal)} />
+                <StatRow label="Win rate" value={pct(ownWins, ownTotal)} accent="emerald" />
                 <StatRow label="Top time" value={pct(userTopSecs, userTotalSecs)} />
               </>
             )}
@@ -287,28 +312,29 @@ export default async function FightCardPage({
               <StatRow key={p.positionId} label={fmtPos(p.positionId)} value={`${Math.round(p.secs)}s`} dim />
             ))}
             {userAttacks.length > 0 && (
-              <div className="pt-1 border-t border-border/20 space-y-1">
-                <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/40">Your attacks</p>
+              <div className="pt-2 mt-1 border-t border-border/20 space-y-1.5">
+                <p className="text-[7px] font-black uppercase tracking-[0.25em] text-muted-foreground/30">Attacks</p>
                 {userAttacks.slice(0, 3).map(a => (
-                  <p key={a.label} className="text-xs text-muted-foreground/70">
-                    <span className="font-medium text-foreground/80">{a.label}</span>
-                    <span className="text-[10px] ml-1 opacity-50">×{a.count}</span>
+                  <p key={a.label} className="text-[11px] text-foreground/70">
+                    <span className="font-semibold">{a.label}</span>
+                    <span className="text-[9px] ml-1 text-muted-foreground/35">×{a.count}</span>
                   </p>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Center divider */}
-          <div className="w-px bg-border/30 mx-2 self-stretch" />
+          {/* Divider */}
+          <div className="bg-border/40" />
 
           {/* Opponent stats */}
-          <div className="p-4 space-y-2.5">
-            <StatRow label="Scouted" value={scoutedMatches.length > 0 ? String(scoutedMatches.length) : '—'} right />
+          <div className="p-4 space-y-2">
+            <p className="text-[7px] font-black uppercase tracking-[0.3em] text-rose-500/50 mb-3 text-right">Their record</p>
+            <StatRow label="Scouted" value={scoutedMatches.length > 0 ? String(scoutedMatches.length) : '—'} right accent="rose" />
             {scoutedMatches.length > 0 && (
               <StatRow label="Top time" value={pct(oppTopSecs, oppTotalSecs)} right />
             )}
-            {ajpRecord && <StatRow label="AJP" value={ajpRecord} right />}
+            {ajpRecord && <StatRow label="AJP" value={ajpRecord} right accent="rose" />}
             {scRecord && <StatRow label="SC" value={scRecord} right />}
             {opponent.ibjjfBestResult && (
               <StatRow label="IBJJF best" value={opponent.ibjjfBestResult} right dim />
@@ -317,12 +343,12 @@ export default async function FightCardPage({
               <StatRow key={p.positionId} label={fmtPos(p.positionId)} value={`${Math.round(p.secs)}s`} dim right />
             ))}
             {oppAttacks.length > 0 && (
-              <div className="pt-1 border-t border-border/20 space-y-1">
-                <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/40 text-right">Their attacks</p>
+              <div className="pt-2 mt-1 border-t border-border/20 space-y-1.5">
+                <p className="text-[7px] font-black uppercase tracking-[0.25em] text-muted-foreground/30 text-right">Attacks</p>
                 {oppAttacks.slice(0, 3).map(a => (
-                  <p key={a.label} className="text-xs text-muted-foreground/70 text-right">
-                    <span className="text-[10px] mr-1 opacity-50">×{a.count}</span>
-                    <span className="font-medium text-foreground/80">{a.label}</span>
+                  <p key={a.label} className="text-[11px] text-foreground/70 text-right">
+                    <span className="text-[9px] mr-1 text-muted-foreground/35">×{a.count}</span>
+                    <span className="font-semibold">{a.label}</span>
                   </p>
                 ))}
               </div>
@@ -331,43 +357,42 @@ export default async function FightCardPage({
         </div>
 
         {/* Footer actions */}
-        <div className="border-t border-border/30 grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-3">
+        <div className="border-t border-border/30 grid grid-cols-[1fr_1px_1fr]">
           <Link
             href={`/upload?context=own&back=/tournaments/${tournamentId}/fight-card/${opponentId}`}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors font-medium"
+            className="px-5 py-3 text-xs text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/[0.04] transition-colors font-medium"
           >
             + Add your footage
           </Link>
-          <div className="w-px bg-border/30 self-stretch" />
+          <div className="bg-border/30" />
           <Link
             href={`/tournaments/${tournamentId}/opponents`}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors font-medium text-right"
+            className="px-5 py-3 text-xs text-muted-foreground hover:text-rose-400 hover:bg-rose-500/[0.04] transition-colors font-medium text-right"
           >
             + Scout footage →
           </Link>
         </div>
       </div>
 
-      {/* Gameplan section */}
+      {/* ── Gameplan ──────────────────────────────────────────────────────────── */}
       <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
         <div className="border-b border-border/40 px-5 py-3 flex items-center justify-between gap-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/50">Gameplan</p>
-          {!plan && !isGenerating && (
+          <p className="text-[9px] font-black uppercase tracking-[0.25em] text-muted-foreground/40">Gameplan</p>
+          {plan ? (
             <Link
               href={`/tournaments/${tournamentId}/gameplan?opponent=${opponentId}&back=/tournaments/${tournamentId}/fight-card/${opponentId}`}
-              className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-            >
-              Full view →
-            </Link>
-          )}
-          {plan && (
-            <Link
-              href={`/tournaments/${tournamentId}/gameplan?opponent=${opponentId}&back=/tournaments/${tournamentId}/fight-card/${opponentId}`}
-              className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+              className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground transition-colors"
             >
               Full gameplan →
             </Link>
-          )}
+          ) : !isGenerating ? (
+            <Link
+              href={`/tournaments/${tournamentId}/gameplan?opponent=${opponentId}&back=/tournaments/${tournamentId}/fight-card/${opponentId}`}
+              className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+            >
+              Full view →
+            </Link>
+          ) : null}
         </div>
 
         {isGenerating ? (
@@ -377,22 +402,20 @@ export default async function FightCardPage({
           </div>
         ) : plan && card ? (
           <div className="p-5 space-y-4">
-            {/* Open with + Watch out */}
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-xl border-l-2 border-emerald-500 bg-emerald-500/[0.06] px-4 py-3 space-y-1">
-                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-500">Open with</p>
+                <p className="text-[8px] font-black uppercase tracking-[0.22em] text-emerald-600 dark:text-emerald-500">Open with</p>
                 <p className="text-sm font-bold leading-snug">{card.open_with}</p>
               </div>
               <div className="rounded-xl border-l-2 border-rose-500 bg-rose-500/[0.06] px-4 py-3 space-y-1">
-                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-rose-600 dark:text-rose-400">Watch out</p>
+                <p className="text-[8px] font-black uppercase tracking-[0.22em] text-rose-600 dark:text-rose-400">Watch out</p>
                 <p className="text-sm font-bold leading-snug text-rose-700 dark:text-rose-300">{card.watch_out}</p>
               </div>
             </div>
 
-            {/* Attack chain */}
             {card.attack_chain.length > 0 && (
               <div className="flex items-center gap-1.5 flex-wrap">
-                <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground/40 mr-1">Attack chain</p>
+                <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-muted-foreground/35 mr-1">Attack chain</p>
                 {card.attack_chain.slice(0, 4).map((step, i, arr) => (
                   <span key={i} className="flex items-center gap-1.5">
                     <span className="text-xs font-semibold bg-foreground/[0.06] border border-border/40 px-2.5 py-1 rounded-lg">
@@ -408,10 +431,9 @@ export default async function FightCardPage({
               </div>
             )}
 
-            {/* If losing */}
             {card.if_losing_points && (
               <div className="flex gap-2 items-start border-t border-border/30 pt-3">
-                <span className="text-[9px] font-black uppercase tracking-[0.15em] text-amber-500/70 whitespace-nowrap flex-shrink-0 pt-px">If losing</span>
+                <span className="text-[8px] font-black uppercase tracking-[0.18em] text-amber-500/70 whitespace-nowrap flex-shrink-0 pt-px">If losing</span>
                 <p className="text-xs text-amber-700 dark:text-amber-400 leading-snug">{card.if_losing_points}</p>
               </div>
             )}
@@ -430,11 +452,11 @@ export default async function FightCardPage({
         )}
       </div>
 
-      {/* Back to opponents */}
+      {/* Back */}
       <div>
         <Link
           href={`/tournaments/${tournamentId}/opponents`}
-          className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+          className="text-xs text-muted-foreground/40 hover:text-muted-foreground transition-colors"
         >
           ← All opponents
         </Link>
@@ -450,18 +472,26 @@ function StatRow({
   value,
   right = false,
   dim = false,
+  accent,
 }: {
   label: string
   value: string
   right?: boolean
   dim?: boolean
+  accent?: 'emerald' | 'rose'
 }) {
+  const valueClass = dim
+    ? 'text-muted-foreground/45'
+    : accent === 'emerald'
+      ? 'text-emerald-400'
+      : accent === 'rose'
+        ? 'text-rose-400'
+        : 'text-foreground/85'
+
   return (
     <div className={`flex items-baseline gap-2 ${right ? 'flex-row-reverse' : ''}`}>
-      <span className={`text-xs font-bold tabular-nums ${dim ? 'text-muted-foreground/50' : 'text-foreground/90'}`}>
-        {value}
-      </span>
-      <span className="text-[10px] text-muted-foreground/40 leading-none">{label}</span>
+      <span className={`text-xs font-bold tabular-nums ${valueClass}`}>{value}</span>
+      <span className="text-[10px] text-muted-foreground/35 leading-none">{label}</span>
     </div>
   )
 }
