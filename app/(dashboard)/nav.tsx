@@ -7,6 +7,7 @@ import { UserButton } from '@clerk/nextjs'
 import { ThemeToggle } from './theme-toggle'
 import { NotificationBell } from './notifications/bell'
 import { buttonVariants } from '@/components/ui/button'
+import { Wordmark } from '@/components/wordmark'
 
 const NAV = [
   { href: '/player-card', label: 'My Stats' },
@@ -147,7 +148,7 @@ export function Nav({ usageSlot }: { usageSlot?: React.ReactNode }) {
         {/* Left: brand + desktop nav */}
         <div className="flex items-center gap-6 sm:gap-8">
           <Link href="/" className="flex items-center gap-2 group shrink-0">
-            <span className="text-xl font-extrabold tracking-tight [font-family:var(--font-brand)]">Roll<span className="text-muted-foreground font-bold">Plan</span></span>
+            <Wordmark />
             <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70 border border-border/50 rounded px-1.5 py-0.5 leading-none hidden sm:inline">Beta</span>
           </Link>
 

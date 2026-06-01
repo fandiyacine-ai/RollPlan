@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { Wordmark } from '@/components/wordmark'
 
 export const metadata = { title: 'About — RollPlan' }
 
@@ -8,8 +9,8 @@ export default function AboutPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border/60 px-6 h-14 flex items-center justify-between sticky top-0 z-40 bg-background/90 backdrop-blur-sm">
-        <Link href="/" className="text-xl font-extrabold tracking-tight [font-family:var(--font-brand)]">
-          Roll<span className="text-muted-foreground font-bold">Plan</span>
+        <Link href="/">
+          <Wordmark />
         </Link>
         <div className="flex items-center gap-4">
           <Link href="/faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:block">

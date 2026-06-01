@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Wordmark } from '@/components/wordmark'
 
 export const metadata = { title: 'FAQ — RollPlan' }
 
@@ -105,9 +106,7 @@ export default function FaqPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border/60 px-6 h-14 flex items-center justify-between sticky top-0 z-40 bg-background/90 backdrop-blur-sm">
-        <Link href="/" className="text-xl font-extrabold tracking-tight [font-family:var(--font-brand)]">
-          RollPlan
-        </Link>
+        <Link href="/"><Wordmark /></Link>
         <Link href="/player-card" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
           ← Back to app
         </Link>

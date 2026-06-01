@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { Wordmark } from '@/components/wordmark'
 
 
 export default function HomePage() {
@@ -11,7 +12,7 @@ export default function HomePage() {
       {/* Nav */}
       <nav className="px-6 h-14 flex items-center justify-between border-b border-border/60 sticky top-0 z-40 bg-background/90 backdrop-blur-sm">
         <div className="flex items-center gap-2">
-          <span className="text-xl font-extrabold tracking-tight [font-family:var(--font-brand)]">Roll<span className="text-muted-foreground font-bold">Plan</span></span>
+          <Wordmark />
           <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70 border border-border/50 rounded px-1.5 py-0.5 leading-none">Beta</span>
         </div>
         <div className="flex items-center gap-2">
@@ -191,7 +192,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="border-t px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
-        <span className="font-extrabold tracking-tight text-foreground [font-family:var(--font-brand)]">Roll<span className="text-muted-foreground font-bold">Plan</span></span>
+        <Wordmark />
         <div className="flex items-center gap-5">
           <Link href="/about" className="hover:text-foreground transition-colors">About</Link>
           <Link href="/faq" className="hover:text-foreground transition-colors">FAQ</Link>
