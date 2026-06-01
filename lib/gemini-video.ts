@@ -94,7 +94,7 @@ export async function geminiVideoObject<T extends z.ZodTypeAny>(
     ? `MEDIA_RESOLUTION_${videoOptions.resolution}`
     : undefined
   // Gemini REST API uses thinkingBudget (token count), not a thinkingEffort enum.
-  const THINKING_BUDGET: Record<string, number> = { LOW: 1024, MEDIUM: 4096, HIGH: 8192 }
+  const THINKING_BUDGET: Record<string, number> = { LOW: 1024, MEDIUM: 8192, HIGH: 24576 }
   const thinkingBudget = videoOptions?.thinkingEffort ? THINKING_BUDGET[videoOptions.thinkingEffort] : null
 
   const userParts: unknown[] = []
@@ -111,6 +111,7 @@ export async function geminiVideoObject<T extends z.ZodTypeAny>(
     generationConfig: {
       responseMimeType: 'application/json',
       responseSchema: buildGeminiSchema(schema),
+      temperature: 0,
       ...(thinkingBudget ? { thinkingConfig: { thinkingBudget } } : {}),
       ...(mediaResolution ? { mediaResolution } : {}),
     },
