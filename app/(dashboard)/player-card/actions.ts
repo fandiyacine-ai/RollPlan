@@ -6,6 +6,17 @@ import { matches, videos } from '../../../lib/db/schema'
 import { eq, or, isNull, count } from 'drizzle-orm'
 import { getOrCreateDbUserId } from '../../../lib/db/get-user'
 import { deleteR2Objects, deleteR2Object, isStoredInR2 } from '../../../lib/storage/r2'
+import { inngest } from '../../../lib/inngest'
+
+export async function triggerTrainingPlan(): Promise<{ error?: string }> {
+  try {
+    const userId = await getOrCreateDbUserId()
+    await inngest.send({ name: 'training-plan/generate', data: { userId } })
+    return {}
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+}
 
 // Matches/videos uploaded before auth was fixed have userId = null.
 // We treat those as belonging to the current user (single-tenant MVP).

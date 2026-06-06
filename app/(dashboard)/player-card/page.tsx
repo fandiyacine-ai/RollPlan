@@ -1,6 +1,6 @@
 import React from 'react'
 import { db } from '../../../lib/db'
-import { matches, insights, videos, positionSegments, matchEvents, users, tournaments, tournamentOpponents, gameplans } from '../../../lib/db/schema'
+import { matches, insights, videos, positionSegments, matchEvents, users, tournaments, tournamentOpponents, gameplans, playerCards } from '../../../lib/db/schema'
 import { desc, eq, inArray, isNull, and, ne, or, sql } from 'drizzle-orm'
 import Link from 'next/link'
 import { buttonVariants } from '../../../components/ui/button'
@@ -14,6 +14,8 @@ import { TransitionDiagram, type TransitionData } from './transition-diagram'
 import { ShareCardButton } from './share-card-button'
 import type { ShareCardData } from './share-card'
 import { RulesetBadge } from '@/components/ruleset-badge'
+import { TrainingPlanSection } from './training-plan-section'
+import type { TrainingPlan } from '../../../lib/ai/schemas/training-plan'
 
 export const dynamic = 'force-dynamic'
 
@@ -184,6 +186,16 @@ export default async function PlayerCardPage() {
     .limit(5)
     .catch(() => [] as { id: string; name: string; eventDate: string | null; ruleset: string | null; opponentCount: number; gameplanCount: number }[])
     : []
+
+  // ── Training plan ──
+  const trainingPlanRow = dbUser ? await db
+    .select({ trainingPlan: playerCards.trainingPlan, trainingPlanGeneratedAt: playerCards.trainingPlanGeneratedAt })
+    .from(playerCards)
+    .where(and(eq(playerCards.ownerId, dbUser.id), eq(playerCards.ownerType, 'user')))
+    .limit(1)
+    .then(rows => rows[0] ?? null)
+    .catch(() => null)
+    : null
 
   // ── Stats ──
   const totalAnalyzedTime = allSegments.reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)
@@ -732,6 +744,12 @@ export default async function PlayerCardPage() {
               </div>
             )}
           </div>
+
+          {/* Training Plan */}
+          <TrainingPlanSection
+            initialPlan={trainingPlanRow?.trainingPlan as TrainingPlan | null ?? null}
+            generatedAt={trainingPlanRow?.trainingPlanGeneratedAt ?? null}
+          />
 
           {/* Settings shortcut */}
           <Link

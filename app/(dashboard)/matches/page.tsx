@@ -250,6 +250,22 @@ export default async function MatchesPage() {
 
         {/* ── Match list ── */}
         <div className="min-w-0 space-y-4">
+          {/* Processing state — no matches yet but videos in progress */}
+          {allMatches.length === 0 && scanningVideos.length > 0 && (
+            <div className="rounded-2xl border border-dashed border-border/60 p-8 space-y-4 text-center">
+              <div className="flex items-center justify-center">
+                <span className="w-2 h-2 rounded-full bg-foreground/40 animate-pulse" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Analysing your footage…</p>
+                <p className="text-xs text-muted-foreground">AI is breaking your match into positions, events, and coaching notes. This usually takes a few minutes.</p>
+              </div>
+              <Link href="/upload" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+                + Upload another match
+              </Link>
+            </div>
+          )}
+
           {/* In Progress */}
           {scanningVideos.length > 0 && (
             <div className="space-y-2">

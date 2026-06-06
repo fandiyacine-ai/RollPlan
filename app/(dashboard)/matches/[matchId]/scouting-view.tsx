@@ -1007,7 +1007,7 @@ export function ScoutingView({
     <div className="flex flex-col h-full max-w-[1400px] mx-auto w-full px-4 sm:px-6">
 
       {/* ── Header ── */}
-      <div className="flex items-start justify-between pb-3 border-b flex-shrink-0 gap-4">
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm flex items-start justify-between pb-3 border-b flex-shrink-0 gap-4">
         <div className="flex flex-col gap-0.5 min-w-0">
           <Link href={backHref} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
             {backLabel ?? defaultBackLabel}
