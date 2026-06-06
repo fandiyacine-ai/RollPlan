@@ -423,11 +423,11 @@ export function TournamentFightView({
         </div>
       </div>
 
-      {/* Desktop: sticky left + scroll-snapped right */}
-      <div className="hidden md:flex gap-5 items-start">
+      {/* Desktop: entire two-column block is sticky so both columns share the same top edge */}
+      <div className="hidden md:flex gap-5 items-start sticky top-20">
 
-        {/* Sticky user card */}
-        <div className="w-[220px] flex-shrink-0 sticky top-20 self-start">
+        {/* User card — left, no sticky needed since parent block is sticky */}
+        <div className="w-[220px] flex-shrink-0">
           <UserCard userName={userName} data={userData} />
 
           {/* Jump nav */}
@@ -453,10 +453,10 @@ export function TournamentFightView({
           )}
         </div>
 
-        {/* Scrollable opponent sections — snaps each card to top */}
+        {/* Opponent sections — scroll container fills remaining viewport height below the sticky offset */}
         <div
           className="flex-1 min-w-0 overflow-y-auto snap-y snap-proximity"
-          style={{ maxHeight: 'calc(100vh - 220px)' }}
+          style={{ height: 'calc(100vh - 100px)' }}
         >
           {opponents.map(opp => (
             <div key={opp.id} id={`opp-${opp.id}`} className="pb-4 snap-start">
