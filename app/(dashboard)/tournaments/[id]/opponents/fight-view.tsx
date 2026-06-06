@@ -72,9 +72,9 @@ function careerRecord(w: number | null | undefined, l: number | null | undefined
 
 function GameStyleBar({ topPct, right = false }: { topPct: number; right?: boolean }) {
   const label = topPct >= 65 ? 'Top player' : topPct >= 50 ? 'Balanced' : topPct >= 35 ? 'Guard-heavy' : 'Guard player'
-  const fillClass = right ? 'bg-rose-500/60' : 'bg-emerald-500/60'
-  const bgClass = right ? 'bg-rose-500/[0.12]' : 'bg-emerald-500/[0.12]'
-  const labelClass = right ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'
+  const fillClass = right ? 'bg-red-500/60' : 'bg-emerald-500/60'
+  const bgClass = right ? 'bg-red-500/[0.12]' : 'bg-emerald-500/[0.12]'
+  const labelClass = right ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
@@ -95,7 +95,7 @@ function VerdictBadge({ verdict, winProbability }: { verdict: string | null; win
   const cfg = {
     favourable: { bg: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400', label: 'Favourable' },
     neutral:    { bg: 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400', label: 'Neutral' },
-    tough:      { bg: 'bg-rose-500/15 border-rose-500/30 text-rose-600 dark:text-rose-400', label: 'Tough match' },
+    tough:      { bg: 'bg-red-500/15 border-red-500/30 text-red-600 dark:text-red-400', label: 'Tough match' },
   }[verdict] ?? { bg: 'bg-zinc-500/15 border-zinc-500/30 text-zinc-500', label: verdict }
   return (
     <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full border ${cfg.bg}`}>
@@ -189,17 +189,17 @@ function OpponentSection({ opp, tournamentId }: { opp: OpponentRow; tournamentId
   return (
     <div className="rounded-2xl overflow-hidden border border-border shadow-sm">
 
-      {/* Rose accent top strip */}
-      <div className="h-1 w-full bg-gradient-to-r from-rose-500 to-rose-600" />
+      {/* Red accent top strip */}
+      <div className="h-1 w-full bg-gradient-to-r from-red-600 to-red-700" />
 
       {/* Opponent header */}
       <div className="bg-zinc-100 dark:bg-zinc-900 px-5 py-4">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-[7px] font-black uppercase tracking-[0.35em] text-rose-600 dark:text-rose-400/70 mb-1.5">Opponent</p>
+            <p className="text-[7px] font-black uppercase tracking-[0.35em] text-red-600 dark:text-red-500/80 mb-1.5">Opponent</p>
             <div className="flex items-center gap-3 min-w-0">
               {opp.profilePhotoUrl && (
-                <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-rose-500/30 flex-shrink-0">
+                <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-red-500/30 flex-shrink-0">
                   <Image src={opp.profilePhotoUrl} alt={opp.opponentLabel} width={36} height={36} className="object-cover w-full h-full" />
                 </div>
               )}
@@ -212,14 +212,14 @@ function OpponentSection({ opp, tournamentId }: { opp: OpponentRow; tournamentId
               {ajpRecord && (
                 <span className="flex items-center gap-1.5">
                   <span className="text-[9px] text-foreground/40 uppercase tracking-wider font-bold">AJP</span>
-                  <span className="text-xs font-bold text-rose-600 dark:text-rose-400">{ajpRecord.split(' ')[0]}</span>
+                  <span className="text-xs font-bold text-red-600 dark:text-red-400">{ajpRecord.split(' ')[0]}</span>
                   <span className="text-xs font-bold text-foreground/40">{ajpRecord.split(' ')[1]}</span>
                 </span>
               )}
               {scRecord && (
                 <span className="flex items-center gap-1.5">
                   <span className="text-[9px] text-foreground/40 uppercase tracking-wider font-bold">SC</span>
-                  <span className="text-xs font-bold text-rose-600 dark:text-rose-400">{scRecord.split(' ')[0]}</span>
+                  <span className="text-xs font-bold text-red-600 dark:text-red-400">{scRecord.split(' ')[0]}</span>
                   <span className="text-xs font-bold text-foreground/40">{scRecord.split(' ')[1]}</span>
                 </span>
               )}
@@ -253,7 +253,7 @@ function OpponentSection({ opp, tournamentId }: { opp: OpponentRow; tournamentId
             )}
             <Link
               href={`/tournaments/${tournamentId}/fight-card/${opp.id}`}
-              className="text-xs text-rose-500/60 hover:text-rose-500 transition-colors font-medium whitespace-nowrap"
+              className="text-xs text-red-500/60 hover:text-red-600 transition-colors font-medium whitespace-nowrap"
             >
               Fight card →
             </Link>
@@ -273,7 +273,7 @@ function OpponentSection({ opp, tournamentId }: { opp: OpponentRow; tournamentId
 
             {/* Left: game stats */}
             <div className="p-4 space-y-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-500 dark:text-rose-400/70">Their game</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-600 dark:text-red-400/80">Their game</p>
 
               {opp.topPct != null && <GameStyleBar topPct={opp.topPct} right />}
 
@@ -324,8 +324,8 @@ function OpponentSection({ opp, tournamentId }: { opp: OpponentRow; tournamentId
                     <p className="text-xs font-semibold leading-snug">{opp.card.open_with}</p>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-[8px] font-black uppercase tracking-[0.2em] text-rose-500 dark:text-rose-400">Watch out</p>
-                    <p className="text-xs font-semibold leading-snug text-rose-700 dark:text-rose-300">{opp.card.watch_out}</p>
+                    <p className="text-[8px] font-black uppercase tracking-[0.2em] text-red-600 dark:text-red-400">Watch out</p>
+                    <p className="text-xs font-semibold leading-snug text-red-700 dark:text-red-300">{opp.card.watch_out}</p>
                   </div>
                   {opp.card.attack_chain.length > 0 && (
                     <div className="flex items-center gap-1 flex-wrap">
@@ -459,7 +459,7 @@ export function TournamentFightView({
           style={{ height: 'calc(100vh - 100px)' }}
         >
           {opponents.map(opp => (
-            <div key={opp.id} id={`opp-${opp.id}`} className="snap-start snap-always pb-4">
+            <div key={opp.id} id={`opp-${opp.id}`} className="snap-start snap-always pb-6" style={{ minHeight: 'calc(100vh - 100px)' }}>
               <OpponentSection opp={opp} tournamentId={tournamentId} />
             </div>
           ))}
