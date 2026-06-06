@@ -455,11 +455,11 @@ export function TournamentFightView({
 
         {/* Opponent sections — scroll container fills remaining viewport height below the sticky offset */}
         <div
-          className="flex-1 min-w-0 overflow-y-auto snap-y snap-proximity"
+          className="flex-1 min-w-0 overflow-y-auto snap-y snap-mandatory"
           style={{ height: 'calc(100vh - 100px)' }}
         >
           {opponents.map(opp => (
-            <div key={opp.id} id={`opp-${opp.id}`} className="pb-4 snap-start">
+            <div key={opp.id} id={`opp-${opp.id}`} className="snap-start snap-always pb-4">
               <OpponentSection opp={opp} tournamentId={tournamentId} />
             </div>
           ))}
