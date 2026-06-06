@@ -857,6 +857,9 @@ function UpgradeGate() {
           <p className="text-xs text-muted-foreground">
             Upgrade to Pro for full AI gameplans, training plans, and unlimited tournaments.
           </p>
+          <Link href="/game-day" className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors underline underline-offset-2">
+            View match-day summary in Competition Day →
+          </Link>
         </div>
         <Link
           href="/upgrade"

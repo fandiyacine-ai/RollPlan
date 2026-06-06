@@ -203,7 +203,7 @@ function OpponentSection({ opp, tournamentId }: { opp: OpponentRow; tournamentId
                   <Image src={opp.profilePhotoUrl} alt={opp.opponentLabel} width={36} height={36} className="object-cover w-full h-full" />
                 </div>
               )}
-              <p className="font-black text-2xl uppercase leading-tight tracking-wide text-foreground truncate">
+              <p className="font-black text-2xl uppercase leading-tight tracking-wide text-foreground break-words">
                 {opp.opponentLabel}
               </p>
             </div>
