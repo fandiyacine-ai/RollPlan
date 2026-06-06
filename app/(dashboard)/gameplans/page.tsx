@@ -326,10 +326,22 @@ export default async function GameplansPage() {
                     const withData = opponents.filter(o => o.plan || o.matchCount > 0)
                     const noData = opponents.filter(o => !o.plan && o.matchCount === 0)
                     if (withData.length === 0) return (
-                      <p className="text-xs text-muted-foreground py-1">
-                        No footage scouted yet — {opponents.map(o => o.opponent.opponentLabel.split(' ')[0]).join(', ')}.{' '}
-                        <Link href={`/tournaments/${tournament.id}/opponents`} className="underline hover:no-underline">Start scouting →</Link>
-                      </p>
+                      <Link
+                        href={`/tournaments/${tournament.id}/opponents`}
+                        className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-border/60 px-4 py-3.5 hover:bg-muted/20 hover:border-border transition-colors group"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground/70 group-hover:text-foreground transition-colors">Scout your opponents</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {opponents.length === 1
+                              ? `Add footage for ${opponents[0].opponent.opponentLabel.split(' ')[0]} to generate a gameplan`
+                              : `${opponents.length} opponents — add footage to generate gameplans`}
+                          </p>
+                        </div>
+                        <svg className="w-4 h-4 text-muted-foreground/40 group-hover:text-muted-foreground flex-shrink-0 transition-colors" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 8h10M9 4l4 4-4 4"/>
+                        </svg>
+                      </Link>
                     )
                     return (
                       <>

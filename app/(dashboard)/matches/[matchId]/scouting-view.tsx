@@ -863,11 +863,12 @@ function MarkdownMessage({ text, compact = false }: { text: string; compact?: bo
   return <div className="space-y-1">{nodes}</div>
 }
 
-function AskTab({ matchId, currentTime, opponentName, videoRef }: {
+function AskTab({ matchId, currentTime, opponentName, videoRef, contextInsights }: {
   matchId: string
   currentTime: number
   opponentName: string
   videoRef?: React.RefObject<HTMLVideoElement | null>
+  contextInsights?: InsightRow[]
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -952,21 +953,29 @@ function AskTab({ matchId, currentTime, opponentName, videoRef }: {
       {/* Messages / empty state */}
       <div className="flex-1 overflow-y-auto min-h-0 p-4">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center min-h-[180px] h-full gap-5 px-2">
-            <div className="flex flex-col items-center gap-2 text-center">
-              <div className="w-10 h-10 rounded-full bg-violet-500/10 flex items-center justify-center flex-shrink-0">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-violet-400">
-                  <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
-                </svg>
+          <div className="flex flex-col gap-4 px-1 py-2">
+            {/* Context brief — what the AI already knows */}
+            {contextInsights && contextInsights.length > 0 && (
+              <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 px-3.5 py-3 space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-violet-400 flex-shrink-0">
+                    <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
+                  </svg>
+                  <p className="text-[11px] font-semibold text-violet-400">I've analysed {opponentName}'s footage</p>
+                </div>
+                <ul className="space-y-1.5">
+                  {contextInsights.slice(0, 3).map((ins, i) => (
+                    <li key={i} className="flex gap-1.5 text-[11px] text-muted-foreground/80 leading-snug">
+                      <span className="text-violet-400/50 flex-shrink-0 mt-px">·</span>
+                      <span>{ins.description}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <p className="text-sm font-semibold">Ask about {opponentName}</p>
-              {canCapture && (
-                <p className="text-xs text-muted-foreground/60 leading-relaxed max-w-[200px]">
-                  Pause the video at any frame to ask the AI exactly what happened in that position.
-                </p>
-              )}
-            </div>
-            <div className="w-full space-y-1.5">
+            )}
+            {/* Suggested questions */}
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40 px-1">Ask anything</p>
               {SUGGESTED_QUESTIONS.map(q => (
                 <button
                   key={q}
@@ -976,6 +985,11 @@ function AskTab({ matchId, currentTime, opponentName, videoRef }: {
                   {q}
                 </button>
               ))}
+              {canCapture && (
+                <p className="text-[10px] text-muted-foreground/40 px-1 pt-1">
+                  Pause the video and ask — the AI will see the frame.
+                </p>
+              )}
             </div>
           </div>
         ) : (
@@ -1288,7 +1302,7 @@ export function ScoutingView({
             </div>
             <div className={activeTab === 'prediction' ? '' : 'hidden'}><PredictionTab insights={insights} opponentName={opponentName} /></div>
             <div className={`${activeTab === 'ask' ? 'flex flex-col h-full' : 'hidden'}`}>
-              <AskTab matchId={match.id} currentTime={currentTime} opponentName={opponentName} videoRef={ytId ? undefined : videoRef} />
+              <AskTab matchId={match.id} currentTime={currentTime} opponentName={opponentName} videoRef={ytId ? undefined : videoRef} contextInsights={insights} />
             </div>
           </div>
         </div>
@@ -1345,7 +1359,7 @@ export function ScoutingView({
             <div className={activeTab === 'stats' ? '' : 'hidden'}><StatsTab sortedPositions={sortedPositions} maxPositionTime={maxPositionTime} positionNames={positionNames} timelineItems={timelineItems} scoutedName={match.opponentLabel?.split(' ')[0] ?? undefined} /></div>
             <div className={activeTab === 'prediction' ? '' : 'hidden'}><PredictionTab insights={insights} opponentName={opponentName} /></div>
             <div className={`${activeTab === 'ask' ? 'flex flex-col h-full' : 'hidden'}`}>
-              <AskTab matchId={match.id} currentTime={currentTime} opponentName={opponentName} videoRef={ytId ? undefined : videoRef} />
+              <AskTab matchId={match.id} currentTime={currentTime} opponentName={opponentName} videoRef={ytId ? undefined : videoRef} contextInsights={insights} />
             </div>
           </div>
         </div>

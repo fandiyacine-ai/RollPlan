@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { triggerTrainingPlan } from './actions'
+import { triggerTrainingPlan, getTrainingPlanStatus } from './actions'
 import type { TrainingPlan } from '../../../lib/ai/schemas/training-plan'
 
 const FOCUS_COLORS: Record<string, string> = {
@@ -39,6 +39,20 @@ export function TrainingPlanSection({
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const router = useRouter()
 
+  // Poll every 3 s while queued; refresh as soon as the plan is ready in DB
+  useEffect(() => {
+    if (state !== 'queued') return
+    let cancelled = false
+    const interval = setInterval(async () => {
+      const { ready } = await getTrainingPlanStatus()
+      if (ready && !cancelled) {
+        clearInterval(interval)
+        router.refresh()
+      }
+    }, 3000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [state, router])
+
   async function handleGenerate() {
     setState('queued')
     setErrorMsg(null)
@@ -46,9 +60,8 @@ export function TrainingPlanSection({
     if (result.error) {
       setState('error')
       setErrorMsg(result.error)
-    } else {
-      router.refresh()
     }
+    // Don't router.refresh() immediately — the poll loop above handles it
   }
 
   const fmtDate = (d: Date) =>

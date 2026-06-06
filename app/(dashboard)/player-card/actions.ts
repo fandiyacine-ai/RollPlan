@@ -2,8 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { db } from '../../../lib/db'
-import { matches, videos } from '../../../lib/db/schema'
-import { eq, or, isNull, count } from 'drizzle-orm'
+import { matches, videos, playerCards } from '../../../lib/db/schema'
+import { eq, or, isNull, count, and } from 'drizzle-orm'
 import { getOrCreateDbUserId } from '../../../lib/db/get-user'
 import { deleteR2Objects, deleteR2Object, isStoredInR2 } from '../../../lib/storage/r2'
 import { inngest } from '../../../lib/inngest'
@@ -15,6 +15,21 @@ export async function triggerTrainingPlan(): Promise<{ error?: string }> {
     return {}
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export async function getTrainingPlanStatus(): Promise<{ ready: boolean }> {
+  try {
+    const userId = await getOrCreateDbUserId()
+    const row = await db
+      .select({ trainingPlan: playerCards.trainingPlan })
+      .from(playerCards)
+      .where(and(eq(playerCards.ownerId, userId), eq(playerCards.ownerType, 'user')))
+      .limit(1)
+      .then(rows => rows[0] ?? null)
+    return { ready: !!row?.trainingPlan }
+  } catch {
+    return { ready: false }
   }
 }
 

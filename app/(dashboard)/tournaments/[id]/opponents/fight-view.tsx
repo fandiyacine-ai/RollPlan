@@ -518,6 +518,31 @@ export function TournamentFightView({
 
       {/* Mobile: stacked */}
       <div className="md:hidden space-y-4">
+
+        {/* Mobile jump nav — only when >1 opponent */}
+        {opponents.length > 1 && (
+          <div className="sticky top-14 z-10 -mx-4 px-4 py-2 bg-background/95 backdrop-blur-sm border-b border-border/40 overflow-x-auto no-scrollbar">
+            <div className="flex gap-1.5 w-max">
+              {opponents.map((opp, i) => (
+                <a
+                  key={opp.id}
+                  href={`#opp-mobile-${opp.id}`}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-border/60 bg-muted/40 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
+                >
+                  <span className="text-[9px] font-mono text-muted-foreground/40">{i + 1}</span>
+                  <span className="font-medium">{opp.opponentLabel.split(' ')[0]}</span>
+                  {opp.gameplanVerdict && (
+                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                      opp.gameplanVerdict === 'favourable' ? 'bg-emerald-400' :
+                      opp.gameplanVerdict === 'tough' ? 'bg-rose-400' : 'bg-amber-400'
+                    }`} />
+                  )}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Condensed user banner */}
         <div className="rounded-xl overflow-hidden border border-border bg-zinc-100 dark:bg-zinc-900 p-4">
           <div className="flex items-center justify-between gap-3">
@@ -541,7 +566,9 @@ export function TournamentFightView({
         </div>
 
         {opponents.map(opp => (
-          <OpponentSection key={opp.id} opp={opp} tournamentId={tournamentId} />
+          <div key={opp.id} id={`opp-mobile-${opp.id}`} className="scroll-mt-28">
+            <OpponentSection opp={opp} tournamentId={tournamentId} />
+          </div>
         ))}
       </div>
     </div>
