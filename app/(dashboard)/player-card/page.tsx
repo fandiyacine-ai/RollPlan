@@ -16,6 +16,7 @@ import type { ShareCardData } from './share-card'
 import { RulesetBadge } from '@/components/ruleset-badge'
 import { TrainingPlanSection } from './training-plan-section'
 import type { TrainingPlan } from '../../../lib/ai/schemas/training-plan'
+import { getSubscriptionStatus } from '../../../lib/subscription'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,6 +87,9 @@ export default async function PlayerCardPage() {
   if (clerkId) {
     dbUser = await db.query.users.findFirst({ where: eq(users.clerkId, clerkId) }) ?? null
   }
+
+  const tier = dbUser ? await getSubscriptionStatus(dbUser.id) : 'free'
+  const isPro = tier === 'pro' || tier === 'trial'
 
   const displayName = clerkUser
     ? [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || clerkUser.emailAddresses?.[0]?.emailAddress || 'Athlete'
@@ -749,6 +753,7 @@ export default async function PlayerCardPage() {
           <TrainingPlanSection
             initialPlan={trainingPlanRow?.trainingPlan as TrainingPlan | null ?? null}
             generatedAt={trainingPlanRow?.trainingPlanGeneratedAt ?? null}
+            isPro={isPro}
           />
 
           {/* Settings shortcut */}

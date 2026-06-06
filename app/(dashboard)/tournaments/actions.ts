@@ -6,6 +6,7 @@ import { tournaments } from '../../../lib/db/schema'
 import { eq, and, ilike } from 'drizzle-orm'
 import { getOrCreateDbUserId } from '../../../lib/db/get-user'
 import { parseSmootcompBracketUrl, parseSmootcompEventUrl } from '../../../lib/smoothcomp/scraper'
+import { getSubscriptionStatus } from '../../../lib/subscription'
 
 export async function createTournament(
   formData: FormData
@@ -15,6 +16,15 @@ export async function createTournament(
 
     const name = (formData.get('name') as string)?.trim()
     if (!name) return { error: 'Tournament name is required' }
+
+    // Free tier: max 1 tournament
+    const tier = await getSubscriptionStatus(userId)
+    if (tier === 'free') {
+      const existing = await db.select({ id: tournaments.id }).from(tournaments).where(eq(tournaments.userId, userId)).limit(2)
+      if (existing.length >= 1) {
+        return { error: 'upgrade_required' }
+      }
+    }
 
     // Duplicate guard — case-insensitive exact match + normalised whitespace
     const normalizedName = name.toLowerCase().replace(/\s+/g, ' ')

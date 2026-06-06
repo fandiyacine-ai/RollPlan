@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { triggerTrainingPlan, getTrainingPlanStatus } from './actions'
 import type { TrainingPlan } from '../../../lib/ai/schemas/training-plan'
 
@@ -31,9 +32,11 @@ function YoutubeLink({ query }: { query: string }) {
 export function TrainingPlanSection({
   initialPlan,
   generatedAt,
+  isPro = false,
 }: {
   initialPlan: TrainingPlan | null
   generatedAt: Date | null
+  isPro?: boolean
 }) {
   const [state, setState] = useState<'idle' | 'queued' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -78,21 +81,33 @@ export function TrainingPlanSection({
             </p>
           )}
         </div>
-        <button
-          onClick={handleGenerate}
-          disabled={state === 'queued'}
-          className="text-[10px] px-2.5 py-1 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-        >
-          {state === 'queued' ? (
-            <>
-              <svg className="animate-spin w-2.5 h-2.5" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-              </svg>
-              Queued…
-            </>
-          ) : initialPlan ? 'Regenerate' : 'Generate'}
-        </button>
+        {isPro ? (
+          <button
+            onClick={handleGenerate}
+            disabled={state === 'queued'}
+            className="text-[10px] px-2.5 py-1 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+          >
+            {state === 'queued' ? (
+              <>
+                <svg className="animate-spin w-2.5 h-2.5" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                </svg>
+                Queued…
+              </>
+            ) : initialPlan ? 'Regenerate' : 'Generate'}
+          </button>
+        ) : (
+          <Link
+            href="/upgrade"
+            className="text-[10px] px-2.5 py-1 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors flex items-center gap-1"
+          >
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            Pro
+          </Link>
+        )}
       </div>
 
       {state === 'queued' && !initialPlan && (

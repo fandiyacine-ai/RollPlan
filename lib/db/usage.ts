@@ -1,6 +1,7 @@
 import { db } from '.'
 import { matches, users, videos, gameplans, tournaments } from './schema'
-import { eq, and, gte, ne, count, sum, sql } from 'drizzle-orm'
+import { eq, and, gte, ne, count, sql } from 'drizzle-orm'
+import { getSubscriptionStatus } from '../subscription'
 
 export type UserUsageStats = {
   planTier: string
@@ -24,7 +25,7 @@ export async function getUserUsageStats(userId: string): Promise<UserUsageStats>
 
   const [user] = await db.select({ planTier: users.planTier }).from(users).where(eq(users.id, userId))
   const planTier = user?.planTier ?? 'free'
-  const monthlyLimit = planTier === 'free' ? FREE_MONTHLY_MATCH_LIMIT : Infinity
+  const monthlyLimit = planTier === 'free' ? FREE_MONTHLY_VIDEO_LIMIT : Infinity
 
   const [matchStats] = await db
     .select({
@@ -62,7 +63,7 @@ export async function getUserUsageStats(userId: string): Promise<UserUsageStats>
   }
 }
 
-export const FREE_MONTHLY_MATCH_LIMIT = 10
+export const FREE_MONTHLY_VIDEO_LIMIT = 5
 
 export async function getMonthlyMatchCount(userId: string): Promise<number> {
   const startOfMonth = new Date()
@@ -81,38 +82,33 @@ export async function getMonthlyMatchCount(userId: string): Promise<number> {
   return row?.total ?? 0
 }
 
-// Count all non-failed matches created this month — used for limit enforcement
-// so concurrent uploads can't both pass a check that only counts analysed matches
-async function getMonthlyActiveMatchCount(userId: string): Promise<number> {
+
+async function getMonthlyVideoCount(userId: string): Promise<number> {
   const startOfMonth = new Date()
   startOfMonth.setDate(1)
   startOfMonth.setHours(0, 0, 0, 0)
 
   const [row] = await db
     .select({ total: count() })
-    .from(matches)
+    .from(videos)
     .where(and(
-      eq(matches.userId, userId),
-      ne(matches.status, 'failed'),
-      gte(matches.createdAt, startOfMonth),
+      eq(videos.userId, userId),
+      ne(videos.status, 'failed'),
+      gte(videos.uploadedAt, startOfMonth),
     ))
 
   return row?.total ?? 0
 }
 
 export async function checkMonthlyLimit(userId: string): Promise<{ allowed: boolean; used: number; limit: number }> {
-  const [user] = await db.select({ planTier: users.planTier }).from(users).where(eq(users.id, userId))
+  const tier = await getSubscriptionStatus(userId)
 
-  // Non-free plans have no monthly cap
-  if (user?.planTier && user.planTier !== 'free') {
-    const used = await getMonthlyMatchCount(userId)
+  // Pro and trial have no monthly cap
+  if (tier === 'pro' || tier === 'trial') {
+    const used = await getMonthlyVideoCount(userId)
     return { allowed: true, used, limit: Infinity }
   }
 
-  // `used` is analysed-only for display; `activeCount` includes pending+processing for enforcement
-  const [used, activeCount] = await Promise.all([
-    getMonthlyMatchCount(userId),
-    getMonthlyActiveMatchCount(userId),
-  ])
-  return { allowed: activeCount < FREE_MONTHLY_MATCH_LIMIT, used, limit: FREE_MONTHLY_MATCH_LIMIT }
+  const used = await getMonthlyVideoCount(userId)
+  return { allowed: used < FREE_MONTHLY_VIDEO_LIMIT, used, limit: FREE_MONTHLY_VIDEO_LIMIT }
 }

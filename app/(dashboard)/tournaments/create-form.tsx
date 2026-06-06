@@ -271,6 +271,10 @@ export function CreateTournamentForm() {
                 setPending(true)
                 setError(null)
                 const result = await createTournament(fd)
+                if (result.error === 'upgrade_required') {
+                  router.push('/upgrade')
+                  return
+                }
                 if (result.error) {
                   setError(result.error)
                   setPending(false)

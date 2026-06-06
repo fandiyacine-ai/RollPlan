@@ -3,6 +3,7 @@ import { db } from '../../../../../lib/db'
 import { gameplans, tournamentOpponents, matches, planExecutions, tournaments } from '../../../../../lib/db/schema'
 import { eq, inArray, and } from 'drizzle-orm'
 import { getOrCreateDbUserId } from '../../../../../lib/db/get-user'
+import { getSubscriptionStatus } from '../../../../../lib/subscription'
 import Link from 'next/link'
 import { GenerateGameplanButton } from './generate-button'
 import { OpponentSelector } from './opponent-selector'
@@ -30,6 +31,9 @@ export default async function GameplanPage({
   const athleteName = clerkUser?.firstName ?? clerkUser?.username ?? null
 
   const userId = await getOrCreateDbUserId().catch(() => null)
+  const tier = userId ? await getSubscriptionStatus(userId) : 'free'
+  const isPro = tier === 'pro' || tier === 'trial'
+
   const tournamentOwned = userId ? await db
     .select({ id: tournaments.id })
     .from(tournaments)
@@ -231,7 +235,9 @@ export default async function GameplanPage({
             </div>
           </div>
 
-          {plan ? (
+          {!isPro ? (
+            <UpgradeGate />
+          ) : plan ? (
             <>
               {scoutedCount <= 1 && (
                 <ConfidenceBanner count={scoutedCount} />
@@ -823,5 +829,42 @@ function PredictionCard({ prediction }: { prediction: MatchupPrediction }) {
         </div>
       </div>
     </Section>
+  )
+}
+
+function UpgradeGate() {
+  return (
+    <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+      {/* Blurred preview skeleton */}
+      <div className="p-5 space-y-4 blur-sm pointer-events-none select-none opacity-60">
+        <div className="space-y-2">
+          <div className="h-2.5 w-16 rounded bg-muted" />
+          <div className="h-4 w-3/4 rounded bg-foreground/10" />
+          <div className="h-3 w-full rounded bg-muted" />
+          <div className="h-3 w-5/6 rounded bg-muted" />
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {[1, 2, 3].map(i => <div key={i} className="h-7 w-24 rounded-lg bg-muted" />)}
+        </div>
+        <div className="h-3 w-full rounded bg-muted" />
+        <div className="h-3 w-4/5 rounded bg-muted" />
+      </div>
+
+      {/* Upgrade CTA */}
+      <div className="border-t border-border/60 bg-background px-5 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <p className="text-sm font-semibold">Unlock Gameplans</p>
+          <p className="text-xs text-muted-foreground">
+            Upgrade to Pro for full AI gameplans, training plans, and unlimited tournaments.
+          </p>
+        </div>
+        <Link
+          href="/upgrade"
+          className="flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-foreground text-background text-xs font-semibold px-4 py-2 hover:opacity-90 transition-opacity"
+        >
+          Upgrade — €5/mo
+        </Link>
+      </div>
+    </div>
   )
 }

@@ -1,5 +1,5 @@
 import { getOrCreateDbUserId } from '@/lib/db/get-user'
-import { getUserUsageStats, FREE_MONTHLY_MATCH_LIMIT } from '@/lib/db/usage'
+import { getUserUsageStats } from '@/lib/db/usage'
 
 export const dynamic = 'force-dynamic'
 
