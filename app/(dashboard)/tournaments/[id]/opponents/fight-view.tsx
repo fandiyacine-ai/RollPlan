@@ -369,9 +369,59 @@ function OpponentSection({ opp, tournamentId }: { opp: OpponentRow; tournamentId
           </div>
         ) : (
           /* No footage yet */
-          <div className="px-5 py-5 space-y-3">
-            <p className="text-sm text-muted-foreground/60">No footage scouted yet.</p>
-            <ScoutForm opponentId={opp.id} tournamentId={tournamentId} opponentName={opp.opponentLabel} hasMatches={false} />
+          <div className="p-5 space-y-5">
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground/60">No footage scouted yet.</p>
+              <ScoutForm opponentId={opp.id} tournamentId={tournamentId} opponentName={opp.opponentLabel} hasMatches={false} />
+            </div>
+
+            {/* Fight card teaser — fills the space and surfaces the fight card */}
+            <div className="rounded-xl border border-red-500/15 bg-red-500/[0.03] p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">Fight card</p>
+                <Link
+                  href={`/tournaments/${tournamentId}/fight-card/${opp.id}`}
+                  className="text-xs text-red-500/60 hover:text-red-600 dark:hover:text-red-400 transition-colors font-medium"
+                >
+                  View →
+                </Link>
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                {ajpRecord && (
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/40 mb-0.5">AJP record</p>
+                    <p className="text-sm font-bold">
+                      <span className="text-red-500">{opp.ajpWins ?? 0}W</span>
+                      <span className="text-foreground/30 ml-1">{opp.ajpLosses ?? 0}L</span>
+                    </p>
+                  </div>
+                )}
+                {(opp.smoothcompWins != null || opp.smoothcompLosses != null) && (
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/40 mb-0.5">Smoothcomp</p>
+                    <p className="text-sm font-bold">
+                      <span className="text-red-500">{opp.smoothcompWins ?? 0}W</span>
+                      <span className="text-foreground/30 ml-1">{opp.smoothcompLosses ?? 0}L</span>
+                    </p>
+                  </div>
+                )}
+                {opp.ibjjfBestResult && (
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/40 mb-0.5">IBJJF best</p>
+                    <p className="text-xs font-semibold text-foreground/60">{opp.ibjjfBestResult.split('|')[0]?.trim()}</p>
+                  </div>
+                )}
+                {opp.communityMatchCount > 0 && (
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/40 mb-0.5">Community</p>
+                    <p className="text-xs font-semibold text-violet-500">{opp.communityMatchCount} match{opp.communityMatchCount !== 1 ? 'es' : ''}</p>
+                  </div>
+                )}
+              </div>
+              <p className="text-[11px] text-muted-foreground/40 leading-relaxed">
+                Side-by-side records, position tendencies, and a match-day reference card — even without scouted footage.
+              </p>
+            </div>
           </div>
         )}
 
