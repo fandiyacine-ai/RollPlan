@@ -151,13 +151,12 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
   }
 
   // ── Per-opponent fight card data (batched) ─────────────────────────────────
-  const scoutedMatchesByOpp: Record<string, string[]> = {}
-  const firstMatchByOpp: Record<string, string> = {}
+  const scoutedMatchesByOpp: Record<string, { id: string; label: string | null }[]> = {}
 
   if (opponentIds.length > 0) {
     try {
       const scoutedRows = await db
-        .select({ id: matches.id, tournamentOpponentId: matches.tournamentOpponentId })
+        .select({ id: matches.id, tournamentOpponentId: matches.tournamentOpponentId, opponentLabel: matches.opponentLabel })
         .from(matches)
         .where(and(inArray(matches.tournamentOpponentId, opponentIds), eq(matches.status, 'analysed')))
         .orderBy(matches.createdAt)
@@ -165,13 +164,12 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
       for (const m of scoutedRows) {
         if (!m.tournamentOpponentId) continue
         scoutedMatchesByOpp[m.tournamentOpponentId] ??= []
-        scoutedMatchesByOpp[m.tournamentOpponentId].push(m.id)
-        firstMatchByOpp[m.tournamentOpponentId] ??= m.id
+        scoutedMatchesByOpp[m.tournamentOpponentId].push({ id: m.id, label: m.opponentLabel ?? null })
       }
     } catch { /* skip */ }
   }
 
-  const allScoutedMatchIds = Object.values(scoutedMatchesByOpp).flat()
+  const allScoutedMatchIds = Object.values(scoutedMatchesByOpp).flat().map(m => m.id)
 
   // Opponent positions — batched with JOIN
   const oppTopSecsByOpp: Record<string, number> = {}
@@ -304,7 +302,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
 
   // ── Build per-opponent data ────────────────────────────────────────────────
   const opponentData: OpponentRow[] = opponents.map(opp => {
-    const matchIds = scoutedMatchesByOpp[opp.id] ?? []
+    const scoutedMatches = scoutedMatchesByOpp[opp.id] ?? []
     const gp = gameplanByOpp[opp.id]
     const plan = gp && gp.status !== 'generating' && gp.structuredPlan && Object.keys(gp.structuredPlan as object).length > 0
       ? gp.structuredPlan as GameplanOutput
@@ -326,8 +324,8 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
       ibjjfBestResult: opp.ibjjfBestResult,
       footageStatus: opp.footageStatus ?? 'manual',
       intelStatus: opp.intelStatus,
-      scoutedMatchCount: matchIds.length,
-      firstMatchId: firstMatchByOpp[opp.id] ?? null,
+      scoutedMatchCount: scoutedMatches.length,
+      scoutedMatches,
       topPositions: (oppPositionsByOpp[opp.id] ?? []).slice(0, 3),
       attacks: oppAttacksByOpp[opp.id] ?? [],
       topPct: totalSecs > 0 ? Math.round((topSecs / totalSecs) * 100) : null,
@@ -337,7 +335,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
       gameplanStatus: gp?.status ?? null,
       hasGameplan: !!plan,
       communityMatchCount: communityCountByOpponentId[opp.id] ?? 0,
-      hasFootage: matchIds.length > 0 || (opp.footageStatus !== 'manual'),
+      hasFootage: scoutedMatches.length > 0 || (opp.footageStatus !== 'manual'),
     }
   })
 

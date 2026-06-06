@@ -39,7 +39,7 @@ export type OpponentRow = {
   footageStatus: string
   intelStatus: string | null
   scoutedMatchCount: number
-  firstMatchId: string | null
+  scoutedMatches: { id: string; label: string | null }[]
   topPositions: { positionId: string; secs: number }[]
   attacks: { label: string; count: number }[]
   topPct: number | null
@@ -63,7 +63,6 @@ const POSITION_LABEL: Record<string, string> = {
   de_la_riva: 'De La Riva', reverse_de_la_riva: 'RDLR',
 }
 function fmtPos(id: string) { return POSITION_LABEL[id] ?? id.replace(/_/g, ' ') }
-function pct(n: number, total: number) { return total === 0 ? '—' : `${Math.round((n / total) * 100)}%` }
 function careerRecord(w: number | null | undefined, l: number | null | undefined) {
   if (w == null && l == null) return null
   return `${w ?? 0}W ${l ?? 0}L`
@@ -75,7 +74,7 @@ function GameStyleBar({ topPct, right = false }: { topPct: number; right?: boole
   const label = topPct >= 65 ? 'Top player' : topPct >= 50 ? 'Balanced' : topPct >= 35 ? 'Guard-heavy' : 'Guard player'
   const fillClass = right ? 'bg-rose-500/60' : 'bg-emerald-500/60'
   const bgClass = right ? 'bg-rose-500/[0.12]' : 'bg-emerald-500/[0.12]'
-  const labelClass = right ? 'text-rose-400' : 'text-emerald-400'
+  const labelClass = right ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
@@ -94,10 +93,10 @@ function GameStyleBar({ topPct, right = false }: { topPct: number; right?: boole
 function VerdictBadge({ verdict, winProbability }: { verdict: string | null; winProbability: number | null }) {
   if (!verdict) return null
   const cfg = {
-    favourable: { bg: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400', label: 'Favourable' },
-    neutral:    { bg: 'bg-amber-500/15 border-amber-500/30 text-amber-400', label: 'Neutral' },
-    tough:      { bg: 'bg-rose-500/15 border-rose-500/30 text-rose-400', label: 'Tough match' },
-  }[verdict] ?? { bg: 'bg-zinc-500/15 border-zinc-500/30 text-zinc-400', label: verdict }
+    favourable: { bg: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400', label: 'Favourable' },
+    neutral:    { bg: 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400', label: 'Neutral' },
+    tough:      { bg: 'bg-rose-500/15 border-rose-500/30 text-rose-600 dark:text-rose-400', label: 'Tough match' },
+  }[verdict] ?? { bg: 'bg-zinc-500/15 border-zinc-500/30 text-zinc-500', label: verdict }
   return (
     <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full border ${cfg.bg}`}>
       {cfg.label}
@@ -110,28 +109,28 @@ function VerdictBadge({ verdict, winProbability }: { verdict: string | null; win
 
 function UserCard({ userName, data }: { userName: string; data: UserCardData }) {
   return (
-    <div className="rounded-2xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/30 bg-[oklch(0.13_0.01_255)]">
+    <div className="rounded-2xl overflow-hidden border border-border shadow-lg bg-zinc-100 dark:bg-zinc-900">
       {/* Green accent top strip */}
       <div className="h-1 w-full bg-gradient-to-r from-emerald-400 to-emerald-600" />
 
       <div className="p-4 space-y-4">
         {/* Identity */}
         <div>
-          <p className="text-[7px] font-black uppercase tracking-[0.35em] text-emerald-400/60 mb-1.5">You</p>
-          <p className="font-black text-2xl uppercase leading-tight tracking-wide text-white break-words">
+          <p className="text-[7px] font-black uppercase tracking-[0.35em] text-emerald-600 dark:text-emerald-400/70 mb-1.5">You</p>
+          <p className="font-black text-2xl uppercase leading-tight tracking-wide text-foreground break-words">
             {userName}
           </p>
           {data.ownTotal > 0 && (
             <div className="flex items-center gap-1.5 mt-2">
-              <span className="text-sm font-bold text-emerald-400">{data.ownWins}W</span>
-              <span className="text-sm font-bold text-white/30">{data.ownTotal - data.ownWins}L</span>
-              <span className="text-[9px] text-white/20 uppercase tracking-wider">on RollPlan</span>
+              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{data.ownWins}W</span>
+              <span className="text-sm font-bold text-foreground/40">{data.ownTotal - data.ownWins}L</span>
+              <span className="text-[9px] text-foreground/30 uppercase tracking-wider">on RollPlan</span>
             </div>
           )}
         </div>
 
         {/* Divider */}
-        <div className="h-px bg-white/[0.06]" />
+        <div className="h-px bg-border" />
 
         {/* Game style */}
         {data.userTopPct != null && (
@@ -141,9 +140,9 @@ function UserCard({ userName, data }: { userName: string; data: UserCardData }) 
         {/* Top positions */}
         {data.topPositions.length > 0 && (
           <div className="space-y-1">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-white/25">Dominates from</p>
+            <p className="text-[9px] font-bold uppercase tracking-wider text-foreground/40">Dominates from</p>
             {data.topPositions.slice(0, 3).map(p => (
-              <p key={p.positionId} className="text-xs text-white/60 font-medium">{fmtPos(p.positionId)}</p>
+              <p key={p.positionId} className="text-xs text-foreground/60 font-medium">{fmtPos(p.positionId)}</p>
             ))}
           </div>
         )}
@@ -151,11 +150,11 @@ function UserCard({ userName, data }: { userName: string; data: UserCardData }) 
         {/* Attacks */}
         {data.attacks.length > 0 && (
           <div className="space-y-1">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-white/25">Key attacks</p>
+            <p className="text-[9px] font-bold uppercase tracking-wider text-foreground/40">Key attacks</p>
             {data.attacks.slice(0, 3).map(a => (
               <p key={a.label} className="text-xs">
-                <span className="font-semibold text-white/70">{a.label}</span>
-                <span className="text-white/30 ml-1">×{a.count}</span>
+                <span className="font-semibold text-foreground/70">{a.label}</span>
+                <span className="text-foreground/40 ml-1">×{a.count}</span>
               </p>
             ))}
           </div>
@@ -163,10 +162,10 @@ function UserCard({ userName, data }: { userName: string; data: UserCardData }) 
 
         {data.ownTotal === 0 && (
           <div className="space-y-2">
-            <p className="text-[11px] text-white/25 italic leading-snug">Upload your own footage to build your player card</p>
+            <p className="text-[11px] text-foreground/40 italic leading-snug">Upload your own footage to build your player card</p>
             <Link
               href="/upload?context=own"
-              className="block text-center text-[10px] font-semibold px-3 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 hover:bg-emerald-500/25 transition-colors"
+              className="block text-center text-[10px] font-semibold px-3 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25 transition-colors"
             >
               + Add your footage
             </Link>
@@ -185,25 +184,26 @@ function OpponentSection({ opp, tournamentId }: { opp: OpponentRow; tournamentId
   const scRecord = careerRecord(opp.smoothcompWins, opp.smoothcompLosses)
   const hasStats = opp.scoutedMatchCount > 0
   const isScanning = opp.footageStatus === 'pending' || opp.footageStatus === 'auto_queued'
+  const backParam = encodeURIComponent(`/tournaments/${tournamentId}/opponents`)
 
   return (
-    <div id={`opp-${opp.id}`} className="rounded-2xl overflow-hidden border border-white/[0.08] shadow-lg shadow-black/20">
+    <div className="rounded-2xl overflow-hidden border border-border shadow-sm">
 
       {/* Rose accent top strip */}
-      <div className="h-1 w-full bg-gradient-to-r from-rose-500 to-rose-700" />
+      <div className="h-1 w-full bg-gradient-to-r from-rose-500 to-rose-600" />
 
       {/* Opponent header */}
-      <div className="bg-[oklch(0.13_0.01_255)] px-5 py-4">
+      <div className="bg-zinc-100 dark:bg-zinc-900 px-5 py-4">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-[7px] font-black uppercase tracking-[0.35em] text-rose-400/60 mb-1.5">Opponent</p>
+            <p className="text-[7px] font-black uppercase tracking-[0.35em] text-rose-600 dark:text-rose-400/70 mb-1.5">Opponent</p>
             <div className="flex items-center gap-3 min-w-0">
               {opp.profilePhotoUrl && (
                 <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-rose-500/30 flex-shrink-0">
                   <Image src={opp.profilePhotoUrl} alt={opp.opponentLabel} width={36} height={36} className="object-cover w-full h-full" />
                 </div>
               )}
-              <p className="font-black text-2xl uppercase leading-tight tracking-wide text-white truncate">
+              <p className="font-black text-2xl uppercase leading-tight tracking-wide text-foreground truncate">
                 {opp.opponentLabel}
               </p>
             </div>
@@ -211,43 +211,49 @@ function OpponentSection({ opp, tournamentId }: { opp: OpponentRow; tournamentId
             <div className="flex items-center gap-3 mt-2 flex-wrap">
               {ajpRecord && (
                 <span className="flex items-center gap-1.5">
-                  <span className="text-[9px] text-white/25 uppercase tracking-wider font-bold">AJP</span>
-                  <span className="text-xs font-bold text-rose-400">{ajpRecord.split(' ')[0]}</span>
-                  <span className="text-xs font-bold text-white/30">{ajpRecord.split(' ')[1]}</span>
+                  <span className="text-[9px] text-foreground/40 uppercase tracking-wider font-bold">AJP</span>
+                  <span className="text-xs font-bold text-rose-600 dark:text-rose-400">{ajpRecord.split(' ')[0]}</span>
+                  <span className="text-xs font-bold text-foreground/40">{ajpRecord.split(' ')[1]}</span>
                 </span>
               )}
               {scRecord && (
                 <span className="flex items-center gap-1.5">
-                  <span className="text-[9px] text-white/25 uppercase tracking-wider font-bold">SC</span>
-                  <span className="text-xs font-bold text-rose-400">{scRecord.split(' ')[0]}</span>
-                  <span className="text-xs font-bold text-white/30">{scRecord.split(' ')[1]}</span>
+                  <span className="text-[9px] text-foreground/40 uppercase tracking-wider font-bold">SC</span>
+                  <span className="text-xs font-bold text-rose-600 dark:text-rose-400">{scRecord.split(' ')[0]}</span>
+                  <span className="text-xs font-bold text-foreground/40">{scRecord.split(' ')[1]}</span>
                 </span>
               )}
               {opp.ibjjfBestResult && (
                 <span className="flex items-center gap-1.5">
-                  <span className="text-[9px] text-white/25 uppercase tracking-wider font-bold">IBJJF</span>
-                  <span className="text-[11px] text-white/50">{opp.ibjjfBestResult.split('|')[0]?.trim()}</span>
+                  <span className="text-[9px] text-foreground/40 uppercase tracking-wider font-bold">IBJJF</span>
+                  <span className="text-[11px] text-foreground/50">{opp.ibjjfBestResult.split('|')[0]?.trim()}</span>
                 </span>
               )}
               {opp.communityMatchCount > 0 && (
-                <span className="text-[9px] text-violet-400/70 font-medium">{opp.communityMatchCount} community match{opp.communityMatchCount !== 1 ? 'es' : ''}</span>
+                <span className="text-[9px] text-violet-600 dark:text-violet-400/70 font-medium">{opp.communityMatchCount} community match{opp.communityMatchCount !== 1 ? 'es' : ''}</span>
               )}
             </div>
           </div>
 
           {/* Action buttons */}
-          <div className="flex flex-col items-end gap-2 flex-shrink-0 pt-1">
-            {hasStats && opp.firstMatchId && (
-              <Link
-                href={`/matches/${opp.firstMatchId}`}
-                className="text-xs text-white/40 hover:text-white/80 transition-colors font-medium whitespace-nowrap"
-              >
-                View scouting →
-              </Link>
+          <div className="flex flex-col items-end gap-1.5 flex-shrink-0 pt-1">
+            {/* Scouting links — one per match */}
+            {hasStats && opp.scoutedMatches.length > 0 && (
+              <div className="flex flex-col items-end gap-1">
+                {opp.scoutedMatches.map(m => (
+                  <Link
+                    key={m.id}
+                    href={`/matches/${m.id}?back=${backParam}`}
+                    className="text-xs text-foreground/40 hover:text-foreground/80 transition-colors font-medium whitespace-nowrap"
+                  >
+                    {m.label ? `vs ${m.label} ↗` : 'View scouting ↗'}
+                  </Link>
+                ))}
+              </div>
             )}
             <Link
               href={`/tournaments/${tournamentId}/fight-card/${opp.id}`}
-              className="text-xs text-rose-400/60 hover:text-rose-400 transition-colors font-medium whitespace-nowrap"
+              className="text-xs text-rose-500/60 hover:text-rose-500 transition-colors font-medium whitespace-nowrap"
             >
               Fight card →
             </Link>
@@ -267,7 +273,7 @@ function OpponentSection({ opp, tournamentId }: { opp: OpponentRow; tournamentId
 
             {/* Left: game stats */}
             <div className="p-4 space-y-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-400/70">Their game</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-500 dark:text-rose-400/70">Their game</p>
 
               {opp.topPct != null && <GameStyleBar topPct={opp.topPct} right />}
 
@@ -369,16 +375,10 @@ function OpponentSection({ opp, tournamentId }: { opp: OpponentRow; tournamentId
           </div>
         )}
 
-        {/* Footer action row — shown when footage exists */}
+        {/* Footer — scout more button only */}
         {hasStats && (
-          <div className="px-5 py-3 border-t border-border/30 flex items-center justify-between gap-3">
+          <div className="px-5 py-3 border-t border-border/30">
             <ScoutForm opponentId={opp.id} tournamentId={tournamentId} opponentName={opp.opponentLabel} hasMatches />
-            <Link
-              href={`/tournaments/${tournamentId}/fight-card/${opp.id}`}
-              className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground transition-colors whitespace-nowrap flex-shrink-0"
-            >
-              Full fight card →
-            </Link>
           </div>
         )}
       </div>
@@ -423,14 +423,14 @@ export function TournamentFightView({
         </div>
       </div>
 
-      {/* Desktop: sticky left + scrollable right */}
+      {/* Desktop: sticky left + scroll-snapped right */}
       <div className="hidden md:flex gap-5 items-start">
 
         {/* Sticky user card */}
-        <div className="w-[220px] flex-shrink-0 sticky top-20">
+        <div className="w-[220px] flex-shrink-0 sticky top-20 self-start">
           <UserCard userName={userName} data={userData} />
 
-          {/* Jump nav — anchor links to each opponent section */}
+          {/* Jump nav */}
           {opponents.length > 1 && (
             <nav className="mt-3 space-y-0.5">
               {opponents.map((opp, i) => (
@@ -453,10 +453,15 @@ export function TournamentFightView({
           )}
         </div>
 
-        {/* Scrollable opponent sections */}
-        <div className="flex-1 min-w-0 space-y-4">
+        {/* Scrollable opponent sections — snaps each card to top */}
+        <div
+          className="flex-1 min-w-0 overflow-y-auto snap-y snap-proximity"
+          style={{ maxHeight: 'calc(100vh - 220px)' }}
+        >
           {opponents.map(opp => (
-            <OpponentSection key={opp.id} opp={opp} tournamentId={tournamentId} />
+            <div key={opp.id} id={`opp-${opp.id}`} className="pb-4 snap-start">
+              <OpponentSection opp={opp} tournamentId={tournamentId} />
+            </div>
           ))}
         </div>
       </div>
@@ -464,16 +469,16 @@ export function TournamentFightView({
       {/* Mobile: stacked */}
       <div className="md:hidden space-y-4">
         {/* Condensed user banner */}
-        <div className="rounded-xl overflow-hidden border border-white/[0.08] bg-[oklch(0.13_0.01_255)] p-4">
+        <div className="rounded-xl overflow-hidden border border-border bg-zinc-100 dark:bg-zinc-900 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[7px] font-black uppercase tracking-[0.35em] text-emerald-400/60 mb-1">You</p>
-              <p className="font-black text-xl uppercase leading-tight text-white">{userName}</p>
+              <p className="text-[7px] font-black uppercase tracking-[0.35em] text-emerald-600 dark:text-emerald-400/60 mb-1">You</p>
+              <p className="font-black text-xl uppercase leading-tight text-foreground">{userName}</p>
               {userData.ownTotal > 0 && (
                 <p className="text-xs mt-1">
-                  <span className="text-emerald-400 font-bold">{userData.ownWins}W</span>
-                  <span className="text-white/30 font-bold ml-1">{userData.ownTotal - userData.ownWins}L</span>
-                  <span className="text-white/20 ml-1 text-[9px] uppercase">on RollPlan</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">{userData.ownWins}W</span>
+                  <span className="text-foreground/40 font-bold ml-1">{userData.ownTotal - userData.ownWins}L</span>
+                  <span className="text-foreground/30 ml-1 text-[9px] uppercase">on RollPlan</span>
                 </p>
               )}
             </div>
