@@ -100,12 +100,13 @@ function GameCard({
             {/* ATTACK chain */}
             <div className="rounded-lg bg-foreground/[0.03] border border-border/30 px-3 py-2.5 space-y-1">
               <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50 mb-1.5">Attack</p>
-              {plan.primary_chain.steps.slice(0, 3).map((step, i) => (
-                <div key={i} className="text-xs text-foreground/85 flex gap-2 items-baseline">
-                  <span className="text-[9px] font-black text-muted-foreground/25 tabular-nums flex-shrink-0 mt-px">{i + 1}</span>
-                  <span className="line-clamp-1 font-medium leading-snug">{step}</span>
-                </div>
-              ))}
+              <div className="text-xs text-foreground/85 flex gap-2 items-baseline">
+                <span className="text-[9px] font-black text-muted-foreground/25 tabular-nums flex-shrink-0 mt-px">1</span>
+                <span className="font-medium leading-snug">{plan.primary_chain.steps[0]}</span>
+              </div>
+              {plan.primary_chain.steps.length > 1 && (
+                <p className="text-[10px] text-muted-foreground/40 pl-4">+{plan.primary_chain.steps.length - 1} more</p>
+              )}
             </div>
 
             {/* DANGER */}

@@ -146,11 +146,16 @@ export default async function MatchesPage() {
           <Link href="/upload" className={buttonVariants({ size: 'sm' })}>+ Analyse</Link>
         </div>
         <div className="rounded-2xl border border-dashed border-border/60 p-10 space-y-8">
-          <div className="max-w-lg">
-            <h2 className="text-lg font-semibold mb-1.5">Upload match footage.</h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              AI breaks it into positions, events, and coaching notes — automatically.
-            </p>
+          <div className="max-w-lg space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold mb-1.5">Upload match footage.</h2>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                AI breaks it into positions, events, and coaching notes — automatically.
+              </p>
+            </div>
+            <Link href="/upload" className={buttonVariants()}>
+              Analyse your first match →
+            </Link>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[
@@ -164,9 +169,6 @@ export default async function MatchesPage() {
               </div>
             ))}
           </div>
-          <Link href="/upload" className={buttonVariants()}>
-            Analyse your first match →
-          </Link>
           <p className="text-xs text-muted-foreground border-t border-border/40 pt-4">
             Scouted opponent footage lives under{' '}
             <Link href="/tournaments" className="underline underline-offset-2 hover:text-foreground transition-colors">

@@ -75,9 +75,14 @@ function BottomTabBar() {
       <div className="flex items-stretch h-16">
         {TAB_NAV.map(({ href, label, icon }) => {
           let active: boolean
+          const isGameplanSubPage = /\/tournaments\/[^/]+\/gameplan/.test(path)
           if (path.startsWith('/matches/')) {
             if (href === '/tournaments') active = back.startsWith('/tournaments')
             else if (href === '/matches') active = !back.startsWith('/tournaments')
+            else active = false
+          } else if (isGameplanSubPage) {
+            if (href === '/gameplans') active = back.startsWith('/gameplans') || back.startsWith('/game-day')
+            else if (href === '/tournaments') active = !back.startsWith('/gameplans') && !back.startsWith('/game-day')
             else active = false
           } else {
             active = path === href || path.startsWith(href + '/')
@@ -109,9 +114,14 @@ function NavLinks({ onLinkClick }: { onLinkClick?: () => void }) {
     <>
       {NAV.map(({ href, label }) => {
         let active: boolean
+        const isGameplanSubPage = /\/tournaments\/[^/]+\/gameplan/.test(path)
         if (path.startsWith('/matches/')) {
           if (href === '/tournaments') active = back.startsWith('/tournaments')
           else if (href === '/matches') active = !back.startsWith('/tournaments')
+          else active = false
+        } else if (isGameplanSubPage) {
+          if (href === '/gameplans') active = back.startsWith('/gameplans') || back.startsWith('/game-day')
+          else if (href === '/tournaments') active = !back.startsWith('/gameplans') && !back.startsWith('/game-day')
           else active = false
         } else {
           active = path === href || path.startsWith(href + '/')

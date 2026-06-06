@@ -346,7 +346,17 @@ export default async function PlayerCardPage() {
         <div className="space-y-5 min-w-0">
           <ProfileHeader name={displayName} dbUser={dbUser} />
 
-          {isEmpty ? (
+          {isEmpty && hasAnyOpponent ? (
+            <div className="rounded-xl border border-border/60 bg-card p-6 space-y-4">
+              <div>
+                <p className="text-sm font-semibold">Upload your first match</p>
+                <p className="text-xs text-muted-foreground mt-0.5">You&apos;ve got opponents set up — upload footage and your player card will populate automatically.</p>
+              </div>
+              <Link href="/upload" className={buttonVariants()}>
+                + Analyse a match
+              </Link>
+            </div>
+          ) : isEmpty ? (
             <div className="rounded-xl border border-border/60 bg-card p-6 space-y-5">
               <div>
                 <p className="text-sm font-semibold">Get started</p>
