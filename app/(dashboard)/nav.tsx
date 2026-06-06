@@ -121,7 +121,7 @@ function NavLinks({ onLinkClick }: { onLinkClick?: () => void }) {
             key={href}
             href={href}
             onClick={onLinkClick}
-            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+            className={`px-3 py-1.5 text-sm rounded-md transition-colors whitespace-nowrap ${
               active
                 ? 'text-foreground font-medium bg-muted'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
@@ -157,18 +157,12 @@ export function Nav({ usageSlot }: { usageSlot?: React.ReactNode }) {
             <Suspense fallback={
               <div className="flex items-center gap-1">
                 {NAV.map(({ href, label }) => (
-                  <Link key={href} href={href} className="px-3 py-1.5 text-sm rounded-md text-muted-foreground">{label}</Link>
+                  <Link key={href} href={href} className="px-3 py-1.5 text-sm rounded-md text-muted-foreground whitespace-nowrap">{label}</Link>
                 ))}
               </div>
             }>
               <NavLinks />
             </Suspense>
-          </div>
-
-          <div className="hidden sm:block">
-            <Link href="/upload" className={buttonVariants({ size: 'sm' })}>
-              + Analyse My Match
-            </Link>
           </div>
         </div>
 
@@ -176,6 +170,9 @@ export function Nav({ usageSlot }: { usageSlot?: React.ReactNode }) {
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Desktop only */}
           <div className="hidden sm:flex items-center gap-3">
+            <Link href="/upload" className={buttonVariants({ size: 'sm' })}>
+              + Analyse
+            </Link>
             {usageSlot}
             <NotificationBell />
             <ThemeToggle />

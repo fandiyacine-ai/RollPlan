@@ -18,11 +18,11 @@ async function UsagePill() {
     const pct = Math.min(100, (used / limit) * 100)
     const barColor = used >= limit ? 'bg-rose-500' : used >= Math.floor(limit * 0.8) ? 'bg-amber-500' : 'bg-foreground/40'
     return (
-      <Link href="/usage" className="flex flex-col items-end gap-1 group" title="My usage">
-        <span className="text-[10px] text-muted-foreground/70 group-hover:text-muted-foreground leading-none tabular-nums transition-colors">{used}/{limit} analyses</span>
-        <div className="w-14 h-1 rounded-full bg-muted overflow-hidden">
+      <Link href="/usage" className="flex items-center gap-1.5 group" title="My usage">
+        <div className="w-12 h-1 rounded-full bg-muted overflow-hidden shrink-0">
           <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
         </div>
+        <span className="text-[10px] text-muted-foreground/70 group-hover:text-muted-foreground leading-none tabular-nums transition-colors whitespace-nowrap">{used}/{limit}</span>
       </Link>
     )
   } catch {
