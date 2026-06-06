@@ -183,6 +183,7 @@ export default async function MatchDetailPage({
         positionNames={POSITION_MAP}
         backHref={backHref}
         backLabel={backLabel}
+        narration={match.narration ?? null}
         viewMode={match.tournamentOpponentId ? 'scouting' : 'analysis'}
         opponentIntel={tournamentOpponentRow ? {
           ajpWins: tournamentOpponentRow.ajpWins ?? null,

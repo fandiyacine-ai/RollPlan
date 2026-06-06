@@ -123,9 +123,19 @@ export default async function GameplanPage({
     ? existingGameplan.structuredPlan as GameplanOutput
     : null
 
+  const resolvedBack = backHref ?? `/tournaments/${tournamentId}/opponents`
+  const backLabel = backHref?.includes('/fight-view') || backHref?.includes('/opponents')
+    ? '← Opponents'
+    : '← Back'
+
   return (
     <div className="space-y-3 sm:space-y-5">
       {isGenerating && <AutoRefresh intervalMs={5000} />}
+
+      {/* Back link */}
+      <Link href={resolvedBack} className="text-xs text-muted-foreground hover:text-foreground transition-colors inline-block -mb-1">
+        {backLabel}
+      </Link>
 
       {/* Opponent selector */}
       {sortedOpponents.length > 1 && (

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useRef, useState, useCallback } from 'react'
+import React, { useRef, useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import { CorrectResultButton } from './correct-result-button'
 import { ShareButton } from './share-button'
@@ -64,9 +64,52 @@ function ResultBadge({ winner, method, technique }: { winner: string; method: st
   )
 }
 
+// ─── TL;DR chips — match-day quick-read strip ─────────────────────────────────
+
+function tldrText(text: string | undefined): string | null {
+  if (!text) return null
+  const words = text.split(/\s+/)
+  return words.slice(0, 6).join(' ') + (words.length > 6 ? '…' : '')
+}
+
+function TldrChips({ insights }: { insights: InsightRow[] }) {
+  const attack = insights.find(i => i.category === 'opportunity')
+  const danger =
+    insights.find(i => i.category === 'mistake' && i.severity === 'critical') ??
+    insights.find(i => i.category === 'mistake')
+  const pattern = insights.find(i => i.category === 'pattern')
+
+  if (!attack && !danger && !pattern) return null
+
+  return (
+    <div className="flex flex-wrap gap-2 px-3 py-2.5">
+      {tldrText(attack?.description) && (
+        <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 leading-none">
+          ↗ {tldrText(attack?.description)}
+        </span>
+      )}
+      {tldrText(danger?.description) && (
+        <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 leading-none">
+          ⚠ {tldrText(danger?.description)}
+        </span>
+      )}
+      {tldrText(pattern?.description) && (
+        <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-zinc-500/10 text-zinc-400 border border-zinc-500/20 leading-none">
+          ↻ {tldrText(pattern?.description)}
+        </span>
+      )}
+    </div>
+  )
+}
+
 // ─── Tab: Scouting Brief ──────────────────────────────────────────────────────
 
-function BriefTab({ insights, large = false }: { insights: InsightRow[]; large?: boolean }) {
+function BriefTab({ insights, narration, narratingAuto, large = false }: {
+  insights: InsightRow[]
+  narration?: string | null
+  narratingAuto?: boolean
+  large?: boolean
+}) {
   const attack = insights.find(i => i.category === 'opportunity')
   const danger =
     insights.find(i => i.category === 'mistake' && i.severity === 'critical') ??
@@ -125,29 +168,8 @@ function BriefTab({ insights, large = false }: { insights: InsightRow[]; large?:
     )
   }
 
-  const tldr = (text: string | undefined) => {
-    if (!text) return null
-    const words = text.split(/\s+/)
-    return words.slice(0, 5).join(' ') + (words.length > 5 ? '…' : '')
-  }
-
   return (
     <div className="divide-y divide-border/40">
-      {/* TL;DR chip row — mobile only, for at-a-glance arena reading */}
-      {large && (attack || danger || pattern) && (
-        <div className="flex flex-wrap gap-1.5 px-4 pt-3 pb-2">
-          {tldr(attack?.description) && (
-            <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 leading-none">
-              ↗ {tldr(attack?.description)}
-            </span>
-          )}
-          {tldr(danger?.description) && (
-            <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 leading-none">
-              ⚠ {tldr(danger?.description)}
-            </span>
-          )}
-        </div>
-      )}
       {rows.map(row => (
         <div key={row.label} className={`flex gap-3 px-4 py-4 items-start ${row.rowBorder}`}>
           <div className="flex items-center gap-1.5 w-20 flex-shrink-0 pt-0.5">
@@ -161,6 +183,19 @@ function BriefTab({ insights, large = false }: { insights: InsightRow[]; large?:
           )}
         </div>
       ))}
+
+      {/* Match narration — auto-generated summary */}
+      {narratingAuto && !narration && (
+        <div className="px-4 py-3 border-t border-border/30">
+          <p className="text-[10px] text-muted-foreground/40 animate-pulse">Writing match report…</p>
+        </div>
+      )}
+      {narration && (
+        <div className="px-4 py-3 border-t border-border/30">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mb-1.5">Match report</p>
+          <p className="text-xs text-muted-foreground/70 leading-relaxed italic">{narration}</p>
+        </div>
+      )}
     </div>
   )
 }
@@ -943,6 +978,7 @@ export function ScoutingView({
   viewMode,
   opponentIntel,
   userIntel,
+  narration,
 }: {
   match: {
     id: string
@@ -967,9 +1003,24 @@ export function ScoutingView({
   viewMode?: 'scouting' | 'analysis'
   opponentIntel?: IntelRecord | null
   userIntel?: IntelRecord | null
+  narration?: string | null
 }) {
   const [currentTime, setCurrentTime] = useState(0)
   const [activeTab, setActiveTab] = useState<TabId>('brief')
+  const [liveNarration, setLiveNarration] = useState<string | null>(narration ?? null)
+  const [narratingAuto, setNarratingAuto] = useState(false)
+
+  useEffect(() => {
+    if (liveNarration) return
+    setNarratingAuto(true)
+    fetch(`/api/matches/${match.id}/narrate`, { method: 'POST' })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { narration?: string } | null) => { if (data?.narration) setLiveNarration(data.narration) })
+      .catch(() => {})
+      .finally(() => setNarratingAuto(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const videoRef = useRef<HTMLVideoElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
@@ -1121,7 +1172,7 @@ export function ScoutingView({
           {/* Tab content — AskTab stays mounted to preserve chat state and active fetches */}
           <div className={`flex-1 min-h-0 ${activeTab === 'ask' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'}`}>
             <div className={activeTab === 'brief' ? '' : 'hidden'}>
-              <BriefTab insights={insights} />
+              <BriefTab insights={insights} narration={liveNarration} narratingAuto={narratingAuto} />
               {viewMode === 'scouting' && <RecordsComparison opponentLabel={match.competitorLabel ?? opponentName} opponentIntel={opponentIntel} userIntel={userIntel} />}
             </div>
             <div className={activeTab === 'timeline' ? '' : 'hidden'}>
@@ -1153,9 +1204,16 @@ export function ScoutingView({
 
       {/* ── Mobile: brief first, rest tabbed ── */}
       <div className="md:hidden flex-1 overflow-hidden flex flex-col pt-4 gap-3">
+        {/* TL;DR chips — always visible above the fold for match-day use */}
+        {insights.length > 0 && (
+          <div className="flex-shrink-0 rounded-xl border border-border/60 bg-card">
+            <TldrChips insights={insights} />
+          </div>
+        )}
+
         {/* Brief — capped so tab panel always gets ≥50% of remaining space */}
-        <div className="flex-shrink-0 rounded-xl border border-border/60 bg-card max-h-[42vh] overflow-y-auto">
-          <BriefTab insights={insights} large />
+        <div className="flex-shrink-0 rounded-xl border border-border/60 bg-card max-h-[38vh] overflow-y-auto">
+          <BriefTab insights={insights} narration={liveNarration} narratingAuto={narratingAuto} large />
           {viewMode === 'scouting' && <RecordsComparison opponentLabel={opponentName} opponentIntel={opponentIntel} userIntel={userIntel} />}
         </div>
 
