@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { CorrectResultButton } from './correct-result-button'
 import { ShareButton } from './share-button'
 import { EVENT_TYPES } from '../../../../lib/taxonomy/events'
+import { correctPosition } from './actions'
+import { POSITIONS } from '../../../../lib/taxonomy/positions'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -243,53 +245,105 @@ const DOM_DOT: Record<string, string> = { dominant: 'bg-emerald-500', inferior: 
 const DOM_LABEL: Record<string, string> = { dominant: 'In control', inferior: 'Under pressure', neutral: 'Neutral' }
 const DOM_TEXT: Record<string, string> = { dominant: 'text-emerald-500', inferior: 'text-rose-500', neutral: 'text-muted-foreground' }
 
-function TimelineTab({ items, onSeek, competitorLabel, opponentLabel }: {
+function TimelineTab({ items, onSeek, competitorLabel, opponentLabel, onCorrectPosition }: {
   items: TimelineItem[]
   onSeek: (t: number) => void
   competitorLabel: string | null
   opponentLabel: string | null
+  onCorrectPosition?: (segmentId: string, newPositionId: string) => Promise<void>
 }) {
+  const [correctingId, setCorrectingId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  async function handleCorrect(segmentId: string, newId: string) {
+    if (!onCorrectPosition) return
+    setSaving(true)
+    await onCorrectPosition(segmentId, newId)
+    setSaving(false)
+    setCorrectingId(null)
+  }
+
   return (
     <div className="divide-y divide-border/30">
-      {items.map((item, i) => (
-        <button
-          key={i}
-          onClick={() => onSeek(item.time)}
-          className="w-full text-left flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors"
-        >
-          <span className="text-[11px] font-mono text-muted-foreground w-9 flex-shrink-0 tabular-nums">
-            {fmtTime(item.time)}
-          </span>
-          {item.type === 'position' ? (
-            <>
-              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${DOM_DOT[item.dominance] ?? 'bg-zinc-500'}`} />
-              <span className="flex-1 text-sm font-medium min-w-0 truncate">{item.positionName}</span>
-              <span className={`text-[10px] font-semibold uppercase tracking-wide flex-shrink-0 ${DOM_TEXT[item.dominance] ?? 'text-muted-foreground'}`}>
-                {DOM_LABEL[item.dominance]}
-              </span>
-              <span className="text-xs text-muted-foreground tabular-nums flex-shrink-0 ml-1">
-                {fmtTime(item.durationSeconds)}
-              </span>
-            </>
-          ) : (
-            <>
-              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${item.actor === 'user' ? 'bg-blue-400' : 'bg-orange-400'}`} />
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${
-                item.actor === 'user' ? 'bg-blue-950 text-blue-400' : 'bg-orange-950 text-orange-400'
-              }`}>
-                {item.actor === 'user' ? (competitorLabel ?? 'You') : (opponentLabel ?? 'Opp')}
-              </span>
-              <span className="flex-1 text-sm font-medium min-w-0 truncate">{item.eventName}</span>
-              {item.techniqueLabel && (
-                <span className="text-xs italic text-muted-foreground flex-shrink-0 hidden sm:inline">{item.techniqueLabel}</span>
-              )}
-              {item.outcome && (
-                <span className="text-xs text-muted-foreground flex-shrink-0 capitalize">{item.outcome}</span>
-              )}
-            </>
-          )}
-        </button>
-      ))}
+      {items.map((item, i) => {
+        const isCorrecting = item.type === 'position' && correctingId === item.segmentId
+        return (
+          <div
+            key={i}
+            className={`group relative flex items-center gap-3 px-4 py-2.5 transition-colors ${!isCorrecting ? 'hover:bg-muted/40 cursor-pointer' : ''}`}
+            onClick={isCorrecting ? undefined : () => onSeek(item.time)}
+          >
+            <span className="text-[11px] font-mono text-muted-foreground w-9 flex-shrink-0 tabular-nums">
+              {fmtTime(item.time)}
+            </span>
+            {item.type === 'position' ? (
+              <>
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${DOM_DOT[item.dominance] ?? 'bg-zinc-500'}`} />
+                <span className="flex-1 text-sm font-medium min-w-0 truncate">{item.positionName}</span>
+                {!isCorrecting && (
+                  <>
+                    <span className={`text-[10px] font-semibold uppercase tracking-wide flex-shrink-0 ${DOM_TEXT[item.dominance] ?? 'text-muted-foreground'}`}>
+                      {DOM_LABEL[item.dominance]}
+                    </span>
+                    <span className="text-xs text-muted-foreground tabular-nums flex-shrink-0 ml-1">
+                      {fmtTime(item.durationSeconds)}
+                    </span>
+                  </>
+                )}
+                {onCorrectPosition && !isCorrecting && (
+                  <button
+                    type="button"
+                    onClick={e => { e.stopPropagation(); setCorrectingId(item.segmentId) }}
+                    className="text-[10px] text-muted-foreground/30 hover:text-muted-foreground/80 group-hover:opacity-100 opacity-30 transition-all flex-shrink-0 ml-1 leading-none"
+                    title="Correct this position"
+                  >
+                    Wrong?
+                  </button>
+                )}
+                {isCorrecting && (
+                  <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                    <select
+                      className="text-xs rounded border border-input bg-background px-2 py-1 focus:outline-none"
+                      defaultValue={POSITIONS.find(p => p.name === item.positionName)?.id ?? ''}
+                      onChange={e => handleCorrect(item.segmentId, e.target.value)}
+                      disabled={saving}
+                    >
+                      <option value="" disabled>Pick correct position…</option>
+                      {POSITIONS.map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setCorrectingId(null)}
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Cancel
+                    </button>
+                    {saving && <span className="text-xs text-muted-foreground">Saving…</span>}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${item.actor === 'user' ? 'bg-blue-400' : 'bg-orange-400'}`} />
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${
+                  item.actor === 'user' ? 'bg-blue-950 text-blue-400' : 'bg-orange-950 text-orange-400'
+                }`}>
+                  {item.actor === 'user' ? (competitorLabel ?? 'You') : (opponentLabel ?? 'Opp')}
+                </span>
+                <span className="flex-1 text-sm font-medium min-w-0 truncate">{item.eventName}</span>
+                {item.techniqueLabel && (
+                  <span className="text-xs italic text-muted-foreground flex-shrink-0 hidden sm:inline">{item.techniqueLabel}</span>
+                )}
+                {item.outcome && (
+                  <span className="text-xs text-muted-foreground flex-shrink-0 capitalize">{item.outcome}</span>
+                )}
+              </>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -769,22 +823,39 @@ function AskTab({ matchId, currentTime, opponentName, videoRef }: {
 
   return (
     <div className="flex flex-col h-full">
+      {/* Clear button — only shown when a conversation exists */}
+      {messages.length > 0 && (
+        <div className="flex items-center justify-end px-3 pt-2 pb-1 flex-shrink-0">
+          <button
+            onClick={() => setMessages([])}
+            className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground/80 transition-colors flex items-center gap-1"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+            New chat
+          </button>
+        </div>
+      )}
+
       {/* Messages / empty state */}
       <div className="flex-1 overflow-y-auto min-h-0 p-4">
         {messages.length === 0 ? (
-          <div className="space-y-4 pt-1">
-            {canCapture && (
-              <p className="text-xs text-muted-foreground/50">
-                Pause at any frame — ask the AI exactly what happened.
-              </p>
-            )}
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-violet-400">
-                <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
-              </svg>
-              Ask anything about {opponentName}
+          <div className="flex flex-col items-center justify-center min-h-[180px] h-full gap-5 px-2">
+            <div className="flex flex-col items-center gap-2 text-center">
+              <div className="w-10 h-10 rounded-full bg-violet-500/10 flex items-center justify-center flex-shrink-0">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-violet-400">
+                  <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
+                </svg>
+              </div>
+              <p className="text-sm font-semibold">Ask about {opponentName}</p>
+              {canCapture && (
+                <p className="text-xs text-muted-foreground/60 leading-relaxed max-w-[200px]">
+                  Pause the video at any frame to ask the AI exactly what happened in that position.
+                </p>
+              )}
             </div>
-            <div className="space-y-2">
+            <div className="w-full space-y-1.5">
               {SUGGESTED_QUESTIONS.map(q => (
                 <button
                   key={q}
@@ -919,6 +990,10 @@ export function ScoutingView({
     setCurrentTime(seconds)
   }, [ytId])
 
+  const handleCorrectPosition = useCallback(async (segmentId: string, newPositionId: string) => {
+    await correctPosition(segmentId, newPositionId)
+  }, [])
+
   const opponentName =
     match.opponentLabel && match.opponentLabel.toLowerCase() !== 'unknown'
       ? match.opponentLabel
@@ -976,7 +1051,7 @@ export function ScoutingView({
       <div className="hidden md:flex flex-1 overflow-hidden gap-4 pt-4">
 
         {/* Left — video (inlined to avoid remount on tab switch) */}
-        <div className="flex flex-col w-[48%] flex-shrink-0 gap-3 overflow-hidden">
+        <div className={`flex flex-col flex-shrink-0 gap-3 overflow-hidden transition-all duration-200 ${activeTab === 'ask' ? 'w-[38%]' : 'w-[48%]'}`}>
           <div className="rounded-xl overflow-hidden bg-black border border-border/60 flex-shrink-0">
             {ytId ? (
               <div className="aspect-video">
@@ -1055,6 +1130,7 @@ export function ScoutingView({
                 onSeek={seekTo}
                 competitorLabel={match.competitorLabel}
                 opponentLabel={match.opponentLabel}
+                onCorrectPosition={handleCorrectPosition}
               />
             </div>
             <div className={activeTab === 'notes' ? '' : 'hidden'}><NotesTab insights={insights} /></div>

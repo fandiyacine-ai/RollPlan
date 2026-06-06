@@ -188,7 +188,7 @@ function TimelineRow({
                 <button
                   type="button"
                   onClick={e => { e.stopPropagation(); setCorrecting(true) }}
-                  className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
+                  className="text-[10px] text-muted-foreground/30 hover:text-muted-foreground opacity-25 group-hover:opacity-100 transition-all flex-shrink-0"
                   title="Correct this position"
                 >
                   Wrong?
