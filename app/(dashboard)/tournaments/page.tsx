@@ -93,7 +93,7 @@ export default async function TournamentsPage() {
               <Link
                 key={t.id}
                 href={`/tournaments/${t.id}/opponents`}
-                className="block rounded-xl border border-border/60 bg-card px-4 py-3.5 hover:bg-muted/30 hover:border-border transition-colors"
+                className="block rounded-xl border border-border/60 bg-card px-4 py-3.5 hover:bg-muted/30 hover:border-border active:bg-muted/40 transition-colors"
               >
                 <div className="flex items-start justify-between gap-3">
                   {/* Left: name + meta */}
@@ -118,7 +118,7 @@ export default async function TournamentsPage() {
                     </div>
                   </div>
 
-                  {/* Right: countdown + status + actions */}
+                  {/* Right: countdown + status + actions + nav chevron */}
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {days !== null && days >= 0 && days <= 60 && (
                       <span className={`text-xs font-bold tabular-nums ${
@@ -132,6 +132,9 @@ export default async function TournamentsPage() {
                     </span>
                     <EditTournamentButton tournament={t} />
                     <DeleteTournamentButton id={t.id} />
+                    <svg className="text-muted-foreground/50 shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M9 18l6-6-6-6"/>
+                    </svg>
                   </div>
                 </div>
               </Link>
