@@ -204,7 +204,7 @@ function BriefTab({ insights, narration, narratingAuto, onRegenerateNarration, l
               </button>
             )}
           </div>
-          <p className="text-xs text-muted-foreground/70 leading-relaxed italic">{narration}</p>
+          <div className="text-muted-foreground/80"><MarkdownMessage text={narration} compact /></div>
         </div>
       )}
     </div>
@@ -798,6 +798,71 @@ const SUGGESTED_QUESTIONS = [
   'How do they react under pressure?',
 ]
 
+function renderInline(text: string): React.ReactNode[] {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g)
+  return parts.map((p, i) =>
+    p.startsWith('**') && p.endsWith('**')
+      ? <strong key={i} className="font-semibold text-foreground">{p.slice(2, -2)}</strong>
+      : p
+  )
+}
+
+// Renders both chat (## headers, - bullets, **bold**) and narration (ALL-CAPS headers, • bullets)
+function MarkdownMessage({ text, compact = false }: { text: string; compact?: boolean }) {
+  const lines = text.split('\n')
+  const nodes: React.ReactNode[] = []
+  let bulletBuffer: string[] = []
+  const textSm = compact ? 'text-xs' : 'text-sm'
+
+  function flushBullets() {
+    if (bulletBuffer.length === 0) return
+    nodes.push(
+      <ul key={`ul-${nodes.length}`} className="mt-1 space-y-1">
+        {bulletBuffer.map((b, i) => (
+          <li key={i} className={`flex gap-1.5 ${textSm} leading-snug`}>
+            <span className="text-foreground/40 flex-shrink-0 mt-0.5">–</span>
+            <span>{renderInline(b)}</span>
+          </li>
+        ))}
+      </ul>
+    )
+    bulletBuffer = []
+  }
+
+  const isAllCapsHeader = (s: string) => s.length > 2 && s === s.toUpperCase() && /^[A-Z][A-Z\s]+$/.test(s)
+
+  for (const raw of lines) {
+    const line = raw.trimStart()
+    if (line.startsWith('## ')) {
+      flushBullets()
+      nodes.push(
+        <p key={nodes.length} className="text-[11px] font-bold uppercase tracking-wider text-foreground/50 mt-3 mb-0.5 first:mt-0">
+          {line.slice(3)}
+        </p>
+      )
+    } else if (isAllCapsHeader(line)) {
+      flushBullets()
+      nodes.push(
+        <p key={nodes.length} className="text-[11px] font-bold uppercase tracking-wider text-foreground/50 mt-3 mb-0.5 first:mt-0">
+          {line}
+        </p>
+      )
+    } else if (line.startsWith('- ') || line.startsWith('* ') || line.startsWith('• ')) {
+      bulletBuffer.push(line.slice(2))
+    } else if (line === '') {
+      flushBullets()
+    } else {
+      flushBullets()
+      nodes.push(
+        <p key={nodes.length} className={`${textSm} leading-relaxed`}>{renderInline(line)}</p>
+      )
+    }
+  }
+  flushBullets()
+
+  return <div className="space-y-1">{nodes}</div>
+}
+
 function AskTab({ matchId, currentTime, opponentName, videoRef }: {
   matchId: string
   currentTime: number
@@ -917,11 +982,15 @@ function AskTab({ matchId, currentTime, opponentName, videoRef }: {
           <div className="space-y-3">
             {messages.map((m, i) => (
               <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
-                <span className={`inline-block text-sm px-3 py-2 rounded-xl max-w-[90%] leading-snug ${
-                  m.role === 'user' ? 'bg-foreground text-background' : 'bg-muted text-foreground'
-                }`}>
-                  {m.text || (loading && m.role === 'coach' ? '…' : '')}
-                </span>
+                {m.role === 'user' ? (
+                  <span className="inline-block text-sm px-3 py-2 rounded-xl max-w-[90%] leading-snug bg-foreground text-background">
+                    {m.text}
+                  </span>
+                ) : (
+                  <div className="px-3 py-2.5 rounded-xl max-w-[90%] bg-muted text-foreground">
+                    {m.text ? <MarkdownMessage text={m.text} /> : loading ? <span className="text-sm text-foreground/40">…</span> : null}
+                  </div>
+                )}
               </div>
             ))}
             <div ref={endRef} />
