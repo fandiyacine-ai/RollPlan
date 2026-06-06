@@ -194,8 +194,8 @@ export const generateGameplan = inngest.createFunction(
       const start = Date.now()
 
       // Fetch technique context for opponent's observed submissions + athlete's observed submissions
-      const opponentEventIds = gameplanData.opponentMatches.flatMap(m => m.events.map((e: { eventTypeId: string }) => e.eventTypeId))
-      const userEventIds = gameplanData.yourMatches.flatMap(m => m.events.map((e: { eventTypeId: string }) => e.eventTypeId))
+      const opponentEventIds = [...new Set(gameplanData.opponentMatches.flatMap(m => m.events.map((e: { eventTypeId: string }) => e.eventTypeId)))]
+      const userEventIds = [...new Set(gameplanData.yourMatches.flatMap(m => m.events.map((e: { eventTypeId: string }) => e.eventTypeId)))]
       const allEventIds = [...new Set([...opponentEventIds, ...userEventIds])]
       const matchFormat = gameplanData.tournament.format as 'gi' | 'no_gi'
       const techniqueVariants = await getTechniqueVariantsByEvents(allEventIds, matchFormat)
@@ -212,10 +212,21 @@ export const generateGameplan = inngest.createFunction(
         prompt: buildGameplanUserPrompt(gameplanData),
       })
 
-      // Collect drill refs — technique variants with source videos, deduplicated by sourceUrl
+      // Tag drill refs: 'defence' = opponent used it (study the counter), 'attack' = athlete used it (drill the finish)
+      // Events in both lists → 'defence' (pre-match priority is knowing what to defend)
+      const oppEventSet = new Set(opponentEventIds)
+      const userEventSet = new Set(userEventIds)
       const seenUrls = new Set<string>()
+      // Limit to 3 variants per eventId to avoid long lists
+      const countPerEvent: Record<string, number> = {}
       const drillRefs = techniqueVariants
-        .filter(v => v.sourceUrl && !seenUrls.has(v.sourceUrl) && seenUrls.add(v.sourceUrl))
+        .filter(v => {
+          if (!v.sourceUrl || seenUrls.has(v.sourceUrl)) return false
+          countPerEvent[v.eventId] = (countPerEvent[v.eventId] ?? 0) + 1
+          if (countPerEvent[v.eventId] > 3) return false
+          seenUrls.add(v.sourceUrl)
+          return true
+        })
         .map(v => ({
           id: v.id,
           name: v.name,
@@ -223,10 +234,11 @@ export const generateGameplan = inngest.createFunction(
           positionId: v.positionId ?? null,
           sourceUrl: v.sourceUrl!,
           sourceLabel: v.sourceLabel ?? v.name,
+          role: (oppEventSet.has(v.eventId) ? 'defence' : 'attack') as 'attack' | 'defence',
         }))
 
       return { plan: object, usage, latencyMs: Date.now() - start, drillRefs }
-    }) as { plan: GameplanOutput; usage: { inputTokens: number; outputTokens: number }; latencyMs: number; drillRefs: Array<{ id: string; name: string; eventId: string; positionId: string | null; sourceUrl: string; sourceLabel: string }> }
+    }) as { plan: GameplanOutput; usage: { inputTokens: number; outputTokens: number }; latencyMs: number; drillRefs: Array<{ id: string; name: string; eventId: string; positionId: string | null; sourceUrl: string; sourceLabel: string; role: 'attack' | 'defence' }> }
 
     await step.run('store-gameplan', async () => {
       const existingGameplan = await db.query.gameplans.findFirst({

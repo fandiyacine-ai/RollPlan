@@ -454,7 +454,7 @@ function MatchCard({ card }: { card: GameplanOutput['match_card'] }) {
   )
 }
 
-type DrillRef = { id: string; name: string; eventId: string; positionId: string | null; sourceUrl: string; sourceLabel: string }
+type DrillRef = { id: string; name: string; eventId: string; positionId: string | null; sourceUrl: string; sourceLabel: string; role?: 'attack' | 'defence' }
 
 function toTitleCase(s: string) {
   return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
@@ -466,68 +466,89 @@ const YT_ICON = (
   </svg>
 )
 
-function DrillLibrary({ drillRefs }: { drillRefs: DrillRef[] }) {
-  if (drillRefs.length === 0) return null
-
-  // Group: submission (eventId) → variant (name) → links
-  const bySubmission = new Map<string, Map<string, DrillRef[]>>()
-  for (const ref of drillRefs) {
-    if (!bySubmission.has(ref.eventId)) bySubmission.set(ref.eventId, new Map())
-    const byVariant = bySubmission.get(ref.eventId)!
-    if (!byVariant.has(ref.name)) byVariant.set(ref.name, [])
-    byVariant.get(ref.name)!.push(ref)
+function DrillGroup({ label, accent, refs }: { label: string; accent: string; refs: DrillRef[] }) {
+  if (refs.length === 0) return null
+  // Group by eventId
+  const byEvent = new Map<string, DrillRef[]>()
+  for (const ref of refs) {
+    if (!byEvent.has(ref.eventId)) byEvent.set(ref.eventId, [])
+    byEvent.get(ref.eventId)!.push(ref)
   }
-
   return (
-    <Section title="Drill Library" mobileCollapsed>
-      <div className="space-y-3">
-        {Array.from(bySubmission.entries()).map(([eventId, byVariant]) => (
-          <div key={eventId} className="rounded-xl border border-border/60 bg-card overflow-hidden">
-            {/* Submission header */}
-            <div className="px-4 py-2.5 border-b border-border/60 bg-muted/30">
-              <p className="text-xs font-bold uppercase tracking-wider text-foreground/80">{toTitleCase(eventId)}</p>
-            </div>
-
-            {/* Variants */}
-            <div className="divide-y divide-border/30">
-              {Array.from(byVariant.entries()).map(([variantName, links]) => (
-                <div key={variantName} className="px-4 py-3">
-                  {/* Variant label */}
-                  <p className="text-[11px] font-semibold text-muted-foreground mb-2">{variantName}</p>
-                  {/* Links */}
-                  <div className="space-y-1.5">
-                    {links.map((ref, li) => {
-                      // sourceLabel may be a search query or an instructor name
-                      // Show instructor name if it differs from the variant name, otherwise generic label
-                      const labelNorm = ref.sourceLabel?.toLowerCase().replace(/\s+/g, ' ').trim()
-                      const variantNorm = variantName.toLowerCase().replace(/\s+/g, ' ').trim()
-                      const displayLabel = ref.sourceLabel && labelNorm !== variantNorm
-                        ? ref.sourceLabel
-                        : `Watch tutorial ${li + 1 > 1 ? `#${li + 1}` : ''}`.trim()
-                      return (
-                        <a
-                          key={ref.id}
-                          href={ref.sourceUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 group"
-                        >
-                          {YT_ICON}
-                          <span className="text-xs text-foreground/70 group-hover:text-foreground transition-colors truncate">
-                            {displayLabel}
-                          </span>
-                          <svg className="w-2.5 h-2.5 text-muted-foreground/25 flex-shrink-0 group-hover:text-muted-foreground/60 transition-colors ml-auto" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M2 10L10 2M5 2h5v5" />
-                          </svg>
-                        </a>
-                      )
-                    })}
+    <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+      <div className={`px-4 py-2.5 border-b border-border/60 ${accent}`}>
+        <p className="text-[11px] font-bold uppercase tracking-wider">{label}</p>
+      </div>
+      <div className="divide-y divide-border/20">
+        {Array.from(byEvent.entries()).map(([eventId, items]) => (
+          <div key={eventId} className="px-4 py-3">
+            <p className="text-[11px] font-semibold text-foreground/50 uppercase tracking-wide mb-2">{toTitleCase(eventId)}</p>
+            <div className="space-y-2">
+              {items.map(ref => (
+                <a
+                  key={ref.id}
+                  href={ref.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-start gap-2.5 group"
+                >
+                  <span className="mt-0.5 flex-shrink-0">{YT_ICON}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-foreground/80 group-hover:text-foreground transition-colors leading-snug font-medium">{ref.name}</p>
+                    {ref.positionId && (
+                      <p className="text-[10px] text-muted-foreground/50 mt-0.5">from {ref.positionId.replace(/_/g, ' ')}</p>
+                    )}
                   </div>
-                </div>
+                  <svg className="w-2.5 h-2.5 text-muted-foreground/25 flex-shrink-0 group-hover:text-muted-foreground/60 transition-colors mt-0.5" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M2 10L10 2M5 2h5v5" />
+                  </svg>
+                </a>
               ))}
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+function DrillLibrary({ drillRefs }: { drillRefs: DrillRef[] }) {
+  if (drillRefs.length === 0) return null
+
+  // Split by role. Legacy refs without role field → show in a single group
+  const hasRoles = drillRefs.some(r => r.role)
+  if (!hasRoles) {
+    // Legacy fallback — flat grouped list
+    const byEvent = new Map<string, DrillRef[]>()
+    for (const ref of drillRefs) {
+      if (!byEvent.has(ref.eventId)) byEvent.set(ref.eventId, [])
+      byEvent.get(ref.eventId)!.push(ref)
+    }
+    return (
+      <Section title="Study materials" mobileCollapsed>
+        <div className="grid grid-cols-1 gap-3">
+          <DrillGroup label="Technique library" accent="bg-muted/30 text-foreground/70" refs={drillRefs} />
+        </div>
+      </Section>
+    )
+  }
+
+  const defenceRefs = drillRefs.filter(r => r.role === 'defence')
+  const attackRefs = drillRefs.filter(r => r.role === 'attack')
+
+  return (
+    <Section title="Study materials" mobileCollapsed>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <DrillGroup
+          label="Opponent's weapons — study the defence"
+          accent="bg-rose-950/30 text-rose-400/80"
+          refs={defenceRefs}
+        />
+        <DrillGroup
+          label="Your attack drills"
+          accent="bg-emerald-950/30 text-emerald-400/80"
+          refs={attackRefs}
+        />
       </div>
     </Section>
   )
