@@ -104,10 +104,11 @@ function TldrChips({ insights }: { insights: InsightRow[] }) {
 
 // ─── Tab: Scouting Brief ──────────────────────────────────────────────────────
 
-function BriefTab({ insights, narration, narratingAuto, large = false }: {
+function BriefTab({ insights, narration, narratingAuto, onRegenerateNarration, large = false }: {
   insights: InsightRow[]
   narration?: string | null
   narratingAuto?: boolean
+  onRegenerateNarration?: () => void
   large?: boolean
 }) {
   const attack = insights.find(i => i.category === 'opportunity')
@@ -192,7 +193,17 @@ function BriefTab({ insights, narration, narratingAuto, large = false }: {
       )}
       {narration && (
         <div className="px-4 py-3 border-t border-border/30">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 mb-1.5">Match report</p>
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">Match report</p>
+            {onRegenerateNarration && (
+              <button
+                onClick={onRegenerateNarration}
+                className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+              >
+                Regenerate
+              </button>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground/70 leading-relaxed italic">{narration}</p>
         </div>
       )}
@@ -1009,6 +1020,7 @@ export function ScoutingView({
   const [activeTab, setActiveTab] = useState<TabId>('brief')
   const [liveNarration, setLiveNarration] = useState<string | null>(narration ?? null)
   const [narratingAuto, setNarratingAuto] = useState(false)
+  const [regenerating, setRegenerating] = useState(false)
 
   useEffect(() => {
     if (liveNarration) return
@@ -1020,6 +1032,17 @@ export function ScoutingView({
       .finally(() => setNarratingAuto(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  function handleRegenerateNarration() {
+    if (regenerating) return
+    setRegenerating(true)
+    setLiveNarration(null)
+    fetch(`/api/matches/${match.id}/narrate`, { method: 'POST' })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { narration?: string } | null) => { if (data?.narration) setLiveNarration(data.narration) })
+      .catch(() => {})
+      .finally(() => setRegenerating(false))
+  }
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -1172,7 +1195,7 @@ export function ScoutingView({
           {/* Tab content — AskTab stays mounted to preserve chat state and active fetches */}
           <div className={`flex-1 min-h-0 ${activeTab === 'ask' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'}`}>
             <div className={activeTab === 'brief' ? '' : 'hidden'}>
-              <BriefTab insights={insights} narration={liveNarration} narratingAuto={narratingAuto} />
+              <BriefTab insights={insights} narration={liveNarration} narratingAuto={narratingAuto || regenerating} onRegenerateNarration={handleRegenerateNarration} />
               {viewMode === 'scouting' && <RecordsComparison opponentLabel={match.competitorLabel ?? opponentName} opponentIntel={opponentIntel} userIntel={userIntel} />}
             </div>
             <div className={activeTab === 'timeline' ? '' : 'hidden'}>
@@ -1203,7 +1226,8 @@ export function ScoutingView({
       </div>
 
       {/* ── Mobile: brief first, rest tabbed ── */}
-      <div className="md:hidden flex-1 overflow-hidden flex flex-col pt-4 gap-3">
+      {/* height: dvh minus nav (56px) + main-top-padding (24px) + scouting header (~90px) = 170px */}
+      <div className="md:hidden flex flex-col pt-4 gap-3" style={{ height: 'calc(100dvh - 170px)', overflow: 'hidden' }}>
         {/* TL;DR chips — always visible above the fold for match-day use */}
         {insights.length > 0 && (
           <div className="flex-shrink-0 rounded-xl border border-border/60 bg-card">
@@ -1213,7 +1237,7 @@ export function ScoutingView({
 
         {/* Brief — capped so tab panel always gets ≥50% of remaining space */}
         <div className="flex-shrink-0 rounded-xl border border-border/60 bg-card max-h-[38vh] overflow-y-auto">
-          <BriefTab insights={insights} narration={liveNarration} narratingAuto={narratingAuto} large />
+          <BriefTab insights={insights} narration={liveNarration} narratingAuto={narratingAuto || regenerating} onRegenerateNarration={handleRegenerateNarration} large />
           {viewMode === 'scouting' && <RecordsComparison opponentLabel={opponentName} opponentIntel={opponentIntel} userIntel={userIntel} />}
         </div>
 
