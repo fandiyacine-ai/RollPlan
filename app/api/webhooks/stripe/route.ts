@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { db } from '@/lib/db'
-import { subscriptions } from '@/lib/db/schema'
+import { subscriptions, users } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
+import { sendUpgradeEmail, sendCancellationEmail } from '@/lib/email/send'
+
+async function emailForUserId(userId: string): Promise<string | null> {
+  const user = await db.query.users.findFirst({ where: eq(users.id, userId) })
+  return user?.email ?? null
+}
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
@@ -37,6 +43,9 @@ export async function POST(req: NextRequest) {
         const sub = await stripe.subscriptions.retrieve(subscriptionId)
 
         await upsertSubscription(userId, session.customer as string, sub)
+
+        const email = await emailForUserId(userId)
+        if (email) sendUpgradeEmail(email).catch(() => {})
         break
       }
 
@@ -53,10 +62,16 @@ export async function POST(req: NextRequest) {
 
       case 'customer.subscription.deleted': {
         const sub = event.data.object as Stripe.Subscription
-        await db
+        const [updated] = await db
           .update(subscriptions)
           .set({ status: 'canceled', updatedAt: new Date() })
           .where(eq(subscriptions.stripeSubscriptionId, sub.id))
+          .returning({ userId: subscriptions.userId })
+
+        if (updated) {
+          const email = await emailForUserId(updated.userId)
+          if (email) sendCancellationEmail(email).catch(() => {})
+        }
         break
       }
     }

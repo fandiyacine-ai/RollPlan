@@ -2,6 +2,7 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { db } from './index'
 import { users } from './schema'
 import { eq } from 'drizzle-orm'
+import { sendWelcomeEmail } from '../email/send'
 
 export async function getOrCreateDbUserId(): Promise<string> {
   // Dev-only bypass: resolve user by email, skipping Clerk entirely
@@ -23,5 +24,6 @@ export async function getOrCreateDbUserId(): Promise<string> {
   const email = clerkUser?.emailAddresses?.[0]?.emailAddress ?? `${clerkId}@unknown.local`
 
   const [created] = await db.insert(users).values({ clerkId, email }).returning()
+  if (!email.endsWith('@unknown.local')) sendWelcomeEmail(email).catch(() => {})
   return created.id
 }
