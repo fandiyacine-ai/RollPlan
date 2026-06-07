@@ -834,7 +834,7 @@ function PredictionCard({ prediction }: { prediction: MatchupPrediction }) {
 
 function UpgradeGate() {
   return (
-    <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+    <div className="relative rounded-xl border border-border/60 bg-card overflow-hidden">
       {/* Blurred preview skeleton */}
       <div className="p-5 space-y-4 blur-sm pointer-events-none select-none opacity-60">
         <div className="space-y-2">
@@ -850,23 +850,23 @@ function UpgradeGate() {
         <div className="h-3 w-4/5 rounded bg-muted" />
       </div>
 
-      {/* Upgrade CTA */}
-      <div className="border-t border-border/60 bg-background px-5 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="space-y-1">
+      {/* Upgrade CTA — overlaid on the blurred preview */}
+      <div className="absolute inset-0 flex items-center justify-center p-5">
+        <div className="max-w-sm w-full rounded-xl border border-border/60 bg-background/95 backdrop-blur-sm shadow-lg px-5 py-5 text-center space-y-3">
           <p className="text-sm font-semibold">Unlock Gameplans</p>
           <p className="text-xs text-muted-foreground">
             Upgrade to Pro for full AI gameplans, training plans, and unlimited tournaments.
           </p>
-          <Link href="/game-day" className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors underline underline-offset-2">
+          <Link
+            href="/upgrade"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-foreground text-background text-xs font-semibold px-4 py-2 hover:opacity-90 transition-opacity"
+          >
+            Upgrade — €5/mo
+          </Link>
+          <Link href="/game-day" className="block text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors underline underline-offset-2">
             View match-day summary in Competition Day →
           </Link>
         </div>
-        <Link
-          href="/upgrade"
-          className="flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-foreground text-background text-xs font-semibold px-4 py-2 hover:opacity-90 transition-opacity"
-        >
-          Upgrade — €5/mo
-        </Link>
       </div>
     </div>
   )
