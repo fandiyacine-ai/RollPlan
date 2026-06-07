@@ -11,6 +11,7 @@ import { PrintButton } from './print-button'
 import { GameplanRatingWidget } from './rating-widget'
 import { AutoRefresh } from './auto-refresh'
 import { PlanExecutionSection } from './plan-execution-section'
+import { PrivateBadge } from '../../../../../components/private-badge'
 import type { GameplanOutput } from '../../../../../lib/ai/schemas/gameplan'
 import type { MatchupPrediction } from '../../../../../lib/ai/schemas/prediction'
 import type { ExecutionDebrief } from '../../../../../lib/ai/schemas/execution-debrief'
@@ -177,7 +178,10 @@ export default async function GameplanPage({
           {/* Desktop: full matchup header */}
           <div className="hidden sm:flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <p className="text-xs text-muted-foreground font-medium mb-1.5">Gameplan</p>
+              <div className="flex items-center gap-2 mb-1.5">
+                <p className="text-xs text-muted-foreground font-medium">Gameplan</p>
+                <PrivateBadge />
+              </div>
               <h2 className="text-xl font-semibold leading-snug">
                 {athleteName ? `${athleteName} vs. ${activeOpponent.opponentLabel}` : `vs. ${activeOpponent.opponentLabel}`}
               </h2>

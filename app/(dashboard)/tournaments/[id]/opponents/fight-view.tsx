@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { AddOpponentForm, ScoutForm } from './opponent-forms'
 import { ImportBracketDialog } from './import-bracket-dialog'
 import { SyncBracketButton } from './sync-bracket-button'
+import { PrivateBadge } from '../../../../../components/private-badge'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -280,7 +281,10 @@ function OpponentSection({ opp, tournamentId, index, total }: { opp: OpponentRow
 
             {/* Left: game stats */}
             <div className="p-4 space-y-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-600 dark:text-red-400/80">Their game</p>
+              <div className="flex items-center gap-2">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-600 dark:text-red-400/80">Their game</p>
+                <PrivateBadge />
+              </div>
 
               {opp.topPct != null && <GameStyleBar topPct={opp.topPct} right />}
 

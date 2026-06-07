@@ -4,6 +4,7 @@ import { eq, asc } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
+import { PrivateBadge } from '@/components/private-badge'
 import { MatchContent, type TimelineItem } from './match-content'
 import { ScoutingView } from './scouting-view'
 import { NarrateButton } from './narrate-button'
@@ -227,6 +228,7 @@ export default async function MatchDetailPage({
                   Opponent scouting
                 </span>
               )}
+              <PrivateBadge />
               {match.resultWinner && (
                 <MatchResultBadge winner={match.resultWinner} method={match.resultMethod} technique={match.resultTechnique} />
               )}
