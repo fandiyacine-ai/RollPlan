@@ -1,7 +1,49 @@
+import Link from 'next/link'
 import { getOrCreateDbUserId } from '@/lib/db/get-user'
 import { getUserUsageStats } from '@/lib/db/usage'
+import { getSubscriptionStatus } from '@/lib/subscription'
 
 export const dynamic = 'force-dynamic'
+
+const PLAN_BADGE: Record<string, { label: string; className: string }> = {
+  free: { label: 'Free plan', className: 'bg-muted text-muted-foreground' },
+  trial: { label: 'Pro trial', className: 'bg-violet-500/15 text-violet-400' },
+  pro: { label: 'Pro', className: 'bg-emerald-500/15 text-emerald-400' },
+}
+
+const PRO_PERKS = [
+  'Unlimited tournaments and video analysis',
+  'Full AI gameplans, no blur',
+  'AI training plans tailored to your matches',
+  'Match narration + Ask AI on every match',
+]
+
+function UpgradePromo() {
+  return (
+    <div className="bg-card border border-border/60 rounded-xl p-5 space-y-4">
+      <div>
+        <p className="text-sm font-semibold">Go Pro — train smarter, win more</p>
+        <p className="text-xs text-muted-foreground mt-0.5">14-day free trial, then €5/mo. Cancel anytime.</p>
+      </div>
+      <ul className="space-y-2">
+        {PRO_PERKS.map(perk => (
+          <li key={perk} className="flex items-start gap-2.5 text-xs text-muted-foreground">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400 mt-0.5 flex-shrink-0">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            {perk}
+          </li>
+        ))}
+      </ul>
+      <Link
+        href="/upgrade"
+        className="inline-flex items-center gap-1.5 rounded-lg bg-foreground text-background text-xs font-semibold px-4 py-2 hover:opacity-90 transition-opacity"
+      >
+        Start free trial →
+      </Link>
+    </div>
+  )
+}
 
 function fmtMinutes(mins: number): string {
   if (mins < 60) return `${mins}m`
@@ -43,20 +85,15 @@ export default async function UsagePage() {
     ? 'bg-foreground/30'
     : pct >= 100 ? 'bg-rose-500' : pct >= 80 ? 'bg-amber-500' : 'bg-primary'
 
-  const planLabel: Record<string, string> = {
-    free: 'Free',
-    athlete: 'Athlete',
-    athlete_plus: 'Athlete+',
-    coach: 'Coach',
-  }
+  const badge = PLAN_BADGE[stats.tier]
 
   return (
     <div className="max-w-2xl space-y-8">
-      <div>
+      <div className="flex items-center gap-2.5">
         <h1 className="text-lg font-semibold">My Usage</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {planLabel[stats.planTier] ?? stats.planTier} plan
-        </p>
+        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${badge.className}`}>
+          {badge.label}
+        </span>
       </div>
 
       {/* Monthly limit */}
@@ -91,6 +128,8 @@ export default async function UsagePage() {
           <p className="text-xs text-muted-foreground">Unlimited analyses on your plan.</p>
         )}
       </div>
+
+      {stats.tier === 'free' && <UpgradePromo />}
 
       {/* This month */}
       <div>

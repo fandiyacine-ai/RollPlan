@@ -1,11 +1,11 @@
 import { db } from '.'
 import { matches, users, videos, gameplans, tournaments } from './schema'
 import { eq, and, gte, ne, count, sql } from 'drizzle-orm'
-import { getSubscriptionStatus } from '../subscription'
+import { getSubscriptionStatus, type SubscriptionTier } from '../subscription'
 import { sendCapReachedEmail } from '../email/send'
 
 export type UserUsageStats = {
-  planTier: string
+  tier: SubscriptionTier
   // monthly
   matchesThisMonth: number
   monthlyLimit: number  // Infinity for paid
@@ -24,9 +24,8 @@ export async function getUserUsageStats(userId: string): Promise<UserUsageStats>
   startOfMonth.setDate(1)
   startOfMonth.setHours(0, 0, 0, 0)
 
-  const [user] = await db.select({ planTier: users.planTier }).from(users).where(eq(users.id, userId))
-  const planTier = user?.planTier ?? 'free'
-  const monthlyLimit = planTier === 'free' ? FREE_MONTHLY_VIDEO_LIMIT : Infinity
+  const tier = await getSubscriptionStatus(userId)
+  const monthlyLimit = tier === 'free' ? FREE_MONTHLY_VIDEO_LIMIT : Infinity
 
   const [matchStats] = await db
     .select({
@@ -51,7 +50,7 @@ export async function getUserUsageStats(userId: string): Promise<UserUsageStats>
     .where(eq(tournaments.userId, userId))
 
   return {
-    planTier,
+    tier,
     matchesThisMonth: Number(matchStats?.thisMonth ?? 0),
     monthlyLimit,
     videoMinutesThisMonth: Number(matchStats?.minutesThisMonth ?? 0),
