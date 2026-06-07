@@ -31,6 +31,7 @@ export const users = pgTable('users', {
   ibjjfBestResult: text('ibjjf_best_result'),
   intelStatus: text('intel_status'),
   capEmailSentAt: timestamp('cap_email_sent_at'),
+  scoutedNotifiedCount: integer('scouted_notified_count').notNull().default(0),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 })

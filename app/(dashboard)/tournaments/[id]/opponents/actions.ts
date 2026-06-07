@@ -8,6 +8,7 @@ import { cloneOpponentMatches } from '../../../../../lib/db/clone-analysis'
 import { inngest } from '../../../../../lib/inngest'
 import { getOrCreateDbUserId } from '../../../../../lib/db/get-user'
 import { checkMonthlyLimit } from '../../../../../lib/db/usage'
+import { notifyScoutedAthletes } from '../../../../../lib/db/scouted'
 import { scrapeBracket, parseSmootcompBracketUrl, parseSmootcompEventUrl } from '../../../../../lib/smoothcomp/scraper'
 import { isYouTubeUrl, normalizeYouTubeUrl } from '../../../../../lib/gemini-video'
 
@@ -569,7 +570,10 @@ export async function importSelectedOpponents(
       }
     }
 
-    if (toInsert.length === 0) return { count: 0 }
+    if (toInsert.length === 0) {
+      notifyScoutedAthletes(userId, toLink.map(t => t.athlete.smoothcompAthleteId)).catch(() => {})
+      return { count: 0 }
+    }
 
     const inserted = await db.insert(tournamentOpponents).values(
       toInsert.map(a => ({
@@ -615,6 +619,11 @@ export async function importSelectedOpponents(
         // Inngest not configured — opponent created, discovery/intel won't auto-run
       }
     }
+
+    notifyScoutedAthletes(userId, [
+      ...toLink.map(t => t.athlete.smoothcompAthleteId),
+      ...inserted.map(o => o.smoothcompAthleteId),
+    ]).catch(() => {})
 
     revalidatePath(`/tournaments/${tournamentId}/opponents`)
     return { count: toInsert.length }
