@@ -2,6 +2,7 @@ import { db } from '.'
 import { matches, users, videos, gameplans, tournaments } from './schema'
 import { eq, and, gte, ne, count, sql } from 'drizzle-orm'
 import { getSubscriptionStatus } from '../subscription'
+import { sendCapReachedEmail } from '../email/send'
 
 export type UserUsageStats = {
   planTier: string
@@ -110,5 +111,21 @@ export async function checkMonthlyLimit(userId: string): Promise<{ allowed: bool
   }
 
   const used = await getMonthlyVideoCount(userId)
+  if (used >= FREE_MONTHLY_VIDEO_LIMIT) notifyCapReached(userId).catch(() => {})
   return { allowed: used < FREE_MONTHLY_VIDEO_LIMIT, used, limit: FREE_MONTHLY_VIDEO_LIMIT }
+}
+
+// Sends the "cap hit" upgrade nudge once per calendar month — gated on
+// cap_email_sent_at so repeated blocked attempts don't spam the user.
+async function notifyCapReached(userId: string) {
+  const startOfMonth = new Date()
+  startOfMonth.setDate(1)
+  startOfMonth.setHours(0, 0, 0, 0)
+
+  const [user] = await db.select({ email: users.email, capEmailSentAt: users.capEmailSentAt }).from(users).where(eq(users.id, userId))
+  if (!user || user.email.endsWith('@unknown.local')) return
+  if (user.capEmailSentAt && user.capEmailSentAt >= startOfMonth) return
+
+  await db.update(users).set({ capEmailSentAt: new Date() }).where(eq(users.id, userId))
+  await sendCapReachedEmail(user.email, FREE_MONTHLY_VIDEO_LIMIT)
 }

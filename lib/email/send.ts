@@ -3,9 +3,19 @@ import { emailLayout } from './layout'
 
 const APP_URL = 'https://rollplan.ai'
 
+// Specific users excluded from all lifecycle email communication on request.
+const EMAIL_EXCLUSION_LIST = new Set([
+  'tommi.lundell@kapsi.fi',
+  'joonas.juokslahti@gmail.com',
+])
+
 // All sends are best-effort: a failed email must never break the user-facing
 // flow that triggered it (signup, checkout, cancellation).
 async function send(to: string, subject: string, html: string) {
+  if (EMAIL_EXCLUSION_LIST.has(to.toLowerCase())) {
+    console.log('[email] excluded recipient — skipping send:', to, subject)
+    return
+  }
   if (!resend) {
     console.warn('[email] RESEND_API_KEY not set — skipping send:', subject)
     return
@@ -69,6 +79,20 @@ export async function sendCancellationEmail(to: string) {
     ctaUrl: `${APP_URL}/settings`,
   })
   await send(to, 'Your RollPlan subscription was canceled', html)
+}
+
+export async function sendCapReachedEmail(to: string, limit: number) {
+  const html = emailLayout({
+    preheader: `You've used all ${limit} free analyses — upgrade for unlimited.`,
+    title: 'Free video cap hit (5/5)',
+    body: `
+      <p style="margin:0 0 12px 0;">You've used all ${limit} free analyses for this month — nice work staying active.</p>
+      <p style="margin:0 0 12px 0;">Upgrade to RollPlan Pro for unlimited video analysis, full AI gameplans, training plans, and Ask AI on every match.</p>
+    `,
+    ctaLabel: 'Upgrade for unlimited',
+    ctaUrl: `${APP_URL}/upgrade`,
+  })
+  await send(to, `You've used all ${limit} free analyses — upgrade for unlimited`, html)
 }
 
 export async function sendTrialEndingEmail(to: string, daysLeft: number) {

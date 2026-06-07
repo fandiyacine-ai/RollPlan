@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       const usage = await checkMonthlyLimit(userId)
       if (!usage.allowed) {
         return NextResponse.json({
-          error: `You've used all ${usage.limit} free analyses for this month. Upgrade to continue.`,
+          error: `You've used all ${usage.limit} free analyses — upgrade for unlimited`,
         }, { status: 402 })
       }
       await db.update(videos).set({
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     const usage2 = await checkMonthlyLimit(userId)
     if (!usage2.allowed) {
       return NextResponse.json({
-        error: `You've used all ${usage2.limit} free analyses for this month. Upgrade to continue.`,
+        error: `You've used all ${usage2.limit} free analyses — upgrade for unlimited`,
       }, { status: 402 })
     }
     await db.update(videos).set({

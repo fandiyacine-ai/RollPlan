@@ -14,8 +14,8 @@ Nothing actively in progress.
 
 ### P1 — Build next
 
-**Freemium paywall enforcement**
-Block `submitFootageUrls` / `importCommunityFootage` when `analysedThisMonth >= 10`. Show upgrade prompt inline (scout form disabled, message shown). Free tier limit exists in DB and is displayed on `/usage` — enforcement wall is the missing piece.
+**Freemium paywall enforcement — inline UI polish**
+Server-side enforcement is done: `submitScoutUrls` blocks at `analysedThisMonth >= FREE_MONTHLY_VIDEO_LIMIT` (5/month) via `checkMonthlyLimit`, with a clear upgrade message and a cap-reached lifecycle email (sends once/month). `importCommunityFootage` does NOT need gating — it clones existing analysed matches (reuses `videoId`, no new Gemini call, no quota consumed). What remains: proactive UI — disable the scout form / show the upgrade prompt inline *before* the user hits submit and gets blocked, rather than only reacting to the server error.
 
 **Technique KB evaluation metrics & A/B test plan**
 Define how we measure whether the KB is actually improving match analysis quality. Candidate metrics: detection recall/precision on match events, analysis completeness, and match-relevant insight accuracy. Plan an A/B experiment comparing current extraction prompt injection against the enriched KB with transcript/embedding-driven retrieval.
@@ -57,7 +57,7 @@ Their incentive is real: athlete prep data is marketing data for them. Cold emai
 | Admin usage dashboard — /admin/usage | 2026-05-20 | Per-user table: analyses, video minutes, gameplans, AI cost. Guarded by ADMIN_CLERK_USER_ID env var |
 | aiCallLogs userId attribution | 2026-05-20 | All AI job calls now write userId to ai_call_logs |
 | Bracket import — inline URL capture | 2026-05-20 | capture-url and linking phases wired in import dialog |
-| Free tier limit (10 analysed matches/month) | 2026-05-20 | Calendar-month reset, UI pill in nav |
+| Free tier limit (5 videos analysed/month) | 2026-05-20 | Calendar-month reset, UI pill in nav. Limit lowered to 5 (`FREE_MONTHLY_VIDEO_LIMIT`) since this entry was written |
 | Tournament event picker (catalog) | 2026-05-20 | Searchable list of ~25 major 2026 events pre-fills create form |
 | Matchup prediction | 2026-05-20 | AI win probability per opponent; Tournament Outlook card on Opponents page |
 | Re-scan failed footage | 2026-05-20 | Re-scan button on failed video rows; resets video + chunk records, re-fires url/submitted |

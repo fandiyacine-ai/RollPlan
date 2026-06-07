@@ -30,6 +30,7 @@ export const users = pgTable('users', {
   ibjjfProfileUrl: text('ibjjf_profile_url'),
   ibjjfBestResult: text('ibjjf_best_result'),
   intelStatus: text('intel_status'),
+  capEmailSentAt: timestamp('cap_email_sent_at'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 })

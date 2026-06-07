@@ -76,7 +76,7 @@ export default async function UsagePage() {
               <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
             </div>
             {pct >= 100 ? (
-              <p className="text-xs text-rose-400">Monthly limit reached. Upgrade to continue analysing matches.</p>
+              <p className="text-xs text-rose-400">You've used all {stats.monthlyLimit} free analyses — upgrade for unlimited.</p>
             ) : pct >= 80 ? (
               <p className="text-xs text-amber-400">
                 {stats.monthlyLimit - stats.matchesThisMonth} analyse{stats.monthlyLimit - stats.matchesThisMonth !== 1 ? 's' : ''} remaining this month.

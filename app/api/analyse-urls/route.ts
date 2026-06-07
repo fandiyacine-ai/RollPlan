@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     const usage = await checkMonthlyLimit(userId)
     if (!usage.allowed) {
       return NextResponse.json({
-        error: `You've used all ${usage.limit} free analyses for this month. Upgrade to continue.`,
+        error: `You've used all ${usage.limit} free analyses — upgrade for unlimited`,
       }, { status: 402 })
     }
 

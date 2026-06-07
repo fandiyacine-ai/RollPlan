@@ -179,7 +179,7 @@ export async function submitScoutUrls(
 
     const usage = await checkMonthlyLimit(userId)
     if (!usage.allowed) {
-      return { error: `You've used all ${usage.limit} free analyses for this month. Upgrade to continue.` }
+      return { error: `You've used all ${usage.limit} free analyses — upgrade for unlimited` }
     }
 
     const skippedUrls: string[] = []
