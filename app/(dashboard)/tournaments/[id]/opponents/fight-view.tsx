@@ -179,7 +179,7 @@ function UserCard({ userName, data }: { userName: string; data: UserCardData }) 
 
 // ── OpponentSection ───────────────────────────────────────────────────────────
 
-function OpponentSection({ opp, tournamentId }: { opp: OpponentRow; tournamentId: string }) {
+function OpponentSection({ opp, tournamentId, index, total }: { opp: OpponentRow; tournamentId: string; index?: number; total?: number }) {
   const ajpRecord = careerRecord(opp.ajpWins, opp.ajpLosses)
   const scRecord = careerRecord(opp.smoothcompWins, opp.smoothcompLosses)
   const hasStats = opp.scoutedMatchCount > 0
@@ -196,7 +196,14 @@ function OpponentSection({ opp, tournamentId }: { opp: OpponentRow; tournamentId
       <div className="bg-zinc-100 dark:bg-zinc-900 px-5 py-4">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-[7px] font-black uppercase tracking-[0.35em] text-red-600 dark:text-red-500/80 mb-1.5">Opponent</p>
+            <div className="flex items-center gap-2 mb-1.5">
+              <p className="text-[7px] font-black uppercase tracking-[0.35em] text-red-600 dark:text-red-500/80">Opponent</p>
+              {total != null && total > 1 && index != null && (
+                <span className="px-1.5 py-px rounded-full bg-foreground/[0.06] border border-border/50 text-[9px] font-bold tabular-nums text-muted-foreground/60">
+                  {index + 1}/{total}
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-3 min-w-0">
               {opp.profilePhotoUrl && (
                 <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-red-500/30 flex-shrink-0">
@@ -480,17 +487,20 @@ export function TournamentFightView({
         <div className="w-[220px] flex-shrink-0">
           <UserCard userName={userName} data={userData} />
 
-          {/* Jump nav */}
+          {/* Jump nav — pill list, opponent count + names together as one unit */}
           {opponents.length > 1 && (
-            <nav className="mt-3 space-y-0.5">
+            <nav className="mt-3 space-y-1.5">
+              <p className="px-1 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50">
+                {opponents.length} opponents
+              </p>
               {opponents.map((opp, i) => (
                 <a
                   key={opp.id}
                   href={`#opp-${opp.id}`}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 transition-colors group"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border/50 bg-muted/20 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:border-border transition-colors group"
                 >
-                  <span className="text-[9px] font-mono text-muted-foreground/30 w-3 flex-shrink-0">{i + 1}</span>
-                  <span className="truncate font-medium">{opp.opponentLabel}</span>
+                  <span className="flex items-center justify-center w-4 h-4 rounded-full bg-foreground/[0.06] text-[9px] font-bold text-muted-foreground/60 flex-shrink-0">{i + 1}</span>
+                  <span className="truncate font-semibold">{opp.opponentLabel}</span>
                   {opp.gameplanVerdict && (
                     <span className={`ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                       opp.gameplanVerdict === 'favourable' ? 'bg-emerald-400' :
@@ -503,16 +513,35 @@ export function TournamentFightView({
           )}
         </div>
 
-        {/* Opponent sections — scroll container fills remaining viewport height below the sticky offset */}
+        {/* Opponent sections — scroll container fills remaining viewport height below the sticky offset.
+            Each section is shorter than the viewport so the next card's accent strip peeks in at the
+            bottom — combined with the "Next opponent" teaser, this signals there's more to scroll to. */}
         <div
           className="flex-1 min-w-0 overflow-y-auto snap-y snap-mandatory"
           style={{ height: 'calc(100vh - 100px)' }}
         >
-          {opponents.map(opp => (
-            <div key={opp.id} id={`opp-${opp.id}`} className="snap-start snap-always pb-6" style={{ minHeight: 'calc(100vh - 100px)' }}>
-              <OpponentSection opp={opp} tournamentId={tournamentId} />
-            </div>
-          ))}
+          {opponents.map((opp, i) => {
+            const next = opponents[i + 1]
+            return (
+              <div key={opp.id} id={`opp-${opp.id}`} className="snap-start snap-always pb-4 flex flex-col" style={{ minHeight: 'calc(100vh - 180px)' }}>
+                <OpponentSection opp={opp} tournamentId={tournamentId} index={i} total={opponents.length} />
+                {next && (
+                  <a
+                    href={`#opp-${next.id}`}
+                    className="mt-3 flex items-center justify-between gap-2 px-4 py-3 rounded-xl border border-dashed border-border/50 text-xs text-muted-foreground hover:text-foreground hover:border-border hover:bg-muted/30 transition-colors group"
+                  >
+                    <span className="font-medium">Next opponent</span>
+                    <span className="flex items-center gap-1.5 font-bold text-foreground/70 group-hover:text-foreground">
+                      {next.opponentLabel}
+                      <svg className="w-3 h-3 group-hover:translate-y-0.5 transition-transform" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M2.5 4.5L6 8l3.5-3.5" />
+                      </svg>
+                    </span>
+                  </a>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
 
@@ -565,9 +594,9 @@ export function TournamentFightView({
           </div>
         </div>
 
-        {opponents.map(opp => (
+        {opponents.map((opp, i) => (
           <div key={opp.id} id={`opp-mobile-${opp.id}`} className="scroll-mt-28">
-            <OpponentSection opp={opp} tournamentId={tournamentId} />
+            <OpponentSection opp={opp} tournamentId={tournamentId} index={i} total={opponents.length} />
           </div>
         ))}
       </div>

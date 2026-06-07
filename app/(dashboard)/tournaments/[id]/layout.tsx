@@ -34,7 +34,7 @@ export default async function TournamentLayout({
   if (!tournament) notFound()
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6">
       <div>
         <TournamentBackLink />
         <div className="flex items-start gap-2.5 min-w-0">
