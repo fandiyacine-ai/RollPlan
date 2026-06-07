@@ -52,7 +52,41 @@ Researched 2026-06-07 (competitor research + persona analysis + codebase fit —
 
 Phased build order:
 1. **Gym/squad layer (foundation)** — promote `users.gym` from free text to real `gyms` + `gym_members` tables. Closed, trusted, zero moderation burden (the relationship already exists offline). Unlocks a coach dashboard for free — same scouting reports/gameplans/player cards RollPlan already generates, just rolled up across a roster — and squad prep groups (everyone at a gym prepping for the same event sees each other's "in prep" status).
-2. **Earned post-competition connections** — after a tournament, two athletes who actually competed (matched via Smoothcomp profile data already ingested) can connect. Connected users see a strictly limited weekly digest: mat time and announced events ONLY — never tendencies, gameplans, or analysis. Requires a `connections` table + privacy rules + basic blocking (these are sometimes rivals with real beef).
+2. **Earned post-competition connections** — spec'd in detail 2026-06-07 (session design pass). Full flow below.
+
+   **Trigger**: ~2-3 days after a tournament's date passes (the "still hyped, want to talk about it" window) — an Inngest job fires per tournament.
+
+   **Single re-engagement touchpoint** (email + in-app notification), in this order:
+   1. Specific hook where eligible: *"You just faced [Name] at [Tournament] — and they're on RollPlan too"* — falls back to a warm general *"How did [Tournament] go?"* when no match is detected. Leading with the specific/personal fact tests as the stronger hook than a generic check-in.
+   2. Lightweight feedback capture — quick reaction + optional free text. Closes the loop on whether RollPlan's prep actually helped, win or lose (losses often produce the most worth saying).
+   3. "Connect" CTA — shown only when a real match is detected and the other person has opted in.
+
+   **⚠️ Honesty constraint on the hook copy**: "you faced [Name]" is a *stronger* claim than "you were both entered in the bracket" — brackets list everyone in a division, but progression/byes mean you don't fight everyone listed. Getting this wrong (claiming you fought someone you never met on the mat) reads as "this app doesn't understand my sport" and kills credibility instantly. **Open question to resolve before building**: does RollPlan capture actual post-event match-result/pairing data (who fought whom, who won) — or only pre-event bracket entries? If only the latter, the honest fallback copy is *"[N] competitors in your division at [Tournament] are also on RollPlan"* (true regardless of who actually fought whom).
+
+   **Settings — the opt-in toggle (off by default)**, doing double duty as a consent gate AND a trust-contract reassurance surface (the #1 thing suppressing opt-in will be the unspoken fear "can they see what I've studied about them?" — so name it and kill it right where the toggle lives):
+
+   > **Let competitors I've faced connect with me** `[ toggle: OFF by default ]`
+   >
+   > When this is on, people you've competed against can send you a connection request after the event — and you'll only actually connect if you *both* want to.
+   >
+   > ✗ Your gameplans, scouted match footage, and AI analysis stay completely private. Connections never see your prep work — before or after connecting. Only you do.
+   > ✓ Connections can see your upcoming tournaments and public competition record — the same info already on your player card.
+   >
+   > *RollPlan is built so you can scout with total privacy and connect with total confidence — at the same time.*
+
+   The same "your prep stays private, period" line is worth echoing inside the existing "scouted N times" notification too — reinforces that the whole scouting mechanic is safe, not just connections.
+
+   **Connection mechanic — direct request, not blind matching.** Considered (and rejected) a Tinder-style blind double-opt-in: it exists to solve "what if my interest is one-sided and they find out," which isn't a real risk here — both people already know they competed (public history, no informational asymmetry) and both have *already* signaled general openness via the toggle. So a simpler, more actionable model wins:
+   - A taps Connect on someone they faced (only offered if B's toggle is on)
+   - B gets notified: *"[Name] wants to connect — you faced them at [Tournament]"* with Accept / (silently ignore)
+   - On Accept → both get *"You and [Name] are connected!"*
+   - **Keep one thing from the dating-app playbook**: non-response is silent. A never learns whether B declined or just didn't act (LinkedIn does the same) — costs nothing to build, spares everyone the sting of a visible rejection.
+
+   **What a connection unlocks** (deliberately narrow — this is the ceiling, not a starting point to expand from): each other's upcoming tournaments + public competition record. No messaging/chat in v1 — visibility alone delivers most of the value with zero moderation burden, and chat reopens the "could this leak scouting intel through casual conversation" risk surface for no proven gain.
+
+   **Federation handling — be transparent about the gap rather than fake it.** Smoothcomp/AJP (where bracket + eventually result-pairing data exists) get the automatic "you faced [Name]" version. IBJJF/local events — where there's no stable athlete ID, only a name — get the *exact same* re-engagement + feedback email, just *without* the connection CTA. Don't build a parallel fuzzy-name-matching mechanism; it will misfire and a false-positive match here ("we think you connected with the wrong person") is worse than no match at all. If there's demand later, the honest v2 is a manual self-serve search ("search for someone you competed against at [Event]") gated by the same opt-in toggle — shifting the matching judgment to the human who actually knows the truth, not an algorithm guessing from a name.
+
+   **Build dependencies**: `connections` table + request/accept state + basic blocking (these are sometimes rivals with real beef), the opt-in toggle on `users`, and — pending the open question above — either real match-result ingestion or a softened honesty-safe copy fallback.
 
 Explicitly do not build: open global feeds, public profiles, follower counts, comments on arbitrary content, global leaderboards (belt/weight stratification makes them either meaningless or demoralizing).
 
