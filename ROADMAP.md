@@ -17,6 +17,9 @@ Nothing actively in progress.
 **Freemium paywall enforcement — inline UI polish**
 Server-side enforcement is done: `submitScoutUrls` blocks at `analysedThisMonth >= FREE_MONTHLY_VIDEO_LIMIT` (5/month) via `checkMonthlyLimit`, with a clear upgrade message and a cap-reached lifecycle email (sends once/month). `importCommunityFootage` does NOT need gating — it clones existing analysed matches (reuses `videoId`, no new Gemini call, no quota consumed). What remains: proactive UI — disable the scout form / show the upgrade prompt inline *before* the user hits submit and gets blocked, rather than only reacting to the server error.
 
+**Fight Card expansion — "vs." cards for any two users (open mat / spar)**
+Cheap, high-leverage win: the head-to-head share-card pipeline already exists (`app/(dashboard)/tournaments/[id]/fight-card/[opponentId]/share-card.tsx` — federation records, ruleset badges, PNG export via `html-to-image`), but it's scoped to *tournament* opponents only. Decouple it so any two users (or a user + a Smoothcomp-profile opponent who isn't on RollPlan) can generate a "vs." poster — match identity via `smoothcompAthleteId` or username, falling back to scraped Smoothcomp record data when the other side isn't a RollPlan user. This is a **sharing/virality** feature wearing a "vs." costume — not a social-graph feature — and should be scoped and measured as such (shares-per-user, not connections-made). Resolves the founder's "open mat / spar" question: it's a content-generation extension of Fight Card, a separate thread from the social layer below.
+
 **Technique KB evaluation metrics & A/B test plan**
 Define how we measure whether the KB is actually improving match analysis quality. Candidate metrics: detection recall/precision on match events, analysis completeness, and match-relevant insight accuracy. Plan an A/B experiment comparing current extraction prompt injection against the enriched KB with transcript/embedding-driven retrieval.
 
@@ -43,6 +46,15 @@ Read the Match Report aloud. TTS route was partially wired — needs UI trigger 
 
 **Smoothcomp partnership**
 Their incentive is real: athlete prep data is marketing data for them. Cold email with the pitch and an API ask. If granted, replace all scraping with clean endpoints.
+
+**Social layer (post-scale) — phased plan**
+Researched 2026-06-07 (competitor research + persona analysis + codebase fit — see session notes). Core finding: the patterns that work for a niche competitive-individual-sport audience are *scoped* comparison (gym/club/friends, never global), reactions tied to *earned* moments, and a coach↔athlete vertical relationship (TrainingPeaks model — maps directly onto the BJJ gym/coach dynamic). The patterns that fail: open feeds, comments, follower counts, global leaderboards — they're borrowed from generic social apps, cost a lot to moderate, and produce engagement disconnected from the sport. **Hard constraint that overrides everything else**: nothing in the social layer may ever expose a user's scouting reports, gameplans, or opponent-tendency analysis to anyone else — even accidentally (e.g. a feed item revealing "User X built a gameplan targeting User Y"). That's the core trust contract the whole product depends on; breaking it once would make competitive athletes abandon ship. Codebase today has zero social-graph infrastructure (no follows/friends/gym tables, `users.gym` is free text, no comments/likes/moderation) — three existing one-way *sharing* primitives (`/share/match/[shortId]`, player-card share images, Fight Card share-cards) are NOT social-graph features and shouldn't be confused with this work.
+
+Phased build order:
+1. **Gym/squad layer (foundation)** — promote `users.gym` from free text to real `gyms` + `gym_members` tables. Closed, trusted, zero moderation burden (the relationship already exists offline). Unlocks a coach dashboard for free — same scouting reports/gameplans/player cards RollPlan already generates, just rolled up across a roster — and squad prep groups (everyone at a gym prepping for the same event sees each other's "in prep" status).
+2. **Earned post-competition connections** — after a tournament, two athletes who actually competed (matched via Smoothcomp profile data already ingested) can connect. Connected users see a strictly limited weekly digest: mat time and announced events ONLY — never tendencies, gameplans, or analysis. Requires a `connections` table + privacy rules + basic blocking (these are sometimes rivals with real beef).
+
+Explicitly do not build: open global feeds, public profiles, follower counts, comments on arbitrary content, global leaderboards (belt/weight stratification makes them either meaningless or demoralizing).
 
 ---
 
