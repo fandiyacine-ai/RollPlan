@@ -1156,6 +1156,12 @@ export function ScoutingView({
       ? match.opponentLabel
       : 'Opponent'
 
+  // In scouting mode the scan is run for the scouted opponent (passed in as `athleteName`,
+  // stored as `competitorLabel`), and `opponentLabel` is whoever they faced in that footage.
+  // So "the person we're scouting" is `competitorLabel`, not `opponentLabel` — using
+  // `opponentLabel` here would label the analysis with the wrong fighter's name.
+  const scoutedOpponentName = viewMode === 'scouting' ? (match.competitorLabel ?? opponentName) : opponentName
+
   const label = viewMode === 'analysis' ? 'Match Analysis' : 'Scouting'
   const defaultBackLabel = viewMode === 'analysis' ? '← My Matches' : '← Scout Opponent'
   const visibleTabs = viewMode === 'analysis' ? TABS.filter(tab => tab.id !== 'prediction') : TABS
@@ -1279,7 +1285,7 @@ export function ScoutingView({
           <div className={`flex-1 min-h-0 ${activeTab === 'ask' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'}`}>
             <div className={activeTab === 'brief' ? '' : 'hidden'}>
               <BriefTab insights={insights} narration={liveNarration} narratingAuto={narratingAuto || regenerating} onRegenerateNarration={handleRegenerateNarration} />
-              {viewMode === 'scouting' && <RecordsComparison opponentLabel={match.competitorLabel ?? opponentName} opponentIntel={opponentIntel} userIntel={userIntel} />}
+              {viewMode === 'scouting' && <RecordsComparison opponentLabel={scoutedOpponentName} opponentIntel={opponentIntel} userIntel={userIntel} />}
             </div>
             <div className={activeTab === 'timeline' ? '' : 'hidden'}>
               <TimelineTab
@@ -1297,12 +1303,12 @@ export function ScoutingView({
                 maxPositionTime={maxPositionTime}
                 positionNames={positionNames}
                 timelineItems={timelineItems}
-                scoutedName={match.opponentLabel?.split(' ')[0] ?? undefined}
+                scoutedName={scoutedOpponentName?.split(' ')[0] ?? undefined}
               />
             </div>
-            <div className={activeTab === 'prediction' ? '' : 'hidden'}><PredictionTab insights={insights} opponentName={opponentName} /></div>
+            <div className={activeTab === 'prediction' ? '' : 'hidden'}><PredictionTab insights={insights} opponentName={scoutedOpponentName} /></div>
             <div className={`${activeTab === 'ask' ? 'flex flex-col h-full' : 'hidden'}`}>
-              <AskTab matchId={match.id} currentTime={currentTime} opponentName={opponentName} videoRef={ytId ? undefined : videoRef} contextInsights={insights} />
+              <AskTab matchId={match.id} currentTime={currentTime} opponentName={scoutedOpponentName} videoRef={ytId ? undefined : videoRef} contextInsights={insights} />
             </div>
           </div>
         </div>
@@ -1321,7 +1327,7 @@ export function ScoutingView({
         {/* Brief — capped so tab panel always gets ≥50% of remaining space */}
         <div className="flex-shrink-0 rounded-xl border border-border/60 bg-card max-h-[38vh] overflow-y-auto">
           <BriefTab insights={insights} narration={liveNarration} narratingAuto={narratingAuto || regenerating} onRegenerateNarration={handleRegenerateNarration} large />
-          {viewMode === 'scouting' && <RecordsComparison opponentLabel={opponentName} opponentIntel={opponentIntel} userIntel={userIntel} />}
+          {viewMode === 'scouting' && <RecordsComparison opponentLabel={scoutedOpponentName} opponentIntel={opponentIntel} userIntel={userIntel} />}
         </div>
 
         {/* Tabs for the rest */}
@@ -1356,10 +1362,10 @@ export function ScoutingView({
               <TimelineTab items={timelineItems} onSeek={seekTo} competitorLabel={match.competitorLabel} opponentLabel={match.opponentLabel} />
             </div>
             <div className={activeTab === 'notes' ? '' : 'hidden'}><NotesTab insights={insights} /></div>
-            <div className={activeTab === 'stats' ? '' : 'hidden'}><StatsTab sortedPositions={sortedPositions} maxPositionTime={maxPositionTime} positionNames={positionNames} timelineItems={timelineItems} scoutedName={match.opponentLabel?.split(' ')[0] ?? undefined} /></div>
-            <div className={activeTab === 'prediction' ? '' : 'hidden'}><PredictionTab insights={insights} opponentName={opponentName} /></div>
+            <div className={activeTab === 'stats' ? '' : 'hidden'}><StatsTab sortedPositions={sortedPositions} maxPositionTime={maxPositionTime} positionNames={positionNames} timelineItems={timelineItems} scoutedName={scoutedOpponentName?.split(' ')[0] ?? undefined} /></div>
+            <div className={activeTab === 'prediction' ? '' : 'hidden'}><PredictionTab insights={insights} opponentName={scoutedOpponentName} /></div>
             <div className={`${activeTab === 'ask' ? 'flex flex-col h-full' : 'hidden'}`}>
-              <AskTab matchId={match.id} currentTime={currentTime} opponentName={opponentName} videoRef={ytId ? undefined : videoRef} contextInsights={insights} />
+              <AskTab matchId={match.id} currentTime={currentTime} opponentName={scoutedOpponentName} videoRef={ytId ? undefined : videoRef} contextInsights={insights} />
             </div>
           </div>
         </div>
