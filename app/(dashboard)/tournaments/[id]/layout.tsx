@@ -37,18 +37,20 @@ export default async function TournamentLayout({
     <div className="space-y-6 max-w-5xl">
       <div>
         <TournamentBackLink />
-        <div className="flex items-center gap-2.5 min-w-0">
-          <h1 className="text-2xl font-black tracking-tight uppercase truncate min-w-0">{tournament.name}</h1>
-          <EditTournamentButton tournament={{
-            id: tournament.id,
-            name: tournament.name,
-            eventDate: tournament.eventDate ?? null,
-            division: tournament.division ?? null,
-            ruleset: tournament.ruleset,
-            notes: tournament.notes ?? null,
-            status: tournament.status,
-            smoothcompUrl: tournament.smoothcompUrl ?? null,
-          }} />
+        <div className="flex items-start gap-2.5 min-w-0">
+          <h1 className="text-2xl font-black tracking-tight uppercase break-words min-w-0">{tournament.name}</h1>
+          <div className="mt-0.5 shrink-0">
+            <EditTournamentButton tournament={{
+              id: tournament.id,
+              name: tournament.name,
+              eventDate: tournament.eventDate ?? null,
+              division: tournament.division ?? null,
+              ruleset: tournament.ruleset,
+              notes: tournament.notes ?? null,
+              status: tournament.status,
+              smoothcompUrl: tournament.smoothcompUrl ?? null,
+            }} />
+          </div>
         </div>
         <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1.5 flex-wrap">
           <span className="font-semibold">{RULESET_LABEL[tournament.ruleset] ?? tournament.ruleset}</span>

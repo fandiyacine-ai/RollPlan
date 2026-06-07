@@ -864,7 +864,7 @@ function UpgradeGate() {
             Upgrade — €5/mo
           </Link>
           <Link href="/game-day" className="block text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors underline underline-offset-2">
-            View match-day summary in Competition Day →
+            View this matchup in Match Day →
           </Link>
         </div>
       </div>

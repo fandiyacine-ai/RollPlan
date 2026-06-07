@@ -53,8 +53,8 @@ const FAQ = [
     a: 'The Gameplan page combines your profile (belt, style, goals) with the opponent scouted data to generate a competition-day gameplan: your go-to attacks, opponent weapons to defend, and mat-side mental cues. Generate it once you have scouted footage ready. The page auto-refreshes while generating — no need to manually reload.',
   },
   {
-    q: 'What is Competition Day?',
-    a: 'Competition Day is your match-morning command centre. It shows all your upcoming tournaments with a countdown, and for each opponent a compact briefing card: the key attack to open with, the danger to watch, your attack chain, and win probability — all visible in one glance without opening individual gameplans. It\'s designed to be readable with one hand, standing in a sports hall, under pressure.',
+    q: 'What is Match Day?',
+    a: 'Match Day is your match-morning command centre. It shows all your upcoming tournaments with a countdown, and for each opponent a compact briefing card: the key attack to open with, the danger to watch, your attack chain, and win probability — all visible in one glance without opening individual gameplans. It\'s designed to be readable with one hand, standing in a sports hall, under pressure.',
   },
   {
     q: 'Can I compare my gameplan against my actual match result?',
