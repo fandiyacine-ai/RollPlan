@@ -122,3 +122,42 @@ export async function sendTrialEndingEmail(to: string, daysLeft: number) {
   })
   await send(to, `Your RollPlan trial ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`, html)
 }
+
+export async function sendPostEventCheckinEmail(to: string, title: string, body: string, tournamentId: string) {
+  const html = emailLayout({
+    preheader: body,
+    title,
+    body: `<p style="margin:0;">${body}</p>`,
+    ctaLabel: 'Tell us how it went',
+    ctaUrl: `${APP_URL}/tournaments/${tournamentId}/opponents`,
+  })
+  await send(to, title, html)
+}
+
+export async function sendConnectionRequestEmail(to: string, requesterLabel: string, tournamentName: string) {
+  const html = emailLayout({
+    preheader: `${requesterLabel} wants to connect with you on RollPlan.`,
+    title: `${requesterLabel} wants to connect`,
+    body: `
+      <p style="margin:0 0 12px 0;">You faced ${requesterLabel} at ${tournamentName} — and they'd like to connect on RollPlan. If you accept, you'll be able to see each other's upcoming tournaments and competition record.</p>
+      <p style="margin:0;">Your gameplans, scouted match footage, and AI analysis stay completely private either way — connections never see your prep work.</p>
+    `,
+    ctaLabel: 'Review request',
+    ctaUrl: `${APP_URL}/connections`,
+  })
+  await send(to, `${requesterLabel} wants to connect on RollPlan`, html)
+}
+
+export async function sendConnectionAcceptedEmail(to: string, otherLabel: string) {
+  const html = emailLayout({
+    preheader: `You and ${otherLabel} are now connected on RollPlan.`,
+    title: `You and ${otherLabel} are connected!`,
+    body: `
+      <p style="margin:0 0 12px 0;">You can now see each other's upcoming tournaments and public competition record.</p>
+      <p style="margin:0;">As always, your gameplans, scouted match footage, and AI analysis stay completely private — only you can see your prep work.</p>
+    `,
+    ctaLabel: 'View connections',
+    ctaUrl: `${APP_URL}/connections`,
+  })
+  await send(to, `You and ${otherLabel} are connected on RollPlan`, html)
+}

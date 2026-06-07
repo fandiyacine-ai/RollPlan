@@ -10,21 +10,24 @@ import { sendScoutedEmail } from '../email/send'
 // surveillance" — RollPlan's brand voice is competitive respect, not alerts.
 function pickScoutedCopy(count: number): { subject: string; title: string; body: string } {
   const s = count === 1 ? '' : 's'
+  // Echoes the trust-contract line from the connections settings toggle —
+  // reinforces that the scouting mechanic itself is safe, not just connections.
+  const reassurance = ` And just like your own scouting, theirs stays one-way — your gameplans, footage, and AI analysis are never visible to anyone but you.`
   const variants = [
     {
       subject: `You're on ${count} competitor${s}' radar — here's what to do about it`,
       title: `You're being taken seriously 🎯`,
-      body: `${count} competitor${s} added you to their tournament prep — a sign they rate your game enough to study it. Make sure your own scouting is just as sharp before your next match.`,
+      body: `${count} competitor${s} added you to their tournament prep — a sign they rate your game enough to study it. Make sure your own scouting is just as sharp before your next match.${reassurance}`,
     },
     {
       subject: `Your reputation on RollPlan is growing`,
       title: `Your reputation is growing`,
-      body: `${count} competitor${s} ${count === 1 ? 'has' : 'have'} studied your matches to prep for you. That's the kind of attention that means you're someone to watch — keep building the gap.`,
+      body: `${count} competitor${s} ${count === 1 ? 'has' : 'have'} studied your matches to prep for you. That's the kind of attention that means you're someone to watch — keep building the gap.${reassurance}`,
     },
     {
       subject: `You've been added to ${count} opponent${s}' prep board${s}`,
       title: `You've been added to ${count} opponent${s}' prep board${s}`,
-      body: `That means ${count} competitor${s} ${count === 1 ? 'is' : 'are'} studying your matches before facing you — a good sign you're on people's radar. Time to make sure your own prep keeps pace.`,
+      body: `That means ${count} competitor${s} ${count === 1 ? 'is' : 'are'} studying your matches before facing you — a good sign you're on people's radar. Time to make sure your own prep keeps pace.${reassurance}`,
     },
   ]
   return variants[Math.floor(Math.random() * variants.length)]

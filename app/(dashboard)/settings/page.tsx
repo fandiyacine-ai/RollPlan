@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm'
 import { getOrCreateDbUserId } from '../../../lib/db/get-user'
 import { SettingsForm } from './settings-form'
 import { CompetitionRecordSection } from './competition-record'
+import { ConnectionsToggle } from './connections-toggle'
 import Link from 'next/link'
 
 export const metadata = { title: 'Settings — RollPlan' }
@@ -43,6 +44,10 @@ export default async function SettingsPage() {
           ibjjfProfileUrl={user?.ibjjfProfileUrl ?? null}
           intelStatus={user?.intelStatus ?? null}
         />
+      </div>
+
+      <div className="mt-12">
+        <ConnectionsToggle defaultOpen={user?.openToConnections ?? false} />
       </div>
 
       <div className="mt-10 pt-8 border-t border-border/60">

@@ -44,6 +44,24 @@ function NotificationIcon({ type }: { type: string }) {
       </div>
     )
   }
+  if (type === 'connection_request' || type === 'connection_accepted') {
+    return (
+      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-950/60 flex items-center justify-center">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-600 dark:text-amber-400">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      </div>
+    )
+  }
+  if (type === 'post_event_checkin') {
+    return (
+      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-rose-100 dark:bg-rose-950/60 flex items-center justify-center">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-rose-600 dark:text-rose-400">
+          <path d="M8 21h8M12 17v4M5 3h14l-1 7a6 6 0 0 1-12 0z"/><path d="M5 3a2 2 0 0 0-2 2c0 3 2 5 4 5M19 3a2 2 0 0 1 2 2c0 3-2 5-4 5"/>
+        </svg>
+      </div>
+    )
+  }
   return (
     <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">

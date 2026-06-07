@@ -18,12 +18,14 @@ import { backfillReferenceImages, backfillReferenceImageOne } from '../../../../
 import { fetchUserIntel } from '../../../../jobs/fetch-user-intel'
 import { generateTrainingPlan } from '../../../../jobs/generate-training-plan'
 import { trialEndingReminder } from '../../../../jobs/trial-ending-reminder'
+import { smoothcompSyncBracketResults } from '../../../../jobs/smoothcomp-sync-bracket-results'
+import { postEventReengagement } from '../../../../jobs/post-event-reengagement'
 
 export const maxDuration = 300
 
 const handlers = serve({
   client: inngest,
-  functions: [analyzeVideo, generateGameplan, scanUrl, smoothcompMonitorBracket, smoothcompProcessBracket, smoothcompDiscoverFootage, generateExecutionDebrief, syncTournamentCatalog, ingestTechnique, techniqueKbAgent, rescanMatchesWithKb, kbTargetedScanMatch, backfillAthleteIntel, buildOpponentIntel, backfillReferenceImages, backfillReferenceImageOne, fetchUserIntel, generateTrainingPlan, trialEndingReminder],
+  functions: [analyzeVideo, generateGameplan, scanUrl, smoothcompMonitorBracket, smoothcompProcessBracket, smoothcompDiscoverFootage, generateExecutionDebrief, syncTournamentCatalog, ingestTechnique, techniqueKbAgent, rescanMatchesWithKb, kbTargetedScanMatch, backfillAthleteIntel, buildOpponentIntel, backfillReferenceImages, backfillReferenceImageOne, fetchUserIntel, generateTrainingPlan, trialEndingReminder, smoothcompSyncBracketResults, postEventReengagement],
 })
 
 function safe(handler: (req: NextRequest) => Promise<Response>) {

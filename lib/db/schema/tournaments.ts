@@ -32,6 +32,8 @@ export const tournaments = pgTable('tournaments', {
   // Post-event engagement
   outcome: text('outcome'),              // 'gold' | 'silver' | 'bronze' | 'eliminated' | 'dns' | null
   postEventNotes: text('post_event_notes'),
+  // Set once the automated post-event job (bracket sync + connection detection) has run for this event — prevents repeat processing
+  postEventSyncedAt: timestamp('post_event_synced_at'),
   // Catalog link — set when tournament is created from the event catalog
   canonicalTournamentId: uuid('canonical_tournament_id').references(() => canonicalTournaments.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at').notNull().defaultNow(),

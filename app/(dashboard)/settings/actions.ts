@@ -61,6 +61,17 @@ export async function updateProfile(_prev: { error?: string }, formData: FormDat
   }
 }
 
+export async function setOpenToConnectionsAction(open: boolean): Promise<{ error?: string }> {
+  try {
+    const userId = await getOrCreateDbUserId()
+    await db.update(users).set({ openToConnections: open }).where(eq(users.id, userId))
+    revalidatePath('/settings')
+    return {}
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 export async function fetchUserIntelAction(): Promise<{ error?: string; queued?: boolean }> {
   try {
     const userId = await getOrCreateDbUserId()

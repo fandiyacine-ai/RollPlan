@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp, pgEnum } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, integer, timestamp, boolean, pgEnum } from 'drizzle-orm/pg-core'
 
 
 export const beltEnum = pgEnum('belt', ['white', 'blue', 'purple', 'brown', 'black', 'grey', 'yellow', 'orange', 'green'])
@@ -32,6 +32,7 @@ export const users = pgTable('users', {
   intelStatus: text('intel_status'),
   capEmailSentAt: timestamp('cap_email_sent_at'),
   scoutedNotifiedCount: integer('scouted_notified_count').notNull().default(0),
+  openToConnections: boolean('open_to_connections').notNull().default(false),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 })
