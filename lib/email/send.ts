@@ -95,18 +95,18 @@ export async function sendCapReachedEmail(to: string, limit: number) {
   await send(to, `You've used all ${limit} free analyses — upgrade for unlimited`, html)
 }
 
-export async function sendScoutedEmail(to: string, count: number) {
+export async function sendScoutedEmail(to: string, copy: { subject: string; title: string; body: string }) {
   const html = emailLayout({
-    preheader: `You've been scouted ${count} time${count === 1 ? '' : 's'} on RollPlan.`,
-    title: `Someone's scouting you 👀`,
+    preheader: copy.body,
+    title: copy.title,
     body: `
-      <p style="margin:0 0 12px 0;">A competitor just added you to their tournament prep on RollPlan — you've now been scouted ${count} time${count === 1 ? '' : 's'} so far.</p>
-      <p style="margin:0;">Make sure your own scouting is just as sharp. Add your next opponent and let the AI build your gameplan.</p>
+      <p style="margin:0 0 12px 0;">${copy.body}</p>
+      <p style="margin:0;">Add your next opponent and let the AI build your gameplan.</p>
     `,
     ctaLabel: 'Scout your next opponent',
     ctaUrl: `${APP_URL}/tournaments`,
   })
-  await send(to, `Someone's scouting you for their next match`, html)
+  await send(to, copy.subject, html)
 }
 
 export async function sendTrialEndingEmail(to: string, daysLeft: number) {
