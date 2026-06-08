@@ -1,9 +1,10 @@
 import { SignUp } from '@clerk/nextjs'
+import { AuthShell, CLERK_APPEARANCE } from '../../auth-shell'
 
 export default function SignUpPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <SignUp forceRedirectUrl="/player-card" />
-    </div>
+    <AuthShell title="Train smarter with RollPlan" subtitle="AI match analysis and opponent gameplans for competition BJJ.">
+      <SignUp forceRedirectUrl="/player-card" appearance={CLERK_APPEARANCE} />
+    </AuthShell>
   )
 }

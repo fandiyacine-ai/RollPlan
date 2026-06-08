@@ -1,8 +1,9 @@
 import { db } from '../../../../lib/db'
-import { matches, videos, positionSegments, matchEvents, insights } from '../../../../lib/db/schema'
+import { matches, videos, positionSegments, matchEvents, insights, users } from '../../../../lib/db/schema'
 import { eq, asc } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { clerkClient } from '@clerk/nextjs/server'
 import { MatchContent, type TimelineItem } from '../../../(dashboard)/matches/[matchId]/match-content'
 import { POSITIONS } from '../../../../lib/taxonomy/positions'
 import { EVENT_TYPES } from '../../../../lib/taxonomy/events'
@@ -16,6 +17,30 @@ function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
   const s = Math.round(seconds % 60)
   return s > 0 ? `${m}m ${s}s` : `${m}m`
+}
+
+// `competitorLabel` is 'you' for self-uploaded matches (it reads naturally inside the
+// owner's own dashboard) but means nothing to an anonymous viewer of a public share link —
+// resolve the owner's real name from Clerk in that case. Scouting matches already store the
+// scouted athlete's real name in `competitorLabel`, so those pass through unchanged.
+async function resolveAthleteName(match: { competitorLabel: string | null; userId: string | null }): Promise<string> {
+  if (match.competitorLabel && match.competitorLabel.toLowerCase() !== 'you') return match.competitorLabel
+
+  if (!match.userId) return 'Athlete'
+  const owner = await db.query.users.findFirst({ where: eq(users.id, match.userId) })
+  if (!owner) return 'Athlete'
+
+  try {
+    const client = await clerkClient()
+    const clerkUser = await client.users.getUser(owner.clerkId)
+    return [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || owner.email.split('@')[0] || 'Athlete'
+  } catch {
+    return owner.email.split('@')[0] || 'Athlete'
+  }
+}
+
+function resolveOpponentName(opponentLabel: string | null | undefined): string {
+  return opponentLabel && opponentLabel.toLowerCase() !== 'unknown' ? opponentLabel : 'an opponent'
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ shortId: string }> }): Promise<Metadata> {
@@ -34,9 +59,10 @@ export async function generateMetadata({ params }: { params: Promise<{ shortId: 
   const topPosName = topPos ? (POSITION_MAP[topPos[0]] ?? topPos[0]) : null
 
   const date = (match.recordedAt ?? match.createdAt).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })
-  const title = `${match.competitorLabel ?? 'Match'} Analysis — ${date}`
+  const athleteName = await resolveAthleteName(match)
+  const title = `${athleteName} Analysis — ${date}`
   const description = [
-    `vs. ${match.opponentLabel}`,
+    `vs. ${resolveOpponentName(match.opponentLabel)}`,
     `${controlRate}% control rate`,
     topPosName ? `${topPosName} dominant` : null,
   ].filter(Boolean).join(' · ')
@@ -98,6 +124,8 @@ export default async function SharedMatchPage({ params }: { params: Promise<{ sh
 
   const displayDate = (match.recordedAt ?? match.createdAt).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })
   const showVideo = match.shareIncludesVideo && video?.publicUrl
+  const athleteName = await resolveAthleteName(match)
+  const opponentName = resolveOpponentName(match.opponentLabel)
 
   return (
     <div className="min-h-screen bg-background">
@@ -120,11 +148,7 @@ export default async function SharedMatchPage({ params }: { params: Promise<{ sh
       <main className="p-6 max-w-3xl mx-auto space-y-6">
         {/* Match header */}
         <div>
-          <h1 className="text-2xl font-bold">
-            {match.tournamentOpponentId
-              ? `${match.competitorLabel || 'Unknown'} vs. ${match.opponentLabel}`
-              : `vs. ${match.opponentLabel}`}
-          </h1>
+          <h1 className="text-2xl font-bold">{athleteName} vs. {opponentName}</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {match.format === 'no_gi' ? 'No-Gi' : 'Gi'} · {match.context}
             {match.eventName ? ` · ${match.eventName}` : ''}
@@ -209,8 +233,8 @@ export default async function SharedMatchPage({ params }: { params: Promise<{ sh
             opponentBbox: (s.opponentBbox as { x1: number; y1: number; x2: number; y2: number } | null) ?? null,
           }))}
           spatialData={null}
-          competitorLabel={match.tournamentOpponentId ? match.competitorLabel : null}
-          opponentLabel={match.tournamentOpponentId ? match.opponentLabel : null}
+          competitorLabel={athleteName}
+          opponentLabel={opponentName}
         />
 
         {/* Footer CTA */}

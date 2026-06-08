@@ -163,16 +163,17 @@ export function FeedbackWidget() {
 
   return (
     <>
-      {/* Floating trigger button — desktop bottom-right, sits above mobile tab bar */}
+      {/* Floating trigger button — icon-only FAB on mobile (small footprint, tucked above the
+          tab bar so it overlaps as little scrollable card content as possible), full label on desktop */}
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40 flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-full border border-border bg-background/95 backdrop-blur-sm shadow-sm hover:bg-muted transition-colors"
+        className="fixed z-40 flex items-center justify-center gap-1.5 text-xs font-medium rounded-full border border-border bg-background/95 backdrop-blur-sm shadow-sm hover:bg-muted transition-colors bottom-[4.75rem] right-3 w-10 h-10 p-0 sm:bottom-6 sm:right-6 sm:w-auto sm:h-auto sm:px-3 sm:py-2"
         aria-label="Give feedback"
       >
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         </svg>
-        Feedback
+        <span className="hidden sm:inline">Feedback</span>
       </button>
 
       {open && <FeedbackModal onClose={handleClose} />}
