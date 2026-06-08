@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { AddOpponentForm, ScoutForm } from './opponent-forms'
@@ -455,6 +455,38 @@ function OpponentSection({ opp, tournamentId, index, total }: { opp: OpponentRow
   )
 }
 
+// ── PaginationControls ────────────────────────────────────────────────────────
+
+function PaginationControls({ index, total, onPrev, onNext }: { index: number; total: number; onPrev: () => void; onNext: () => void }) {
+  if (total <= 1) return null
+  return (
+    <div className="flex items-center justify-between gap-3 px-1">
+      <button
+        onClick={onPrev}
+        disabled={index === 0}
+        className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-border/50 text-muted-foreground hover:text-foreground hover:border-border disabled:opacity-30 disabled:hover:text-muted-foreground disabled:hover:border-border/50 transition-colors"
+      >
+        <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9.5 4.5L6 8 9.5 11.5" transform="rotate(180 6 6)" />
+          <path d="M7 2.5L3 6l4 3.5" />
+        </svg>
+        Previous
+      </button>
+      <span className="text-[11px] font-bold tabular-nums text-muted-foreground/50">{index + 1} / {total}</span>
+      <button
+        onClick={onNext}
+        disabled={index === total - 1}
+        className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-border/50 text-muted-foreground hover:text-foreground hover:border-border disabled:opacity-30 disabled:hover:text-muted-foreground disabled:hover:border-border/50 transition-colors"
+      >
+        Next
+        <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 2.5l4 3.5-4 3.5" />
+        </svg>
+      </button>
+    </div>
+  )
+}
+
 // ── TournamentFightView ───────────────────────────────────────────────────────
 
 export function TournamentFightView({
@@ -472,6 +504,11 @@ export function TournamentFightView({
   smoothcompUrl: string | null
   userSmootcompAthleteId: string | null | undefined
 }) {
+  const [activeIndex, setActiveIndex] = useState(0)
+  const active = opponents[activeIndex]
+  const goPrev = () => setActiveIndex(i => Math.max(0, i - 1))
+  const goNext = () => setActiveIndex(i => Math.min(opponents.length - 1, i + 1))
+
   return (
     <div>
       {/* Management header */}
@@ -492,26 +529,33 @@ export function TournamentFightView({
         </div>
       </div>
 
-      {/* Desktop: entire two-column block is sticky so both columns share the same top edge */}
-      <div className="hidden md:flex gap-5 items-start sticky top-20">
+      {/* Desktop: two-column layout — user card pinned left, single opponent + pagination right.
+          Only one opponent renders at a time, so the two columns can never drift out of alignment
+          regardless of how much content each opponent has. */}
+      <div className="hidden md:flex gap-5 items-start">
 
-        {/* User card — left, no sticky needed since parent block is sticky */}
-        <div className="w-[220px] flex-shrink-0">
+        <div className="w-[220px] flex-shrink-0 sticky top-20 space-y-3">
           <UserCard userName={userName} data={userData} />
 
-          {/* Jump nav — pill list, opponent count + names together as one unit */}
+          {/* Opponent picker — clicking jumps pagination directly to that opponent */}
           {opponents.length > 1 && (
-            <nav className="mt-3 space-y-1.5">
+            <nav className="space-y-1.5">
               <p className="px-1 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50">
                 {opponents.length} opponents
               </p>
               {opponents.map((opp, i) => (
-                <a
+                <button
                   key={opp.id}
-                  href={`#opp-${opp.id}`}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border/50 bg-muted/20 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:border-border transition-colors group"
+                  onClick={() => setActiveIndex(i)}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl border text-xs transition-colors group ${
+                    i === activeIndex
+                      ? 'border-foreground/30 bg-foreground/[0.06] text-foreground'
+                      : 'border-border/50 bg-muted/20 text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:border-border'
+                  }`}
                 >
-                  <span className="flex items-center justify-center w-4 h-4 rounded-full bg-foreground/[0.06] text-[9px] font-bold text-muted-foreground/60 flex-shrink-0">{i + 1}</span>
+                  <span className={`flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-bold flex-shrink-0 ${
+                    i === activeIndex ? 'bg-foreground/15 text-foreground' : 'bg-foreground/[0.06] text-muted-foreground/60'
+                  }`}>{i + 1}</span>
                   <span className="truncate font-semibold">{opp.opponentLabel}</span>
                   {opp.gameplanVerdict && (
                     <span className={`ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0 ${
@@ -519,70 +563,21 @@ export function TournamentFightView({
                       opp.gameplanVerdict === 'tough' ? 'bg-rose-400' : 'bg-amber-400'
                     }`} />
                   )}
-                </a>
+                </button>
               ))}
             </nav>
           )}
         </div>
 
-        {/* Opponent sections — scroll container fills remaining viewport height below the sticky offset.
-            Each section is shorter than the viewport so the next card's accent strip peeks in at the
-            bottom — combined with the "Next opponent" teaser, this signals there's more to scroll to. */}
-        <div
-          className="flex-1 min-w-0 overflow-y-auto snap-y snap-mandatory"
-          style={{ height: 'calc(100vh - 100px)' }}
-        >
-          {opponents.map((opp, i) => {
-            const next = opponents[i + 1]
-            return (
-              <div key={opp.id} id={`opp-${opp.id}`} className="snap-start snap-always pb-4 flex flex-col" style={{ minHeight: 'calc(100vh - 180px)' }}>
-                <OpponentSection opp={opp} tournamentId={tournamentId} index={i} total={opponents.length} />
-                {next && (
-                  <a
-                    href={`#opp-${next.id}`}
-                    className="mt-3 flex items-center justify-between gap-2 px-4 py-3 rounded-xl border border-dashed border-border/50 text-xs text-muted-foreground hover:text-foreground hover:border-border hover:bg-muted/30 transition-colors group"
-                  >
-                    <span className="font-medium">Next opponent</span>
-                    <span className="flex items-center gap-1.5 font-bold text-foreground/70 group-hover:text-foreground">
-                      {next.opponentLabel}
-                      <svg className="w-3 h-3 group-hover:translate-y-0.5 transition-transform" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M2.5 4.5L6 8l3.5-3.5" />
-                      </svg>
-                    </span>
-                  </a>
-                )}
-              </div>
-            )
-          })}
+        {/* Active opponent + pagination */}
+        <div className="flex-1 min-w-0 space-y-3">
+          {active && <OpponentSection opp={active} tournamentId={tournamentId} index={activeIndex} total={opponents.length} />}
+          <PaginationControls index={activeIndex} total={opponents.length} onPrev={goPrev} onNext={goNext} />
         </div>
       </div>
 
       {/* Mobile: stacked */}
       <div className="md:hidden space-y-4">
-
-        {/* Mobile jump nav — only when >1 opponent */}
-        {opponents.length > 1 && (
-          <div className="sticky top-14 z-10 -mx-4 px-4 py-2 bg-background/95 backdrop-blur-sm border-b border-border/40 overflow-x-auto no-scrollbar">
-            <div className="flex gap-1.5 w-max">
-              {opponents.map((opp, i) => (
-                <a
-                  key={opp.id}
-                  href={`#opp-mobile-${opp.id}`}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-border/60 bg-muted/40 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors whitespace-nowrap"
-                >
-                  <span className="text-[9px] font-mono text-muted-foreground/40">{i + 1}</span>
-                  <span className="font-medium">{opp.opponentLabel.split(' ')[0]}</span>
-                  {opp.gameplanVerdict && (
-                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                      opp.gameplanVerdict === 'favourable' ? 'bg-emerald-400' :
-                      opp.gameplanVerdict === 'tough' ? 'bg-rose-400' : 'bg-amber-400'
-                    }`} />
-                  )}
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Condensed user banner */}
         <div className="rounded-xl overflow-hidden border border-border bg-zinc-100 dark:bg-zinc-900 p-4">
@@ -606,11 +601,8 @@ export function TournamentFightView({
           </div>
         </div>
 
-        {opponents.map((opp, i) => (
-          <div key={opp.id} id={`opp-mobile-${opp.id}`} className="scroll-mt-28">
-            <OpponentSection opp={opp} tournamentId={tournamentId} index={i} total={opponents.length} />
-          </div>
-        ))}
+        {active && <OpponentSection opp={active} tournamentId={tournamentId} index={activeIndex} total={opponents.length} />}
+        <PaginationControls index={activeIndex} total={opponents.length} onPrev={goPrev} onNext={goNext} />
       </div>
     </div>
   )

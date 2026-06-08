@@ -1,35 +1,57 @@
 'use client'
 
-import { useRef, useState, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ShareCard, type ShareCardData } from './share-card'
 
 export function ShareCardButton({ data }: { data: ShareCardData }) {
   const [open, setOpen] = useState(false)
   const [downloading, setDownloading] = useState(false)
+  const [canNativeShare, setCanNativeShare] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!open) return
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setOpen(false) }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open])
+    setCanNativeShare(typeof navigator !== 'undefined' && typeof navigator.share === 'function')
+  }, [])
 
-  async function download() {
+  function triggerDownload(dataUrl: string, filename: string) {
+    const link = document.createElement('a')
+    link.download = filename
+    link.href = dataUrl
+    link.click()
+  }
+
+  async function handleShare() {
     if (!cardRef.current) return
     setDownloading(true)
     try {
       const { toPng } = await import('html-to-image')
       const dataUrl = await toPng(cardRef.current, {
-        pixelRatio: 2,
         cacheBust: true,
-        width: 540,
-        height: 540,
+        pixelRatio: 3,
+        backgroundColor: '#f4f4f5',
       })
-      const a = document.createElement('a')
-      a.href = dataUrl
-      a.download = `${data.name.replace(/\s+/g, '-').toLowerCase()}-rollplan.png`
-      a.click()
+      const filename = `rollplan-${data.name.replace(/\s+/g, '-').toLowerCase()}-player-card.png`
+
+      if (canNativeShare) {
+        try {
+          const blob = await (await fetch(dataUrl)).blob()
+          const file = new File([blob], filename, { type: 'image/png' })
+          if (navigator.canShare?.({ files: [file] })) {
+            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('share-timeout')), 15000))
+            await Promise.race([navigator.share({
+              files: [file],
+              title: `${data.name} — Player Card`,
+              text: `My player card — powered by RollPlan.AI`,
+            }), timeout])
+            return
+          }
+        } catch (err) {
+          if ((err as Error)?.name === 'AbortError') return
+          // share failed, hung, or timed out — fall through to download below
+        }
+      }
+
+      triggerDownload(dataUrl, filename)
     } finally {
       setDownloading(false)
     }
@@ -39,54 +61,38 @@ export function ShareCardButton({ data }: { data: ShareCardData }) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-border hover:bg-muted transition-colors font-medium"
+        className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors border border-border/40 hover:border-border rounded-lg px-3 py-1.5"
       >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+        <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M11 4.5V3a1 1 0 00-1-1H3a1 1 0 00-1 1v8a1 1 0 001 1h1.5" />
+          <rect x="5" y="6" width="9" height="8" rx="1" />
         </svg>
-        Share Card
+        Share card
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setOpen(false)} />
-          <div className="relative bg-background border border-border rounded-2xl shadow-2xl p-6 space-y-5 z-10 max-w-2xl w-full">
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-base">Your Player Card</h2>
-              <button
-                onClick={() => setOpen(false)}
-                className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M18 6L6 18M6 6l12 12"/>
-                </svg>
-              </button>
-            </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setOpen(false)}>
+          <div className="flex flex-col items-center gap-4 max-h-[95vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
 
-            {/* Card preview — uses overflow-x-auto for narrow screens */}
-            <div className="overflow-x-auto rounded-xl">
+            <div style={{ flexShrink: 0 }}>
               <ShareCard data={data} innerRef={cardRef} />
             </div>
 
-            <div className="flex items-center gap-3 pt-1">
+            {/* Controls */}
+            <div className="flex items-center gap-3">
               <button
-                onClick={download}
+                onClick={handleShare}
                 disabled={downloading}
-                className="flex-1 flex items-center justify-center gap-2 text-sm px-4 py-2.5 rounded-xl bg-foreground text-background font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-6 py-2.5 bg-white text-zinc-900 text-sm font-bold rounded-xl hover:bg-zinc-100 disabled:opacity-50 transition-colors"
               >
-                {downloading ? (
-                  'Generating…'
-                ) : (
-                  <>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                    </svg>
-                    Download PNG
-                  </>
-                )}
+                {downloading ? 'Preparing…' : canNativeShare ? '↑ Share card' : '↓ Download PNG'}
               </button>
-              <p className="text-xs text-muted-foreground">2× retina quality</p>
+              <button
+                onClick={() => setOpen(false)}
+                className="px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

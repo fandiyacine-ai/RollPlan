@@ -12,8 +12,9 @@ export type ShareCardData = {
   ruleset?: string | null
   division?: string | null
   weightClass?: string | null
-  ownTotal: number
-  ownWins: number
+  ownAjpRecord?: string | null
+  ownScRecord?: string | null
+  ownIbjjfBest?: string | null
   oppAjpRecord?: string | null
   oppScRecord?: string | null
   oppIbjjfBest?: string | null
@@ -90,6 +91,8 @@ export function ShareButton({ data }: { data: ShareCardData }) {
   const fedTags = detectFedTags(data.tournamentName)
   const oppBestRecord = data.oppAjpRecord ?? data.oppScRecord ?? null
   const oppRecordSource = data.oppAjpRecord ? 'AJP' : data.oppScRecord ? 'SC' : null
+  const ownBestRecord = data.ownAjpRecord ?? data.ownScRecord ?? null
+  const ownRecordSource = data.ownAjpRecord ? 'AJP' : data.ownScRecord ? 'SC' : null
 
   return (
     <>
@@ -155,11 +158,16 @@ export function ShareButton({ data }: { data: ShareCardData }) {
                 <div style={{ fontSize: 48, fontWeight: 900, color: '#18181b', lineHeight: 0.88, textTransform: 'uppercase', letterSpacing: '-0.01em', wordBreak: 'break-word' }}>
                   {data.userName}
                 </div>
-                {data.ownTotal > 0 && (
+                {ownBestRecord && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
-                    <span style={{ fontSize: 15, fontWeight: 800, color: '#059669' }}>{data.ownWins}W</span>
-                    <span style={{ fontSize: 15, fontWeight: 800, color: 'rgba(0,0,0,0.3)' }}>{data.ownTotal - data.ownWins}L</span>
-                    <span style={{ fontSize: 9, color: 'rgba(0,0,0,0.3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>on RollPlan</span>
+                    {ownRecordSource && <span style={{ fontSize: 9, color: 'rgba(0,0,0,0.3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{ownRecordSource}</span>}
+                    <span style={{ fontSize: 15, fontWeight: 800, color: '#059669' }}>{ownBestRecord.split(' ')[0]}</span>
+                    <span style={{ fontSize: 15, fontWeight: 800, color: 'rgba(0,0,0,0.3)' }}>{ownBestRecord.split(' ')[1]}</span>
+                  </div>
+                )}
+                {data.ownIbjjfBest && (
+                  <div style={{ marginTop: 8 }}>
+                    <span style={{ fontSize: 9, color: 'rgba(0,0,0,0.35)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>IBJJF · {condenseMedals(data.ownIbjjfBest) ?? data.ownIbjjfBest}</span>
                   </div>
                 )}
               </div>

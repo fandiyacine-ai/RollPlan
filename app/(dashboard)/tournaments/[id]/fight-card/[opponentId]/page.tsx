@@ -1,5 +1,5 @@
 import { db } from '@/lib/db'
-import { tournaments, tournamentOpponents, matches, positionSegments, matchEvents, gameplans, videos } from '@/lib/db/schema'
+import { tournaments, tournamentOpponents, matches, positionSegments, matchEvents, gameplans, videos, users } from '@/lib/db/schema'
 import { eq, and, inArray, sql } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
@@ -14,11 +14,6 @@ import { condenseMedals } from '@/lib/tournament-utils'
 export const dynamic = 'force-dynamic'
 
 // ── helpers ────────────────────────────────────────────────────────────────────
-
-function pct(n: number, total: number): string {
-  if (total === 0) return '—'
-  return `${Math.round((n / total) * 100)}%`
-}
 
 function careerRecord(wins: number | null | undefined, losses: number | null | undefined): string | null {
   if (wins == null && losses == null) return null
@@ -47,6 +42,12 @@ export default async function FightCardPage({
     where: and(eq(tournamentOpponents.id, opponentId), eq(tournamentOpponents.tournamentId, tournamentId)),
   })
   if (!opponent) notFound()
+
+  // User's own competition record (same fields/source as opponent intel — keeps "Your game" vs "Their game" comparable)
+  const userRecord = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+    columns: { ajpWins: true, ajpLosses: true, smoothcompWins: true, smoothcompLosses: true, ibjjfBestResult: true, ibjjfProfileUrl: true },
+  })
 
   // User display name (from Clerk profile)
   const clerkUser = await currentUser()
@@ -122,8 +123,6 @@ export default async function FightCardPage({
   const ownMatchRows = await db
     .select({
       id: matches.id,
-      resultWinner: matches.resultWinner,
-      resultMethod: matches.resultMethod,
     })
     .from(matches)
     .innerJoin(videos, eq(videos.id, matches.videoId))
@@ -136,8 +135,6 @@ export default async function FightCardPage({
     )
 
   const ownMatchIds = ownMatchRows.map(m => m.id)
-  const ownWins = ownMatchRows.filter(m => m.resultWinner === 'user').length
-  const ownTotal = ownMatchRows.length
 
   // ── User position stats ───────────────────────────────────────────────────────
   let userTopSecs = 0
@@ -206,6 +203,8 @@ export default async function FightCardPage({
 
   const ajpRecord = careerRecord(opponent.ajpWins, opponent.ajpLosses)
   const scRecord = careerRecord(opponent.smoothcompWins, opponent.smoothcompLosses)
+  const ownAjpRecord = careerRecord(userRecord?.ajpWins, userRecord?.ajpLosses)
+  const ownScRecord = careerRecord(userRecord?.smoothcompWins, userRecord?.smoothcompLosses)
 
   function fmtDate(d: string) {
     try { return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) }
@@ -282,11 +281,22 @@ export default async function FightCardPage({
               <p className="font-display text-5xl sm:text-6xl uppercase leading-[0.88] tracking-wide text-foreground truncate">
                 {userName}
               </p>
-              {ownTotal > 0 && (
+              {(ownAjpRecord || ownScRecord) && (
                 <div className="flex items-center gap-2 mt-2">
-                  <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{ownWins}W</span>
-                  <span className="text-sm font-bold text-foreground/30">{ownTotal - ownWins}L</span>
-                  <span className="text-[9px] text-foreground/30 uppercase tracking-wider">on RollPlan</span>
+                  {ownAjpRecord && (
+                    <>
+                      <span className="text-[9px] text-foreground/30 uppercase tracking-wider">AJP</span>
+                      <span className="text-sm font-bold text-emerald-500">{ownAjpRecord.split(' ')[0]}</span>
+                      <span className="text-sm font-bold text-foreground/30">{ownAjpRecord.split(' ')[1]}</span>
+                    </>
+                  )}
+                  {!ownAjpRecord && ownScRecord && (
+                    <>
+                      <span className="text-[9px] text-foreground/30 uppercase tracking-wider">SC</span>
+                      <span className="text-sm font-bold text-emerald-500">{ownScRecord.split(' ')[0]}</span>
+                      <span className="text-sm font-bold text-foreground/30">{ownScRecord.split(' ')[1]}</span>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -362,17 +372,43 @@ export default async function FightCardPage({
             </>
           )}
 
-          {/* Win rate / career records */}
-          {(ownTotal > 0 || ajpRecord || scRecord || opponent.ibjjfBestResult) && (
+          {/* Career records — same source/basis on both sides for a fair comparison */}
+          {(ownAjpRecord || ownScRecord || userRecord?.ibjjfBestResult || ajpRecord || scRecord || opponent.ibjjfBestResult) && (
             <>
               <div className="bg-card px-4 pb-3">
-                {ownTotal > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-emerald-400">{pct(ownWins, ownTotal)}</span>
-                    <span className="text-[11px] text-muted-foreground/60">win rate</span>
-                    <span className="text-muted-foreground/30">·</span>
-                    <span className="text-sm font-bold text-foreground/80">{ownTotal}</span>
-                    <span className="text-[11px] text-muted-foreground/60">matches</span>
+                {(ownAjpRecord || ownScRecord || userRecord?.ibjjfBestResult) && (
+                  <div className="flex flex-col items-start gap-1">
+                    {ownAjpRecord && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-medium">AJP</span>
+                        <span className="text-sm font-bold text-emerald-400">{ownAjpRecord.split(' ')[0]}</span>
+                        <span className="text-sm font-bold text-foreground/60">{ownAjpRecord.split(' ')[1]}</span>
+                      </div>
+                    )}
+                    {ownScRecord && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-medium">SC</span>
+                        <span className="text-sm font-bold text-emerald-400">{ownScRecord.split(' ')[0]}</span>
+                        <span className="text-sm font-bold text-foreground/60">{ownScRecord.split(' ')[1]}</span>
+                      </div>
+                    )}
+                    {userRecord?.ibjjfBestResult && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-medium">IBJJF</span>
+                        {userRecord.ibjjfProfileUrl ? (
+                          <a
+                            href={userRecord.ibjjfProfileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[11px] text-muted-foreground/70 hover:text-foreground hover:underline underline-offset-2 transition-colors"
+                          >
+                            {condenseMedals(userRecord.ibjjfBestResult) ?? userRecord.ibjjfBestResult}
+                          </a>
+                        ) : (
+                          <span className="text-[11px] text-muted-foreground/70">{condenseMedals(userRecord.ibjjfBestResult) ?? userRecord.ibjjfBestResult}</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -492,8 +528,9 @@ export default async function FightCardPage({
               ruleset: tournament.ruleset,
               division: tournament.division,
               weightClass: tournament.weightClass,
-              ownTotal,
-              ownWins,
+              ownAjpRecord,
+              ownScRecord,
+              ownIbjjfBest: userRecord?.ibjjfBestResult,
               oppAjpRecord: ajpRecord,
               oppScRecord: scRecord,
               oppIbjjfBest: opponent.ibjjfBestResult,
