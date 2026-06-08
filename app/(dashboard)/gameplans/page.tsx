@@ -166,10 +166,10 @@ export default async function GameplansPage() {
       <div className="max-w-xl space-y-4">
         <h1 className="text-2xl font-semibold">Gameplans</h1>
         <div className="rounded-xl border border-dashed p-10 text-center space-y-2">
-          <p className="font-semibold">No tournaments yet</p>
-          <p className="text-sm text-muted-foreground">
-            <Link href="/tournaments" className="underline hover:no-underline">Create a tournament</Link>{' '}
-            and add opponents to generate gameplans.
+          <p className="font-semibold">Add a tournament, get a gameplan</p>
+          <p className="text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">
+            Once you've got opponents lined up, RollPlan studies their tape and hands you a plan — what to open with, what to watch for, how the fight could go.{' '}
+            <Link href="/tournaments" className="underline underline-offset-2 hover:text-foreground transition-colors">Add your first tournament →</Link>
           </p>
         </div>
       </div>

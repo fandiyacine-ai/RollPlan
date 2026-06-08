@@ -80,8 +80,10 @@ export default async function TournamentsPage() {
 
       {allTournaments.length === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground">
-          <p className="font-medium">No tournaments yet</p>
-          <p className="text-sm mt-1">Create one to start scouting opponents and generating gameplans.</p>
+          <p className="font-medium text-foreground">Your next fight starts here</p>
+          <p className="text-sm mt-1.5 max-w-sm mx-auto leading-relaxed">
+            Drop in a tournament and watch the picture build — opponents scouted, gameplans drafted, the countdown running. By fight day, nothing about them will surprise you.
+          </p>
         </div>
       ) : (
         <div className="space-y-2.5">
