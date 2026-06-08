@@ -17,9 +17,19 @@ export function ConnectionsToggle({ defaultOpen }: { defaultOpen: boolean }) {
   }
 
   return (
-    <section>
-      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">Connections</h2>
-      <div className="rounded-xl border border-border/60 bg-muted/30 p-4">
+    <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+      <div className="px-5 py-2.5 border-b border-border/60">
+        <h2 className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+          <svg className="w-3 h-3 opacity-50" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2.5" y="5.5" width="7" height="5" rx="1" />
+            <path d="M3.5 5.5V4a2.5 2.5 0 0 1 5 0v1.5" />
+          </svg>
+          Privacy & Connections
+        </h2>
+        <p className="text-[11px] text-muted-foreground/70 mt-0.5">Who can reach you, and what they can see.</p>
+      </div>
+
+      <div className="px-5 py-4">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-sm font-semibold text-foreground">Let competitors I've faced connect with me</p>
@@ -52,6 +62,6 @@ export function ConnectionsToggle({ defaultOpen }: { defaultOpen: boolean }) {
           RollPlan is built so you can scout with total privacy and connect with total confidence — at the same time.
         </p>
       </div>
-    </section>
+    </div>
   )
 }

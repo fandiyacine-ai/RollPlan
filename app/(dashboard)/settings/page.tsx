@@ -23,16 +23,16 @@ export default async function SettingsPage() {
         </p>
       </div>
 
-      <SettingsForm
-        defaultBelt={user?.belt}
-        defaultStyle={user?.primaryStyle}
-        defaultWeightClassKg={user?.weightClassKg}
-        defaultGym={user?.gym}
-        defaultGoals={user?.goals}
-        defaultSmootcompProfileUrl={user?.smoothcompProfileUrl}
-      />
+      <div className="space-y-6">
+        <SettingsForm
+          defaultBelt={user?.belt}
+          defaultStyle={user?.primaryStyle}
+          defaultWeightClassKg={user?.weightClassKg}
+          defaultGym={user?.gym}
+          defaultGoals={user?.goals}
+          defaultSmootcompProfileUrl={user?.smoothcompProfileUrl}
+        />
 
-      <div className="mt-12">
         <CompetitionRecordSection
           ajpWins={user?.ajpWins ?? null}
           ajpLosses={user?.ajpLosses ?? null}
@@ -44,13 +44,11 @@ export default async function SettingsPage() {
           ibjjfProfileUrl={user?.ibjjfProfileUrl ?? null}
           intelStatus={user?.intelStatus ?? null}
         />
-      </div>
 
-      <div className="mt-12">
         <ConnectionsToggle defaultOpen={user?.openToConnections ?? false} />
       </div>
 
-      <div className="mt-10 pt-8 border-t border-border/60">
+      <div className="mt-10 pt-6 border-t border-border/60">
         <p className="text-xs text-muted-foreground">
           Have questions?{' '}
           <Link href="/faq" className="underline underline-offset-2 hover:text-foreground">

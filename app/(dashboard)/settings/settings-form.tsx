@@ -73,136 +73,167 @@ export function SettingsForm({ defaultBelt, defaultStyle, defaultWeightClassKg, 
   }
 
   return (
-    <form action={action} className="space-y-10">
+    <form action={action} className="space-y-6">
 
-      {/* Competitor Category */}
-      <section>
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">Competitor Category</h2>
-        <div className="flex gap-2 rounded-lg bg-muted p-1 w-fit">
-          {([
-            { value: 'adult', label: 'Adult / Teen' },
-            { value: 'kids',  label: 'Kids (< 16)' },
-          ] as const).map((cat) => (
-            <button
-              key={cat.value}
-              type="button"
-              onClick={() => handleCategorySwitch(cat.value)}
-              className={`px-5 py-1.5 rounded-md text-sm font-medium transition-all ${
-                category === cat.value
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
+      {/* Athlete Profile card */}
+      <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+        <div className="px-5 py-2.5 border-b border-border/60">
+          <h2 className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+            <svg className="w-3 h-3 opacity-50" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="6" cy="4" r="2" />
+              <path d="M2 11c0-2.2 1.8-4 4-4s4 1.8 4 4" />
+            </svg>
+            Athlete Profile
+          </h2>
+          <p className="text-[11px] text-muted-foreground/70 mt-0.5">Used by the AI when generating gameplans and coaching notes.</p>
         </div>
-      </section>
 
-      {/* Belt */}
-      <section>
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">Belt</h2>
-        <div className="flex flex-wrap gap-3">
-          {belts.map((b) => (
-            <label key={b.value} className="cursor-pointer">
-              <input
-                type="radio"
-                name="belt"
-                value={b.value}
-                defaultChecked={defaultBelt === b.value}
-                className="sr-only peer"
-              />
-              <span
-                className="inline-flex items-center px-4 py-1.5 rounded-full text-sm font-semibold ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-offset-background peer-checked:ring-current transition-all select-none"
-                style={{ backgroundColor: b.color, color: b.text }}
-              >
-                {b.label}
-              </span>
-            </label>
-          ))}
-        </div>
-        {category === 'kids' && (
-          <p className="text-xs text-muted-foreground mt-2">IBJJF youth belt colours (grey, yellow, orange, green)</p>
-        )}
-      </section>
+        <div className="px-5 py-5 space-y-7">
+          {/* Competitor Category */}
+          <section>
+            <h3 className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wide mb-3">Competitor Category</h3>
+            <div className="flex gap-2 rounded-lg bg-muted p-1 w-fit">
+              {([
+                { value: 'adult', label: 'Adult / Teen' },
+                { value: 'kids',  label: 'Kids (< 16)' },
+              ] as const).map((cat) => (
+                <button
+                  key={cat.value}
+                  type="button"
+                  onClick={() => handleCategorySwitch(cat.value)}
+                  className={`px-5 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    category === cat.value
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+          </section>
 
-      {/* Style */}
-      <section>
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">Primary Style</h2>
-        <div className="flex gap-2 rounded-lg bg-muted p-1 w-fit">
-          {STYLES.map((s) => (
-            <label key={s.value} className="cursor-pointer">
-              <input
-                type="radio"
-                name="primaryStyle"
-                value={s.value}
-                defaultChecked={defaultStyle === s.value}
-                className="sr-only peer"
-              />
-              <span className="inline-flex px-5 py-1.5 rounded-md text-sm font-medium text-muted-foreground peer-checked:bg-background peer-checked:text-foreground peer-checked:shadow-sm transition-all select-none">
-                {s.label}
-              </span>
-            </label>
-          ))}
-        </div>
-      </section>
+          {/* Belt */}
+          <section>
+            <h3 className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wide mb-3">Belt</h3>
+            <div className="flex flex-wrap gap-3">
+              {belts.map((b) => (
+                <label key={b.value} className="cursor-pointer">
+                  <input
+                    type="radio"
+                    name="belt"
+                    value={b.value}
+                    defaultChecked={defaultBelt === b.value}
+                    className="sr-only peer"
+                  />
+                  <span
+                    className="inline-flex items-center px-4 py-1.5 rounded-full text-sm font-semibold ring-2 ring-transparent peer-checked:ring-offset-2 peer-checked:ring-offset-background peer-checked:ring-current transition-all select-none"
+                    style={{ backgroundColor: b.color, color: b.text }}
+                  >
+                    {b.label}
+                  </span>
+                </label>
+              ))}
+            </div>
+            {category === 'kids' && (
+              <p className="text-xs text-muted-foreground mt-2">IBJJF youth belt colours (grey, yellow, orange, green)</p>
+            )}
+          </section>
 
-      {/* Weight class */}
-      <section>
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">Weight Class</h2>
-        <input type="hidden" name="weightClassKg" id="weightClassKgInput" defaultValue={defaultWeightClassKg ?? ''} />
-        <div className="flex flex-wrap gap-2" id="weightPills">
-          {weights.map((w) => (
-            <WeightPill
-              key={w.kg}
-              kg={w.kg}
-              label={w.label}
-              defaultSelected={defaultWeightClassKg === w.kg}
+          {/* Style */}
+          <section>
+            <h3 className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wide mb-3">Primary Style</h3>
+            <div className="flex gap-2 rounded-lg bg-muted p-1 w-fit">
+              {STYLES.map((s) => (
+                <label key={s.value} className="cursor-pointer">
+                  <input
+                    type="radio"
+                    name="primaryStyle"
+                    value={s.value}
+                    defaultChecked={defaultStyle === s.value}
+                    className="sr-only peer"
+                  />
+                  <span className="inline-flex px-5 py-1.5 rounded-md text-sm font-medium text-muted-foreground peer-checked:bg-background peer-checked:text-foreground peer-checked:shadow-sm transition-all select-none">
+                    {s.label}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </section>
+
+          {/* Weight class */}
+          <section>
+            <h3 className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wide mb-3">Weight Class</h3>
+            <input type="hidden" name="weightClassKg" id="weightClassKgInput" defaultValue={defaultWeightClassKg ?? ''} />
+            <div className="flex flex-wrap gap-2" id="weightPills">
+              {weights.map((w) => (
+                <WeightPill
+                  key={w.kg}
+                  kg={w.kg}
+                  label={w.label}
+                  defaultSelected={defaultWeightClassKg === w.kg}
+                />
+              ))}
+            </div>
+          </section>
+
+          {/* Gym */}
+          <section>
+            <h3 className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wide mb-3">Gym / Academy</h3>
+            <input
+              name="gym"
+              type="text"
+              defaultValue={defaultGym ?? ''}
+              placeholder="e.g. Atos HQ, New Wave Jiu-Jitsu…"
+              className="w-full max-w-md rounded-lg border border-border bg-background px-4 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             />
-          ))}
+          </section>
         </div>
-      </section>
+      </div>
 
-      {/* Gym */}
-      <section>
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">Gym / Academy</h2>
-        <input
-          name="gym"
-          type="text"
-          defaultValue={defaultGym ?? ''}
-          placeholder="e.g. Atos HQ, New Wave Jiu-Jitsu…"
-          className="w-full max-w-md rounded-lg border border-border bg-background px-4 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-        />
-      </section>
+      {/* AI Context card */}
+      <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+        <div className="px-5 py-2.5 border-b border-border/60">
+          <h2 className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+            <svg className="w-3 h-3 opacity-50" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 1.5l1 2.5 2.5 1-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1z" />
+            </svg>
+            AI Context
+          </h2>
+          <p className="text-[11px] text-muted-foreground/70 mt-0.5">Feeds the gameplan generator and identifies your matches in brackets.</p>
+        </div>
 
-      {/* Goals */}
-      <section>
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">Training Goals</h2>
-        <textarea
-          name="goals"
-          defaultValue={defaultGoals ?? ''}
-          rows={4}
-          placeholder="What are you working towards? The AI uses this when generating gameplans and coaching notes."
-          className="w-full max-w-lg rounded-lg border border-border bg-background px-4 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-        />
-      </section>
+        <div className="px-5 py-5 space-y-7">
+          {/* Goals */}
+          <section>
+            <h3 className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wide mb-3">Training Goals</h3>
+            <textarea
+              name="goals"
+              defaultValue={defaultGoals ?? ''}
+              rows={4}
+              placeholder="What are you working towards? The AI uses this when generating gameplans and coaching notes."
+              className="w-full max-w-lg rounded-lg border border-border bg-background px-4 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+            />
+          </section>
 
-      {/* Smoothcomp profile */}
-      <section>
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">Smoothcomp Profile</h2>
-        <p className="text-xs text-muted-foreground mb-4">Used to automatically exclude you from bracket imports and identify your matches.</p>
-        <input
-          name="smoothcompProfileUrl"
-          type="text"
-          defaultValue={defaultSmootcompProfileUrl ?? ''}
-          placeholder="https://smoothcomp.com/en/athlete/12345"
-          className="w-full max-w-md rounded-lg border border-border bg-background px-4 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-        />
-        <p className="text-xs text-muted-foreground mt-1.5">Go to your Smoothcomp profile page and paste the URL here.</p>
-      </section>
+          {/* Smoothcomp profile */}
+          <section>
+            <h3 className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wide mb-1">Smoothcomp Profile</h3>
+            <p className="text-xs text-muted-foreground mb-3">Used to automatically exclude you from bracket imports and identify your matches.</p>
+            <input
+              name="smoothcompProfileUrl"
+              type="text"
+              defaultValue={defaultSmootcompProfileUrl ?? ''}
+              placeholder="https://smoothcomp.com/en/athlete/12345"
+              className="w-full max-w-md rounded-lg border border-border bg-background px-4 py-2.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            <p className="text-xs text-muted-foreground mt-1.5">Go to your Smoothcomp profile page and paste the URL here.</p>
+          </section>
+        </div>
+      </div>
 
       {/* Submit */}
-      <div className="flex items-center gap-4 pt-2">
+      <div className="flex items-center gap-4 pt-1">
         <button
           type="submit"
           disabled={pending}

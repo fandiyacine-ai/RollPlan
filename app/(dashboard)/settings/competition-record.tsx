@@ -81,12 +81,19 @@ export function CompetitionRecordSection({
   }
 
   return (
-    <div className="border border-border/60 rounded-xl p-6 space-y-4">
-      <div className="flex items-center justify-between gap-3">
+    <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+      <div className="px-5 py-2.5 border-b border-border/60 flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold">Competition Record</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Your wins / losses and IBJJF medals pulled from AJP, Smoothcomp, and IBJJF.
+          <h2 className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+            <svg className="w-3 h-3 opacity-50" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3.5 1.5h5v2a2.5 2.5 0 0 1-2.5 2.5 2.5 2.5 0 0 1-2.5-2.5v-2z" />
+              <path d="M5 6v1.5h2V6" />
+              <path d="M4 9.5h4" />
+            </svg>
+            Competition Record
+          </h2>
+          <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+            Wins / losses and IBJJF medals pulled from AJP, Smoothcomp, and IBJJF.
           </p>
         </div>
         <button
@@ -98,25 +105,27 @@ export function CompetitionRecordSection({
         </button>
       </div>
 
-      {errorMsg && (
-        <p className="text-xs text-rose-400">{errorMsg}</p>
-      )}
+      <div className="px-5 py-4 space-y-2.5">
+        {errorMsg && (
+          <p className="text-xs text-rose-400">{errorMsg}</p>
+        )}
 
-      {isRunning && !hasData && (
-        <p className="text-xs text-muted-foreground/60 animate-pulse">Scanning AJP, Smoothcomp, and IBJJF…</p>
-      )}
+        {isRunning && !hasData && (
+          <p className="text-xs text-muted-foreground/60 animate-pulse">Scanning AJP, Smoothcomp, and IBJJF…</p>
+        )}
 
-      {hasData ? (
-        <div className="space-y-2.5">
-          <WLRow label="AJP" wins={ajpWins} losses={ajpLosses} url={ajpProfileUrl} />
-          <WLRow label="Smoothcomp" wins={smoothcompWins} losses={smoothcompLosses} url={smoothcompFedUrl} />
-          <MedalRow result={ibjjfBestResult} url={ibjjfProfileUrl} />
-        </div>
-      ) : intelStatus === 'done' ? (
-        <p className="text-xs text-muted-foreground/60">No public record found. If you have a Smoothcomp profile, add the URL above and try again.</p>
-      ) : !isRunning ? (
-        <p className="text-xs text-muted-foreground/60">Not fetched yet. Click "Fetch record" to pull your competition history.</p>
-      ) : null}
+        {hasData ? (
+          <div className="space-y-2.5">
+            <WLRow label="AJP" wins={ajpWins} losses={ajpLosses} url={ajpProfileUrl} />
+            <WLRow label="Smoothcomp" wins={smoothcompWins} losses={smoothcompLosses} url={smoothcompFedUrl} />
+            <MedalRow result={ibjjfBestResult} url={ibjjfProfileUrl} />
+          </div>
+        ) : intelStatus === 'done' ? (
+          <p className="text-xs text-muted-foreground/60">No public record found. If you have a Smoothcomp profile, add the URL above and try again.</p>
+        ) : !isRunning ? (
+          <p className="text-xs text-muted-foreground/60">Not fetched yet. Click "Fetch record" to pull your competition history.</p>
+        ) : null}
+      </div>
     </div>
   )
 }
