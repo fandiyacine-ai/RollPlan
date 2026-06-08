@@ -24,6 +24,8 @@ export default async function SettingsPage() {
       </div>
 
       <div className="space-y-6">
+        <ConnectionsToggle defaultOpen={user?.openToConnections ?? false} />
+
         <SettingsForm
           defaultBelt={user?.belt}
           defaultStyle={user?.primaryStyle}
@@ -44,8 +46,6 @@ export default async function SettingsPage() {
           ibjjfProfileUrl={user?.ibjjfProfileUrl ?? null}
           intelStatus={user?.intelStatus ?? null}
         />
-
-        <ConnectionsToggle defaultOpen={user?.openToConnections ?? false} />
       </div>
 
       <div className="mt-10 pt-6 border-t border-border/60">
