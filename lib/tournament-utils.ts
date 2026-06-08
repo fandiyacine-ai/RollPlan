@@ -84,6 +84,23 @@ export function countryFlag(location: string | null): string | null {
   return null
 }
 
+// Condenses a pipe-delimited medal string (e.g. "Gold – Worlds 2026|Silver – Pans 2025|...")
+// into tier counts for display, e.g. "30 Gold · 15 Silver · 4 Bronze"
+const MEDAL_TIER_ORDER = ['Gold', 'Silver', 'Bronze'] as const
+
+export function condenseMedals(result: string | null | undefined): string | null {
+  if (!result) return null
+  const counts: Record<string, number> = {}
+  for (const entry of result.split('|')) {
+    const tier = entry.split(' – ')[0]?.trim()
+    if (tier) counts[tier] = (counts[tier] ?? 0) + 1
+  }
+  const parts = MEDAL_TIER_ORDER
+    .filter(tier => counts[tier] > 0)
+    .map(tier => `${counts[tier]} ${tier}`)
+  return parts.length > 0 ? parts.join(' · ') : null
+}
+
 export function giNoGi(ruleset: string, name: string): 'gi' | 'nogi' {
   if (['adcc', 'ebi', 'nogi'].includes(ruleset)) return 'nogi'
   const l = name.toLowerCase()

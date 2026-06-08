@@ -323,6 +323,14 @@ function OpponentSection({ opp, tournamentId, index, total }: { opp: OpponentRow
                 )}
               </div>
 
+              {/* Invisible spacer matching the "Their game" column's GameStyleBar footprint,
+                  so "Open with" lines up with "Dominates from" regardless of badge/label heights */}
+              {opp.topPct != null && (
+                <div className="invisible" aria-hidden="true">
+                  <GameStyleBar topPct={opp.topPct} />
+                </div>
+              )}
+
               {opp.gameplanStatus === 'generating' ? (
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
