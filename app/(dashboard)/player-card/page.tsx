@@ -193,7 +193,7 @@ export default async function PlayerCardPage() {
 
   // ── Training plan ──
   const trainingPlanRow = dbUser ? await db
-    .select({ trainingPlan: playerCards.trainingPlan, trainingPlanGeneratedAt: playerCards.trainingPlanGeneratedAt })
+    .select({ trainingPlan: playerCards.trainingPlan, trainingPlanGeneratedAt: playerCards.trainingPlanGeneratedAt, trainingPlanStatus: playerCards.trainingPlanStatus })
     .from(playerCards)
     .where(and(eq(playerCards.ownerId, dbUser.id), eq(playerCards.ownerType, 'user')))
     .limit(1)
@@ -763,6 +763,7 @@ export default async function PlayerCardPage() {
           <TrainingPlanSection
             initialPlan={trainingPlanRow?.trainingPlan as TrainingPlan | null ?? null}
             generatedAt={trainingPlanRow?.trainingPlanGeneratedAt ?? null}
+            isGenerating={trainingPlanRow?.trainingPlanStatus === 'generating'}
             isPro={isPro}
           />
 

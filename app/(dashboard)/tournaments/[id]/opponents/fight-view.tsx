@@ -51,6 +51,7 @@ export type OpponentRow = {
   hasGameplan: boolean
   communityMatchCount: number
   hasFootage: boolean
+  hasPendingUpload: boolean
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -184,7 +185,7 @@ function OpponentSection({ opp, tournamentId, index, total }: { opp: OpponentRow
   const ajpRecord = careerRecord(opp.ajpWins, opp.ajpLosses)
   const scRecord = careerRecord(opp.smoothcompWins, opp.smoothcompLosses)
   const hasStats = opp.scoutedMatchCount > 0
-  const isScanning = opp.footageStatus === 'pending' || opp.footageStatus === 'auto_queued'
+  const isScanning = opp.footageStatus === 'pending' || opp.footageStatus === 'auto_queued' || opp.hasPendingUpload
   const backParam = encodeURIComponent(`/tournaments/${tournamentId}/opponents`)
 
   return (
@@ -274,7 +275,11 @@ function OpponentSection({ opp, tournamentId, index, total }: { opp: OpponentRow
         {isScanning ? (
           <div className="px-5 py-4 flex items-center gap-3">
             <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse flex-shrink-0" />
-            <p className="text-sm text-muted-foreground">Searching for footage…</p>
+            <p className="text-sm text-muted-foreground">
+              {opp.hasPendingUpload && opp.footageStatus !== 'pending' && opp.footageStatus !== 'auto_queued'
+                ? 'Scanning your uploaded footage…'
+                : 'Searching for footage…'}
+            </p>
           </div>
         ) : hasStats ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-border/30">

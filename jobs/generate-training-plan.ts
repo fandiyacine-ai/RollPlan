@@ -22,6 +22,12 @@ export const generateTrainingPlan = inngest.createFunction(
     name: 'Generate Training Plan',
     triggers: [{ event: 'training-plan/generate' }],
     concurrency: { limit: 3 },
+    onFailure: async ({ event }: { event: { data: { event: { data: { userId: string } } } } }) => {
+      const { userId } = event.data.event.data
+      await db.update(playerCards)
+        .set({ trainingPlanStatus: 'idle' })
+        .where(and(eq(playerCards.ownerId, userId), eq(playerCards.ownerType, 'user')))
+    },
   },
   async ({ event, step }: { event: { data: { userId: string } }; step: any }) => {
     const { userId } = event.data
@@ -191,7 +197,7 @@ Return 3 drills ordered: most critical first.`,
 
       if (existing[0]) {
         await db.update(playerCards)
-          .set({ trainingPlan: plan, trainingPlanGeneratedAt: now })
+          .set({ trainingPlan: plan, trainingPlanGeneratedAt: now, trainingPlanStatus: 'ready' })
           .where(eq(playerCards.id, existing[0].id))
       } else {
         await db.insert(playerCards).values({
@@ -199,6 +205,7 @@ Return 3 drills ordered: most critical first.`,
           ownerId: userId,
           trainingPlan: plan,
           trainingPlanGeneratedAt: now,
+          trainingPlanStatus: 'ready',
         })
       }
     })

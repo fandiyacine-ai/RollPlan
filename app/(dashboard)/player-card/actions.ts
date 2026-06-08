@@ -11,6 +11,22 @@ import { inngest } from '../../../lib/inngest'
 export async function triggerTrainingPlan(): Promise<{ error?: string }> {
   try {
     const userId = await getOrCreateDbUserId()
+
+    // Write a "generating" placeholder immediately so the page reflects the
+    // in-flight job even if the user navigates away and back before it finishes.
+    const existing = await db
+      .select({ id: playerCards.id })
+      .from(playerCards)
+      .where(and(eq(playerCards.ownerId, userId), eq(playerCards.ownerType, 'user')))
+      .limit(1)
+      .then(rows => rows[0] ?? null)
+
+    if (existing) {
+      await db.update(playerCards).set({ trainingPlanStatus: 'generating' }).where(eq(playerCards.id, existing.id))
+    } else {
+      await db.insert(playerCards).values({ ownerType: 'user', ownerId: userId, trainingPlanStatus: 'generating' })
+    }
+
     await inngest.send({ name: 'training-plan/generate', data: { userId } })
     return {}
   } catch (err) {
@@ -18,18 +34,18 @@ export async function triggerTrainingPlan(): Promise<{ error?: string }> {
   }
 }
 
-export async function getTrainingPlanStatus(): Promise<{ ready: boolean }> {
+export async function getTrainingPlanStatus(): Promise<{ ready: boolean; generating: boolean }> {
   try {
     const userId = await getOrCreateDbUserId()
     const row = await db
-      .select({ trainingPlan: playerCards.trainingPlan })
+      .select({ trainingPlan: playerCards.trainingPlan, trainingPlanStatus: playerCards.trainingPlanStatus })
       .from(playerCards)
       .where(and(eq(playerCards.ownerId, userId), eq(playerCards.ownerType, 'user')))
       .limit(1)
       .then(rows => rows[0] ?? null)
-    return { ready: !!row?.trainingPlan }
+    return { ready: !!row?.trainingPlan, generating: row?.trainingPlanStatus === 'generating' }
   } catch {
-    return { ready: false }
+    return { ready: false, generating: false }
   }
 }
 

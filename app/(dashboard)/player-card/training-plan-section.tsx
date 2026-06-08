@@ -32,23 +32,26 @@ function YoutubeLink({ query }: { query: string }) {
 export function TrainingPlanSection({
   initialPlan,
   generatedAt,
+  isGenerating = false,
   isPro = false,
 }: {
   initialPlan: TrainingPlan | null
   generatedAt: Date | null
+  isGenerating?: boolean
   isPro?: boolean
 }) {
-  const [state, setState] = useState<'idle' | 'queued' | 'error'>('idle')
+  const [state, setState] = useState<'idle' | 'queued' | 'error'>(isGenerating ? 'queued' : 'idle')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const router = useRouter()
 
-  // Poll every 3 s while queued; refresh as soon as the plan is ready in DB
+  // Poll every 3 s while queued — covers both a freshly-triggered generation and
+  // one already in flight when the page loads/remounts (persisted via DB status).
   useEffect(() => {
     if (state !== 'queued') return
     let cancelled = false
     const interval = setInterval(async () => {
-      const { ready } = await getTrainingPlanStatus()
-      if (ready && !cancelled) {
+      const { ready, generating } = await getTrainingPlanStatus()
+      if ((ready || !generating) && !cancelled) {
         clearInterval(interval)
         router.refresh()
       }

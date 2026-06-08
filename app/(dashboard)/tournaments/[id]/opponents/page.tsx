@@ -262,10 +262,11 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
 
   // Videos for active scan check
   let hasActiveScans = false
+  let opponentIdsWithPendingUpload = new Set<string>()
   if (opponentIds.length > 0) {
     try {
       const pendingVids = await db
-        .select({ status: videos.status })
+        .select({ status: videos.status, tournamentOpponentId: videos.tournamentOpponentId })
         .from(videos)
         .leftJoin(matches, eq(matches.videoId, videos.id))
         .where(and(
@@ -273,7 +274,13 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
           isNull(matches.id),
           notLike(videos.r2Key, 'chunk/%'),
         ))
-        .limit(5)
+        .limit(20)
+
+      opponentIdsWithPendingUpload = new Set(
+        pendingVids
+          .filter(v => (v.status === 'processing' || v.status === 'uploaded') && v.tournamentOpponentId)
+          .map(v => v.tournamentOpponentId as string)
+      )
 
       const matchStatuses = await db
         .select({ status: matches.status })
@@ -336,6 +343,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
       hasGameplan: !!plan,
       communityMatchCount: communityCountByOpponentId[opp.id] ?? 0,
       hasFootage: scoutedMatches.length > 0 || (opp.footageStatus !== 'manual'),
+      hasPendingUpload: opponentIdsWithPendingUpload.has(opp.id),
     }
   })
 

@@ -17,4 +17,5 @@ export const playerCards = pgTable('player_cards', {
   promptVersion: text('prompt_version'),
   trainingPlan: jsonb('training_plan'),
   trainingPlanGeneratedAt: timestamp('training_plan_generated_at'),
+  trainingPlanStatus: text('training_plan_status').notNull().default('idle'), // idle | generating | ready
 })
