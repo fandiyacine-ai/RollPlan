@@ -165,10 +165,10 @@ export default async function GameDayPage() {
       <div className="max-w-xl space-y-5">
         <h1 className="text-2xl font-bold">Match Day</h1>
         <div className="rounded-xl border border-dashed p-12 text-center space-y-2">
-          <p className="font-semibold">No upcoming tournaments</p>
-          <p className="text-sm text-muted-foreground">
-            <Link href="/tournaments" className="underline hover:no-underline">Create a tournament</Link>{' '}
-            to start preparing your competition day plan.
+          <p className="font-semibold">Nothing on the books yet</p>
+          <p className="text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">
+            <Link href="/tournaments" className="underline underline-offset-2 hover:text-foreground transition-colors">Add your next tournament</Link>{' '}
+            and this is where your fight-day plan comes together — opponents, gameplans, and the countdown, all in one place.
           </p>
         </div>
       </div>

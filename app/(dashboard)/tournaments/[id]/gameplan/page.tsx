@@ -58,12 +58,12 @@ export default async function GameplanPage({
     return (
       <div className="rounded-xl border border-dashed border-border/50 p-10 text-center space-y-3">
         <p className="text-xs text-muted-foreground font-medium">Step 3 of 3</p>
-        <p className="font-semibold text-lg">No opponents yet</p>
-        <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+        <p className="font-semibold text-lg">The gameplan is waiting on the scouting</p>
+        <p className="text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">
           <Link href={`/tournaments/${tournamentId}/opponents`} className="text-foreground underline underline-offset-2 hover:no-underline">
-            Add opponents and scout their footage
+            Add who you're facing and let the AI break down their footage
           </Link>{' '}
-          first — then come back to generate your gameplan.
+          — once it knows their game, it'll build yours.
         </p>
       </div>
     )
