@@ -3,7 +3,7 @@ import { db } from '../../../../../lib/db'
 import { gameplans, tournamentOpponents, matches, planExecutions, tournaments } from '../../../../../lib/db/schema'
 import { eq, inArray, and } from 'drizzle-orm'
 import { getOrCreateDbUserId } from '../../../../../lib/db/get-user'
-import { getSubscriptionStatus } from '../../../../../lib/subscription'
+import { checkMonthlyLimit, FREE_MONTHLY_VIDEO_LIMIT } from '../../../../../lib/db/usage'
 import Link from 'next/link'
 import { GenerateGameplanButton } from './generate-button'
 import { OpponentSelector } from './opponent-selector'
@@ -32,8 +32,7 @@ export default async function GameplanPage({
   const athleteName = clerkUser?.firstName ?? clerkUser?.username ?? null
 
   const userId = await getOrCreateDbUserId().catch(() => null)
-  const tier = userId ? await getSubscriptionStatus(userId) : 'free'
-  const isPro = tier === 'pro' || tier === 'trial'
+  const canGenerate = userId ? (await checkMonthlyLimit(userId)).allowed : false
 
   const tournamentOwned = userId ? await db
     .select({ id: tournaments.id })
@@ -172,6 +171,8 @@ export default async function GameplanPage({
               tournamentId={tournamentId}
               opponentId={activeOpponent.id}
               label={plan ? 'Regen' : 'Generate'}
+              disabled={!canGenerate}
+              title={!canGenerate ? `Monthly limit of ${FREE_MONTHLY_VIDEO_LIMIT} analyses reached` : undefined}
             />
           </div>
 
@@ -235,13 +236,13 @@ export default async function GameplanPage({
                 tournamentId={tournamentId}
                 opponentId={activeOpponent.id}
                 label={plan ? 'Regenerate' : 'Generate Gameplan'}
+                disabled={!canGenerate}
+                title={!canGenerate ? `Monthly limit of ${FREE_MONTHLY_VIDEO_LIMIT} analyses reached` : undefined}
               />
             </div>
           </div>
 
-          {!isPro ? (
-            <UpgradeGate />
-          ) : plan ? (
+          {plan ? (
             <>
               {scoutedCount <= 1 && (
                 <ConfidenceBanner count={scoutedCount} />
@@ -275,12 +276,14 @@ export default async function GameplanPage({
                 )
               })()}
             </>
-          ) : (
+          ) : canGenerate ? (
             <ReadyToGenerateState
               tournamentId={tournamentId}
               opponentId={activeOpponent.id}
               scoutedCount={scoutedCount}
             />
+          ) : (
+            <LimitReachedGate />
           )}
         </>
       )}
@@ -836,42 +839,22 @@ function PredictionCard({ prediction }: { prediction: MatchupPrediction }) {
   )
 }
 
-function UpgradeGate() {
+function LimitReachedGate() {
   return (
-    <div className="relative rounded-xl border border-border/60 bg-card overflow-hidden">
-      {/* Blurred preview skeleton */}
-      <div className="p-5 space-y-4 blur-sm pointer-events-none select-none opacity-60">
-        <div className="space-y-2">
-          <div className="h-2.5 w-16 rounded bg-muted" />
-          <div className="h-4 w-3/4 rounded bg-foreground/10" />
-          <div className="h-3 w-full rounded bg-muted" />
-          <div className="h-3 w-5/6 rounded bg-muted" />
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          {[1, 2, 3].map(i => <div key={i} className="h-7 w-24 rounded-lg bg-muted" />)}
-        </div>
-        <div className="h-3 w-full rounded bg-muted" />
-        <div className="h-3 w-4/5 rounded bg-muted" />
+    <div className="rounded-xl border border-border/60 bg-card p-8 text-center space-y-5">
+      <div>
+        <p className="text-xs text-muted-foreground font-medium mb-3">Monthly limit reached</p>
+        <h3 className="font-semibold text-lg mb-2">No new gameplans this month</h3>
+        <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+          You&apos;ve used all {FREE_MONTHLY_VIDEO_LIMIT} of your free analyses this month. New gameplans unlock again next month — or upgrade for unlimited.
+        </p>
       </div>
-
-      {/* Upgrade CTA — overlaid on the blurred preview */}
-      <div className="absolute inset-0 flex items-center justify-center p-5">
-        <div className="max-w-sm w-full rounded-xl border border-border/60 bg-background/95 backdrop-blur-sm shadow-lg px-5 py-5 text-center space-y-3">
-          <p className="text-sm font-semibold">Unlock Gameplans</p>
-          <p className="text-xs text-muted-foreground">
-            Upgrade to Pro for full AI gameplans, training plans, and unlimited tournaments.
-          </p>
-          <Link
-            href="/upgrade"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-foreground text-background text-xs font-semibold px-4 py-2 hover:opacity-90 transition-opacity"
-          >
-            Upgrade — €5/mo
-          </Link>
-          <Link href="/game-day" className="block text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors underline underline-offset-2">
-            View this matchup in Match Day →
-          </Link>
-        </div>
-      </div>
+      <Link
+        href="/upgrade"
+        className="inline-flex items-center gap-1.5 rounded-lg bg-foreground text-background text-xs font-semibold px-4 py-2 hover:opacity-90 transition-opacity"
+      >
+        Upgrade — €5/mo
+      </Link>
     </div>
   )
 }

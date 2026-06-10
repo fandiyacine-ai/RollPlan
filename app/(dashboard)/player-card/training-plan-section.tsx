@@ -33,12 +33,12 @@ export function TrainingPlanSection({
   initialPlan,
   generatedAt,
   isGenerating = false,
-  isPro = false,
+  canGenerate = true,
 }: {
   initialPlan: TrainingPlan | null
   generatedAt: Date | null
   isGenerating?: boolean
-  isPro?: boolean
+  canGenerate?: boolean
 }) {
   const [state, setState] = useState<'idle' | 'queued' | 'error'>(isGenerating ? 'queued' : 'idle')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -84,7 +84,7 @@ export function TrainingPlanSection({
             </p>
           )}
         </div>
-        {isPro ? (
+        {canGenerate ? (
           <button
             onClick={handleGenerate}
             disabled={state === 'queued'}
@@ -103,12 +103,13 @@ export function TrainingPlanSection({
         ) : (
           <Link
             href="/upgrade"
+            title="Monthly analysis limit reached — upgrade for unlimited"
             className="text-[10px] px-2.5 py-1 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors flex items-center gap-1"
           >
             <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
             </svg>
-            Pro
+            Limit reached
           </Link>
         )}
       </div>
