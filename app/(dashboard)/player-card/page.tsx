@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { Suspense } from 'react'
 import { db } from '../../../lib/db'
 import { matches, insights, videos, positionSegments, matchEvents, users, tournaments, tournamentOpponents, gameplans, playerCards } from '../../../lib/db/schema'
 import { desc, eq, inArray, isNull, and, ne, or, sql } from 'drizzle-orm'
@@ -17,6 +17,7 @@ import { RulesetBadge } from '@/components/ruleset-badge'
 import { TrainingPlanSection } from './training-plan-section'
 import type { TrainingPlan } from '../../../lib/ai/schemas/training-plan'
 import { checkMonthlyLimit } from '../../../lib/db/usage'
+import { UpgradeConversion } from './upgrade-conversion'
 
 export const dynamic = 'force-dynamic'
 
@@ -337,6 +338,9 @@ export default async function PlayerCardPage() {
 
   return (
     <div className="w-full max-w-7xl">
+      <Suspense fallback={null}>
+        <UpgradeConversion />
+      </Suspense>
       {isProcessing && <RefreshPoller />}
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_280px] gap-6 items-start">
