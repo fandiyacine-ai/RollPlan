@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import type { UsageInfo } from './fight-view'
 import { addOpponent, submitScoutUrls, deleteOpponent, updateOpponent, rescanVideo, retriggerIntel, deleteFootage } from './actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -439,11 +441,13 @@ export function ScoutForm({
   opponentId,
   opponentName,
   hasMatches = false,
+  usage,
 }: {
   tournamentId: string
   opponentId: string
   opponentName: string
   hasMatches?: boolean
+  usage?: UsageInfo
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -578,6 +582,20 @@ export function ScoutForm({
     return <span className="text-xs text-emerald-400 font-medium">Scanning queued ✓</span>
   }
 
+  // Free tier exhausted — skip the form entirely and send straight to the upgrade page
+  if (usage && !usage.allowed) {
+    return (
+      <Link
+        href="/upgrade"
+        className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-foreground text-background hover:opacity-90 transition-opacity whitespace-nowrap"
+      >
+        {usage.used}/{usage.limit} used — Upgrade
+      </Link>
+    )
+  }
+
+  const isLastFreeAnalysis = !!usage && isFinite(usage.limit) && usage.used >= usage.limit - 1
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <Button variant="outline" size="xs" onClick={() => setOpen(true)}>{hasMatches ? '+ Add footage' : 'Scout footage'}</Button>
@@ -585,6 +603,15 @@ export function ScoutForm({
         <DialogHeader>
           <DialogTitle>Scout {opponentName}</DialogTitle>
         </DialogHeader>
+
+        {isLastFreeAnalysis && usage && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+            This is your last free analysis this month ({usage.used}/{usage.limit} used) —{' '}
+            <Link href="/upgrade" className="font-semibold underline underline-offset-2 hover:no-underline">
+              upgrade for unlimited
+            </Link>
+          </div>
+        )}
 
         {/* Method picker */}
         <div className="grid grid-cols-2 gap-3">

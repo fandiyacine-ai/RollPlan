@@ -10,6 +10,7 @@ import type { GameplanOutput } from '../../../../../lib/ai/schemas/gameplan'
 import { getOrCreateDbUserId } from '../../../../../lib/db/get-user'
 import { getCommunityMatchCounts } from './actions'
 import { currentUser } from '@clerk/nextjs/server'
+import { checkMonthlyLimit } from '../../../../../lib/db/usage'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +31,10 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
     getOrCreateDbUserId().catch(() => null),
     currentUser(),
   ])
+
+  const usage = userId
+    ? await checkMonthlyLimit(userId).catch(() => ({ allowed: true, used: 0, limit: Infinity }))
+    : { allowed: true, used: 0, limit: Infinity }
 
   const userName = [clerkUser?.firstName, clerkUser?.lastName].filter(Boolean).join(' ') || 'You'
 
@@ -396,6 +401,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
           opponents={opponentData}
           smoothcompUrl={tournamentRow.smoothcompUrl ?? null}
           userSmootcompAthleteId={userSmootcompAthleteId}
+          usage={usage}
         />
       )}
     </div>

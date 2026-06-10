@@ -18,6 +18,8 @@ type MatchCard = {
   if_losing_points?: string
 }
 
+export type UsageInfo = { allowed: boolean; used: number; limit: number }
+
 export type UserCardData = {
   ownTotal: number
   ownWins: number
@@ -181,7 +183,7 @@ function UserCard({ userName, data }: { userName: string; data: UserCardData }) 
 
 // ── OpponentSection ───────────────────────────────────────────────────────────
 
-function OpponentSection({ opp, tournamentId, index, total }: { opp: OpponentRow; tournamentId: string; index?: number; total?: number }) {
+function OpponentSection({ opp, tournamentId, index, total, usage }: { opp: OpponentRow; tournamentId: string; index?: number; total?: number; usage: UsageInfo }) {
   const ajpRecord = careerRecord(opp.ajpWins, opp.ajpLosses)
   const scRecord = careerRecord(opp.smoothcompWins, opp.smoothcompLosses)
   const hasStats = opp.scoutedMatchCount > 0
@@ -396,7 +398,7 @@ function OpponentSection({ opp, tournamentId, index, total }: { opp: OpponentRow
           <div className="p-5 space-y-5">
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground/60">No footage scouted yet.</p>
-              <ScoutForm opponentId={opp.id} tournamentId={tournamentId} opponentName={opp.opponentLabel} hasMatches={false} />
+              <ScoutForm opponentId={opp.id} tournamentId={tournamentId} opponentName={opp.opponentLabel} hasMatches={false} usage={usage} />
             </div>
 
             {/* Fight card teaser — fills the space and surfaces the fight card */}
@@ -452,7 +454,7 @@ function OpponentSection({ opp, tournamentId, index, total }: { opp: OpponentRow
         {/* Footer — scout more button only */}
         {hasStats && (
           <div className="px-5 py-3 border-t border-border/30">
-            <ScoutForm opponentId={opp.id} tournamentId={tournamentId} opponentName={opp.opponentLabel} hasMatches />
+            <ScoutForm opponentId={opp.id} tournamentId={tournamentId} opponentName={opp.opponentLabel} hasMatches usage={usage} />
           </div>
         )}
       </div>
@@ -501,6 +503,7 @@ export function TournamentFightView({
   opponents,
   smoothcompUrl,
   userSmootcompAthleteId,
+  usage,
 }: {
   userName: string
   tournamentId: string
@@ -508,6 +511,7 @@ export function TournamentFightView({
   opponents: OpponentRow[]
   smoothcompUrl: string | null
   userSmootcompAthleteId: string | null | undefined
+  usage: UsageInfo
 }) {
   const [activeIndex, setActiveIndex] = useState(0)
   const active = opponents[activeIndex]
@@ -576,7 +580,7 @@ export function TournamentFightView({
 
         {/* Active opponent + pagination */}
         <div className="flex-1 min-w-0 space-y-3">
-          {active && <OpponentSection opp={active} tournamentId={tournamentId} index={activeIndex} total={opponents.length} />}
+          {active && <OpponentSection opp={active} tournamentId={tournamentId} index={activeIndex} total={opponents.length} usage={usage} />}
           <PaginationControls index={activeIndex} total={opponents.length} onPrev={goPrev} onNext={goNext} />
         </div>
       </div>
@@ -606,7 +610,7 @@ export function TournamentFightView({
           </div>
         </div>
 
-        {active && <OpponentSection opp={active} tournamentId={tournamentId} index={activeIndex} total={opponents.length} />}
+        {active && <OpponentSection opp={active} tournamentId={tournamentId} index={activeIndex} total={opponents.length} usage={usage} />}
         <PaginationControls index={activeIndex} total={opponents.length} onPrev={goPrev} onNext={goNext} />
       </div>
     </div>
