@@ -3,6 +3,12 @@ import { db } from '../lib/db'
 import { tournamentOpponents } from '../lib/db/schema'
 import { eq, ne, isNotNull, sql } from 'drizzle-orm'
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+// AJP/Smoothcomp's paginated event-history endpoints sit behind Cloudflare and start
+// returning 429s mid-pagination when hit back-to-back; spacing requests out avoids that.
+const PAGINATION_DELAY_MS = 3000
+
 // AJP/Smoothcomp exposes a public JSON API for athlete event history — no auth, no proxy needed.
 // GET https://ajptour.com/en/profile/{athleteId}/events?page={n}
 // Returns paginated competition history with match-level detail.
@@ -612,6 +618,7 @@ export const buildOpponentIntel = inngest.createFunction(
             const firstPage = await fetchAjpEventsPage(_ajpAthleteId, 1)
             const allEvents: AjpEvent[] = [...(firstPage.data ?? [])]
             for (let p = 2; p <= (firstPage.last_page ?? 1); p++) {
+              await sleep(PAGINATION_DELAY_MS)
               const page = await fetchAjpEventsPage(_ajpAthleteId, p)
               allEvents.push(...(page.data ?? []))
             }
@@ -713,6 +720,7 @@ export const buildOpponentIntel = inngest.createFunction(
             const firstPage = await fetchSmoothcompEventsPage(baseUrl, scAthleteId, 1)
             const allEvents: AjpEvent[] = [...(firstPage.data ?? [])]
             for (let p = 2; p <= (firstPage.last_page ?? 1); p++) {
+              await sleep(PAGINATION_DELAY_MS)
               const page = await fetchSmoothcompEventsPage(baseUrl, scAthleteId, p)
               allEvents.push(...(page.data ?? []))
             }

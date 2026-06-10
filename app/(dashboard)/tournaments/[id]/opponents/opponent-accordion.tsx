@@ -531,6 +531,16 @@ export function OpponentAccordion({
       <div className="px-4 py-2.5 border-t border-border/30 flex items-center gap-4 flex-wrap justify-between">
           {opponent.ajpWins != null ? (
             <WLBadge label="AJP" wins={opponent.ajpWins} losses={opponent.ajpLosses ?? 0} url={opponent.ajpProfileUrl} />
+          ) : opponent.ajpProfileUrl ? (
+            <a href={opponent.ajpProfileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 opacity-50 hover:opacity-75 transition-opacity" title="View AJP profile">
+              <PlatformBadge label="AJP" />
+              <span className="text-[11px] font-mono text-muted-foreground">Private</span>
+            </a>
+          ) : opponent.intelStatus === 'done' ? (
+            <span className="flex items-center gap-1.5 opacity-30">
+              <PlatformBadge label="AJP" />
+              <span className="text-[11px] text-muted-foreground/60">Profile not found</span>
+            </span>
           ) : (
             <span className="flex items-center gap-1.5 opacity-30">
               <PlatformBadge label="AJP" />
@@ -544,6 +554,11 @@ export function OpponentAccordion({
               <PlatformBadge label="Smoothcomp" />
               <span className="text-[11px] font-mono text-muted-foreground">Private</span>
             </a>
+          ) : opponent.intelStatus === 'done' ? (
+            <span className="flex items-center gap-1.5 opacity-30">
+              <PlatformBadge label="Smoothcomp" />
+              <span className="text-[11px] text-muted-foreground/60">Profile not found</span>
+            </span>
           ) : (
             <span className="flex items-center gap-1.5 opacity-30">
               <PlatformBadge label="Smoothcomp" />
@@ -577,6 +592,11 @@ export function OpponentAccordion({
               <PlatformBadge label="IBJJF" />
               <span className="text-[11px] font-mono text-muted-foreground">Profile</span>
             </a>
+          ) : opponent.intelStatus === 'done' ? (
+            <span className="flex items-center gap-1.5 opacity-30">
+              <PlatformBadge label="IBJJF" />
+              <span className="text-[11px] text-muted-foreground/60">Profile not found</span>
+            </span>
           ) : (
             <span className="flex items-center gap-1.5 opacity-30">
               <PlatformBadge label="IBJJF" />
