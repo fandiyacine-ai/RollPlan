@@ -19,6 +19,7 @@ import { eq, inArray, and, ne, not, sql, or, lt, gt } from 'drizzle-orm'
 import { uploadBuffer, getPublicVideoUrl } from '../lib/storage/r2'
 import { google, anthropic, GEMINI_URL_SCAN_MODEL, CLAUDE_SYNTHESIS_MODEL, estimateCostUsd } from '../lib/ai/clients'
 import { geminiVideoObject, isYouTubeUrl } from '../lib/gemini-video'
+import { uploadVideoToGemini, deleteGeminiFile } from '../lib/ai/gemini-files'
 import { UrlScanOutputSchema, FoundMatch } from '../lib/ai/schemas/url-scan'
 import { MatchExtractionOutputSchema, type MatchExtractionOutput } from '../lib/ai/schemas/match-extraction'
 import { PositionVerificationSchema } from '../lib/ai/schemas/position-verification'
@@ -89,6 +90,29 @@ export const scanUrl = inngest.createFunction(
     const CHUNK_OVERLAP = 5 * 60 // 5-min overlap so matches near a boundary appear fully in the next chunk
     const NUM_CHUNKS = 20        // covers up to ~5h50m effective with overlap (handles full competition day)
 
+    // Non-YouTube (R2-uploaded) videos must go through the Gemini Files API.
+    // Passing the R2 URL to generateObject as a file part makes the AI SDK download
+    // the entire video into memory and inline it as a base64 string — multi-GB heap
+    // allocations that OOM-crash the server. Streaming upload to Gemini avoids that.
+    const geminiFile: { fileUri: string; mimeType: string } | null = await step.run('upload-to-gemini', async () => {
+      const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
+      if (!video?.publicUrl) throw new Error('Video has no public URL')
+      if (isYouTubeUrl(video.publicUrl)) return null
+      const mimeType = video.contentType ?? 'video/mp4'
+      try {
+        const fileUri = await uploadVideoToGemini(video.publicUrl, mimeType)
+        return { fileUri, mimeType }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        if (msg.includes('file processing failed') || msg.includes('Gemini file processing')) {
+          const reason = 'This video could not be processed — the file may be in an unsupported format or was rejected by the AI provider. Try a different video source.'
+          await db.update(videos).set({ status: 'failed', failureReason: reason }).where(eq(videos.id, videoId))
+          throw new NonRetriableError(reason)
+        }
+        throw err
+      }
+    })
+
     // null return value signals "needs chunking" — handled after the step
     const scanStepResult: FoundMatch[] | null = skipScan
       ? [{ start_seconds: 0, end_seconds: 999999, opponent_name: 'unknown', round_or_bracket: null }]
@@ -150,7 +174,7 @@ export const scanUrl = inngest.createFunction(
             messages: [{
               role: 'user',
               content: [
-                videoFilePart(video.publicUrl, video.contentType),
+                videoFilePart(geminiFile!.fileUri, geminiFile!.mimeType),
                 { type: 'text', text: buildScanUrlUserPrompt(athleteName, appearanceHint, knownOpponentName) },
               ],
             }],
@@ -603,7 +627,7 @@ export const scanUrl = inngest.createFunction(
                 messages: [{
                   role: 'user',
                   content: [
-                    videoFilePart(video.publicUrl, video.contentType),
+                    videoFilePart(geminiFile!.fileUri, geminiFile!.mimeType),
                     {
                       type: 'text',
                       text: buildExtractMatchUserPrompt({
@@ -774,7 +798,7 @@ export const scanUrl = inngest.createFunction(
                 messages: [{
                   role: 'user',
                   content: [
-                    videoFilePart(video.publicUrl, video.contentType),
+                    videoFilePart(geminiFile!.fileUri, geminiFile!.mimeType),
                     { type: 'text', text: buildVerifyPositionsUserPrompt(
                       toVerify.map((s, i) => ({
                         index: i,
@@ -1177,6 +1201,12 @@ export const scanUrl = inngest.createFunction(
           matchesFoundSoFar: newMatchesFoundSoFar,
           consecutiveEmptyChunks: newConsecutiveEmpty,
         },
+      })
+    }
+
+    if (geminiFile) {
+      await step.run('cleanup-gemini-file', async () => {
+        await deleteGeminiFile(geminiFile.fileUri)
       })
     }
   }
