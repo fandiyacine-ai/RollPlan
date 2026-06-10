@@ -63,7 +63,7 @@ export async function getUserUsageStats(userId: string): Promise<UserUsageStats>
   }
 }
 
-export const FREE_MONTHLY_VIDEO_LIMIT = 5
+export const FREE_MONTHLY_VIDEO_LIMIT = 15
 
 export async function getMonthlyMatchCount(userId: string): Promise<number> {
   const startOfMonth = new Date()
