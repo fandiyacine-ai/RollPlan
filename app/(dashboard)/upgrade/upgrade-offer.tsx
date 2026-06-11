@@ -6,11 +6,10 @@ const MONTHLY_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY ?? ''
 const ANNUAL_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL ?? ''
 
 const FEATURES = [
-  'Unlimited tournaments',
   'Unlimited video analysis',
-  'Full AI gameplans (no blur)',
-  'AI training plan',
-  'Match narration + Ask AI',
+  'Unlimited opponent scouting',
+  'Unlimited tournaments',
+  'Everything in Free, no monthly cap',
   '14-day free trial — cancel anytime',
 ]
 

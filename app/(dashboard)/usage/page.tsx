@@ -12,10 +12,10 @@ const PLAN_BADGE: Record<string, { label: string; className: string }> = {
 }
 
 const PRO_PERKS = [
-  'Unlimited tournaments and video analysis',
-  'Full AI gameplans, no blur',
-  'AI training plans tailored to your matches',
-  'Match narration + Ask AI on every match',
+  'Unlimited video analysis',
+  'Unlimited opponent scouting',
+  'Unlimited tournaments',
+  'Everything in Free, no monthly cap',
 ]
 
 function UpgradePromo() {

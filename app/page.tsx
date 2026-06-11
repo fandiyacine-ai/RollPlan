@@ -26,110 +26,97 @@ export default function HomePage() {
       </nav>
 
       {/* Hero */}
-      <section className="px-6 pt-16 pb-12">
-        <div className="max-w-2xl mx-auto space-y-6 text-center">
-          <div className="inline-flex items-center gap-2 text-xs text-muted-foreground border rounded-full px-4 py-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Powered by Google Gemini AI
+      <section className="px-6 pt-12 pb-12 sm:pt-16">
+        <div className="max-w-5xl mx-auto grid lg:grid-cols-2 gap-10 lg:gap-12 items-center">
+          <div className="space-y-6 text-center lg:text-left">
+            <div className="inline-flex items-center gap-2 text-xs text-muted-foreground border rounded-full px-4 py-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Powered by Google Gemini AI
+            </div>
+
+            <h1 className="text-5xl sm:text-6xl font-black tracking-tight leading-none">
+              Every frame tells<br />
+              <span className="text-muted-foreground">the truth.</span>
+            </h1>
+
+            <p className="text-base text-muted-foreground leading-relaxed max-w-lg mx-auto lg:mx-0">
+              RollPlan turns your BJJ footage into a full analysis — every position,
+              transition, and turning point traced to the exact timestamp.
+              No more guessing what went wrong.
+            </p>
+
+            <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
+              <Link href="/sign-up" className={cn(buttonVariants({ size: 'lg' }))}>
+                Analyse My Game
+              </Link>
+              <Link href="/sign-up" className={cn(buttonVariants({ variant: 'outline', size: 'lg' }))}>
+                Scout an Opponent
+              </Link>
+            </div>
           </div>
 
-          <h1 className="text-5xl sm:text-6xl font-black tracking-tight leading-none">
-            Every frame tells<br />
-            <span className="text-muted-foreground">the truth.</span>
-          </h1>
-
-          <p className="text-base text-muted-foreground leading-relaxed max-w-lg mx-auto">
-            RollPlan turns your BJJ footage into a full analysis — every position,
-            transition, and turning point traced to the exact timestamp.
-            No more guessing what went wrong.
-          </p>
-
-          <div className="flex flex-wrap gap-3 justify-center">
-            <Link href="/sign-up" className={cn(buttonVariants({ size: 'lg' }))}>
-              Analyse My Game
-            </Link>
-            <Link href="/sign-up" className={cn(buttonVariants({ variant: 'outline', size: 'lg' }))}>
-              Scout an Opponent
-            </Link>
+          <div className="rounded-2xl border border-border/60 overflow-hidden shadow-2xl shadow-black/10">
+            <Image
+              src="/marketing/player-card.png"
+              alt="RollPlan Player Card — automatic match breakdown with control rate, top attacks, and position timeline"
+              width={1600}
+              height={1000}
+              className="w-full h-auto"
+              priority
+            />
           </div>
         </div>
       </section>
 
-      {/* What it does — central explanation */}
-      <section className="px-6 py-16 max-w-3xl mx-auto w-full">
-        <div className="rounded-2xl border bg-card p-8 sm:p-10 space-y-8">
-          <div className="text-center space-y-2">
-            <h2 className="text-2xl font-bold">What RollPlan does</h2>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Upload a match clip and the AI does the work — no tagging, no manual breakdown.
+      {/* What it does — compact feature grid */}
+      <section className="px-6 pb-16 max-w-4xl mx-auto w-full">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="rounded-xl border bg-card p-5 space-y-2">
+            <div className="w-8 h-8 rounded-lg bg-emerald-950 flex items-center justify-center">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+              </svg>
+            </div>
+            <h3 className="font-semibold text-sm">Automatic match breakdown</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Every position, transition, and key event — timestamped, with coaching notes. No tagging required.
             </p>
           </div>
 
-          <div className="space-y-6">
-            <div className="flex gap-4">
-              <div className="w-8 h-8 rounded-lg bg-emerald-950 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm mb-1">Automatic match breakdown</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  The AI identifies every position you spent time in, how dominant you were in each,
-                  and the key events (takedowns, guard passes, submission attempts, sweeps).
-                  You see a timestamped timeline of the whole match.
-                </p>
-              </div>
+          <div className="rounded-xl border bg-card p-5 space-y-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-950 flex items-center justify-center">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+              </svg>
             </div>
+            <h3 className="font-semibold text-sm">Frame by Frame AI chat</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Pause the video anywhere and ask the AI what happened. It sees the exact frame you're on.
+            </p>
+          </div>
 
-            <div className="flex gap-4">
-              <div className="w-8 h-8 rounded-lg bg-blue-950 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm mb-1">Frame by Frame — AI video review</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Pause the video at any moment and ask the AI what happened.
-                  "Why did I lose the underhook here?", "What could I have done at 3:12?"
-                  The AI sees the same frame you're looking at and responds in context.
-                </p>
-              </div>
+          <div className="rounded-xl border bg-card p-5 space-y-2">
+            <div className="w-8 h-8 rounded-lg bg-amber-950 flex items-center justify-center">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
             </div>
+            <h3 className="font-semibold text-sm">Scout from a bracket — or a long stream</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Import AJP, IBJJF, or Smoothcomp brackets, or point the AI at a multi-hour stream and it clips out your opponent's matches.
+            </p>
+          </div>
 
-            <div className="flex gap-4">
-              <div className="w-8 h-8 rounded-lg bg-amber-950 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm mb-1">Scout opponents — from a bracket or a long stream</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Connect AJP, IBJJF, or Smoothcomp and RollPlan imports your bracket, pulling each
-                  opponent's competition record and footage automatically. No bracket yet? Paste a
-                  multi-hour tournament stream, tell the AI who to look for, and it scans the whole
-                  recording to clip out every one of that athlete's matches.
-                </p>
-              </div>
+          <div className="rounded-xl border bg-card p-5 space-y-2">
+            <div className="w-8 h-8 rounded-lg bg-violet-950 flex items-center justify-center">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
+              </svg>
             </div>
-
-            <div className="flex gap-4">
-              <div className="w-8 h-8 rounded-lg bg-violet-950 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm mb-1">Gameplans, win probability &amp; Fight Card</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Every scouted opponent gets an AI gameplan — what to open with, what to watch for,
-                  and your attack chain — plus a win probability with a Favourable, Even, or Tough
-                  verdict. Turn it into a Fight Card: a shareable head-to-head page for your coach or squad.
-                </p>
-              </div>
-            </div>
+            <h3 className="font-semibold text-sm">Gameplans, win probability &amp; Fight Card</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              A Favourable, Even, or Tough verdict and an attack plan for every opponent — shareable as a Fight Card.
+            </p>
           </div>
         </div>
       </section>
@@ -263,13 +250,16 @@ export default function HomePage() {
             <div>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Free</p>
               <p className="text-3xl font-black mt-1">€0</p>
+              <p className="text-xs text-muted-foreground">15 analyses a month</p>
             </div>
             <ul className="space-y-2.5 text-sm">
               {[
-                '15 video analyses per month',
-                'Frame by Frame AI chat',
-                'Position breakdowns & key moments',
-                'Player Card stats',
+                'Match breakdowns & Frame by Frame AI chat',
+                'Opponent scouting — bracket import or stream scan',
+                'Gameplans with win probability',
+                'Fight Card & Match Day',
+                'AI training plan',
+                '1 active tournament',
               ].map(f => (
                 <li key={f} className="flex items-start gap-2.5">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400 mt-0.5 flex-shrink-0">
@@ -291,11 +281,10 @@ export default function HomePage() {
             </div>
             <ul className="space-y-2.5 text-sm">
               {[
+                'Everything in Free, no monthly cap',
                 'Unlimited video analysis',
-                'Unlimited tournaments & opponent scouting',
-                'Full AI gameplans (no blur)',
-                'AI training plan',
-                'Match narration + Ask AI',
+                'Unlimited opponent scouting',
+                'Unlimited tournaments',
               ].map(f => (
                 <li key={f} className="flex items-start gap-2.5">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400 mt-0.5 flex-shrink-0">
@@ -305,10 +294,13 @@ export default function HomePage() {
                 </li>
               ))}
             </ul>
+            <p className="text-xs text-muted-foreground pt-3 border-t">
+              No feature gates, no separate "competitor" tier — just no limits. Cancel anytime.
+            </p>
           </div>
         </div>
         <p className="text-center text-sm text-muted-foreground mt-6">
-          Opponent scouting and AI gameplans are included in Pro from day one — no separate "competitor" tier.
+          Scouting, gameplans, Fight Card, and Match Day are all on Free from day one. Pro just removes the monthly cap.
         </p>
       </section>
 
