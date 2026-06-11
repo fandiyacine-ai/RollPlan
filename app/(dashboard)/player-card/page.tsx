@@ -18,6 +18,7 @@ import { TrainingPlanSection } from './training-plan-section'
 import type { TrainingPlan } from '../../../lib/ai/schemas/training-plan'
 import { checkMonthlyLimit } from '../../../lib/db/usage'
 import { UpgradeConversion } from './upgrade-conversion'
+import { SignupConversion } from './signup-conversion'
 
 export const dynamic = 'force-dynamic'
 
@@ -340,6 +341,9 @@ export default async function PlayerCardPage() {
     <div className="w-full max-w-7xl">
       <Suspense fallback={null}>
         <UpgradeConversion />
+      </Suspense>
+      <Suspense fallback={null}>
+        <SignupConversion />
       </Suspense>
       {isProcessing && <RefreshPoller />}
 
