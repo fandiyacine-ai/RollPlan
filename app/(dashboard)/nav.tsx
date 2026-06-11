@@ -15,6 +15,7 @@ const NAV = [
   { href: '/tournaments', label: 'Tournaments' },
   { href: '/gameplans', label: 'Gameplans' },
   { href: '/game-day', label: 'Match Day' },
+  { href: '/drills', label: 'Drills' },
 ]
 
 const TAB_NAV = [

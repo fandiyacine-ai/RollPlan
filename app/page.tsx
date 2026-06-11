@@ -105,15 +105,35 @@ export default function HomePage() {
                 </svg>
               </div>
               <div>
-                <h3 className="font-semibold text-sm mb-1">Opponent scouting</h3>
+                <h3 className="font-semibold text-sm mb-1">Opponent scouting — automatically</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Heading into a tournament? Add your potential opponents, submit their competition footage,
-                  and the AI builds you a personalised gameplan — their tendencies, favourite positions,
-                  and where they're vulnerable.
+                  Connect your AJP, IBJJF, and Smoothcomp accounts and RollPlan pulls your opponents'
+                  competition records and footage for you. No manual data entry — just an AI gameplan
+                  with their tendencies, favourite positions, and where they're vulnerable.
                 </p>
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* See it in action — Frame by Frame screenshot */}
+      <section className="px-6 pb-16 max-w-4xl mx-auto w-full">
+        <div className="text-center space-y-2 mb-6">
+          <h2 className="text-2xl font-bold">Pause anywhere. Ask anything.</h2>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            "Why did I lose the underhook here?" The AI sees the exact frame you're paused on
+            and answers in context — every position and event on the timeline, linked to its timestamp.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-border/60 overflow-hidden shadow-2xl shadow-black/20">
+          <Image
+            src="/marketing/frame-by-frame.png"
+            alt="RollPlan Frame by Frame AI chat — synced to the video timeline with position and event breakdown"
+            width={1440}
+            height={710}
+            className="w-full h-auto"
+          />
         </div>
       </section>
 
@@ -155,6 +175,94 @@ export default function HomePage() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* Who it's for */}
+      <section className="px-6 pb-16 max-w-3xl mx-auto w-full">
+        <h2 className="text-xl font-bold text-center mb-8">Built for every grappler</h2>
+        <div className="grid sm:grid-cols-3 gap-4">
+          <div className="rounded-xl border bg-card p-5 space-y-2">
+            <h3 className="font-semibold text-sm">Competitors</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Auto-scout opponents from AJP, IBJJF, and Smoothcomp, then walk in with an
+              AI gameplan built around their tendencies and weaknesses.
+            </p>
+          </div>
+          <div className="rounded-xl border bg-card p-5 space-y-2">
+            <h3 className="font-semibold text-sm">Hobbyists</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Upload any roll or class footage and see exactly where your game holds up —
+              and where it breaks down — frame by frame.
+            </p>
+          </div>
+          <div className="rounded-xl border bg-card p-5 space-y-2">
+            <h3 className="font-semibold text-sm">Coaches &amp; teammates</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Share a full match report with your coach in one tap. They walk into your
+              next session already knowing what to work on.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing */}
+      <section className="px-6 pb-16 max-w-3xl mx-auto w-full">
+        <div className="text-center space-y-2 mb-8">
+          <h2 className="text-2xl font-bold">Start free. Upgrade when you're ready.</h2>
+          <p className="text-sm text-muted-foreground">No credit card required to get started.</p>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="rounded-2xl border bg-card p-6 space-y-4">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Free</p>
+              <p className="text-3xl font-black mt-1">€0</p>
+            </div>
+            <ul className="space-y-2.5 text-sm">
+              {[
+                '15 video analyses per month',
+                'Frame by Frame AI chat',
+                'Position breakdowns & key moments',
+                'Player Card stats',
+              ].map(f => (
+                <li key={f} className="flex items-start gap-2.5">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400 mt-0.5 flex-shrink-0">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                  {f}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-2xl border-2 border-foreground/80 bg-card p-6 space-y-4 relative">
+            <span className="absolute -top-3 left-6 text-[10px] font-bold uppercase tracking-wider bg-foreground text-background rounded-full px-2.5 py-1">
+              14-day free trial
+            </span>
+            <div>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Pro</p>
+              <p className="text-3xl font-black mt-1">€5<span className="text-base font-medium text-muted-foreground">/mo</span></p>
+              <p className="text-xs text-muted-foreground">or €50/year — save 17%</p>
+            </div>
+            <ul className="space-y-2.5 text-sm">
+              {[
+                'Unlimited video analysis',
+                'Unlimited tournaments & opponent scouting',
+                'Full AI gameplans (no blur)',
+                'AI training plan',
+                'Match narration + Ask AI',
+              ].map(f => (
+                <li key={f} className="flex items-start gap-2.5">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400 mt-0.5 flex-shrink-0">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                  {f}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        <p className="text-center text-sm text-muted-foreground mt-6">
+          Opponent scouting and AI gameplans are included in Pro from day one — no separate "competitor" tier.
+        </p>
       </section>
 
       {/* CTA */}
