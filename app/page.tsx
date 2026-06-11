@@ -165,15 +165,6 @@ export default function HomePage() {
             gameplan with a win probability for each one.
           </p>
         </div>
-        <div className="rounded-2xl border border-border/60 overflow-hidden shadow-2xl shadow-black/20">
-          <Image
-            src="/marketing/opponent-scouting.png"
-            alt="RollPlan opponent scouting — bracket import from AJP, IBJJF, and Smoothcomp with career records and an AI gameplan showing win probability"
-            width={1600}
-            height={1000}
-            className="w-full h-auto"
-          />
-        </div>
       </section>
 
       {/* Fight Card */}
@@ -185,15 +176,6 @@ export default function HomePage() {
             — open with, watch out for, attack chain — all on one page. Share it with your coach
             or squad in one tap.
           </p>
-        </div>
-        <div className="rounded-2xl border border-border/60 overflow-hidden shadow-2xl shadow-black/20">
-          <Image
-            src="/marketing/fight-card.png"
-            alt="RollPlan Fight Card — shareable head-to-head matchup page with stats comparison and AI gameplan"
-            width={1600}
-            height={1362}
-            className="w-full h-auto"
-          />
         </div>
       </section>
 
