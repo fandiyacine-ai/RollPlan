@@ -33,6 +33,57 @@ const DIFFICULTY_BADGE: Record<Difficulty, string> = {
   advanced: 'bg-rose-500/15 text-rose-400 border-rose-500/25',
 }
 
+// Technique text comes from the KB as either a few \n\n-separated "Option N:"
+// blocks or one long unbroken paragraph (sometimes 1500+ chars). Break it into
+// readable chunks: keep existing blocks/headers, and split long blocks into
+// ~280-char sentence groups so the expanded view isn't a wall of text.
+const SECTION_HEADER_RE = /^((?:Option|Step|Variation)\s+\d+[:.])\s*(.*)$/i
+const PARAGRAPH_TARGET_LEN = 280
+
+function formatTechniqueText(text: string): string[] {
+  const blocks = text.split(/\n+/).map(b => b.trim()).filter(Boolean)
+  const paragraphs: string[] = []
+
+  for (const block of blocks) {
+    if (block.length <= PARAGRAPH_TARGET_LEN || SECTION_HEADER_RE.test(block)) {
+      paragraphs.push(block)
+      continue
+    }
+    const sentences = block.match(/[^.!?]+[.!?]+(?:\s+|$)/g) ?? [block]
+    let current = ''
+    for (const sentence of sentences) {
+      if (current && current.length + sentence.length > PARAGRAPH_TARGET_LEN) {
+        paragraphs.push(current.trim())
+        current = sentence
+      } else {
+        current += sentence
+      }
+    }
+    if (current.trim()) paragraphs.push(current.trim())
+  }
+
+  return paragraphs
+}
+
+function FormattedText({ text }: { text: string }) {
+  return (
+    <div className="space-y-2">
+      {formatTechniqueText(text).map((p, i) => {
+        const match = p.match(SECTION_HEADER_RE)
+        if (match) {
+          return (
+            <p key={i}>
+              <span className="font-semibold text-foreground/90">{match[1]}</span>
+              {match[2] ? ` ${match[2]}` : ''}
+            </p>
+          )
+        }
+        return <p key={i}>{p}</p>
+      })}
+    </div>
+  )
+}
+
 function FilterPill({
   active, onClick, children, small,
 }: { active: boolean; onClick: () => void; children: React.ReactNode; small?: boolean }) {
@@ -70,10 +121,10 @@ function DrillCard({ drill }: { drill: Drill }) {
         )}
       </div>
 
-      <p className={`text-xs text-muted-foreground leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}>
-        {drill.visualCues}
-      </p>
-      {drill.visualCues.length > 180 && (
+      <div className={`text-xs text-muted-foreground leading-relaxed ${expanded ? '' : 'line-clamp-3'}`}>
+        {expanded ? <FormattedText text={drill.visualCues} /> : drill.visualCues}
+      </div>
+      {(drill.visualCues.length > 180 || (drill.counters?.length ?? 0) > 180) && (
         <button
           onClick={() => setExpanded(e => !e)}
           className="text-xs text-foreground/70 hover:text-foreground underline underline-offset-2 self-start -mt-1.5"
@@ -85,7 +136,13 @@ function DrillCard({ drill }: { drill: Drill }) {
       {drill.counters && (
         <div className="rounded-lg bg-foreground/[0.03] border border-border/30 px-3 py-2 space-y-1">
           <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">Common counter</p>
-          <p className="text-xs text-foreground/80 leading-snug line-clamp-3">{drill.counters}</p>
+          {expanded ? (
+            <div className="text-xs text-foreground/80 leading-relaxed">
+              <FormattedText text={drill.counters} />
+            </div>
+          ) : (
+            <p className="text-xs text-foreground/80 leading-snug line-clamp-3">{drill.counters}</p>
+          )}
         </div>
       )}
 
