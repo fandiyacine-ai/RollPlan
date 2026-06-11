@@ -105,11 +105,28 @@ export default function HomePage() {
                 </svg>
               </div>
               <div>
-                <h3 className="font-semibold text-sm mb-1">Opponent scouting — automatically</h3>
+                <h3 className="font-semibold text-sm mb-1">Scout opponents — from a bracket or a long stream</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Connect your AJP, IBJJF, and Smoothcomp accounts and RollPlan pulls your opponents'
-                  competition records and footage for you. No manual data entry — just an AI gameplan
-                  with their tendencies, favourite positions, and where they're vulnerable.
+                  Connect AJP, IBJJF, or Smoothcomp and RollPlan imports your bracket, pulling each
+                  opponent's competition record and footage automatically. No bracket yet? Paste a
+                  multi-hour tournament stream, tell the AI who to look for, and it scans the whole
+                  recording to clip out every one of that athlete's matches.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="w-8 h-8 rounded-lg bg-violet-950 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-semibold text-sm mb-1">Gameplans, win probability &amp; Fight Card</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Every scouted opponent gets an AI gameplan — what to open with, what to watch for,
+                  and your attack chain — plus a win probability with a Favourable, Even, or Tough
+                  verdict. Turn it into a Fight Card: a shareable head-to-head page for your coach or squad.
                 </p>
               </div>
             </div>
@@ -132,6 +149,49 @@ export default function HomePage() {
             alt="RollPlan Frame by Frame AI chat — synced to the video timeline with position and event breakdown"
             width={1440}
             height={710}
+            className="w-full h-auto"
+          />
+        </div>
+      </section>
+
+      {/* Scout the bracket or a long stream */}
+      <section className="px-6 pb-16 max-w-4xl mx-auto w-full">
+        <div className="text-center space-y-2 mb-6">
+          <h2 className="text-2xl font-bold">Scout the whole bracket — or one long stream</h2>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            Import from AJP, IBJJF, or Smoothcomp and RollPlan pulls every opponent's record and
+            footage automatically. Or paste a tournament stream and tell the AI who to look for —
+            it scans hours of footage and clips out their matches. Either way, you get an AI
+            gameplan with a win probability for each one.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-border/60 overflow-hidden shadow-2xl shadow-black/20">
+          <Image
+            src="/marketing/opponent-scouting.png"
+            alt="RollPlan opponent scouting — bracket import from AJP, IBJJF, and Smoothcomp with career records and an AI gameplan showing win probability"
+            width={1600}
+            height={1000}
+            className="w-full h-auto"
+          />
+        </div>
+      </section>
+
+      {/* Fight Card */}
+      <section className="px-6 pb-16 max-w-4xl mx-auto w-full">
+        <div className="text-center space-y-2 mb-6">
+          <h2 className="text-2xl font-bold">Your Fight Card — ready before you compete</h2>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            Head-to-head stats, game styles, dominant positions, top attacks, and your AI gameplan
+            — open with, watch out for, attack chain — all on one page. Share it with your coach
+            or squad in one tap.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-border/60 overflow-hidden shadow-2xl shadow-black/20">
+          <Image
+            src="/marketing/fight-card.png"
+            alt="RollPlan Fight Card — shareable head-to-head matchup page with stats comparison and AI gameplan"
+            width={1600}
+            height={1362}
             className="w-full h-auto"
           />
         </div>
@@ -164,6 +224,11 @@ export default function HomePage() {
               n: '4',
               title: 'Go Frame by Frame',
               body: 'Hit "Frame by Frame" on any analysed match to open the AI chat. Pause the video anywhere and ask the AI what happened — it sees your current frame in real time.',
+            },
+            {
+              n: '5',
+              title: 'Compete with Match Day',
+              body: 'On the morning of the tournament, open Match Day. Every opponent in your draw gets a one-glance card — win probability, what to open with, what to watch for. Built to read in five seconds, one-handed, between matches.',
             },
           ].map((step) => (
             <div key={step.n} className="relative pl-10 pb-8">
