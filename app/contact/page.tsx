@@ -1,7 +1,11 @@
 import Link from 'next/link'
 import { Wordmark } from '@/components/wordmark'
 
-export const metadata = { title: 'Contact — RollPlan' }
+export const metadata = {
+  title: 'Contact — RollPlan',
+  description: 'Get in touch with the RollPlan team — questions, feedback, and support for AI BJJ match analysis and opponent scouting.',
+  alternates: { canonical: '/contact' },
+}
 
 export default function ContactPage() {
   return (

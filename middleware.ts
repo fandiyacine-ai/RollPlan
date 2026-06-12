@@ -1,7 +1,19 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 
-const isPublicRoute = createRouteMatcher(['/', '/sign-in(.*)', '/sign-up(.*)', '/faq', '/api/(.*)', '/share/(.*)'])
+const isPublicRoute = createRouteMatcher([
+  '/',
+  '/sign-in(.*)',
+  '/sign-up(.*)',
+  '/faq',
+  '/about',
+  '/contact',
+  '/api/(.*)',
+  '/share/(.*)',
+  '/sitemap.xml',
+  '/robots.txt',
+  '/opengraph-image(.*)',
+])
 
 export default clerkMiddleware(async (auth, request) => {
   // Dev-only bypass: set DEV_BYPASS_AUTH=true in .env.local for localhost UX review

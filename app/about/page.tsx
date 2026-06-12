@@ -2,8 +2,13 @@ import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Wordmark } from '@/components/wordmark'
+import { InstagramIcon } from '@/components/icons/instagram'
 
-export const metadata = { title: 'About — RollPlan' }
+export const metadata = {
+  title: 'About — RollPlan',
+  description: 'Why RollPlan exists: an AI-powered BJJ match analysis and opponent scouting tool built by a grappler who got tired of going into matches blind.',
+  alternates: { canonical: '/about' },
+}
 
 export default function AboutPage() {
   return (
@@ -166,6 +171,15 @@ export default function AboutPage() {
           <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
           <Link href="/faq" className="hover:text-foreground transition-colors">FAQ</Link>
           <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
+          <a
+            href="https://www.instagram.com/rollplan.ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="RollPlan on Instagram"
+            className="hover:text-foreground transition-colors"
+          >
+            <InstagramIcon className="w-4 h-4" />
+          </a>
         </div>
       </footer>
     </div>

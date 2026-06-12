@@ -3,11 +3,37 @@ import Image from 'next/image'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Wordmark } from '@/components/wordmark'
+import { InstagramIcon } from '@/components/icons/instagram'
 
+
+const organizationLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'RollPlan',
+  url: 'https://rollplan.ai',
+  logo: 'https://rollplan.ai/RollPlan-logo.png',
+  sameAs: ['https://www.instagram.com/rollplan.ai'],
+}
+
+const softwareLd = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'RollPlan',
+  applicationCategory: 'SportsApplication',
+  operatingSystem: 'Web',
+  description: 'AI-powered BJJ match analysis, opponent scouting, and gameplan generation with win probability.',
+  url: 'https://rollplan.ai',
+  offers: [
+    { '@type': 'Offer', name: 'Free', price: '0', priceCurrency: 'EUR' },
+    { '@type': 'Offer', name: 'Pro', price: '5', priceCurrency: 'EUR' },
+  ],
+}
 
 export default function HomePage() {
   return (
     <main className="flex min-h-screen flex-col bg-background text-foreground">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareLd) }} />
 
       {/* Nav */}
       <nav className="px-6 h-14 flex items-center justify-between border-b border-border/60 sticky top-0 z-40 bg-background/90 backdrop-blur-sm">
@@ -344,6 +370,15 @@ export default function HomePage() {
           <Link href="/about" className="hover:text-foreground transition-colors">About</Link>
           <Link href="/faq" className="hover:text-foreground transition-colors">FAQ</Link>
           <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
+          <a
+            href="https://www.instagram.com/rollplan.ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="RollPlan on Instagram"
+            className="hover:text-foreground transition-colors"
+          >
+            <InstagramIcon className="w-4 h-4" />
+          </a>
         </div>
         <p className="text-center sm:text-right max-w-sm">
           Your video is processed by Google Gemini AI and stored securely.

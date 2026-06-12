@@ -1,7 +1,11 @@
 import Link from 'next/link'
 import { Wordmark } from '@/components/wordmark'
 
-export const metadata = { title: 'FAQ — RollPlan' }
+export const metadata = {
+  title: 'FAQ — RollPlan',
+  description: 'Answers to common questions about RollPlan: AI match analysis, opponent scouting, gameplans, Match Day, usage limits, and more.',
+  alternates: { canonical: '/faq' },
+}
 
 const FAQ = [
   {
@@ -102,9 +106,20 @@ const FAQ = [
   },
 ]
 
+const faqLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: FAQ.map(({ q, a }) => ({
+    '@type': 'Question',
+    name: q,
+    acceptedAnswer: { '@type': 'Answer', text: a },
+  })),
+}
+
 export default function FaqPage() {
   return (
     <div className="min-h-screen bg-background">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }} />
       <header className="border-b border-border/60 px-6 h-14 flex items-center justify-between sticky top-0 z-40 bg-background/90 backdrop-blur-sm">
         <Link href="/"><Wordmark /></Link>
         <Link href="/player-card" className="text-sm text-muted-foreground hover:text-foreground transition-colors">

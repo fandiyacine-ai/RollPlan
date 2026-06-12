@@ -11,9 +11,54 @@ const inter = Inter({ subsets: ['latin'] })
 const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-brand', weight: ['400', '500', '600', '700'] })
 const bebasNeue = Bebas_Neue({ subsets: ['latin'], variable: '--font-display', weight: '400' })
 
+const SITE_URL = 'https://rollplan.ai'
+const SITE_NAME = 'RollPlan'
+const SITE_DESCRIPTION = 'Upload your BJJ footage and get an AI-powered match breakdown — every position, transition, and turning point traced to the exact timestamp. Scout opponents and get an AI gameplan with win probability.'
+
 export const metadata: Metadata = {
-  title: 'RollPlan — AI BJJ Match Analysis',
-  description: 'Upload your BJJ footage. AI maps every position, event, and turning point — all traced to timestamps.',
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: 'RollPlan — AI BJJ Match Analysis',
+    template: '%s | RollPlan',
+  },
+  description: SITE_DESCRIPTION,
+  keywords: [
+    'BJJ video analysis',
+    'jiu jitsu match analysis',
+    'AI BJJ coach',
+    'BJJ video review software',
+    'BJJ opponent scouting',
+    'BJJ gameplan',
+    'grappling analytics',
+  ],
+  authors: [{ name: 'RollPlan' }],
+  alternates: { canonical: '/' },
+  icons: {
+    apple: '/RollPlan-logo.png',
+  },
+  openGraph: {
+    title: 'RollPlan — AI BJJ Match Analysis',
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    locale: 'en_US',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'RollPlan — AI BJJ Match Analysis',
+    description: SITE_DESCRIPTION,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
