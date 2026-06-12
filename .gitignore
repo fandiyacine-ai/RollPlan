@@ -4,6 +4,8 @@ node_modules/
 .env.local
 *.env
 tsconfig.tsbuildinfo
+.DS_Store
 
 # Browser screenshots from UX review sessions
 .screenshots/
+.playwright-mcp/

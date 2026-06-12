@@ -15,7 +15,7 @@
 import { generateObject } from 'ai'
 import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
-import { matches, videos, positionSegments, matchEvents, aiCallLogs } from '../lib/db/schema'
+import { matches, videos, positionSegments, matchEvents, aiCallLogs, tournaments, tournamentOpponents } from '../lib/db/schema'
 import { eq, and, gte, inArray, sql, asc } from 'drizzle-orm'
 import { anthropic, CLAUDE_SYNTHESIS_MODEL, estimateCostUsd } from '../lib/ai/clients'
 import { GEMINI_VIDEO_MODEL } from '../lib/ai/clients'
@@ -27,6 +27,11 @@ import { SubmissionScanOutputSchema } from '../lib/ai/schemas/submission-scan'
 import { getTechniqueVariantsForPositions, formatVariantsAsPromptBlock } from '../lib/ai/technique-retrieval'
 import { techniqueVariants } from '../lib/db/schema'
 import { createNotification } from '../lib/db/notifications'
+
+// Once a match has absorbed this many KB-driven rescans, further rescans tend to
+// turn up nothing new but still cost a Claude review + Gemini scan — stop spending
+// tokens on it.
+const MAX_KB_UPGRADES = 3
 
 export const rescanMatchesWithKb = inngest.createFunction(
   {
@@ -63,7 +68,8 @@ export const rescanMatchesWithKb = inngest.createFunction(
 
     // Find analysed YouTube matches that have segments in any of those positions
     const affectedMatches = await step.run('find-affected-matches', async () => {
-      // Join matches with videos to filter by YouTube publicUrl
+      // Join matches with videos to filter by YouTube publicUrl, and (for opponent-scouting
+      // matches) with the linked tournament to know if it's already over.
       const rows = await db
         .select({
           id: matches.id,
@@ -75,16 +81,32 @@ export const rescanMatchesWithKb = inngest.createFunction(
           kbChangelog: matches.kbChangelog,
           kbVersion: matches.kbVersion,
           videoPublicUrl: videos.publicUrl,
+          tournamentStatus: tournaments.status,
+          tournamentEventDate: tournaments.eventDate,
         })
         .from(matches)
         .innerJoin(videos, eq(matches.videoId, videos.id))
+        .leftJoin(tournamentOpponents, eq(matches.tournamentOpponentId, tournamentOpponents.id))
+        .leftJoin(tournaments, eq(tournamentOpponents.tournamentId, tournaments.id))
         .where(eq(matches.status, 'analysed'))
 
       const ytMatches = rows.filter(m => m.videoPublicUrl && isYouTubeUrl(m.videoPublicUrl))
 
       if (ytMatches.length === 0) return []
 
-      const ytMatchIds = ytMatches.map(m => m.id)
+      // Stop rescanning matches that have already had their 3 free upgrades, or whose
+      // tournament has already happened — both cases just burn AI tokens for no benefit.
+      const today = new Date().toISOString().slice(0, 10)
+      const eligibleMatches = ytMatches.filter(m => {
+        if ((m.kbChangelog?.length ?? 0) >= MAX_KB_UPGRADES) return false
+        if (m.tournamentStatus === 'completed') return false
+        if (m.tournamentEventDate && m.tournamentEventDate < today) return false
+        return true
+      })
+
+      if (eligibleMatches.length === 0) return []
+
+      const ytMatchIds = eligibleMatches.map(m => m.id)
 
       // Find which of those have relevant segments
       let relevantMatchIds: string[]
@@ -102,7 +124,7 @@ export const rescanMatchesWithKb = inngest.createFunction(
         relevantMatchIds = [...new Set(relevantSegments.map(s => s.matchId))]
       }
 
-      return ytMatches.filter(m => relevantMatchIds.includes(m.id))
+      return eligibleMatches.filter(m => relevantMatchIds.includes(m.id))
     })
 
     if (affectedMatches.length === 0) return { upgraded: 0, reason: 'no YouTube matches with relevant positions' }
