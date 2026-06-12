@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Wordmark } from '@/components/wordmark'
+import { InstagramIcon } from '@/components/icons/instagram'
 
 const CLERK_APPEARANCE = {
   variables: {
@@ -26,6 +27,21 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
       </div>
 
       {children}
+
+      <footer className="flex items-center gap-5 text-xs text-muted-foreground">
+        <Link href="/about" className="hover:text-foreground transition-colors">About</Link>
+        <Link href="/faq" className="hover:text-foreground transition-colors">FAQ</Link>
+        <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
+        <a
+          href="https://www.instagram.com/rollplan.ai"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="RollPlan on Instagram"
+          className="hover:text-foreground transition-colors"
+        >
+          <InstagramIcon className="w-4 h-4" />
+        </a>
+      </footer>
     </div>
   )
 }
