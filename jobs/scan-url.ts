@@ -71,6 +71,10 @@ function parseYouTubeTimestamp(url: string): number {
   } catch { return 0 }
 }
 
+const CHUNK_SECS = 20 * 60   // 20-minute windows — ~60 frames at 0.05fps
+const CHUNK_OVERLAP = 5 * 60 // 5-min overlap so matches near a boundary appear fully in the next chunk
+const NUM_CHUNKS = 20        // covers up to ~5h50m effective with overlap (handles full competition day)
+
 export const scanUrl = inngest.createFunction(
   {
     id: 'scan-url',
@@ -79,16 +83,60 @@ export const scanUrl = inngest.createFunction(
     triggers: [{ event: 'url/submitted' }],
     // Cap simultaneous Gemini calls — Railway Pro has 24 GB RAM; 4 concurrent jobs fit safely
     concurrency: { limit: 4 },
+    // Runs once all 10 retries are exhausted. Without this, a chunk that keeps hitting
+    // transient Gemini errors leaves its video (and the parent) stuck in 'processing'
+    // forever, and the sequential chunk chain never sends 'send-next-chunk' for the
+    // remaining chunks — the rest of the video is silently never scanned.
+    onFailure: async ({ event }: {
+      event: { data: { event: { data: { videoId: string; userId?: string; athleteName: string; format: string; sourceType: string; eventName?: string; appearanceHint?: string; tournamentOpponentId?: string; endSeconds?: number; chunkIndex?: number; chunkTotal?: number; chunkVideoIds?: string[]; matchesFoundSoFar?: number; consecutiveEmptyChunks?: number } } } }
+    }) => {
+      const { videoId, userId, athleteName, format, sourceType, eventName, appearanceHint, tournamentOpponentId, endSeconds, chunkIndex, chunkTotal, chunkVideoIds, matchesFoundSoFar, consecutiveEmptyChunks } = event.data.event.data
+
+      const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
+      if (video?.status === 'processing') {
+        await db.update(videos).set({ status: 'failed', failureReason: 'Scan failed after repeated errors — try rescanning this video.' }).where(eq(videos.id, videoId))
+      }
+
+      if (chunkIndex === undefined || chunkTotal === undefined || !chunkVideoIds) return
+
+      // Chunk r2Keys are 'chunk/{parentVideoId}/{index}' — extract parent ID
+      const parentId = video?.r2Key.split('/')[1]
+      if (!parentId) return
+
+      if (chunkIndex < chunkTotal - 1) {
+        // Skip the failed chunk and continue the chain so the rest of the video still gets scanned
+        await inngest.send({
+          name: 'url/submitted',
+          data: {
+            videoId: chunkVideoIds[chunkIndex + 1],
+            userId, athleteName, format, sourceType, eventName, appearanceHint, tournamentOpponentId,
+            startSeconds: endSeconds! - CHUNK_OVERLAP,
+            endSeconds: endSeconds! - CHUNK_OVERLAP + CHUNK_SECS,
+            chunkIndex: chunkIndex + 1,
+            chunkTotal,
+            chunkVideoIds,
+            matchesFoundSoFar: matchesFoundSoFar ?? 0,
+            consecutiveEmptyChunks: (consecutiveEmptyChunks ?? 0) + 1,
+          },
+        })
+        return
+      }
+
+      // Last chunk failed permanently — finalize the parent based on whatever was found so far
+      const found = await db.select({ id: matches.id }).from(matches).where(inArray(matches.videoId, chunkVideoIds))
+      if (found.length === 0) {
+        const reason = `"${athleteName}" was not found in this video. Check the name matches exactly what's shown on screen.`
+        await db.update(videos).set({ status: 'failed', failureReason: reason }).where(eq(videos.id, parentId))
+      } else {
+        await db.update(videos).set({ status: 'analysed' }).where(eq(videos.id, parentId))
+      }
+    },
   },
   async ({ event, step }: {
     event: { data: { videoId: string; userId?: string; athleteName: string; format: string; sourceType: string; eventName?: string; appearanceHint?: string; tournamentOpponentId?: string; skipScan?: boolean; startSeconds?: number; endSeconds?: number; chunkIndex?: number; chunkTotal?: number; chunkVideoIds?: string[]; matchesFoundSoFar?: number; consecutiveEmptyChunks?: number; ytTimestampHint?: number } }
     step: any
   }) => {
     const { videoId, userId, athleteName, format, sourceType, eventName, appearanceHint, tournamentOpponentId, skipScan, startSeconds, endSeconds, chunkIndex, chunkTotal, chunkVideoIds, matchesFoundSoFar, consecutiveEmptyChunks, ytTimestampHint } = event.data
-
-    const CHUNK_SECS = 20 * 60   // 20-minute windows — ~60 frames at 0.05fps
-    const CHUNK_OVERLAP = 5 * 60 // 5-min overlap so matches near a boundary appear fully in the next chunk
-    const NUM_CHUNKS = 20        // covers up to ~5h50m effective with overlap (handles full competition day)
 
     // Non-YouTube (R2-uploaded) videos must go through the Gemini Files API.
     // Passing the R2 URL to generateObject as a file part makes the AI SDK download

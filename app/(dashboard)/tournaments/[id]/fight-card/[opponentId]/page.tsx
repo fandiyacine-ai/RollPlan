@@ -373,10 +373,10 @@ export default async function FightCardPage({
           )}
 
           {/* Career records — same source/basis on both sides for a fair comparison */}
-          {(ownAjpRecord || ownScRecord || userRecord?.ibjjfBestResult || ajpRecord || scRecord || opponent.ibjjfBestResult) && (
+          {(ownAjpRecord || ownScRecord || userRecord?.ibjjfBestResult || userRecord?.ibjjfProfileUrl || ajpRecord || scRecord || opponent.ibjjfBestResult || opponent.ibjjfProfileUrl) && (
             <>
               <div className="bg-card px-4 pb-3">
-                {(ownAjpRecord || ownScRecord || userRecord?.ibjjfBestResult) && (
+                {(ownAjpRecord || ownScRecord || userRecord?.ibjjfBestResult || userRecord?.ibjjfProfileUrl) && (
                   <div className="flex flex-col items-start gap-1">
                     {ownAjpRecord && (
                       <div className="flex items-center gap-2">
@@ -392,7 +392,7 @@ export default async function FightCardPage({
                         <span className="text-sm font-bold text-foreground/60">{ownScRecord.split(' ')[1]}</span>
                       </div>
                     )}
-                    {userRecord?.ibjjfBestResult && (
+                    {(userRecord?.ibjjfBestResult || userRecord?.ibjjfProfileUrl) && (
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-medium">IBJJF</span>
                         {userRecord.ibjjfProfileUrl ? (
@@ -402,10 +402,10 @@ export default async function FightCardPage({
                             rel="noopener noreferrer"
                             className="text-[11px] text-muted-foreground/70 hover:text-foreground hover:underline underline-offset-2 transition-colors"
                           >
-                            {condenseMedals(userRecord.ibjjfBestResult) ?? userRecord.ibjjfBestResult}
+                            {userRecord.ibjjfBestResult ? (condenseMedals(userRecord.ibjjfBestResult) ?? userRecord.ibjjfBestResult) : 'Profile'}
                           </a>
                         ) : (
-                          <span className="text-[11px] text-muted-foreground/70">{condenseMedals(userRecord.ibjjfBestResult) ?? userRecord.ibjjfBestResult}</span>
+                          <span className="text-[11px] text-muted-foreground/70">{condenseMedals(userRecord.ibjjfBestResult!) ?? userRecord.ibjjfBestResult}</span>
                         )}
                       </div>
                     )}
@@ -413,7 +413,7 @@ export default async function FightCardPage({
                 )}
               </div>
               <div className="bg-card px-4 pb-3">
-                {(ajpRecord || scRecord || opponent.ibjjfBestResult) && (
+                {(ajpRecord || scRecord || opponent.ibjjfBestResult || opponent.ibjjfProfileUrl) && (
                   <div className="flex flex-col items-end gap-1">
                     {ajpRecord && (
                       <div className="flex items-center gap-2">
@@ -429,7 +429,7 @@ export default async function FightCardPage({
                         <span className="text-sm font-bold text-foreground/60">{scRecord.split(' ')[1]}</span>
                       </div>
                     )}
-                    {opponent.ibjjfBestResult && (
+                    {(opponent.ibjjfBestResult || opponent.ibjjfProfileUrl) && (
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-medium">IBJJF</span>
                         {opponent.ibjjfProfileUrl ? (
@@ -439,10 +439,10 @@ export default async function FightCardPage({
                             rel="noopener noreferrer"
                             className="text-[11px] text-muted-foreground/70 hover:text-foreground hover:underline underline-offset-2 transition-colors"
                           >
-                            {condenseMedals(opponent.ibjjfBestResult) ?? opponent.ibjjfBestResult}
+                            {opponent.ibjjfBestResult ? (condenseMedals(opponent.ibjjfBestResult) ?? opponent.ibjjfBestResult) : 'Profile'}
                           </a>
                         ) : (
-                          <span className="text-[11px] text-muted-foreground/70">{condenseMedals(opponent.ibjjfBestResult) ?? opponent.ibjjfBestResult}</span>
+                          <span className="text-[11px] text-muted-foreground/70">{condenseMedals(opponent.ibjjfBestResult!) ?? opponent.ibjjfBestResult}</span>
                         )}
                       </div>
                     )}

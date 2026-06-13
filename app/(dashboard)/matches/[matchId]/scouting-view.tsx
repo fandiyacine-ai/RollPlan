@@ -33,8 +33,10 @@ type TabId = 'brief' | 'timeline' | 'notes' | 'stats' | 'prediction' | 'ask'
 
 function fmtTime(s: number): string {
   const t = Math.round(s)
-  const m = Math.floor(t / 60)
+  const h = Math.floor(t / 3600)
+  const m = Math.floor((t % 3600) / 60)
   const sec = t % 60
+  if (h > 0) return sec > 0 ? `${h}h ${m}m ${sec}s` : m > 0 ? `${h}h ${m}m` : `${h}h`
   if (m > 0) return sec > 0 ? `${m}m ${sec}s` : `${m}m`
   return `${sec}s`
 }

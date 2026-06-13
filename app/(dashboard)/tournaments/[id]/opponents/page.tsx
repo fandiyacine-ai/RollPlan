@@ -65,7 +65,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
     id: string; opponentLabel: string; profilePhotoUrl: string | null
     ajpWins: number | null; ajpLosses: number | null; ajpProfileUrl: string | null
     smoothcompWins: number | null; smoothcompLosses: number | null; smoothcompProfileUrl: string | null
-    ibjjfBestResult: string | null; footageStatus: string; intelStatus: string | null
+    ibjjfBestResult: string | null; ibjjfProfileUrl: string | null; footageStatus: string; intelStatus: string | null
     smoothcompAthleteId: string | null
   }[]
 
@@ -81,6 +81,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
       smoothcompLosses: tournamentOpponents.smoothcompLosses,
       smoothcompProfileUrl: tournamentOpponents.smoothcompProfileUrl,
       ibjjfBestResult: tournamentOpponents.ibjjfBestResult,
+      ibjjfProfileUrl: tournamentOpponents.ibjjfProfileUrl,
       footageStatus: tournamentOpponents.footageStatus,
       intelStatus: tournamentOpponents.intelStatus,
       smoothcompAthleteId: tournamentOpponents.smoothcompAthleteId,
@@ -334,6 +335,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
       smoothcompLosses: opp.smoothcompLosses,
       smoothcompProfileUrl: opp.smoothcompProfileUrl,
       ibjjfBestResult: opp.ibjjfBestResult,
+      ibjjfProfileUrl: opp.ibjjfProfileUrl,
       footageStatus: opp.footageStatus ?? 'manual',
       intelStatus: opp.intelStatus,
       scoutedMatchCount: scoutedMatches.length,

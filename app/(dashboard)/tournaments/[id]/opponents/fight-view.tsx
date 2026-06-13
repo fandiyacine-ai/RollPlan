@@ -39,6 +39,7 @@ export type OpponentRow = {
   smoothcompLosses: number | null
   smoothcompProfileUrl: string | null
   ibjjfBestResult: string | null
+  ibjjfProfileUrl: string | null
   footageStatus: string
   intelStatus: string | null
   scoutedMatchCount: number
@@ -234,11 +235,21 @@ function OpponentSection({ opp, tournamentId, index, total, usage }: { opp: Oppo
                   <span className="text-xs font-bold text-foreground/40">{scRecord.split(' ')[1]}</span>
                 </span>
               )}
-              {opp.ibjjfBestResult && (
+              {opp.ibjjfBestResult ? (
                 <span className="flex items-center gap-1.5">
                   <span className="text-[9px] text-foreground/40 uppercase tracking-wider font-bold">IBJJF</span>
                   <span className="text-[11px] text-foreground/50">{opp.ibjjfBestResult.split('|')[0]?.trim()}</span>
                 </span>
+              ) : opp.ibjjfProfileUrl && (
+                <a
+                  href={opp.ibjjfProfileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+                >
+                  <span className="text-[9px] text-foreground/40 uppercase tracking-wider font-bold">IBJJF</span>
+                  <span className="text-[11px] text-foreground/50 underline underline-offset-2">Profile</span>
+                </a>
               )}
               {opp.communityMatchCount > 0 && (
                 <span className="text-[9px] text-violet-600 dark:text-violet-400/70 font-medium">{opp.communityMatchCount} community match{opp.communityMatchCount !== 1 ? 'es' : ''}</span>
@@ -431,10 +442,22 @@ function OpponentSection({ opp, tournamentId, index, total, usage }: { opp: Oppo
                     </p>
                   </div>
                 )}
-                {opp.ibjjfBestResult && (
+                {opp.ibjjfBestResult ? (
                   <div>
                     <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/40 mb-0.5">IBJJF best</p>
                     <p className="text-xs font-semibold text-foreground/60">{opp.ibjjfBestResult.split('|')[0]?.trim()}</p>
+                  </div>
+                ) : opp.ibjjfProfileUrl && (
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/40 mb-0.5">IBJJF</p>
+                    <a
+                      href={opp.ibjjfProfileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-semibold text-foreground/60 underline underline-offset-2 hover:text-foreground transition-colors"
+                    >
+                      Profile
+                    </a>
                   </div>
                 )}
                 {opp.communityMatchCount > 0 && (
