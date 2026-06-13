@@ -7,6 +7,7 @@ import { clerkClient } from '@clerk/nextjs/server'
 import { MatchContent, type TimelineItem } from '../../../(dashboard)/matches/[matchId]/match-content'
 import { POSITIONS } from '../../../../lib/taxonomy/positions'
 import { EVENT_TYPES } from '../../../../lib/taxonomy/events'
+import { Wordmark } from '../../../../components/wordmark'
 import type { Metadata } from 'next'
 
 const POSITION_MAP = Object.fromEntries(POSITIONS.map((p) => [p.id, p.name]))
@@ -131,8 +132,8 @@ export default async function SharedMatchPage({ params }: { params: Promise<{ sh
     <div className="min-h-screen bg-background">
       {/* Minimal header */}
       <header className="border-b border-border/60 px-6 h-14 flex items-center justify-between sticky top-0 z-40 bg-background/90 backdrop-blur-sm">
-        <Link href="/" className="text-xl font-extrabold tracking-tight [font-family:var(--font-brand)]">
-          Frame<span className="text-muted-foreground font-bold">Matters</span>
+        <Link href="/">
+          <Wordmark />
         </Link>
         <div className="flex items-center gap-3">
           <span className="text-xs text-muted-foreground hidden sm:block">Shared match analysis</span>
@@ -190,7 +191,7 @@ export default async function SharedMatchPage({ params }: { params: Promise<{ sh
                     </div>
                     <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                       <div className="h-full flex rounded-full overflow-hidden" style={{ width: `${barPct}%` }}>
-                        <div className="bg-emerald-500" style={{ width: `${domPct}%` }} />
+                        <div className="bg-blue-500" style={{ width: `${domPct}%` }} />
                         <div className="bg-zinc-600" style={{ width: `${neuPct}%` }} />
                         <div className="bg-rose-400" style={{ width: `${infPct}%` }} />
                       </div>
@@ -200,7 +201,7 @@ export default async function SharedMatchPage({ params }: { params: Promise<{ sh
               })}
             </div>
             <div className="flex items-center gap-4 pt-1 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" /> In Control</span>
+              <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block" /> In Control</span>
               <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-zinc-600 inline-block" /> Neutral</span>
               <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-rose-400 inline-block" /> Under Pressure</span>
             </div>

@@ -49,7 +49,7 @@ function MatchResultBadge({ winner, method, technique }: { winner: string; metho
   return (
     <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
       isWin
-        ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/30'
+        ? 'bg-blue-950/60 text-blue-400 border border-blue-800/30'
         : 'bg-rose-950/60 text-rose-400 border border-rose-800/30'
     }`}>
       {label}

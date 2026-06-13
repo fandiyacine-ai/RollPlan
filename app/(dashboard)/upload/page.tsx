@@ -161,14 +161,14 @@ function buildAnnotatedRefImageBase64(frame: Frame, roi: Rect, athleteBox: Rect)
       ctx.fillRect(rx + rw, ry, W - rx - rw, rh)
 
       // Green mat box
-      ctx.strokeStyle = '#4ade80'
+      ctx.strokeStyle = '#3b82f6'
       ctx.lineWidth = 3
       ctx.setLineDash([8, 4])
       ctx.strokeRect(rx + 1.5, ry + 1.5, rw - 3, rh - 3)
       ctx.setLineDash([])
       ctx.font = 'bold 12px sans-serif'
       const mlw = ctx.measureText('YOUR MAT').width
-      ctx.fillStyle = '#4ade80'
+      ctx.fillStyle = '#3b82f6'
       ctx.beginPath()
       ctx.roundRect(rx, Math.max(0, ry - 22), mlw + 12, 22, [3])
       ctx.fill()
@@ -304,7 +304,7 @@ function FrameSelector({
     ctx.fillRect(0, ry, rx, rh)
     ctx.fillRect(rx + rw, ry, W - rx - rw, rh)
 
-    ctx.strokeStyle = '#4ade80'
+    ctx.strokeStyle = '#3b82f6'
     ctx.lineWidth = 2
     ctx.strokeRect(rx, ry, rw, rh)
 
@@ -443,7 +443,7 @@ function FrameSelector({
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={f.dataUrl} alt={`Frame ${i + 1}`} className="h-20 w-auto object-cover block" draggable={false} />
                     {f.label === 'entry' && (
-                      <span className="absolute bottom-1 left-1 text-[9px] font-bold uppercase bg-emerald-500 text-white px-1 py-0.5 rounded leading-none tracking-wide">
+                      <span className="absolute bottom-1 left-1 text-[9px] font-bold uppercase bg-blue-500 text-white px-1 py-0.5 rounded leading-none tracking-wide">
                         Entry
                       </span>
                     )}
@@ -454,11 +454,11 @@ function FrameSelector({
           </div>
           {frames.some(f => f.label === 'entry') && phase === 'pick-frame' && (
             <p className="text-xs text-muted-foreground">
-              <span className="text-emerald-400 font-medium">Entry frames</span> show athletes walking onto the mat — easiest to identify yourself before the match starts.
+              <span className="text-blue-400 font-medium">Entry frames</span> show athletes walking onto the mat — easiest to identify yourself before the match starts.
             </p>
           )}
           {phase === 'done' && (
-            <p className="text-xs text-emerald-400 font-medium">Position captured — identity reference saved.</p>
+            <p className="text-xs text-blue-400 font-medium">Position captured — identity reference saved.</p>
           )}
         </div>
       )}
@@ -602,10 +602,10 @@ function FileUploadTab() {
 
   if (state === 'success') {
     return (
-      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-8 py-10 text-center space-y-5">
+      <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 px-8 py-10 text-center space-y-5">
         <div className="flex justify-center">
-          <div className="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <div className="w-14 h-14 rounded-full bg-blue-500/15 border border-blue-500/30 flex items-center justify-center">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12" />
             </svg>
           </div>
@@ -767,10 +767,10 @@ function UrlAnalysisTab() {
   if (state === 'success') {
     const streamCount = urls.filter(Boolean).length
     return (
-      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-8 py-10 text-center space-y-5">
+      <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 px-8 py-10 text-center space-y-5">
         <div className="flex justify-center">
-          <div className="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <div className="w-14 h-14 rounded-full bg-blue-500/15 border border-blue-500/30 flex items-center justify-center">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12" />
             </svg>
           </div>
@@ -935,7 +935,7 @@ function SharedFields({
           <span className="self-center text-xs text-muted-foreground">side of the mat</span>
         </div>
         {startingSideAuto && startingSide && (
-          <p className="text-xs text-emerald-400">
+          <p className="text-xs text-blue-400">
             Auto-detected from your frame selection — tap to override.
           </p>
         )}

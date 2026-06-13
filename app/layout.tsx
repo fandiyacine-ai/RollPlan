@@ -33,9 +33,6 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: 'RollPlan' }],
   alternates: { canonical: '/' },
-  icons: {
-    apple: '/RollPlan-logo.png',
-  },
   openGraph: {
     title: 'RollPlan — AI BJJ Match Analysis',
     description: SITE_DESCRIPTION,

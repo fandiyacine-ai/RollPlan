@@ -76,9 +76,9 @@ function careerRecord(w: number | null | undefined, l: number | null | undefined
 
 function GameStyleBar({ topPct, right = false }: { topPct: number; right?: boolean }) {
   const label = topPct >= 65 ? 'Top player' : topPct >= 50 ? 'Balanced' : topPct >= 35 ? 'Guard-heavy' : 'Guard player'
-  const fillClass = right ? 'bg-red-500/60' : 'bg-emerald-500/60'
-  const bgClass = right ? 'bg-red-500/[0.12]' : 'bg-emerald-500/[0.12]'
-  const labelClass = right ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'
+  const fillClass = right ? 'bg-red-500/60' : 'bg-blue-500/60'
+  const bgClass = right ? 'bg-red-500/[0.12]' : 'bg-blue-500/[0.12]'
+  const labelClass = right ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
@@ -97,7 +97,7 @@ function GameStyleBar({ topPct, right = false }: { topPct: number; right?: boole
 function VerdictBadge({ verdict, winProbability }: { verdict: string | null; winProbability: number | null }) {
   if (!verdict) return null
   const cfg = {
-    favourable: { bg: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400', label: 'Favourable' },
+    favourable: { bg: 'bg-blue-500/15 border-blue-500/30 text-blue-600 dark:text-blue-400', label: 'Favourable' },
     neutral:    { bg: 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400', label: 'Neutral' },
     tough:      { bg: 'bg-red-500/15 border-red-500/30 text-red-600 dark:text-red-400', label: 'Tough match' },
   }[verdict] ?? { bg: 'bg-zinc-500/15 border-zinc-500/30 text-zinc-500', label: verdict }
@@ -115,18 +115,18 @@ function UserCard({ userName, data }: { userName: string; data: UserCardData }) 
   return (
     <div className="rounded-2xl overflow-hidden border border-border shadow-lg bg-zinc-100 dark:bg-zinc-900">
       {/* Green accent top strip */}
-      <div className="h-1 w-full bg-gradient-to-r from-emerald-400 to-emerald-600" />
+      <div className="h-1 w-full bg-gradient-to-r from-blue-400 to-blue-600" />
 
       <div className="p-4 space-y-4">
         {/* Identity */}
         <div>
-          <p className="text-[7px] font-black uppercase tracking-[0.35em] text-emerald-600 dark:text-emerald-400/70 mb-1.5">You</p>
+          <p className="text-[7px] font-black uppercase tracking-[0.35em] text-blue-600 dark:text-blue-400/70 mb-1.5">You</p>
           <p className="font-black text-2xl uppercase leading-tight tracking-wide text-foreground break-words">
             {userName}
           </p>
           {data.ownTotal > 0 && (
             <div className="flex items-center gap-1.5 mt-2">
-              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{data.ownWins}W</span>
+              <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{data.ownWins}W</span>
               <span className="text-sm font-bold text-foreground/40">{data.ownTotal - data.ownWins}L</span>
               <span className="text-[9px] text-foreground/30 uppercase tracking-wider">on RollPlan</span>
             </div>
@@ -169,7 +169,7 @@ function UserCard({ userName, data }: { userName: string; data: UserCardData }) 
             <p className="text-[11px] text-foreground/40 italic leading-snug">Upload your own footage to build your player card</p>
             <Link
               href="/upload?context=own"
-              className="block text-center text-[10px] font-semibold px-3 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25 transition-colors"
+              className="block text-center text-[10px] font-semibold px-3 py-2 rounded-lg bg-blue-500/15 border border-blue-500/25 text-blue-600 dark:text-blue-400 hover:bg-blue-500/25 transition-colors"
             >
               + Add your footage
             </Link>
@@ -346,7 +346,7 @@ function OpponentSection({ opp, tournamentId, index, total, usage }: { opp: Oppo
               ) : opp.card ? (
                 <div className="space-y-2.5">
                   <div className="space-y-1">
-                    <p className="text-[8px] font-black uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-500">Open with</p>
+                    <p className="text-[8px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-500">Open with</p>
                     <p className="text-xs font-semibold leading-snug">{opp.card.open_with}</p>
                   </div>
                   <div className="space-y-1">
@@ -568,7 +568,7 @@ export function TournamentFightView({
                   <span className="truncate font-semibold">{opp.opponentLabel}</span>
                   {opp.gameplanVerdict && (
                     <span className={`ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                      opp.gameplanVerdict === 'favourable' ? 'bg-emerald-400' :
+                      opp.gameplanVerdict === 'favourable' ? 'bg-blue-400' :
                       opp.gameplanVerdict === 'tough' ? 'bg-rose-400' : 'bg-amber-400'
                     }`} />
                   )}
@@ -592,11 +592,11 @@ export function TournamentFightView({
         <div className="rounded-xl overflow-hidden border border-border bg-zinc-100 dark:bg-zinc-900 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[7px] font-black uppercase tracking-[0.35em] text-emerald-600 dark:text-emerald-400/60 mb-1">You</p>
+              <p className="text-[7px] font-black uppercase tracking-[0.35em] text-blue-600 dark:text-blue-400/60 mb-1">You</p>
               <p className="font-black text-xl uppercase leading-tight text-foreground">{userName}</p>
               {userData.ownTotal > 0 && (
                 <p className="text-xs mt-1">
-                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">{userData.ownWins}W</span>
+                  <span className="text-blue-600 dark:text-blue-400 font-bold">{userData.ownWins}W</span>
                   <span className="text-foreground/40 font-bold ml-1">{userData.ownTotal - userData.ownWins}L</span>
                   <span className="text-foreground/30 ml-1 text-[9px] uppercase">on RollPlan</span>
                 </p>

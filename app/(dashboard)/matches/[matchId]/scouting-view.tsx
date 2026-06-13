@@ -56,7 +56,7 @@ function ResultBadge({ winner, method, technique }: { winner: string; method: st
   return (
     <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full flex-shrink-0 ${
       isWin
-        ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/30'
+        ? 'bg-blue-950/60 text-blue-400 border border-blue-800/30'
         : 'bg-rose-950/60 text-rose-400 border border-rose-800/30'
     }`}>
       {label}
@@ -234,7 +234,7 @@ function RecordColumn({ label, intel }: { label: string; intel: IntelRecord | nu
             <div className="flex items-center gap-1.5">
               <span className="text-[8px] font-bold px-1 py-px rounded border bg-orange-900/50 text-orange-300 border-orange-700/40">AJP</span>
               <span className="text-xs tabular-nums">
-                <span className="font-bold text-emerald-400">{intel.ajpWins}W</span>
+                <span className="font-bold text-blue-400">{intel.ajpWins}W</span>
                 <span className="text-muted-foreground/50 mx-0.5">–</span>
                 <span className="font-bold text-rose-400">{intel.ajpLosses ?? 0}L</span>
               </span>
@@ -244,7 +244,7 @@ function RecordColumn({ label, intel }: { label: string; intel: IntelRecord | nu
             <div className="flex items-center gap-1.5">
               <span className="text-[8px] font-bold px-1 py-px rounded border bg-sky-900/50 text-sky-300 border-sky-700/40">SC</span>
               <span className="text-xs tabular-nums">
-                <span className="font-bold text-emerald-400">{intel.smoothcompWins}W</span>
+                <span className="font-bold text-blue-400">{intel.smoothcompWins}W</span>
                 <span className="text-muted-foreground/50 mx-0.5">–</span>
                 <span className="font-bold text-rose-400">{intel.smoothcompLosses ?? 0}L</span>
               </span>
@@ -287,9 +287,9 @@ function RecordsComparison({ opponentLabel, opponentIntel, userIntel }: {
 
 // ─── Tab: Timeline ────────────────────────────────────────────────────────────
 
-const DOM_DOT: Record<string, string> = { dominant: 'bg-emerald-500', inferior: 'bg-rose-500', neutral: 'bg-zinc-500' }
+const DOM_DOT: Record<string, string> = { dominant: 'bg-blue-500', inferior: 'bg-rose-500', neutral: 'bg-zinc-500' }
 const DOM_LABEL: Record<string, string> = { dominant: 'In control', inferior: 'Under pressure', neutral: 'Neutral' }
-const DOM_TEXT: Record<string, string> = { dominant: 'text-emerald-500', inferior: 'text-rose-500', neutral: 'text-muted-foreground' }
+const DOM_TEXT: Record<string, string> = { dominant: 'text-blue-500', inferior: 'text-rose-500', neutral: 'text-muted-foreground' }
 
 function TimelineTab({ items, onSeek, competitorLabel, opponentLabel, onCorrectPosition }: {
   items: TimelineItem[]
@@ -481,7 +481,7 @@ function StatArcGauge({ pct, pressurePct }: { pct: number; pressurePct: number }
   const gap1 = (C1 * (1 - pct / 100)).toFixed(2)
   const fill2 = (C2 * pressurePct / 100).toFixed(2)
   const gap2 = (C2 * (1 - pressurePct / 100)).toFixed(2)
-  const gaugeColor = pct >= 55 ? '#4ade80' : pct < 38 ? '#f87171' : '#818cf8'
+  const gaugeColor = pct >= 55 ? '#3b82f6' : pct < 38 ? '#f87171' : '#818cf8'
   return (
     <svg width={112} height={112} viewBox="0 0 112 112" className="flex-shrink-0">
       <circle cx={cx} cy={cy} r={R} fill="none" stroke={gaugeColor} strokeWidth={16} opacity={0.07} />
@@ -606,19 +606,19 @@ function StatsTab({ sortedPositions, maxPositionTime, positionNames, timelineIte
 
       {/* ── Row 2: Arsenal / Exposed ── */}
       <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-2.5">
-          <div className="text-[8px] font-bold uppercase tracking-widest text-emerald-500 mb-0.5">Arsenal</div>
-          <div className="text-[9px] text-emerald-500/50 mb-2">positions in control</div>
+        <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-2.5">
+          <div className="text-[8px] font-bold uppercase tracking-widest text-blue-500 mb-0.5">Arsenal</div>
+          <div className="text-[9px] text-blue-500/50 mb-2">positions in control</div>
           {strongPositions.length > 0 ? strongPositions.map(pos => {
             const pct = Math.round(pos.dominantPct * 100)
             return (
               <div key={pos.name} className="mb-1.5">
                 <div className="flex justify-between items-baseline mb-0.5 gap-1">
                   <span className="text-[10px] text-foreground/80 font-medium truncate">{pos.name}</span>
-                  <span className="text-[10px] text-emerald-500 font-bold flex-shrink-0">{pct}%</span>
+                  <span className="text-[10px] text-blue-500 font-bold flex-shrink-0">{pct}%</span>
                 </div>
                 <div className="h-1 w-full rounded-full bg-muted/40 overflow-hidden">
-                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
+                  <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }} />
                 </div>
               </div>
             )

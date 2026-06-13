@@ -21,8 +21,8 @@ function DataQualityNote({ matchCount }: { matchCount: number }) {
 
 function WinBar({ probability, verdict }: { probability: number; verdict: string }) {
   const verdictLabel = verdict === 'favourable' ? 'Favourable' : verdict === 'tough' ? 'Tough' : 'Even'
-  const verdictColor = verdict === 'favourable' ? 'text-emerald-400' : verdict === 'tough' ? 'text-rose-400' : 'text-amber-400'
-  const barColor = verdict === 'favourable' ? 'bg-emerald-500/60' : verdict === 'tough' ? 'bg-rose-500/60' : 'bg-amber-500/60'
+  const verdictColor = verdict === 'favourable' ? 'text-blue-400' : verdict === 'tough' ? 'text-rose-400' : 'text-amber-400'
+  const barColor = verdict === 'favourable' ? 'bg-blue-500/60' : verdict === 'tough' ? 'bg-rose-500/60' : 'bg-amber-500/60'
   return (
     <div className="space-y-1.5">
       <div className="flex items-end justify-between gap-2">

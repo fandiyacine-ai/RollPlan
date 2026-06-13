@@ -61,7 +61,7 @@ export default function AboutPage() {
             for someone to sit with our footage for two hours before every tournament.
           </p>
 
-          <div className="border-l-2 border-emerald-500/40 pl-5 my-8">
+          <div className="border-l-2 border-blue-500/40 pl-5 my-8">
             <p className="text-foreground font-medium text-base">
               I built RollPlan because I wanted what those athletes had — without needing a coaching staff to get it.
             </p>
@@ -101,7 +101,7 @@ export default function AboutPage() {
 
         {/* Founder sig */}
         <div className="flex items-center gap-4 py-2">
-          <div className="w-10 h-10 rounded-full bg-emerald-950 border border-emerald-800/50 flex items-center justify-center text-emerald-400 font-bold text-sm flex-shrink-0">
+          <div className="w-10 h-10 rounded-full bg-blue-950 border border-blue-800/50 flex items-center justify-center text-blue-400 font-bold text-sm flex-shrink-0">
             Y
           </div>
           <div>

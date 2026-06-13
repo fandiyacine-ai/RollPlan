@@ -4,12 +4,12 @@ import { InstagramIcon } from '@/components/icons/instagram'
 
 const CLERK_APPEARANCE = {
   variables: {
-    colorPrimary: '#4ade80',
+    colorPrimary: '#1D4FA8',
     borderRadius: '0.75rem',
   },
   elements: {
     card: 'shadow-none border border-border/60',
-    footerActionLink: 'text-emerald-500 hover:text-emerald-600',
+    footerActionLink: 'text-[#1D4FA8] hover:text-[#163d85]',
   },
 }
 

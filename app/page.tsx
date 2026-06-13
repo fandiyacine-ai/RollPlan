@@ -56,7 +56,7 @@ export default function HomePage() {
         <div className="max-w-5xl mx-auto grid lg:grid-cols-2 gap-10 lg:gap-12 items-center">
           <div className="space-y-6 text-center lg:text-left">
             <div className="inline-flex items-center gap-2 text-xs text-muted-foreground border rounded-full px-4 py-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
               Powered by Google Gemini AI
             </div>
 
@@ -98,8 +98,8 @@ export default function HomePage() {
       <section className="px-6 pb-16 max-w-4xl mx-auto w-full">
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="rounded-xl border bg-card p-5 space-y-2">
-            <div className="w-8 h-8 rounded-lg bg-emerald-950 flex items-center justify-center">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <div className="w-8 h-8 rounded-lg bg-blue-950 flex items-center justify-center">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
               </svg>
             </div>
@@ -288,7 +288,7 @@ export default function HomePage() {
                 '1 active tournament',
               ].map(f => (
                 <li key={f} className="flex items-start gap-2.5">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400 mt-0.5 flex-shrink-0">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400 mt-0.5 flex-shrink-0">
                     <polyline points="20 6 9 17 4 12"/>
                   </svg>
                   {f}
@@ -313,7 +313,7 @@ export default function HomePage() {
                 'Unlimited tournaments',
               ].map(f => (
                 <li key={f} className="flex items-start gap-2.5">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400 mt-0.5 flex-shrink-0">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400 mt-0.5 flex-shrink-0">
                     <polyline points="20 6 9 17 4 12"/>
                   </svg>
                   {f}

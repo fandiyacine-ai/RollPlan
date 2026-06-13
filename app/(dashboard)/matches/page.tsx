@@ -227,7 +227,7 @@ export default async function MatchesPage() {
                 <p className="text-xs text-muted-foreground font-medium mb-1.5 lg:mb-2.5">Record</p>
                 <div className="flex items-end gap-3 lg:gap-4">
                   <div>
-                    <p className="text-xl lg:text-2xl font-bold text-emerald-500 tabular-nums leading-none">{wins}</p>
+                    <p className="text-xl lg:text-2xl font-bold text-blue-500 tabular-nums leading-none">{wins}</p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">wins</p>
                   </div>
                   <div>
@@ -416,7 +416,7 @@ function MatchCard({
                 {match.resultWinner && (
                   <span className={`text-xs font-medium px-1.5 py-0.5 rounded-sm border ${
                     match.resultWinner === 'user'
-                      ? 'text-emerald-500 border-emerald-500/30'
+                      ? 'text-blue-500 border-blue-500/30'
                       : 'text-rose-500 border-rose-500/30'
                   }`}>
                     {match.resultWinner === 'user'

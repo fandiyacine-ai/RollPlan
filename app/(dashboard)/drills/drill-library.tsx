@@ -28,7 +28,7 @@ const PAGE_SIZE = 24
 const FORMAT_LABELS: Record<string, string> = { gi: 'Gi', no_gi: 'No-Gi', both: 'Gi & No-Gi' }
 
 const DIFFICULTY_BADGE: Record<Difficulty, string> = {
-  fundamental: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25',
+  fundamental: 'bg-blue-500/15 text-blue-400 border-blue-500/25',
   intermediate: 'bg-blue-500/15 text-blue-400 border-blue-500/25',
   advanced: 'bg-rose-500/15 text-rose-400 border-rose-500/25',
 }

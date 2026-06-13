@@ -579,7 +579,7 @@ export function ScoutForm({
   }
 
   if (done) {
-    return <span className="text-xs text-emerald-400 font-medium">Scanning queued ✓</span>
+    return <span className="text-xs text-blue-400 font-medium">Scanning queued ✓</span>
   }
 
   // Free tier exhausted — skip the form entirely and send straight to the upgrade page

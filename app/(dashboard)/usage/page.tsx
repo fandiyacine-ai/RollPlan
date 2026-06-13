@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 const PLAN_BADGE: Record<string, { label: string; className: string }> = {
   free: { label: 'Free plan', className: 'bg-muted text-muted-foreground' },
   trial: { label: 'Pro trial', className: 'bg-violet-500/15 text-violet-400' },
-  pro: { label: 'Pro', className: 'bg-emerald-500/15 text-emerald-400' },
+  pro: { label: 'Pro', className: 'bg-blue-500/15 text-blue-400' },
 }
 
 const PRO_PERKS = [
@@ -28,7 +28,7 @@ function UpgradePromo() {
       <ul className="space-y-2">
         {PRO_PERKS.map(perk => (
           <li key={perk} className="flex items-start gap-2.5 text-xs text-muted-foreground">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400 mt-0.5 flex-shrink-0">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400 mt-0.5 flex-shrink-0">
               <polyline points="20 6 9 17 4 12" />
             </svg>
             {perk}

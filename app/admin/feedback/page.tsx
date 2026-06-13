@@ -18,7 +18,7 @@ const RATING_COLOUR: Record<number, string> = {
   2: 'text-orange-400',
   3: 'text-yellow-400',
   4: 'text-green-400',
-  5: 'text-emerald-400',
+  5: 'text-blue-400',
 }
 
 export default async function AdminFeedbackPage() {

@@ -244,7 +244,7 @@ export default async function FightCardPage({
         <div className="relative bg-zinc-100 dark:bg-zinc-900 overflow-hidden">
 
           {/* Side accent strips */}
-          <div className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-emerald-400 to-emerald-600" />
+          <div className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-blue-400 to-blue-600" />
           <div className="absolute inset-y-0 right-0 w-1.5 bg-gradient-to-b from-rose-400 to-rose-600" />
 
           {/* Meta row */}
@@ -277,7 +277,7 @@ export default async function FightCardPage({
 
             {/* User side */}
             <div className="min-w-0">
-              <p className="text-[7px] font-black uppercase tracking-[0.35em] text-emerald-600 dark:text-emerald-400/70 mb-1.5">You</p>
+              <p className="text-[7px] font-black uppercase tracking-[0.35em] text-blue-600 dark:text-blue-400/70 mb-1.5">You</p>
               <p className="font-display text-5xl sm:text-6xl uppercase leading-[0.88] tracking-wide text-foreground truncate">
                 {userName}
               </p>
@@ -286,14 +286,14 @@ export default async function FightCardPage({
                   {ownAjpRecord && (
                     <>
                       <span className="text-[9px] text-foreground/30 uppercase tracking-wider">AJP</span>
-                      <span className="text-sm font-bold text-emerald-500">{ownAjpRecord.split(' ')[0]}</span>
+                      <span className="text-sm font-bold text-blue-500">{ownAjpRecord.split(' ')[0]}</span>
                       <span className="text-sm font-bold text-foreground/30">{ownAjpRecord.split(' ')[1]}</span>
                     </>
                   )}
                   {!ownAjpRecord && ownScRecord && (
                     <>
                       <span className="text-[9px] text-foreground/30 uppercase tracking-wider">SC</span>
-                      <span className="text-sm font-bold text-emerald-500">{ownScRecord.split(' ')[0]}</span>
+                      <span className="text-sm font-bold text-blue-500">{ownScRecord.split(' ')[0]}</span>
                       <span className="text-sm font-bold text-foreground/30">{ownScRecord.split(' ')[1]}</span>
                     </>
                   )}
@@ -354,7 +354,7 @@ export default async function FightCardPage({
 
           {/* Section headers — paired so every following section lines up row-by-row */}
           <div className="bg-card px-4 pt-4 pb-2">
-            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-emerald-400/80">Your game</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-blue-400/80">Your game</p>
           </div>
           <div className="bg-card px-4 pt-4 pb-2 text-right">
             <p className="text-[10px] font-black uppercase tracking-[0.25em] text-rose-400/80">Their game</p>
@@ -381,14 +381,14 @@ export default async function FightCardPage({
                     {ownAjpRecord && (
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-medium">AJP</span>
-                        <span className="text-sm font-bold text-emerald-400">{ownAjpRecord.split(' ')[0]}</span>
+                        <span className="text-sm font-bold text-blue-400">{ownAjpRecord.split(' ')[0]}</span>
                         <span className="text-sm font-bold text-foreground/60">{ownAjpRecord.split(' ')[1]}</span>
                       </div>
                     )}
                     {ownScRecord && (
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-medium">SC</span>
-                        <span className="text-sm font-bold text-emerald-400">{ownScRecord.split(' ')[0]}</span>
+                        <span className="text-sm font-bold text-blue-400">{ownScRecord.split(' ')[0]}</span>
                         <span className="text-sm font-bold text-foreground/60">{ownScRecord.split(' ')[1]}</span>
                       </div>
                     )}
@@ -540,7 +540,7 @@ export default async function FightCardPage({
           <div className="grid grid-cols-[1fr_1px_1fr]">
             <Link
               href={`/upload?context=own&back=/tournaments/${tournamentId}/fight-card/${opponentId}`}
-              className="px-5 py-3 text-xs text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/[0.04] transition-colors font-medium"
+              className="px-5 py-3 text-xs text-muted-foreground hover:text-blue-400 hover:bg-blue-500/[0.04] transition-colors font-medium"
             >
               + Add your footage
             </Link>
@@ -584,8 +584,8 @@ export default async function FightCardPage({
         ) : plan && card ? (
           <div className="p-5 space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-xl border-l-2 border-emerald-500 bg-emerald-500/[0.06] px-4 py-3 space-y-1">
-                <p className="text-[8px] font-black uppercase tracking-[0.22em] text-emerald-600 dark:text-emerald-500">Open with</p>
+              <div className="rounded-xl border-l-2 border-blue-500 bg-blue-500/[0.06] px-4 py-3 space-y-1">
+                <p className="text-[8px] font-black uppercase tracking-[0.22em] text-blue-600 dark:text-blue-500">Open with</p>
                 <p className="text-sm font-bold leading-snug">{card.open_with}</p>
               </div>
               <div className="rounded-xl border-l-2 border-rose-500 bg-rose-500/[0.06] px-4 py-3 space-y-1">
@@ -650,9 +650,9 @@ export default async function FightCardPage({
 
 function GameStyleBar({ topPct, right = false }: { topPct: number; right?: boolean }) {
   const label = topPct >= 65 ? 'Top player' : topPct >= 50 ? 'Balanced' : topPct >= 35 ? 'Guard-heavy' : 'Guard player'
-  const fillClass = right ? 'bg-rose-500/60' : 'bg-emerald-500/60'
-  const bgClass = right ? 'bg-rose-500/[0.12]' : 'bg-emerald-500/[0.12]'
-  const labelClass = right ? 'text-rose-400' : 'text-emerald-400'
+  const fillClass = right ? 'bg-rose-500/60' : 'bg-blue-500/60'
+  const bgClass = right ? 'bg-rose-500/[0.12]' : 'bg-blue-500/[0.12]'
+  const labelClass = right ? 'text-rose-400' : 'text-blue-400'
   return (
     <div className="space-y-1.5">
       <div className={`flex items-center justify-between ${right ? 'flex-row-reverse' : ''}`}>
@@ -686,7 +686,7 @@ function StatRow({
   const valueClass = dim
     ? 'text-foreground/70'
     : accent === 'emerald'
-      ? 'text-emerald-400'
+      ? 'text-blue-400'
       : accent === 'rose'
         ? 'text-rose-400'
         : 'text-foreground/85'

@@ -8,7 +8,7 @@ import type { TrainingPlan } from '../../../lib/ai/schemas/training-plan'
 
 const FOCUS_COLORS: Record<string, string> = {
   defence: 'text-rose-400 bg-rose-400/10',
-  offence: 'text-emerald-400 bg-emerald-400/10',
+  offence: 'text-blue-400 bg-blue-400/10',
   transitions: 'text-amber-400 bg-amber-400/10',
 }
 

@@ -21,7 +21,7 @@ type Variant = {
 
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-amber-500/15 text-amber-400 border-amber-500/25',
-  active: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25',
+  active: 'bg-blue-500/15 text-blue-400 border-blue-500/25',
   rejected: 'bg-rose-500/15 text-rose-400 border-rose-500/25',
 }
 
@@ -289,7 +289,7 @@ export default function AdminTechniquesPage() {
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {v.status === 'draft' && (
                     <>
-                      <button onClick={() => patch(v.id, { status: 'active' })} className="text-xs px-3 py-1.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 rounded-lg hover:bg-emerald-500/25 transition-colors">Approve</button>
+                      <button onClick={() => patch(v.id, { status: 'active' })} className="text-xs px-3 py-1.5 bg-blue-500/15 text-blue-400 border border-blue-500/25 rounded-lg hover:bg-blue-500/25 transition-colors">Approve</button>
                       <button onClick={() => patch(v.id, { status: 'rejected' })} className="text-xs px-3 py-1.5 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-lg hover:bg-rose-500/20 transition-colors">Reject</button>
                     </>
                   )}

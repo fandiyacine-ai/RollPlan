@@ -12,6 +12,7 @@ import { GameplanRatingWidget } from './rating-widget'
 import { AutoRefresh } from './auto-refresh'
 import { PlanExecutionSection } from './plan-execution-section'
 import { PrivateBadge } from '../../../../../components/private-badge'
+import { Wordmark } from '../../../../../components/wordmark'
 import type { GameplanOutput } from '../../../../../lib/ai/schemas/gameplan'
 import type { MatchupPrediction } from '../../../../../lib/ai/schemas/prediction'
 import type { ExecutionDebrief } from '../../../../../lib/ai/schemas/execution-debrief'
@@ -141,6 +142,14 @@ export default async function GameplanPage({
         {backLabel}
       </Link>
 
+      {/* Print-only branding header — the nav (with logo) is hidden via @media print */}
+      <div className="hidden print:flex items-center justify-between pb-4 mb-2 border-b border-border">
+        <Wordmark />
+        <span className="text-xs text-muted-foreground">
+          {athleteName ? `${athleteName} vs. ${activeOpponent.opponentLabel}` : `vs. ${activeOpponent.opponentLabel}`} · Gameplan
+        </span>
+      </div>
+
       {/* Opponent selector */}
       {sortedOpponents.length > 1 && (
         <OpponentSelector
@@ -215,7 +224,7 @@ export default async function GameplanPage({
                       : isWin ? 'W — Win' : 'L — Loss'
                     return (
                       <span key={m.id} className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                        isWin ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/30' : 'bg-rose-950/60 text-rose-400 border border-rose-800/30'
+                        isWin ? 'bg-blue-950/60 text-blue-400 border border-blue-800/30' : 'bg-rose-950/60 text-rose-400 border border-rose-800/30'
                       }`}>
                         {label}
                       </span>
@@ -445,8 +454,8 @@ function MatchCard({ card }: { card: GameplanOutput['match_card'] }) {
 
         {/* Open with + Watch out — left-bordered cells, high contrast */}
         <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-lg border-l-[3px] border-emerald-500 bg-emerald-500/[0.07] dark:bg-emerald-500/[0.08] px-3 py-2.5 space-y-1">
-            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-500">Open with</p>
+          <div className="rounded-lg border-l-[3px] border-blue-500 bg-blue-500/[0.07] dark:bg-blue-500/[0.08] px-3 py-2.5 space-y-1">
+            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-blue-600 dark:text-blue-500">Open with</p>
             <p className="text-xs font-bold leading-snug">{card.open_with}</p>
           </div>
           <div className="rounded-lg border-l-[3px] border-rose-500 bg-rose-500/[0.07] dark:bg-rose-500/[0.08] px-3 py-2.5 space-y-1">
@@ -559,7 +568,7 @@ function DrillLibrary({ drillRefs }: { drillRefs: DrillRef[] }) {
         />
         <DrillGroup
           label="Your attack drills"
-          accent="bg-emerald-950/30 text-emerald-400/80"
+          accent="bg-blue-950/30 text-blue-400/80"
           refs={attackRefs}
         />
       </div>
@@ -687,7 +696,7 @@ function GameplanDisplay({ plan, drillRefs }: { plan: GameplanOutput; drillRefs?
               <p className="text-xs leading-relaxed">{plan.opponent_intel.biggest_threat}</p>
             </div>
             <div className="rounded-xl border border-border/40 bg-card p-4 space-y-1.5">
-              <p className="text-xs font-medium text-emerald-500">Their gap</p>
+              <p className="text-xs font-medium text-blue-500">Their gap</p>
               <p className="text-xs leading-relaxed">{plan.opponent_intel.biggest_weakness}</p>
             </div>
           </div>
@@ -774,7 +783,7 @@ function Section({ title, children, mobileCollapsed = false }: { title: string; 
 }
 
 const VERDICT_STYLES: Record<string, { bar: string; label: string; text: string }> = {
-  favourable: { bar: 'bg-emerald-500', label: 'Favourable', text: 'text-emerald-400' },
+  favourable: { bar: 'bg-blue-500', label: 'Favourable', text: 'text-blue-400' },
   neutral:    { bar: 'bg-amber-500',   label: 'Neutral',    text: 'text-amber-400' },
   tough:      { bar: 'bg-rose-500',    label: 'Tough draw', text: 'text-rose-400' },
 }
@@ -818,7 +827,7 @@ function PredictionCard({ prediction }: { prediction: MatchupPrediction }) {
         {/* Advantages + Risks */}
         <div className="grid sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-border/60">
           <div className="px-5 py-4 space-y-2">
-            <p className="text-xs font-medium text-emerald-500">Your edge</p>
+            <p className="text-xs font-medium text-blue-500">Your edge</p>
             {prediction.key_advantages.map((a, i) => (
               <p key={i} className="text-xs text-muted-foreground leading-relaxed">{a}</p>
             ))}

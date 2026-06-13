@@ -32,7 +32,7 @@ function ConfidenceDots({ matchCount }: { matchCount: number }) {
 }
 
 const VERDICT_COLOR: Record<string, string> = {
-  favourable: 'text-emerald-400',
+  favourable: 'text-blue-400',
   neutral:    'text-amber-400',
   tough:      'text-rose-400',
 }
@@ -87,8 +87,8 @@ function OpponentGameCard({
         <div className="px-4 py-3 space-y-2.5">
           {/* Open with + Watch out */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div className="rounded-lg border-l-2 border-emerald-500 bg-emerald-500/[0.06] px-2.5 py-2 space-y-0.5">
-              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-500">Open with</p>
+            <div className="rounded-lg border-l-2 border-blue-500 bg-blue-500/[0.06] px-2.5 py-2 space-y-0.5">
+              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-blue-600 dark:text-blue-500">Open with</p>
               <p className="text-xs font-bold leading-snug">{card.open_with}</p>
             </div>
             <div className="rounded-lg border-l-2 border-rose-500 bg-rose-500/[0.06] px-2.5 py-2 space-y-0.5">

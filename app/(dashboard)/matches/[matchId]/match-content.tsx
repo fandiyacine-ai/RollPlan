@@ -118,7 +118,7 @@ function CategoryIcon({ category }: { category: string }) {
 }
 
 const DOMINANCE_DOT: Record<string, string> = {
-  dominant: 'bg-emerald-500',
+  dominant: 'bg-blue-500',
   inferior: 'bg-rose-500',
   neutral: 'bg-zinc-500',
 }
@@ -180,7 +180,7 @@ function TimelineRow({
             <div className="flex items-baseline gap-2 flex-wrap">
               <span className="text-sm font-medium">{item.positionName}</span>
               <span className={`text-[10px] font-semibold uppercase tracking-wide ${
-                item.dominance === 'dominant' ? 'text-emerald-500' :
+                item.dominance === 'dominant' ? 'text-blue-500' :
                 item.dominance === 'inferior' ? 'text-rose-500' : 'text-muted-foreground'
               }`}>{DOMINANCE_LABEL[item.dominance]}</span>
               <span className="text-xs text-muted-foreground ml-auto tabular-nums">{formatTime(item.durationSeconds)}</span>
@@ -265,7 +265,7 @@ function drawSpatialOverlay(canvas: HTMLCanvasElement, spatial: SpatialData) {
   ctx.fillRect(rx + rw, ry, W - rx - rw, rh)
 
   // Green ROI box
-  ctx.strokeStyle = '#4ade80'
+  ctx.strokeStyle = '#3b82f6'
   ctx.lineWidth = 3
   ctx.setLineDash([8, 4])
   ctx.strokeRect(rx + 1.5, ry + 1.5, rw - 3, rh - 3)
@@ -275,7 +275,7 @@ function drawSpatialOverlay(canvas: HTMLCanvasElement, spatial: SpatialData) {
   ctx.font = 'bold 11px sans-serif'
   const label = 'YOUR MAT'
   const lw = ctx.measureText(label).width
-  ctx.fillStyle = '#4ade80'
+  ctx.fillStyle = '#3b82f6'
   ctx.beginPath()
   ctx.roundRect(rx, ry - 20, lw + 12, 20, [3, 3, 0, 0])
   ctx.fill()
@@ -318,14 +318,14 @@ function drawBboxes(
   if (userBbox) {
     const x = userBbox.x1 * W, y = userBbox.y1 * H
     const w = (userBbox.x2 - userBbox.x1) * W, h = (userBbox.y2 - userBbox.y1) * H
-    ctx.strokeStyle = '#4ade80'
+    ctx.strokeStyle = '#3b82f6'
     ctx.lineWidth = 2.5
     ctx.setLineDash([6, 3])
     ctx.strokeRect(x, y, w, h)
     ctx.setLineDash([])
     const lw = ctx.measureText('YOU').width
     const labelY = Math.max(0, y - 20)
-    ctx.fillStyle = '#4ade80'
+    ctx.fillStyle = '#3b82f6'
     ctx.beginPath()
     ctx.roundRect(x, labelY, lw + 10, 20, [3, 3, 0, 0])
     ctx.fill()
@@ -594,7 +594,7 @@ export function MatchContent({
           ) : (
             <div className="relative">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground pb-3">
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0" />{competitorLabel ? `${competitorLabel} in control` : 'In Control'}</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500 flex-shrink-0" />{competitorLabel ? `${competitorLabel} in control` : 'In Control'}</span>
                 <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-zinc-500 flex-shrink-0" />Neutral</span>
                 <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-rose-500 flex-shrink-0" />{competitorLabel ? `${competitorLabel} under pressure` : 'Under Pressure'}</span>
                 <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-400 flex-shrink-0" />{competitorLabel ?? 'Your'} action</span>

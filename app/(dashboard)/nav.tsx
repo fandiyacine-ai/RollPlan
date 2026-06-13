@@ -8,6 +8,9 @@ import { ThemeToggle } from './theme-toggle'
 import { NotificationBell } from './notifications/bell'
 import { buttonVariants } from '@/components/ui/button'
 import { Wordmark } from '@/components/wordmark'
+import { cn } from '@/lib/utils'
+
+const CTA_CLASS = 'bg-[#F5C518] text-zinc-900 [a]:hover:bg-[#F5C518]/90 border-transparent'
 
 const NAV = [
   { href: '/player-card', label: 'My Stats' },
@@ -181,7 +184,7 @@ export function Nav({ usageSlot }: { usageSlot?: React.ReactNode }) {
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Desktop only */}
           <div className="hidden sm:flex items-center gap-3">
-            <Link href="/upload" className={buttonVariants({ size: 'sm' })}>
+            <Link href="/upload" className={cn(buttonVariants({ size: 'sm' }), CTA_CLASS)}>
               + Analyse
             </Link>
             {usageSlot}
@@ -216,7 +219,7 @@ export function Nav({ usageSlot }: { usageSlot?: React.ReactNode }) {
 
           {/* Mobile: compact CTA + hamburger */}
           <div className="sm:hidden">
-            <Link href="/upload" className={buttonVariants({ size: 'sm' })}>
+            <Link href="/upload" className={cn(buttonVariants({ size: 'sm' }), CTA_CLASS)}>
               + Analyse
             </Link>
           </div>

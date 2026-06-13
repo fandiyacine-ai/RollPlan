@@ -60,7 +60,7 @@ export function UpgradeOffer() {
           className={`flex-1 py-2 transition-colors relative ${billing === 'annual' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'}`}
         >
           Annual — €50
-          <span className={`ml-1.5 text-[9px] font-bold px-1 py-0.5 rounded ${billing === 'annual' ? 'bg-background/20 text-background' : 'bg-emerald-500/20 text-emerald-400'}`}>
+          <span className={`ml-1.5 text-[9px] font-bold px-1 py-0.5 rounded ${billing === 'annual' ? 'bg-background/20 text-background' : 'bg-blue-500/20 text-blue-400'}`}>
             -17%
           </span>
         </button>
@@ -70,7 +70,7 @@ export function UpgradeOffer() {
       <ul className="space-y-2.5">
         {FEATURES.map(f => (
           <li key={f} className="flex items-start gap-2.5 text-sm">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400 mt-0.5 flex-shrink-0">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400 mt-0.5 flex-shrink-0">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
             {f}
@@ -82,7 +82,7 @@ export function UpgradeOffer() {
       <button
         onClick={handleUpgrade}
         disabled={loading}
-        className="w-full py-3 rounded-xl bg-foreground text-background text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full py-3 rounded-xl bg-[#F5C518] text-zinc-900 text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? 'Redirecting…' : `Start free trial — ${billing === 'annual' ? '€50/year' : '€5/month'}`}
       </button>

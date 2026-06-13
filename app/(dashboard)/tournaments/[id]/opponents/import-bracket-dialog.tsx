@@ -216,7 +216,7 @@ export function ImportBracketDialog({ tournamentId, hasBracketUrl = true, userSm
 
         {state.phase === 'done' && (
           <div className="py-6 text-center space-y-2">
-            <p className="text-sm font-semibold text-emerald-400">
+            <p className="text-sm font-semibold text-blue-400">
               {state.count === 0 ? 'All opponents already added.' : `${state.count} opponent${state.count !== 1 ? 's' : ''} imported.`}
             </p>
             <p className="text-xs text-muted-foreground">

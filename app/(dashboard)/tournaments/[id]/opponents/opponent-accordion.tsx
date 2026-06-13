@@ -64,13 +64,13 @@ function WLBadge({ label, wins, losses, url }: { label: string; wins: number; lo
     <span className="flex items-center gap-1.5">
       <PlatformBadge label={label} />
       <span className="text-[11px] font-mono">
-        <span className="text-emerald-400/80">{wins}W</span>
+        <span className="text-blue-400/80">{wins}W</span>
         <span className="text-muted-foreground/30 mx-0.5">/</span>
         <span className="text-rose-400/80">{losses}L</span>
       </span>
       {total > 0 && (
         <span className="w-10 h-1 rounded-full bg-zinc-700 overflow-hidden flex-shrink-0">
-          <span className="h-full bg-emerald-500/60 block" style={{ width: `${winPct}%` }} />
+          <span className="h-full bg-blue-500/60 block" style={{ width: `${winPct}%` }} />
         </span>
       )}
     </span>
@@ -96,7 +96,7 @@ function ResultBadge({ winner, method, technique }: { winner: string; method: st
     : isWin ? 'Win' : 'Loss'
   return (
     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
-      isWin ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/30' : 'bg-rose-950/60 text-rose-400 border border-rose-800/30'
+      isWin ? 'bg-blue-950/60 text-blue-400 border border-blue-800/30' : 'bg-rose-950/60 text-rose-400 border border-rose-800/30'
     }`}>
       {label}
     </span>
@@ -106,7 +106,7 @@ function ResultBadge({ winner, method, technique }: { winner: string; method: st
 const STATUS_CHIP: Record<string, string> = {
   pending:    'bg-zinc-800 text-zinc-400',
   processing: 'bg-blue-950 text-blue-400 border border-blue-800/50',
-  analysed:   'bg-emerald-950/60 text-emerald-400 border border-emerald-800/30',
+  analysed:   'bg-blue-950/60 text-blue-400 border border-blue-800/30',
   failed:     'bg-rose-950 text-rose-400 border border-rose-800/50',
   uploaded:   'bg-zinc-800 text-zinc-400',
 }
@@ -197,7 +197,7 @@ function OpponentResultWidget({
         <>
           <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
             localResult === 'win'
-              ? 'bg-emerald-950/60 text-emerald-400 border-emerald-800/30'
+              ? 'bg-blue-950/60 text-blue-400 border-blue-800/30'
               : 'bg-rose-950/60 text-rose-400 border-rose-800/30'
           }`}>
             {resultLabel}
@@ -242,7 +242,7 @@ function OpponentResultWidget({
           <button
             onClick={() => handleResultClick('win')}
             disabled={pending}
-            className="text-[10px] px-2 py-0.5 rounded border border-border/60 text-muted-foreground hover:border-emerald-600 hover:text-emerald-400 transition-colors disabled:opacity-40"
+            className="text-[10px] px-2 py-0.5 rounded border border-border/60 text-muted-foreground hover:border-blue-600 hover:text-blue-400 transition-colors disabled:opacity-40"
           >
             Won
           </button>
@@ -316,7 +316,7 @@ export function OpponentAccordion({
   const statusDot = pending > 0
     ? <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse flex-shrink-0" />
     : analysed > 0
-    ? <span className="w-2 h-2 rounded-full bg-emerald-400/60 flex-shrink-0" />
+    ? <span className="w-2 h-2 rounded-full bg-blue-400/60 flex-shrink-0" />
     : <span className="w-2 h-2 rounded-full border border-muted-foreground/30 flex-shrink-0" />
 
   const { footageStatus } = opponent
@@ -340,7 +340,7 @@ export function OpponentAccordion({
         const firstAnalysed = matches.find(m => m.status === 'analysed')
         const label = `${analysed} match${analysed !== 1 ? 'es' : ''} ready${failed > 0 ? ` · ${failed} failed` : ''}`
         return firstAnalysed
-          ? <Link href={`/matches/${firstAnalysed.id}`} className="text-emerald-400 hover:text-emerald-300 transition-colors">{label} →</Link>
+          ? <Link href={`/matches/${firstAnalysed.id}`} className="text-blue-400 hover:text-blue-300 transition-colors">{label} →</Link>
           : label
       })()
     : failed > 0
@@ -386,7 +386,7 @@ export function OpponentAccordion({
               {opponent.userResult && (
                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${
                   opponent.userResult === 'win'
-                    ? 'bg-emerald-950/60 text-emerald-400 border-emerald-800/30'
+                    ? 'bg-blue-950/60 text-blue-400 border-blue-800/30'
                     : 'bg-rose-950/60 text-rose-400 border-rose-800/30'
                 }`}>
                   {opponent.userResult === 'win'
@@ -448,7 +448,7 @@ export function OpponentAccordion({
             </button>
           )}
           {importDone && (
-            <span className="text-xs text-emerald-400 px-2">✓ Imported</span>
+            <span className="text-xs text-blue-400 px-2">✓ Imported</span>
           )}
           {/* Hide scout form when auto-discovery is actively queued with no results yet */}
           {footageStatus !== 'pending' && !(footageStatus === 'auto_queued' && allRows.length === 0) && (

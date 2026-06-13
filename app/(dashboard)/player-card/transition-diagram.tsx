@@ -65,8 +65,8 @@ function NodeCircle({
 }) {
   const domPct = totalTime > 0 ? dominantTime / totalTime : 0
   const infPct = totalTime > 0 ? inferiorTime / totalTime : 0
-  const color = domPct >= 0.5 ? '#10b981' : infPct >= 0.4 ? '#ef4444' : '#71717a'
-  const fill  = domPct >= 0.5 ? '#10b98118' : infPct >= 0.4 ? '#ef444418' : '#3f3f4680'
+  const color = domPct >= 0.5 ? '#3b82f6' : infPct >= 0.4 ? '#ef4444' : '#71717a'
+  const fill  = domPct >= 0.5 ? '#3b82f618' : infPct >= 0.4 ? '#ef444418' : '#3f3f4680'
   const lines = splitLabel(name)
   const { anchor, baseX, baseY } = labelProps(angle)
 
@@ -134,7 +134,7 @@ function EdgeArrow({
   const by = (sy + 2 * cy + ey) / 4
 
   const sw = 1.4 + (count / maxCount) * 3.2
-  const color = yourAction ? '#10b981' : '#ef4444'
+  const color = yourAction ? '#3b82f6' : '#ef4444'
   const markerId = yourAction ? 'arr-g' : 'arr-r'
 
   return (
@@ -202,7 +202,7 @@ export function TransitionDiagram({ data }: { data: TransitionData }) {
         `}</style>
         {(['g', 'r'] as const).map(k => (
           <marker key={k} id={`arr-${k}`} markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
-            <path d="M0,0.5 L0,6.5 L6.5,3.5 z" fill={k === 'g' ? '#10b981' : '#ef4444'} opacity="0.8" />
+            <path d="M0,0.5 L0,6.5 L6.5,3.5 z" fill={k === 'g' ? '#3b82f6' : '#ef4444'} opacity="0.8" />
           </marker>
         ))}
       </defs>
