@@ -60,6 +60,26 @@ export function nameMatchThreshold(parts: string[]): number {
   return Math.ceil(parts.length * 2 / 3)
 }
 
+// Career medal counts (career totals, not finals-only W/L) embedded as JSON-LD
+// in the bjjmetrics fighter page — used as a fallback when jiujitsu.net has no medals.
+export async function fetchBjjmetricsMedalCounts(slug: string): Promise<string | null> {
+  try {
+    const resp = await fetch(`https://bjjmetrics.com/fighter/${slug}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(12000),
+    })
+    if (!resp.ok) return null
+    const html = await resp.text()
+    const gold = html.match(/"name":\s*"Gold Medals",\s*"value":\s*(\d+)/)?.[1]
+    const silver = html.match(/"name":\s*"Silver Medals",\s*"value":\s*(\d+)/)?.[1]
+    const bronze = html.match(/"name":\s*"Bronze Medals",\s*"value":\s*(\d+)/)?.[1]
+    if (gold == null && silver == null && bronze == null) return null
+    const g = Number(gold ?? 0), s = Number(silver ?? 0), b = Number(bronze ?? 0)
+    if (g + s + b === 0) return null
+    return `🥇${g} 🥈${s} 🥉${b}`
+  } catch { return null }
+}
+
 // Extract AJP profile ID from any URL found in search results
 function extractAjpProfileId(urls: string[]): string | null {
   for (const url of urls) {
@@ -868,6 +888,12 @@ export const buildOpponentIntel = inngest.createFunction(
           break
         }
       } catch { /* non-fatal */ }
+
+      // Fallback: jiujitsu.net had no medals — try bjjmetrics career medal counts
+      if (!dbUpdate.ibjjfBestResult && bjjmetricsExactSlug) {
+        const medalCounts = await fetchBjjmetricsMedalCounts(bjjmetricsExactSlug)
+        if (medalCounts) dbUpdate.ibjjfBestResult = medalCounts
+      }
 
       if (Object.keys(dbUpdate).length > 0) {
         await db.update(tournamentOpponents)

@@ -11,6 +11,7 @@ import {
   findSmoothcompProfiles,
   fetchSmoothcompEventsPage,
   fetchAjpEventsPage,
+  fetchBjjmetricsMedalCounts,
   type AjpEventsPage,
 } from './build-opponent-intel'
 
@@ -215,6 +216,12 @@ export const fetchUserIntel = inngest.createFunction(
           break
         }
       } catch { /* non-fatal */ }
+
+      // Fallback: jiujitsu.net had no medals — try bjjmetrics career medal counts
+      if (!dbUpdate.ibjjfBestResult && bjjmetricsExactSlug) {
+        const medalCounts = await fetchBjjmetricsMedalCounts(bjjmetricsExactSlug)
+        if (medalCounts) dbUpdate.ibjjfBestResult = medalCounts
+      }
 
       if (Object.keys(dbUpdate).length > 0) {
         await db.update(users).set(dbUpdate as any).where(eq(users.id, userId))
