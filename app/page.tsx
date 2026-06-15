@@ -4,7 +4,12 @@ import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Wordmark } from '@/components/wordmark'
 import { InstagramIcon } from '@/components/icons/instagram'
+import { ScoutMockup, FightCardMockup } from '@/components/marketing/section-mockups'
+import { db } from '@/lib/db'
+import { matches, tournaments, tournamentOpponents } from '@/lib/db/schema'
+import { sql, eq } from 'drizzle-orm'
 
+export const revalidate = 3600
 
 const organizationLd = {
   '@context': 'https://schema.org',
@@ -14,6 +19,8 @@ const organizationLd = {
   logo: 'https://rollplan.ai/RollPlan-logo.png',
   sameAs: ['https://www.instagram.com/rollplan.ai'],
 }
+
+const GOLD_CTA = 'bg-[#F5C518] text-zinc-900 [a]:hover:bg-[#F5C518]/90 border-transparent'
 
 const softwareLd = {
   '@context': 'https://schema.org',
@@ -29,7 +36,17 @@ const softwareLd = {
   ],
 }
 
-export default function HomePage() {
+async function getLiveStats() {
+  const [[m], [t], [o]] = await Promise.all([
+    db.select({ c: sql<number>`count(*)` }).from(matches).where(eq(matches.status, 'analysed')),
+    db.select({ c: sql<number>`count(*)` }).from(tournaments),
+    db.select({ c: sql<number>`count(*)` }).from(tournamentOpponents),
+  ])
+  return { matches: Number(m.c), tournaments: Number(t.c), opponents: Number(o.c) }
+}
+
+export default async function HomePage() {
+  const stats = await getLiveStats()
   return (
     <main className="flex min-h-screen flex-col bg-background text-foreground">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationLd) }} />
@@ -45,7 +62,7 @@ export default function HomePage() {
           <Link href="/sign-in" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}>
             Sign In
           </Link>
-          <Link href="/sign-up" className={cn(buttonVariants({ size: 'sm' }))}>
+          <Link href="/sign-up" className={cn(buttonVariants({ size: 'sm' }), GOLD_CTA)}>
             Get Started
           </Link>
         </div>
@@ -72,7 +89,7 @@ export default function HomePage() {
             </p>
 
             <div className="flex flex-wrap gap-3 justify-center lg:justify-start">
-              <Link href="/sign-up" className={cn(buttonVariants({ size: 'lg' }))}>
+              <Link href="/sign-up" className={cn(buttonVariants({ size: 'lg' }), GOLD_CTA)}>
                 Analyse My Game
               </Link>
               <Link href="/sign-up" className={cn(buttonVariants({ variant: 'outline', size: 'lg' }))}>
@@ -81,15 +98,36 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-border/60 overflow-hidden shadow-2xl shadow-black/10">
-            <Image
-              src="/marketing/player-card.png"
-              alt="RollPlan Player Card — automatic match breakdown with control rate, top attacks, and position timeline"
-              width={1600}
-              height={1000}
-              className="w-full h-auto"
-              priority
-            />
+          <div className="relative">
+            <div className="absolute -inset-6 bg-gradient-to-br from-blue-500/25 via-[#F5C518]/15 to-transparent rounded-[2rem] blur-2xl -z-10" />
+            <div className="rounded-2xl border border-border/60 overflow-hidden shadow-2xl shadow-black/10">
+              <Image
+                src="/marketing/player-card.png"
+                alt="RollPlan Player Card — automatic match breakdown with control rate, top attacks, and position timeline"
+                width={1600}
+                height={1000}
+                className="w-full h-auto"
+                priority
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Live stats */}
+      <section className="px-6 pb-12">
+        <div className="max-w-3xl mx-auto flex flex-wrap justify-center gap-x-12 gap-y-4 text-center">
+          <div>
+            <p className="text-3xl font-black">{stats.matches}</p>
+            <p className="text-xs text-muted-foreground mt-1">matches analysed</p>
+          </div>
+          <div>
+            <p className="text-3xl font-black">{stats.opponents}</p>
+            <p className="text-xs text-muted-foreground mt-1">opponents scouted</p>
+          </div>
+          <div>
+            <p className="text-3xl font-black">{stats.tournaments}</p>
+            <p className="text-xs text-muted-foreground mt-1">tournaments tracked</p>
           </div>
         </div>
       </section>
@@ -168,37 +206,44 @@ export default function HomePage() {
       </section>
 
       {/* Scout the bracket or a long stream */}
-      <section className="px-6 pb-16 max-w-4xl mx-auto w-full">
-        <div className="text-center space-y-2 mb-6">
-          <h2 className="text-2xl font-bold">Scout the whole bracket — or one long stream</h2>
-          <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            Import from AJP, IBJJF, or Smoothcomp and RollPlan pulls every opponent's record and
-            footage automatically. Or paste a tournament stream and tell the AI who to look for —
-            it scans hours of footage and clips out their matches. Either way, you get an AI
-            gameplan with a win probability for each one.
-          </p>
+      <section className="px-6 pb-16 max-w-5xl mx-auto w-full">
+        <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+          <div className="space-y-3 text-center lg:text-left order-2 lg:order-1">
+            <h2 className="text-2xl font-bold">Scout the whole bracket — or one long stream</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed max-w-md mx-auto lg:mx-0">
+              Import from AJP, IBJJF, or Smoothcomp and RollPlan pulls every opponent's record and
+              footage automatically. Or paste a tournament stream and tell the AI who to look for —
+              it scans hours of footage and clips out their matches. Either way, you get an AI
+              gameplan with a win probability for each one.
+            </p>
+          </div>
+          <div className="order-1 lg:order-2">
+            <ScoutMockup />
+          </div>
         </div>
       </section>
 
       {/* Fight Card */}
-      <section className="px-6 pb-16 max-w-4xl mx-auto w-full">
-        <div className="text-center space-y-2 mb-6">
-          <h2 className="text-2xl font-bold">Your Fight Card — ready before you compete</h2>
-          <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            Head-to-head stats, game styles, dominant positions, top attacks, and your AI gameplan
-            — open with, watch out for, attack chain — all on one page. Share it with your coach
-            or squad in one tap.
-          </p>
+      <section className="px-6 pb-16 max-w-5xl mx-auto w-full">
+        <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+          <div>
+            <FightCardMockup />
+          </div>
+          <div className="space-y-3 text-center lg:text-left">
+            <h2 className="text-2xl font-bold">Your Fight Card — ready before you compete</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed max-w-md mx-auto lg:mx-0">
+              Head-to-head record, game styles, dominant positions, top attacks, and your AI gameplan
+              — open with, watch out for, attack chain — all on one page. Share it with your coach
+              or squad in one tap.
+            </p>
+          </div>
         </div>
       </section>
 
       {/* How to use — step guide */}
-      <section className="px-6 pb-16 max-w-3xl mx-auto w-full">
+      <section className="px-6 pb-16 max-w-5xl mx-auto w-full">
         <h2 className="text-xl font-bold text-center mb-8">How to use it</h2>
-        <div className="relative space-y-0">
-          {/* connector line */}
-          <div className="absolute left-4 top-5 bottom-8 w-px bg-border/60" />
-
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[
             {
               n: '1',
@@ -226,11 +271,11 @@ export default function HomePage() {
               body: 'On the morning of the tournament, open Match Day. Every opponent in your draw gets a one-glance card — win probability, what to open with, what to watch for. Built to read in five seconds, one-handed, between matches.',
             },
           ].map((step) => (
-            <div key={step.n} className="relative pl-10 pb-8">
-              <div className="absolute left-0 top-1 w-8 h-8 rounded-full bg-card border border-border flex items-center justify-center text-xs font-bold z-10">
+            <div key={step.n} className="rounded-xl border bg-card p-5 space-y-2">
+              <div className="w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center text-xs font-bold">
                 {step.n}
               </div>
-              <h3 className="font-semibold text-sm mb-1">{step.title}</h3>
+              <h3 className="font-semibold text-sm">{step.title}</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">{step.body}</p>
             </div>
           ))}
@@ -238,7 +283,7 @@ export default function HomePage() {
       </section>
 
       {/* Who it's for */}
-      <section className="px-6 pb-16 max-w-3xl mx-auto w-full">
+      <section className="px-6 pb-16 max-w-5xl mx-auto w-full">
         <h2 className="text-xl font-bold text-center mb-8">Built for every grappler</h2>
         <div className="grid sm:grid-cols-3 gap-4">
           <div className="rounded-xl border bg-card p-5 space-y-2">
@@ -296,8 +341,8 @@ export default function HomePage() {
               ))}
             </ul>
           </div>
-          <div className="rounded-2xl border-2 border-foreground/80 bg-card p-6 space-y-4 relative">
-            <span className="absolute -top-3 left-6 text-[10px] font-bold uppercase tracking-wider bg-foreground text-background rounded-full px-2.5 py-1">
+          <div className="rounded-2xl border-2 border-[#F5C518]/60 bg-card p-6 space-y-4 relative">
+            <span className="absolute -top-3 left-6 text-[10px] font-bold uppercase tracking-wider bg-[#F5C518] text-zinc-900 rounded-full px-2.5 py-1">
               14-day free trial
             </span>
             <div>
@@ -313,7 +358,7 @@ export default function HomePage() {
                 'Unlimited tournaments',
               ].map(f => (
                 <li key={f} className="flex items-start gap-2.5">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400 mt-0.5 flex-shrink-0">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#F5C518] mt-0.5 flex-shrink-0">
                     <polyline points="20 6 9 17 4 12"/>
                   </svg>
                   {f}
@@ -337,7 +382,7 @@ export default function HomePage() {
           <p className="text-sm text-muted-foreground">
             Free to use. Upload your first clip and have a full breakdown in under five minutes.
           </p>
-          <Link href="/sign-up" className={cn(buttonVariants({ size: 'lg' }))}>
+          <Link href="/sign-up" className={cn(buttonVariants({ size: 'lg' }), GOLD_CTA)}>
             Get started — it&apos;s free
           </Link>
         </div>
@@ -370,6 +415,8 @@ export default function HomePage() {
           <Link href="/about" className="hover:text-foreground transition-colors">About</Link>
           <Link href="/faq" className="hover:text-foreground transition-colors">FAQ</Link>
           <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
+          <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+          <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
           <a
             href="https://www.instagram.com/rollplan.ai"
             target="_blank"

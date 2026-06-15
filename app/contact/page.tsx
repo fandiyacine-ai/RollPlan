@@ -3,7 +3,7 @@ import { Wordmark } from '@/components/wordmark'
 import { InstagramIcon } from '@/components/icons/instagram'
 
 export const metadata = {
-  title: 'Contact — RollPlan',
+  title: 'Contact',
   description: 'Get in touch with the RollPlan team — questions, feedback, and support for AI BJJ match analysis and opponent scouting.',
   alternates: { canonical: '/contact' },
 }
@@ -68,6 +68,8 @@ export default function ContactPage() {
           <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
           <Link href="/about" className="hover:text-foreground transition-colors">About</Link>
           <Link href="/faq" className="hover:text-foreground transition-colors">FAQ</Link>
+          <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+          <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
           <a
             href="https://www.instagram.com/rollplan.ai"
             target="_blank"

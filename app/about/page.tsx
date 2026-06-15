@@ -5,7 +5,7 @@ import { Wordmark } from '@/components/wordmark'
 import { InstagramIcon } from '@/components/icons/instagram'
 
 export const metadata = {
-  title: 'About — RollPlan',
+  title: 'About',
   description: 'Why RollPlan exists: an AI-powered BJJ match analysis and opponent scouting tool built by a grappler who got tired of going into matches blind.',
   alternates: { canonical: '/about' },
 }
@@ -149,7 +149,7 @@ export default function AboutPage() {
               Analyse my game
             </Link>
             <a
-              href="mailto:feedback@rollplan.app"
+              href="mailto:feedback@rollplan.ai"
               className={cn(buttonVariants({ variant: 'outline', size: 'lg' }))}
             >
               Send feedback
@@ -157,8 +157,8 @@ export default function AboutPage() {
           </div>
           <p className="text-xs text-muted-foreground">
             Have a question or found a bug?{' '}
-            <a href="mailto:support@rollplan.app" className="underline underline-offset-2 hover:text-foreground">
-              support@rollplan.app
+            <a href="mailto:support@rollplan.ai" className="underline underline-offset-2 hover:text-foreground">
+              support@rollplan.ai
             </a>
             {' '}— I read every message.
           </p>
@@ -171,6 +171,8 @@ export default function AboutPage() {
           <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
           <Link href="/faq" className="hover:text-foreground transition-colors">FAQ</Link>
           <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
+          <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+          <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
           <a
             href="https://www.instagram.com/rollplan.ai"
             target="_blank"
