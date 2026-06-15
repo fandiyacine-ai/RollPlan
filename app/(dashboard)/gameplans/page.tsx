@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { getOrCreateDbUserId } from '@/lib/db/get-user'
 import type { GameplanOutput } from '@/lib/ai/schemas/gameplan'
 import type { MatchupPrediction } from '@/lib/ai/schemas/prediction'
+import { SampleGameplanPreview } from '@/components/sample-preview'
 
 export const dynamic = 'force-dynamic'
 
@@ -172,6 +173,7 @@ export default async function GameplansPage() {
             <Link href="/tournaments" className="underline underline-offset-2 hover:text-foreground transition-colors">Add your first tournament →</Link>
           </p>
         </div>
+        <SampleGameplanPreview />
       </div>
     )
   }

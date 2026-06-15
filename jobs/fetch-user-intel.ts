@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm'
 import { currentUser } from '@clerk/nextjs/server'
 import {
   normalizeName,
+  normalizeIbjjfEventKey,
   nameMatchThreshold,
   findAjpAthleteIdByName,
   verifySmoothcompProfileName,
@@ -195,7 +196,7 @@ export const fetchUserIntel = inngest.createFunction(
 
           const eventMap = new Map<string, typeof medals[0]>()
           for (const medal of medals) {
-            const key = medal.event_name.replace(/\s*\(Results\)\s*$/i, '').trim()
+            const key = normalizeIbjjfEventKey(medal.event_name)
             const existing = eventMap.get(key)
             if (!existing) {
               eventMap.set(key, medal)

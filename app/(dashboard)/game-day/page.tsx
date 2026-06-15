@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { getOrCreateDbUserId } from '@/lib/db/get-user'
 import type { GameplanOutput } from '@/lib/ai/schemas/gameplan'
 import type { MatchupPrediction } from '@/lib/ai/schemas/prediction'
+import { SampleGameDayPreview } from '@/components/sample-preview'
 
 export const dynamic = 'force-dynamic'
 
@@ -171,6 +172,7 @@ export default async function GameDayPage() {
             and this is where your fight-day plan comes together — opponents, gameplans, and the countdown, all in one place.
           </p>
         </div>
+        <SampleGameDayPreview />
       </div>
     )
   }

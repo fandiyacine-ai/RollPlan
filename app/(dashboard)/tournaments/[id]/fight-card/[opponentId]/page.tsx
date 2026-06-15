@@ -163,6 +163,23 @@ export default async function FightCardPage({
     userTopPositions.sort((a, b) => b.secs - a.secs)
   }
 
+  // ── Position-time comparison (head-to-head, % of own match time) ───────────────
+  const positionIds = new Set<string>()
+  userTopPositions.slice(0, 4).forEach(p => positionIds.add(p.positionId))
+  oppTopPositions.slice(0, 4).forEach(p => positionIds.add(p.positionId))
+
+  const userPosMap = new Map(userTopPositions.map(p => [p.positionId, p.secs]))
+  const oppPosMap = new Map(oppTopPositions.map(p => [p.positionId, p.secs]))
+
+  const positionComparison = Array.from(positionIds)
+    .map(id => ({
+      positionId: id,
+      userPct: userTotalSecs > 0 ? Math.round(((userPosMap.get(id) ?? 0) / userTotalSecs) * 100) : 0,
+      oppPct: oppTotalSecs > 0 ? Math.round(((oppPosMap.get(id) ?? 0) / oppTotalSecs) * 100) : 0,
+    }))
+    .sort((a, b) => Math.max(b.userPct, b.oppPct) - Math.max(a.userPct, a.oppPct))
+    .slice(0, 4)
+
   // ── User key attacks ──────────────────────────────────────────────────────────
   let userAttacks: Array<{ label: string; count: number }> = []
   if (ownMatchIds.length > 0) {
@@ -226,7 +243,7 @@ export default async function FightCardPage({
     closed_guard: 'Closed guard', half_guard: 'Half guard', open_guard: 'Open guard',
     butterfly_guard: 'Butterfly', back_control: 'Back control', mount: 'Mount',
     side_control: 'Side control', turtle: 'Turtle', north_south: 'N/S',
-    knee_on_belly: 'Knee on belly', standing: 'Standing', rear_naked: 'RNC',
+    knee_on_belly: 'Knee on belly', standing: 'Standing',
     x_guard: 'X-guard', deep_half: 'Deep half', fifty_fifty: '50/50',
   }
 
@@ -303,8 +320,8 @@ export default async function FightCardPage({
 
             {/* VS badge */}
             <div className="flex-shrink-0">
-              <div className="w-10 h-10 rounded-full border border-red-500/30 bg-red-500/[0.06] flex items-center justify-center">
-                <span className="text-[10px] font-black tracking-[0.1em] text-red-500 uppercase">vs</span>
+              <div className="w-10 h-10 rounded-full border border-rose-500/30 bg-rose-500/[0.06] flex items-center justify-center">
+                <span className="text-[10px] font-black tracking-[0.1em] text-rose-500 uppercase">vs</span>
               </div>
             </div>
 
@@ -452,30 +469,16 @@ export default async function FightCardPage({
             </>
           )}
 
-          {/* Dominates from */}
-          {(userTopPositions.length > 0 || oppTopPositions.length > 0) && (
-            <>
-              <div className="bg-card px-4 pt-2 pb-3 border-t border-border/30">
-                {userTopPositions.length > 0 && (
-                  <div className="space-y-1.5">
-                    <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/55">Dominates from</p>
-                    {userTopPositions.slice(0, 2).map(p => (
-                      <StatRow key={p.positionId} label={fmtPos(p.positionId)} value={`${Math.round(p.secs)}s`} dim />
-                    ))}
-                  </div>
-                )}
+          {/* Dominates from — head-to-head position-time bars, % of each athlete's own match time */}
+          {positionComparison.length > 0 && (
+            <div className="col-span-2 bg-card px-4 pt-3 pb-4 border-t border-border/30 space-y-3">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/55 text-center">Dominates from</p>
+              <div className="space-y-3">
+                {positionComparison.map(p => (
+                  <PositionTimeBar key={p.positionId} label={fmtPos(p.positionId)} userPct={p.userPct} oppPct={p.oppPct} />
+                ))}
               </div>
-              <div className="bg-card px-4 pt-2 pb-3 border-t border-border/30">
-                {oppTopPositions.length > 0 && (
-                  <div className="space-y-1.5">
-                    <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/55 text-right">Dominates from</p>
-                    {oppTopPositions.slice(0, 2).map(p => (
-                      <StatRow key={p.positionId} label={fmtPos(p.positionId)} value={`${Math.round(p.secs)}s`} dim right />
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
+            </div>
           )}
 
           {/* Attacks (opponent side falls back to "no footage" when empty) */}
@@ -694,7 +697,31 @@ function StatRow({
   return (
     <div className={`flex items-baseline gap-2 ${right ? 'flex-row-reverse' : ''}`}>
       <span className={`text-sm font-bold tabular-nums ${valueClass}`}>{value}</span>
-      <span className="text-[11px] text-muted-foreground/65 leading-none">{label}</span>
+      {label && <span className="text-[11px] text-muted-foreground/65 leading-none">{label}</span>}
+    </div>
+  )
+}
+
+// Head-to-head position-time row — both athletes' share of their own match time
+// in a given position, shown on one bidirectional scale (% of match, not raw seconds).
+function PositionTimeBar({ label, userPct, oppPct }: { label: string; userPct: number; oppPct: number }) {
+  const userDominant = userPct > oppPct
+  const oppDominant = oppPct > userPct
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between gap-2">
+        <StatRow label="" value={`${userPct}%`} accent={userDominant ? 'emerald' : undefined} />
+        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/55 text-center truncate">{label}</span>
+        <StatRow label="" value={`${oppPct}%`} right accent={oppDominant ? 'rose' : undefined} />
+      </div>
+      <div className="flex items-center gap-1">
+        <div className="flex-1 h-2 rounded-full bg-blue-500/[0.12] overflow-hidden flex justify-end">
+          <div className={`h-full rounded-full ${userDominant ? 'bg-blue-500/70' : 'bg-blue-500/40'}`} style={{ width: `${userPct}%` }} />
+        </div>
+        <div className="flex-1 h-2 rounded-full bg-rose-500/[0.12] overflow-hidden">
+          <div className={`h-full rounded-full ${oppDominant ? 'bg-rose-500/70' : 'bg-rose-500/40'}`} style={{ width: `${oppPct}%` }} />
+        </div>
+      </div>
     </div>
   )
 }

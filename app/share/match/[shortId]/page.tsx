@@ -47,7 +47,7 @@ function resolveOpponentName(opponentLabel: string | null | undefined): string {
 export async function generateMetadata({ params }: { params: Promise<{ shortId: string }> }): Promise<Metadata> {
   const { shortId } = await params
   const match = await db.query.matches.findFirst({ where: eq(matches.shareToken, shortId) })
-  if (!match) return { title: 'Match Analysis — RollPlan' }
+  if (!match) return { title: 'Match Analysis' }
 
   const segments = await db.select().from(positionSegments).where(eq(positionSegments.matchId, match.id))
   const totalTime = segments.reduce((acc, s) => acc + (s.endSeconds - s.startSeconds), 0)

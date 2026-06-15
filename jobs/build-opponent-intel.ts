@@ -60,6 +60,20 @@ export function nameMatchThreshold(parts: string[]): number {
   return Math.ceil(parts.length * 2 / 3)
 }
 
+// jiujitsu.net sometimes lists the same event twice with slightly different
+// titles — a "(Results)" page variant, an "IBJJF" prefix/suffix that's
+// inconsistently present, and en-dash vs hyphen separators. Normalize all of
+// that away so both variants collapse to the same dedup key.
+export function normalizeIbjjfEventKey(eventName: string): string {
+  return eventName
+    .replace(/\s*\(Results\)\s*$/i, '')
+    .replace(/\bIBJJF\b/gi, '')
+    .replace(/[-‐-―−]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+}
+
 // Career medal counts (career totals, not finals-only W/L) embedded as JSON-LD
 // in the bjjmetrics fighter page — used as a fallback when jiujitsu.net has no medals.
 export async function fetchBjjmetricsMedalCounts(slug: string): Promise<string | null> {
@@ -865,7 +879,7 @@ export const buildOpponentIntel = inngest.createFunction(
           // at multiple events, some with event_medals_only=true and some without.
           const eventMap = new Map<string, typeof medals[0]>()
           for (const medal of medals) {
-            const key = medal.event_name.replace(/\s*\(Results\)\s*$/i, '').trim()
+            const key = normalizeIbjjfEventKey(medal.event_name)
             const existing = eventMap.get(key)
             if (!existing) {
               eventMap.set(key, medal)

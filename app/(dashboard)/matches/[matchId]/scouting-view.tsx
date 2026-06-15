@@ -707,59 +707,61 @@ function StatsTab({ sortedPositions, maxPositionTime, positionNames, timelineIte
 
 // ─── Tab: Prediction ─────────────────────────────────────────────────────────
 
-function PredictionTab({ insights, opponentName }: { insights: InsightRow[]; opponentName: string }) {
+function PredictionTab({ insights, opponentName, hasOwnFootage }: { insights: InsightRow[]; opponentName: string; hasOwnFootage?: boolean }) {
   const patterns = insights.filter(i => i.category === 'pattern')
   const strengths = insights.filter(i => i.category === 'strength')
 
   return (
     <div className="p-4 space-y-5">
-      {/* Footage invite — recruitment opportunity */}
-      <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-5 space-y-4">
-        <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-lg bg-amber-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-4.5 h-4.5 text-amber-400">
-              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-            </svg>
-          </div>
-          <div className="space-y-1">
-            <p className="text-sm font-semibold leading-tight">
-              Your prediction could be sharper
-            </p>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              We know {opponentName}'s tendencies inside out — but a real matchup prediction means comparing their game against <em>yours</em>. Right now we're only seeing half the picture.
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-amber-500/70">
-            Unlock with your footage
-          </p>
-          {[
-            'Win probability based on your actual positions',
-            'Where their attacks meet your defence',
-            'Your submission entries vs. their guard patterns',
-          ].map((benefit, i) => (
-            <div key={i} className="flex items-start gap-2 text-xs text-foreground/70">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5">
-                <polyline points="20 6 9 17 4 12"/>
+      {/* Footage invite — recruitment opportunity, only relevant if the user hasn't uploaded their own footage yet */}
+      {!hasOwnFootage && (
+        <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-5 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-lg bg-amber-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-4.5 h-4.5 text-amber-400">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
               </svg>
-              {benefit}
             </div>
-          ))}
-        </div>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold leading-tight">
+                Your prediction could be sharper
+              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                We know {opponentName}'s tendencies inside out — but a real matchup prediction means comparing their game against <em>yours</em>. Right now we're only seeing half the picture.
+              </p>
+            </div>
+          </div>
 
-        <a
-          href="/matches"
-          className="flex items-center justify-center gap-2 text-xs font-semibold px-4 py-2.5 rounded-lg bg-amber-500 text-zinc-950 hover:bg-amber-400 transition-colors w-full"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
-            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-            <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-          </svg>
-          Upload my footage
-        </a>
-      </div>
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-amber-500/70">
+              Unlock with your footage
+            </p>
+            {[
+              'Win probability based on your actual positions',
+              'Where their attacks meet your defence',
+              'Your submission entries vs. their guard patterns',
+            ].map((benefit, i) => (
+              <div key={i} className="flex items-start gap-2 text-xs text-foreground/70">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                {benefit}
+              </div>
+            ))}
+          </div>
+
+          <a
+            href="/matches"
+            className="flex items-center justify-center gap-2 text-xs font-semibold px-4 py-2.5 rounded-lg bg-amber-500 text-zinc-950 hover:bg-amber-400 transition-colors w-full"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            Upload my footage
+          </a>
+        </div>
+      )}
 
       {/* What we do know about the opponent */}
       {strengths.length > 0 && (
@@ -958,17 +960,17 @@ function AskTab({ matchId, currentTime, opponentName, videoRef, contextInsights 
           <div className="flex flex-col gap-4 px-1 py-2">
             {/* Context brief — what the AI already knows */}
             {contextInsights && contextInsights.length > 0 && (
-              <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 px-3.5 py-3 space-y-2">
+              <div className="rounded-xl border border-[#F5C518]/20 bg-[#F5C518]/5 px-3.5 py-3 space-y-2">
                 <div className="flex items-center gap-1.5">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-violet-400 flex-shrink-0">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-[#F5C518] flex-shrink-0">
                     <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
                   </svg>
-                  <p className="text-[11px] font-semibold text-violet-400">I've analysed {opponentName}'s footage</p>
+                  <p className="text-[11px] font-semibold text-[#F5C518]">I've analysed {opponentName}'s footage</p>
                 </div>
                 <ul className="space-y-1.5">
                   {contextInsights.slice(0, 3).map((ins, i) => (
                     <li key={i} className="flex gap-1.5 text-[11px] text-muted-foreground/80 leading-snug">
-                      <span className="text-violet-400/50 flex-shrink-0 mt-px">·</span>
+                      <span className="text-[#F5C518]/50 flex-shrink-0 mt-px">·</span>
                       <span>{ins.description}</span>
                     </li>
                   ))}
@@ -1021,7 +1023,7 @@ function AskTab({ matchId, currentTime, opponentName, videoRef, contextInsights 
             type="checkbox"
             checked={sendFrame}
             onChange={e => setSendFrame(e.target.checked)}
-            className="w-3.5 h-3.5 accent-violet-500 rounded border-border"
+            className="w-3.5 h-3.5 accent-[#F5C518] rounded border-border"
           />
           Frame sent with each question
         </label>
@@ -1075,6 +1077,7 @@ export function ScoutingView({
   opponentIntel,
   userIntel,
   narration,
+  hasOwnFootage,
 }: {
   match: {
     id: string
@@ -1100,6 +1103,7 @@ export function ScoutingView({
   opponentIntel?: IntelRecord | null
   userIntel?: IntelRecord | null
   narration?: string | null
+  hasOwnFootage?: boolean
 }) {
   const [currentTime, setCurrentTime] = useState(0)
   const [activeTab, setActiveTab] = useState<TabId>('brief')
@@ -1186,7 +1190,7 @@ export function ScoutingView({
             </span>
             {(match.kbVersion ?? 0) >= 1 && (
               <span
-                className="flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20 flex-shrink-0"
+                className="flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[#F5C518]/10 text-[#F5C518] border border-[#F5C518]/20 flex-shrink-0"
                 title={match.kbVersion && match.kbVersion > 1 ? `Technique library applied · upgraded ${match.kbVersion - 1}×` : 'Technique library applied during analysis'}
               >
                 <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a1 1 0 0 1 .894.553l1.618 3.276 3.614.525a1 1 0 0 1 .554 1.706L11.97 9.695l.617 3.6a1 1 0 0 1-1.451 1.054L8 12.617l-3.136 1.732a1 1 0 0 1-1.45-1.054l.616-3.6L1.32 7.06a1 1 0 0 1 .554-1.706l3.614-.525L7.106 1.553A1 1 0 0 1 8 1z"/></svg>
@@ -1257,8 +1261,8 @@ export function ScoutingView({
                 className={`px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors relative flex-shrink-0 ${
                   tab.ai
                     ? activeTab === tab.id
-                      ? 'text-violet-400'
-                      : 'text-violet-500/60 hover:text-violet-400'
+                      ? 'text-[#F5C518]'
+                      : 'text-[#F5C518]/60 hover:text-[#F5C518]'
                     : activeTab === tab.id
                       ? 'text-foreground'
                       : 'text-muted-foreground hover:text-foreground'
@@ -1277,7 +1281,7 @@ export function ScoutingView({
                   ? `${tab.label} (${insights.length})`
                   : tab.label}
                 {activeTab === tab.id && (
-                  <span className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full ${tab.ai ? 'bg-violet-400' : 'bg-foreground'}`} />
+                  <span className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full ${tab.ai ? 'bg-[#F5C518]' : 'bg-foreground'}`} />
                 )}
               </button>
             ))}
@@ -1308,7 +1312,7 @@ export function ScoutingView({
                 scoutedName={scoutedOpponentName?.split(' ')[0] ?? undefined}
               />
             </div>
-            <div className={activeTab === 'prediction' ? '' : 'hidden'}><PredictionTab insights={insights} opponentName={scoutedOpponentName} /></div>
+            <div className={activeTab === 'prediction' ? '' : 'hidden'}><PredictionTab insights={insights} opponentName={scoutedOpponentName} hasOwnFootage={hasOwnFootage} /></div>
             <div className={`${activeTab === 'ask' ? 'flex flex-col h-full' : 'hidden'}`}>
               <AskTab matchId={match.id} currentTime={currentTime} opponentName={scoutedOpponentName} videoRef={ytId ? undefined : videoRef} contextInsights={insights} />
             </div>
@@ -1341,7 +1345,7 @@ export function ScoutingView({
                 onClick={() => setActiveTab(tab.id === activeTab ? 'timeline' : tab.id)}
                 className={`px-3 py-2.5 text-xs font-medium whitespace-nowrap transition-colors relative flex-shrink-0 ${
                   tab.ai
-                    ? activeTab === tab.id ? 'text-violet-400' : 'text-violet-500/60 hover:text-violet-400'
+                    ? activeTab === tab.id ? 'text-[#F5C518]' : 'text-[#F5C518]/60 hover:text-[#F5C518]'
                     : activeTab === tab.id ? 'text-foreground' : 'text-muted-foreground'
                 }`}
               >
@@ -1354,7 +1358,7 @@ export function ScoutingView({
                   </span>
                 ) : tab.label}
                 {activeTab === tab.id && (
-                  <span className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full ${tab.ai ? 'bg-violet-400' : 'bg-foreground'}`} />
+                  <span className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full ${tab.ai ? 'bg-[#F5C518]' : 'bg-foreground'}`} />
                 )}
               </button>
             ))}
@@ -1365,7 +1369,7 @@ export function ScoutingView({
             </div>
             <div className={activeTab === 'notes' ? '' : 'hidden'}><NotesTab insights={insights} /></div>
             <div className={activeTab === 'stats' ? '' : 'hidden'}><StatsTab sortedPositions={sortedPositions} maxPositionTime={maxPositionTime} positionNames={positionNames} timelineItems={timelineItems} scoutedName={scoutedOpponentName?.split(' ')[0] ?? undefined} /></div>
-            <div className={activeTab === 'prediction' ? '' : 'hidden'}><PredictionTab insights={insights} opponentName={scoutedOpponentName} /></div>
+            <div className={activeTab === 'prediction' ? '' : 'hidden'}><PredictionTab insights={insights} opponentName={scoutedOpponentName} hasOwnFootage={hasOwnFootage} /></div>
             <div className={`${activeTab === 'ask' ? 'flex flex-col h-full' : 'hidden'}`}>
               <AskTab matchId={match.id} currentTime={currentTime} opponentName={scoutedOpponentName} videoRef={ytId ? undefined : videoRef} contextInsights={insights} />
             </div>

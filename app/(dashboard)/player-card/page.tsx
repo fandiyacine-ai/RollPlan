@@ -14,11 +14,13 @@ import { TransitionDiagram, type TransitionData } from './transition-diagram'
 import { ShareCardButton } from './share-card-button'
 import type { ShareCardData } from './share-card'
 import { RulesetBadge } from '@/components/ruleset-badge'
+import { StatArcGauge } from '@/components/stat-arc-gauge'
 import { TrainingPlanSection } from './training-plan-section'
 import type { TrainingPlan } from '../../../lib/ai/schemas/training-plan'
 import { checkMonthlyLimit } from '../../../lib/db/usage'
 import { UpgradeConversion } from './upgrade-conversion'
 import { SignupConversion } from './signup-conversion'
+import { SamplePlayerCardPreview } from '@/components/sample-preview'
 
 export const dynamic = 'force-dynamic'
 
@@ -113,7 +115,11 @@ export default async function PlayerCardPage() {
     })
     .from(matches)
     .leftJoin(videos, eq(matches.videoId, videos.id))
-    .where(and(matchFilter, or(isNull(videos.sourceType), ne(videos.sourceType, 'opponent'))))
+    .where(and(matchFilter, or(
+      isNull(videos.sourceType),
+      ne(videos.sourceType, 'opponent'),
+      and(eq(matches.competitorLabel, 'you'), isNull(matches.tournamentOpponentId)),
+    )))
     .orderBy(desc(matches.createdAt))
     .limit(50)
 
@@ -125,7 +131,12 @@ export default async function PlayerCardPage() {
     .select({ id: videos.id, originalFilename: videos.originalFilename, sourceType: videos.sourceType, status: videos.status })
     .from(videos)
     .leftJoin(matches, eq(matches.videoId, videos.id))
-    .where(and(isNull(matches.id), ne(videos.status, 'analysed'), ne(videos.sourceType, 'opponent'), videoFilter))
+    .where(and(
+      isNull(matches.id),
+      ne(videos.status, 'analysed'),
+      or(ne(videos.sourceType, 'opponent'), isNull(videos.tournamentOpponentId)),
+      videoFilter,
+    ))
     .limit(10)
 
   const scanningVideos = videosWithNoMatches.filter(v => v.status !== 'failed')
@@ -216,6 +227,8 @@ export default async function PlayerCardPage() {
   const losses = recentMatches.filter(m => m.status === 'analysed' && m.resultWinner === 'opponent').length
   const subWins = recentMatches.filter(m => m.resultWinner === 'user' && m.resultMethod === 'submission').length
   const hasRecord = wins > 0 || losses > 0
+  const winRatePct = hasRecord ? Math.round((wins / (wins + losses)) * 100) : null
+  const subRatePct = wins > 0 ? Math.round((subWins / wins) * 100) : null
 
   // ── Per-match trend (chronological) ──
   const perMatchTrend: TrendPoint[] = ownAnalysedIds
@@ -351,7 +364,22 @@ export default async function PlayerCardPage() {
 
         {/* ── Left: Analytics ── */}
         <div className="space-y-5 min-w-0">
-          <ProfileHeader name={displayName} dbUser={dbUser} />
+          <ProfileHeader name={displayName} dbUser={dbUser} imageUrl={clerkUser?.imageUrl} />
+
+          {/* Updating banner — last-known card stays visible while new footage is analysed */}
+          {pendingCount > 0 && ownAnalysedIds.length > 0 && (
+            <div className="rounded-xl border border-border/60 bg-card px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                <p className="text-sm text-muted-foreground">
+                  Updating — {pendingCount} match{pendingCount !== 1 ? 'es' : ''} being analysed
+                </p>
+              </div>
+              <Link href="/matches" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                View →
+              </Link>
+            </div>
+          )}
 
           {isEmpty && hasAnyOpponent ? (
             <div className="rounded-xl border border-border/60 bg-card p-6 space-y-4">
@@ -402,26 +430,24 @@ export default async function PlayerCardPage() {
             <>
               {/* Hero stats strip */}
               {ownAnalysedIds.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {/* Control rate — most important, gets special treatment */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Performance gauges — the headline read on the whole card */}
                   {(() => {
                     const v = controlVerdict(controlPct)
                     return (
-                      <div className="rounded-xl border border-border/60 bg-card p-4 space-y-2 col-span-2 sm:col-span-1">
+                      <div className="rounded-xl border border-border/60 bg-card p-4 space-y-3">
                         <div className="flex items-center justify-between">
-                          <p className="text-xs text-muted-foreground font-medium">Control Rate</p>
-                          <span className={`text-[10px] font-bold uppercase tracking-wide ${v.colour}`}>{v.label}</span>
-                        </div>
-                        <div className="flex items-end gap-2">
-                          <span className="text-3xl font-bold tabular-nums leading-none">{controlPct}%</span>
+                          <p className="text-xs text-muted-foreground font-medium">Performance</p>
                           {trendDelta != null && trendDelta !== 0 && (
-                            <span className={`text-xs font-medium mb-1 ${trendDelta > 0 ? 'text-blue-500' : 'text-rose-500'}`}>
-                              {trendDelta > 0 ? '↑' : '↓'}{Math.abs(trendDelta)}
+                            <span className={`text-[10px] font-bold ${trendDelta > 0 ? 'text-blue-500' : 'text-rose-500'}`}>
+                              {trendDelta > 0 ? '↑' : '↓'}{Math.abs(trendDelta)} control
                             </span>
                           )}
                         </div>
-                        <div className="h-1 rounded-full bg-muted overflow-hidden">
-                          <div className="h-full rounded-full bg-foreground/40 transition-all" style={{ width: `${controlPct}%` }} />
+                        <div className="flex items-center justify-around">
+                          <StatArcGauge pct={controlPct} label="Control" color="#3b82f6" />
+                          <StatArcGauge pct={winRatePct} label="Win rate" color="#F5C518" />
+                          <StatArcGauge pct={subRatePct} label="Sub rate" color="#818cf8" />
                         </div>
                         <p className="text-[10px] text-muted-foreground/70 leading-snug">{v.tip}</p>
                       </div>
@@ -491,21 +517,6 @@ export default async function PlayerCardPage() {
                     </div>
                     <ControlTrendChart data={perMatchTrend} />
                   </div>
-                </div>
-              )}
-
-              {/* Processing banner */}
-              {pendingCount > 0 && (
-                <div className="rounded-xl border border-border/60 bg-card px-4 py-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-foreground/40 animate-pulse" />
-                    <p className="text-sm text-muted-foreground">
-                      {pendingCount} match{pendingCount !== 1 ? 'es' : ''} being analysed
-                    </p>
-                  </div>
-                  <Link href="/matches" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                    View →
-                  </Link>
                 </div>
               )}
 
@@ -667,6 +678,8 @@ export default async function PlayerCardPage() {
               </div>
             </>
           )}
+
+          {isEmpty && <SamplePlayerCardPreview />}
         </div>
 
         {/* ── Right: Sidebar ── */}
@@ -793,15 +806,20 @@ export default async function PlayerCardPage() {
 
 // ── Sub-components ──
 
-function ProfileHeader({ name, dbUser }: { name: string; dbUser: typeof users.$inferSelect | null }) {
+function ProfileHeader({ name, dbUser, imageUrl }: { name: string; dbUser: typeof users.$inferSelect | null; imageUrl?: string | null }) {
   const belt = dbUser?.belt
   const gym = dbUser?.gym
   const style = dbUser?.primaryStyle
 
   return (
     <div className="flex items-center gap-4">
-      <div className="w-14 h-14 rounded-full bg-foreground/[0.06] border border-border/60 text-foreground flex items-center justify-center text-base font-semibold flex-shrink-0">
-        {initials(name)}
+      <div className="w-14 h-14 rounded-full bg-foreground/[0.06] border border-border/60 text-foreground flex items-center justify-center text-base font-semibold flex-shrink-0 overflow-hidden">
+        {imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={imageUrl} alt={name} className="w-full h-full object-cover" />
+        ) : (
+          initials(name)
+        )}
       </div>
       <div className="min-w-0">
         <h1 className="text-xl font-semibold leading-snug">{name}</h1>

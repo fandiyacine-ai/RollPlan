@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 const CTA_CLASS = 'bg-[#F5C518] text-zinc-900 [a]:hover:bg-[#F5C518]/90 border-transparent'
 
 const NAV = [
-  { href: '/player-card', label: 'My Stats' },
+  { href: '/player-card', label: 'Player Card' },
   { href: '/matches', label: 'My Matches' },
   { href: '/tournaments', label: 'Tournaments' },
   { href: '/gameplans', label: 'Gameplans' },
@@ -24,7 +24,7 @@ const NAV = [
 const TAB_NAV = [
   {
     href: '/player-card',
-    label: 'My Stats',
+    label: 'Player Card',
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"/><path d="M12 8v4l3 3"/>

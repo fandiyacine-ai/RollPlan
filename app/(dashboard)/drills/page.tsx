@@ -17,7 +17,12 @@ function humanize(id: string): string {
   return id.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 }
 
-export default async function DrillsPage() {
+export default async function DrillsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>
+}) {
+  const { q } = await searchParams
   const userId = await getOrCreateDbUserId()
   const dbUser = await db.query.users.findFirst({ where: eq(users.id, userId) })
 
@@ -36,5 +41,5 @@ export default async function DrillsPage() {
     difficulty: classifyDifficulty(v.eventId, v.positionId),
   }))
 
-  return <DrillLibrary drills={drills} userBelt={dbUser?.belt ?? null} />
+  return <DrillLibrary drills={drills} userBelt={dbUser?.belt ?? null} initialSearch={q} />
 }

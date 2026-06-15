@@ -623,7 +623,7 @@ function FileUploadTab() {
         )}
         <div className="flex gap-3 justify-center pt-1">
           <Button variant="outline" onClick={() => { setFile(null); setFrameResult(null); setState('idle'); setProgress(0); setAthleteName(''); setEventName('') }}>Upload another</Button>
-          <Button onClick={() => router.push('/player-card')}>View My Stats</Button>
+          <Button onClick={() => router.push('/player-card')}>View Player Card</Button>
         </div>
       </div>
     )

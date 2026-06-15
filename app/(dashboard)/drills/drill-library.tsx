@@ -27,6 +27,25 @@ const PAGE_SIZE = 24
 
 const FORMAT_LABELS: Record<string, string> = { gi: 'Gi', no_gi: 'No-Gi', both: 'Gi & No-Gi' }
 
+// Words that show up in AI-generated search queries (e.g. Training Plan
+// "youtube_search" strings) but never in KB technique names — stripping
+// them lets a multi-word query like "armbar from closed guard tutorial"
+// still match a KB entry named "Armbar from Closed Guard".
+const SEARCH_STOPWORDS = new Set([
+  'tutorial', 'tutorials', 'video', 'videos', 'how', 'to', 'technique', 'techniques',
+  'drill', 'drills', 'a', 'an', 'the', 'for', 'with', 'vs', 'bjj', 'jiu', 'jitsu',
+])
+
+// All significant words in the query must appear somewhere in the haystack
+// (in any order) — more forgiving than a single substring match for
+// multi-word natural-language queries.
+function matchesSearch(haystack: string, query: string): boolean {
+  const words = query.toLowerCase().split(/\s+/).filter(w => w && !SEARCH_STOPWORDS.has(w))
+  if (words.length === 0) return true
+  const h = haystack.toLowerCase()
+  return words.every(w => h.includes(w))
+}
+
 const DIFFICULTY_BADGE: Record<Difficulty, string> = {
   fundamental: 'bg-blue-500/15 text-blue-400 border-blue-500/25',
   intermediate: 'bg-blue-500/15 text-blue-400 border-blue-500/25',
@@ -163,8 +182,8 @@ function DrillCard({ drill }: { drill: Drill }) {
   )
 }
 
-export function DrillLibrary({ drills, userBelt }: { drills: Drill[]; userBelt: string | null }) {
-  const [search, setSearch] = useState('')
+export function DrillLibrary({ drills, userBelt, initialSearch }: { drills: Drill[]; userBelt: string | null; initialSearch?: string }) {
+  const [search, setSearch] = useState(initialSearch ?? '')
   const [category, setCategory] = useState<DrillCategory | 'all'>('all')
   const [format, setFormat] = useState<'all' | 'gi' | 'no_gi'>('all')
   const [difficulty, setDifficulty] = useState<Difficulty | 'all'>('all')
@@ -185,8 +204,8 @@ export function DrillLibrary({ drills, userBelt }: { drills: Drill[]; userBelt: 
       if (format !== 'all' && d.format !== 'both' && d.format !== format) return false
       if (recommendedOnly && !isRecommendedForBelt(d.difficulty, userBelt)) return false
       if (q) {
-        const haystack = `${d.name} ${d.eventName} ${d.positionName ?? ''}`.toLowerCase()
-        if (!haystack.includes(q)) return false
+        const haystack = `${d.name} ${d.eventName} ${d.positionName ?? ''}`
+        if (!matchesSearch(haystack, q)) return false
       }
       return true
     })
