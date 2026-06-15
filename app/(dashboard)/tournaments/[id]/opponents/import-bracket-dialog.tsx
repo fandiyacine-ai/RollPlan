@@ -112,7 +112,7 @@ export function ImportBracketDialog({ tournamentId, hasBracketUrl = true, userSm
 
   return (
     <Dialog open={open} onOpenChange={handleOpen}>
-      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>Import from bracket</Button>
+      <Button variant="outline" size="sm" onClick={() => handleOpen(true)}>Import from bracket</Button>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Import opponents from bracket</DialogTitle>
@@ -228,24 +228,18 @@ export function ImportBracketDialog({ tournamentId, hasBracketUrl = true, userSm
         <DialogFooter>
           {state.phase === 'capture-url' && (
             <>
-              <DialogClose>
-                <Button variant="outline" type="button">Cancel</Button>
-              </DialogClose>
+              <DialogClose render={<Button variant="outline" type="button" />}>Cancel</DialogClose>
               <Button onClick={handleLinkAndImport} disabled={!bracketUrlInput.trim()}>
                 Link &amp; Import
               </Button>
             </>
           )}
           {(state.phase === 'done' || state.phase === 'unpublished' || state.phase === 'error') && (
-            <DialogClose>
-              <Button variant="outline" type="button">Close</Button>
-            </DialogClose>
+            <DialogClose render={<Button variant="outline" type="button" />}>Close</DialogClose>
           )}
           {state.phase === 'selecting' && (
             <>
-              <DialogClose>
-                <Button variant="outline" type="button">Cancel</Button>
-              </DialogClose>
+              <DialogClose render={<Button variant="outline" type="button" />}>Cancel</DialogClose>
               <Button onClick={handleImport} disabled={selectedCount === 0}>
                 Import {selectedCount > 0 ? `${selectedCount} opponent${selectedCount !== 1 ? 's' : ''}` : ''}
               </Button>
