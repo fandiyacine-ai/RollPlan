@@ -11,6 +11,7 @@ function resolveBinPath(name: string): string {
 }
 const ytdlpBin = resolveBinPath('yt-dlp')
 import { inngest } from '../lib/inngest'
+import { ROBOFLOW_CLASS_MAP as CLASS_MAP } from '../lib/ai/roboflow-class-map'
 import { db } from '../lib/db'
 import { techniqueVariants, aiCallLogs } from '../lib/db/schema'
 import { GEMINI_VIDEO_MODEL, estimateCostUsd } from '../lib/ai/clients'
@@ -212,6 +213,21 @@ export const ingestTechnique = inngest.createFunction(
             .where(eq(techniqueVariants.id, variantId.id))
         })
       }
+    }
+
+    // Fire Roboflow harvest for active records that have a source URL.
+    // Draft records are handled by the weekly backfill once an admin approves them.
+    if (variantId.status === 'active' && youtubeUrl && CLASS_MAP[object.event_id]) {
+      await step.sendEvent('trigger-roboflow-harvest', {
+        name: 'technique/roboflow-harvest-requested',
+        data: {
+          variantId: variantId.id,
+          eventId: object.event_id,
+          sourceUrl: youtubeUrl,
+          visualCues: object.visual_cues,
+          keyMomentSeconds: object.key_moment_seconds ?? null,
+        },
+      })
     }
 
     return {
