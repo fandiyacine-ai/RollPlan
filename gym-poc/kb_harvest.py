@@ -38,7 +38,7 @@ DATABASE_URL    = os.environ["DATABASE_URL"]
 ROBOFLOW_KEY    = os.environ["ROBOFLOW_API_KEY"]
 ANTHROPIC_KEY   = os.environ["ANTHROPIC_API_KEY"]
 WORKSPACE       = "hello-rollplan-ai"
-PROJECT         = "bjj-submissions"
+PROJECT         = "bjj-techniques"
 POSITION_MODEL  = "bjj3/1"
 
 # Extract one candidate frame per second (lower than before — quality over quantity)

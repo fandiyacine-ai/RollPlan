@@ -37,7 +37,7 @@ import { ROBOFLOW_CLASS_MAP } from '../lib/ai/roboflow-class-map'
 
 const ROBOFLOW_KEY   = process.env.ROBOFLOW_API_KEY ?? '9qRhtkZOTlh4C38sjI2W'
 const ROBOFLOW_WS    = 'hello-rollplan-ai'
-const ROBOFLOW_PROJ  = 'bjj-submissions'
+const ROBOFLOW_PROJ  = 'bjj-techniques'
 
 // Window around key_moment to download (seconds each side)
 const WINDOW_BEFORE  = 30
