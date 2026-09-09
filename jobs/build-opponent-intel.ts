@@ -3,6 +3,12 @@ import { db } from '../lib/db'
 import { tournamentOpponents } from '../lib/db/schema'
 import { eq, ne, isNotNull, sql } from 'drizzle-orm'
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+// AJP/Smoothcomp's paginated event-history endpoints sit behind Cloudflare and start
+// returning 429s mid-pagination when hit back-to-back; spacing requests out avoids that.
+const PAGINATION_DELAY_MS = 3000
+
 // AJP/Smoothcomp exposes a public JSON API for athlete event history — no auth, no proxy needed.
 // GET https://ajptour.com/en/profile/{athleteId}/events?page={n}
 // Returns paginated competition history with match-level detail.
@@ -52,6 +58,40 @@ export function nameMatchThreshold(parts: string[]): number {
   if (parts.length <= 2) return parts.length
   if (parts.length === 3) return 2  // middle name optional
   return Math.ceil(parts.length * 2 / 3)
+}
+
+// jiujitsu.net sometimes lists the same event twice with slightly different
+// titles — a "(Results)" page variant, an "IBJJF" prefix/suffix that's
+// inconsistently present, and en-dash vs hyphen separators. Normalize all of
+// that away so both variants collapse to the same dedup key.
+export function normalizeIbjjfEventKey(eventName: string): string {
+  return eventName
+    .replace(/\s*\(Results\)\s*$/i, '')
+    .replace(/\bIBJJF\b/gi, '')
+    .replace(/[-‐-―−]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+}
+
+// Career medal counts (career totals, not finals-only W/L) embedded as JSON-LD
+// in the bjjmetrics fighter page — used as a fallback when jiujitsu.net has no medals.
+export async function fetchBjjmetricsMedalCounts(slug: string): Promise<string | null> {
+  try {
+    const resp = await fetch(`https://bjjmetrics.com/fighter/${slug}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(12000),
+    })
+    if (!resp.ok) return null
+    const html = await resp.text()
+    const gold = html.match(/"name":\s*"Gold Medals",\s*"value":\s*(\d+)/)?.[1]
+    const silver = html.match(/"name":\s*"Silver Medals",\s*"value":\s*(\d+)/)?.[1]
+    const bronze = html.match(/"name":\s*"Bronze Medals",\s*"value":\s*(\d+)/)?.[1]
+    if (gold == null && silver == null && bronze == null) return null
+    const g = Number(gold ?? 0), s = Number(silver ?? 0), b = Number(bronze ?? 0)
+    if (g + s + b === 0) return null
+    return `🥇${g} 🥈${s} 🥉${b}`
+  } catch { return null }
 }
 
 // Extract AJP profile ID from any URL found in search results
@@ -612,6 +652,7 @@ export const buildOpponentIntel = inngest.createFunction(
             const firstPage = await fetchAjpEventsPage(_ajpAthleteId, 1)
             const allEvents: AjpEvent[] = [...(firstPage.data ?? [])]
             for (let p = 2; p <= (firstPage.last_page ?? 1); p++) {
+              await sleep(PAGINATION_DELAY_MS)
               const page = await fetchAjpEventsPage(_ajpAthleteId, p)
               allEvents.push(...(page.data ?? []))
             }
@@ -713,6 +754,7 @@ export const buildOpponentIntel = inngest.createFunction(
             const firstPage = await fetchSmoothcompEventsPage(baseUrl, scAthleteId, 1)
             const allEvents: AjpEvent[] = [...(firstPage.data ?? [])]
             for (let p = 2; p <= (firstPage.last_page ?? 1); p++) {
+              await sleep(PAGINATION_DELAY_MS)
               const page = await fetchSmoothcompEventsPage(baseUrl, scAthleteId, p)
               allEvents.push(...(page.data ?? []))
             }
@@ -837,7 +879,7 @@ export const buildOpponentIntel = inngest.createFunction(
           // at multiple events, some with event_medals_only=true and some without.
           const eventMap = new Map<string, typeof medals[0]>()
           for (const medal of medals) {
-            const key = medal.event_name.replace(/\s*\(Results\)\s*$/i, '').trim()
+            const key = normalizeIbjjfEventKey(medal.event_name)
             const existing = eventMap.get(key)
             if (!existing) {
               eventMap.set(key, medal)
@@ -860,6 +902,12 @@ export const buildOpponentIntel = inngest.createFunction(
           break
         }
       } catch { /* non-fatal */ }
+
+      // Fallback: jiujitsu.net had no medals — try bjjmetrics career medal counts
+      if (!dbUpdate.ibjjfBestResult && bjjmetricsExactSlug) {
+        const medalCounts = await fetchBjjmetricsMedalCounts(bjjmetricsExactSlug)
+        if (medalCounts) dbUpdate.ibjjfBestResult = medalCounts
+      }
 
       if (Object.keys(dbUpdate).length > 0) {
         await db.update(tournamentOpponents)

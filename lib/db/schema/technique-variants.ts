@@ -33,6 +33,10 @@ export const techniqueVariants = pgTable('technique_variants', {
   status: text('status').notNull().default('draft'), // 'draft' | 'active' | 'rejected'
   adminNotes: text('admin_notes'),
 
+  // Roboflow training dataset sync
+  // Set when frames from this technique's source video have been uploaded to Roboflow.
+  roboflowSyncedAt: timestamp('roboflow_synced_at'),
+
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 })

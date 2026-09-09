@@ -94,7 +94,7 @@ async function youtubeSearch(query: string, maxResults = 8): Promise<YTVideo[]> 
 
 // ── Agent tools ───────────────────────────────────────────────────────────────
 
-function buildTools(state: { searchCount: number; queuedCount: number; queuedUrls: Set<string> }) {
+function buildTools(state: { searchCount: number; queuedCount: number; queuedUrls: Set<string>; existingUrls: Set<string> }) {
   return {
 
     get_coverage_gaps: tool({
@@ -189,7 +189,7 @@ function buildTools(state: { searchCount: number; queuedCount: number; queuedUrl
               description: v.description.slice(0, 200),
               is_trusted_channel: is_trusted,
               likely_narrated_analysis: is_analysis,
-              already_queued: state.queuedUrls.has(v.url),
+              already_queued: state.queuedUrls.has(v.url) || state.existingUrls.has(v.url),
             }
           }),
           searches_used: state.searchCount,
@@ -211,6 +211,9 @@ function buildTools(state: { searchCount: number; queuedCount: number; queuedUrl
       execute: async ({ url, technique_hint, position_hint, reason, sourceCategory, includeTranscript }: { url: string; technique_hint: string; position_hint?: string; reason: string; sourceCategory?: 'instructional' | 'analysis'; includeTranscript?: boolean }) => {
         if (state.queuedUrls.has(url)) {
           return { skipped: true, reason: 'already queued this run' }
+        }
+        if (state.existingUrls.has(url)) {
+          return { skipped: true, reason: 'already in the technique library from a previous run — pick a different video' }
         }
         if (state.queuedCount >= MAX_VIDEOS_QUEUED) {
           return { error: 'Video queue limit reached for this run.' }
@@ -270,8 +273,14 @@ export const techniqueKbAgent = inngest.createFunction(
   async ({ step }: { step: any }) => {
     const runStartedAt = new Date().toISOString()
 
+    // Source URLs already ingested (any run, any status) — never re-queue these.
+    const existingSourceUrls: string[] = await step.run('load-existing-sources', async () => {
+      const rows = await db.select({ sourceUrl: techniqueVariants.sourceUrl }).from(techniqueVariants)
+      return rows.map(r => r.sourceUrl).filter((u): u is string => !!u)
+    })
+
     const result = await step.run('run-agent', async () => {
-      const state = { searchCount: 0, queuedCount: 0, queuedUrls: new Set<string>() }
+      const state = { searchCount: 0, queuedCount: 0, queuedUrls: new Set<string>(), existingUrls: new Set(existingSourceUrls) }
       const start = Date.now()
 
       const { text, usage, steps } = await generateText({
@@ -310,7 +319,7 @@ The library must cover white through black belt techniques. Priority order:
 - Competition highlight reels
 - "Top 10" compilation videos
 - Unknown channels with few subscribers (indicated by is_trusted_channel: false and a vague description)
-- Videos already marked as already_queued
+- Videos already marked as already_queued — this includes videos ingested in earlier runs, not just this one. If the top result for a gap is already_queued, try a more specific or different search query rather than queueing it again or skipping the gap entirely.
 
 Be efficient — one good search per gap, queue 1–2 videos, move on. Don't over-search the same technique.`,
 

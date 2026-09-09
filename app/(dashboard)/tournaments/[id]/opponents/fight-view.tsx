@@ -18,6 +18,8 @@ type MatchCard = {
   if_losing_points?: string
 }
 
+export type UsageInfo = { allowed: boolean; used: number; limit: number }
+
 export type UserCardData = {
   ownTotal: number
   ownWins: number
@@ -37,6 +39,7 @@ export type OpponentRow = {
   smoothcompLosses: number | null
   smoothcompProfileUrl: string | null
   ibjjfBestResult: string | null
+  ibjjfProfileUrl: string | null
   footageStatus: string
   intelStatus: string | null
   scoutedMatchCount: number
@@ -70,21 +73,53 @@ function careerRecord(w: number | null | undefined, l: number | null | undefined
   return `${w ?? 0}W ${l ?? 0}L`
 }
 
+// "5W 2L" → "5-2" — used for the big W-L record headline
+function bigRecord(record: string | null): string | null {
+  const m = record?.match(/(\d+)W\s+(\d+)L/)
+  return m ? `${m[1]}-${m[2]}` : null
+}
+
 // ── GameStyleBar ──────────────────────────────────────────────────────────────
 
 function GameStyleBar({ topPct, right = false }: { topPct: number; right?: boolean }) {
   const label = topPct >= 65 ? 'Top player' : topPct >= 50 ? 'Balanced' : topPct >= 35 ? 'Guard-heavy' : 'Guard player'
-  const fillClass = right ? 'bg-red-500/60' : 'bg-emerald-500/60'
-  const bgClass = right ? 'bg-red-500/[0.12]' : 'bg-emerald-500/[0.12]'
-  const labelClass = right ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'
+  const fillClass = right ? 'bg-rose-500/60' : 'bg-blue-500/60'
+  const bgClass = right ? 'bg-rose-500/[0.12]' : 'bg-blue-500/[0.12]'
+  const labelClass = right ? 'text-rose-600 dark:text-rose-400' : 'text-blue-600 dark:text-blue-400'
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/55">Game style</span>
-        <span className={`text-[11px] font-bold ${labelClass}`}>{label}</span>
+        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/55">Game style</span>
+        <span className={`text-sm font-bold ${labelClass}`}>{label}</span>
       </div>
-      <div className={`h-2 w-full rounded-full ${bgClass} overflow-hidden`}>
+      <div className={`h-3 w-full rounded-full ${bgClass} overflow-hidden`}>
         <div className={`h-full rounded-full ${fillClass}`} style={{ width: `${topPct}%` }} />
+      </div>
+    </div>
+  )
+}
+
+// ── AttackBarChart ────────────────────────────────────────────────────────────
+
+function AttackBarChart({ attacks, color = 'blue' }: { attacks: { label: string; count: number }[]; color?: 'blue' | 'rose' }) {
+  if (attacks.length === 0) return null
+  const max = Math.max(...attacks.map(a => a.count))
+  const barClass = color === 'rose' ? 'bg-rose-500/60' : 'bg-blue-500/60'
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/55">Key attacks</p>
+      <div className="space-y-1.5">
+        {attacks.slice(0, 4).map(a => (
+          <div key={a.label} className="space-y-0.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-foreground/80 truncate">{a.label}</span>
+              <span className="text-[10px] text-muted-foreground/55 tabular-nums flex-shrink-0">×{a.count}</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-muted/40 overflow-hidden">
+              <div className={`h-full rounded-full ${barClass}`} style={{ width: `${(a.count / max) * 100}%` }} />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -95,9 +130,9 @@ function GameStyleBar({ topPct, right = false }: { topPct: number; right?: boole
 function VerdictBadge({ verdict, winProbability }: { verdict: string | null; winProbability: number | null }) {
   if (!verdict) return null
   const cfg = {
-    favourable: { bg: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400', label: 'Favourable' },
+    favourable: { bg: 'bg-[#F5C518]/15 border-[#F5C518]/30 text-[#F5C518]', label: 'Favourable' },
     neutral:    { bg: 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400', label: 'Neutral' },
-    tough:      { bg: 'bg-red-500/15 border-red-500/30 text-red-600 dark:text-red-400', label: 'Tough match' },
+    tough:      { bg: 'bg-rose-500/15 border-rose-500/30 text-rose-600 dark:text-rose-400', label: 'Tough match' },
   }[verdict] ?? { bg: 'bg-zinc-500/15 border-zinc-500/30 text-zinc-500', label: verdict }
   return (
     <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full border ${cfg.bg}`}>
@@ -112,21 +147,20 @@ function VerdictBadge({ verdict, winProbability }: { verdict: string | null; win
 function UserCard({ userName, data }: { userName: string; data: UserCardData }) {
   return (
     <div className="rounded-2xl overflow-hidden border border-border shadow-lg bg-zinc-100 dark:bg-zinc-900">
-      {/* Green accent top strip */}
-      <div className="h-1 w-full bg-gradient-to-r from-emerald-400 to-emerald-600" />
+      {/* Blue accent top strip */}
+      <div className="h-1 w-full bg-gradient-to-r from-blue-400 to-blue-600" />
 
       <div className="p-4 space-y-4">
         {/* Identity */}
         <div>
-          <p className="text-[7px] font-black uppercase tracking-[0.35em] text-emerald-600 dark:text-emerald-400/70 mb-1.5">You</p>
+          <p className="text-[7px] font-black uppercase tracking-[0.35em] text-blue-600 dark:text-blue-400/70 mb-1.5">You</p>
           <p className="font-black text-2xl uppercase leading-tight tracking-wide text-foreground break-words">
             {userName}
           </p>
           {data.ownTotal > 0 && (
-            <div className="flex items-center gap-1.5 mt-2">
-              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{data.ownWins}W</span>
-              <span className="text-sm font-bold text-foreground/40">{data.ownTotal - data.ownWins}L</span>
-              <span className="text-[9px] text-foreground/30 uppercase tracking-wider">on RollPlan</span>
+            <div className="flex items-baseline gap-2 mt-2">
+              <span className="text-3xl font-black tabular-nums text-blue-600 dark:text-blue-400">{data.ownWins}-{data.ownTotal - data.ownWins}</span>
+              <span className="text-[9px] text-foreground/30 uppercase tracking-wider font-bold">W-L on RollPlan</span>
             </div>
           )}
         </div>
@@ -151,15 +185,7 @@ function UserCard({ userName, data }: { userName: string; data: UserCardData }) 
 
         {/* Attacks */}
         {data.attacks.length > 0 && (
-          <div className="space-y-1">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-foreground/40">Key attacks</p>
-            {data.attacks.slice(0, 3).map(a => (
-              <p key={a.label} className="text-xs">
-                <span className="font-semibold text-foreground/70">{a.label}</span>
-                <span className="text-foreground/40 ml-1">×{a.count}</span>
-              </p>
-            ))}
-          </div>
+          <AttackBarChart attacks={data.attacks} color="blue" />
         )}
 
         {data.ownTotal === 0 && (
@@ -167,7 +193,7 @@ function UserCard({ userName, data }: { userName: string; data: UserCardData }) 
             <p className="text-[11px] text-foreground/40 italic leading-snug">Upload your own footage to build your player card</p>
             <Link
               href="/upload?context=own"
-              className="block text-center text-[10px] font-semibold px-3 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25 transition-colors"
+              className="block text-center text-[10px] font-semibold px-3 py-2 rounded-lg bg-blue-500/15 border border-blue-500/25 text-blue-600 dark:text-blue-400 hover:bg-blue-500/25 transition-colors"
             >
               + Add your footage
             </Link>
@@ -181,9 +207,12 @@ function UserCard({ userName, data }: { userName: string; data: UserCardData }) 
 
 // ── OpponentSection ───────────────────────────────────────────────────────────
 
-function OpponentSection({ opp, tournamentId, index, total }: { opp: OpponentRow; tournamentId: string; index?: number; total?: number }) {
+function OpponentSection({ opp, tournamentId, index, total, usage }: { opp: OpponentRow; tournamentId: string; index?: number; total?: number; usage: UsageInfo }) {
   const ajpRecord = careerRecord(opp.ajpWins, opp.ajpLosses)
   const scRecord = careerRecord(opp.smoothcompWins, opp.smoothcompLosses)
+  const primaryRecord = ajpRecord ?? scRecord
+  const primaryLabel = ajpRecord ? 'AJP' : 'SC'
+  const secondaryRecord = ajpRecord && scRecord ? scRecord : null
   const hasStats = opp.scoutedMatchCount > 0
   const isScanning = opp.footageStatus === 'pending' || opp.footageStatus === 'auto_queued' || opp.hasPendingUpload
   const backParam = encodeURIComponent(`/tournaments/${tournamentId}/opponents`)
@@ -191,15 +220,15 @@ function OpponentSection({ opp, tournamentId, index, total }: { opp: OpponentRow
   return (
     <div className="rounded-2xl overflow-hidden border border-border shadow-sm">
 
-      {/* Red accent top strip */}
-      <div className="h-1 w-full bg-gradient-to-r from-red-600 to-red-700" />
+      {/* Rose accent top strip */}
+      <div className="h-1 w-full bg-gradient-to-r from-rose-600 to-rose-700" />
 
       {/* Opponent header */}
       <div className="bg-zinc-100 dark:bg-zinc-900 px-5 py-4">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2 mb-1.5">
-              <p className="text-[7px] font-black uppercase tracking-[0.35em] text-red-600 dark:text-red-500/80">Opponent</p>
+              <p className="text-[7px] font-black uppercase tracking-[0.35em] text-rose-600 dark:text-rose-500/80">Opponent</p>
               {total != null && total > 1 && index != null && (
                 <span className="px-1.5 py-px rounded-full bg-foreground/[0.06] border border-border/50 text-[9px] font-bold tabular-nums text-muted-foreground/60">
                   {index + 1}/{total}
@@ -208,7 +237,7 @@ function OpponentSection({ opp, tournamentId, index, total }: { opp: OpponentRow
             </div>
             <div className="flex items-center gap-3 min-w-0">
               {opp.profilePhotoUrl && (
-                <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-red-500/30 flex-shrink-0">
+                <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-rose-500/30 flex-shrink-0">
                   <Image src={opp.profilePhotoUrl} alt={opp.opponentLabel} width={36} height={36} className="object-cover w-full h-full" />
                 </div>
               )}
@@ -217,30 +246,41 @@ function OpponentSection({ opp, tournamentId, index, total }: { opp: OpponentRow
               </p>
             </div>
             {/* Records row */}
-            <div className="flex items-center gap-3 mt-2 flex-wrap">
-              {ajpRecord && (
-                <span className="flex items-center gap-1.5">
-                  <span className="text-[9px] text-foreground/40 uppercase tracking-wider font-bold">AJP</span>
-                  <span className="text-xs font-bold text-red-600 dark:text-red-400">{ajpRecord.split(' ')[0]}</span>
-                  <span className="text-xs font-bold text-foreground/40">{ajpRecord.split(' ')[1]}</span>
-                </span>
+            <div className="flex items-end gap-3 mt-2 flex-wrap">
+              {primaryRecord && (
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-3xl font-black tabular-nums text-rose-600 dark:text-rose-400">{bigRecord(primaryRecord)}</span>
+                  <span className="text-[9px] text-foreground/30 uppercase tracking-wider font-bold">{primaryLabel} W-L</span>
+                </div>
               )}
-              {scRecord && (
-                <span className="flex items-center gap-1.5">
-                  <span className="text-[9px] text-foreground/40 uppercase tracking-wider font-bold">SC</span>
-                  <span className="text-xs font-bold text-red-600 dark:text-red-400">{scRecord.split(' ')[0]}</span>
-                  <span className="text-xs font-bold text-foreground/40">{scRecord.split(' ')[1]}</span>
-                </span>
-              )}
-              {opp.ibjjfBestResult && (
-                <span className="flex items-center gap-1.5">
-                  <span className="text-[9px] text-foreground/40 uppercase tracking-wider font-bold">IBJJF</span>
-                  <span className="text-[11px] text-foreground/50">{opp.ibjjfBestResult.split('|')[0]?.trim()}</span>
-                </span>
-              )}
-              {opp.communityMatchCount > 0 && (
-                <span className="text-[9px] text-violet-600 dark:text-violet-400/70 font-medium">{opp.communityMatchCount} community match{opp.communityMatchCount !== 1 ? 'es' : ''}</span>
-              )}
+              <div className="flex items-center gap-3 flex-wrap pb-0.5">
+                {secondaryRecord && (
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-[9px] text-foreground/40 uppercase tracking-wider font-bold">SC</span>
+                    <span className="text-xs font-bold text-rose-600 dark:text-rose-400">{secondaryRecord.split(' ')[0]}</span>
+                    <span className="text-xs font-bold text-foreground/40">{secondaryRecord.split(' ')[1]}</span>
+                  </span>
+                )}
+                {opp.ibjjfBestResult ? (
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-[9px] text-foreground/40 uppercase tracking-wider font-bold">IBJJF</span>
+                    <span className="text-[11px] text-foreground/50">{opp.ibjjfBestResult.split('|')[0]?.trim()}</span>
+                  </span>
+                ) : opp.ibjjfProfileUrl && (
+                  <a
+                    href={opp.ibjjfProfileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+                  >
+                    <span className="text-[9px] text-foreground/40 uppercase tracking-wider font-bold">IBJJF</span>
+                    <span className="text-[11px] text-foreground/50 underline underline-offset-2">Profile</span>
+                  </a>
+                )}
+                {opp.communityMatchCount > 0 && (
+                  <span className="text-[9px] text-violet-600 dark:text-violet-400/70 font-medium">{opp.communityMatchCount} community match{opp.communityMatchCount !== 1 ? 'es' : ''}</span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -262,7 +302,7 @@ function OpponentSection({ opp, tournamentId, index, total }: { opp: OpponentRow
             )}
             <Link
               href={`/tournaments/${tournamentId}/fight-card/${opp.id}`}
-              className="text-xs text-red-500/60 hover:text-red-600 transition-colors font-medium whitespace-nowrap"
+              className="text-xs text-rose-500/60 hover:text-rose-600 transition-colors font-medium whitespace-nowrap"
             >
               Fight card →
             </Link>
@@ -287,7 +327,7 @@ function OpponentSection({ opp, tournamentId, index, total }: { opp: OpponentRow
             {/* Left: game stats */}
             <div className="p-4 space-y-3">
               <div className="flex items-center gap-2">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-600 dark:text-red-400/80">Their game</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-600 dark:text-rose-400/80">Their game</p>
                 <PrivateBadge />
               </div>
 
@@ -303,15 +343,7 @@ function OpponentSection({ opp, tournamentId, index, total }: { opp: OpponentRow
               )}
 
               {opp.attacks.length > 0 && (
-                <div className="space-y-1">
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/55">Key attacks</p>
-                  {opp.attacks.slice(0, 3).map(a => (
-                    <p key={a.label} className="text-xs">
-                      <span className="font-semibold text-foreground/80">{a.label}</span>
-                      <span className="text-muted-foreground/55 ml-1">×{a.count}</span>
-                    </p>
-                  ))}
-                </div>
+                <AttackBarChart attacks={opp.attacks} color="rose" />
               )}
 
               <p className="text-[10px] text-muted-foreground/40">
@@ -321,8 +353,11 @@ function OpponentSection({ opp, tournamentId, index, total }: { opp: OpponentRow
 
             {/* Right: gameplan */}
             <div className="p-4 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">Gameplan</p>
+              <div className="flex items-center justify-between gap-2 flex-wrap gap-y-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">Gameplan</p>
+                  <PrivateBadge />
+                </div>
                 {(opp.gameplanVerdict || opp.winProbability) && (
                   <VerdictBadge verdict={opp.gameplanVerdict} winProbability={opp.winProbability} />
                 )}
@@ -344,12 +379,12 @@ function OpponentSection({ opp, tournamentId, index, total }: { opp: OpponentRow
               ) : opp.card ? (
                 <div className="space-y-2.5">
                   <div className="space-y-1">
-                    <p className="text-[8px] font-black uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-500">Open with</p>
+                    <p className="text-[8px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-500">Open with</p>
                     <p className="text-xs font-semibold leading-snug">{opp.card.open_with}</p>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-[8px] font-black uppercase tracking-[0.2em] text-red-600 dark:text-red-400">Watch out</p>
-                    <p className="text-xs font-semibold leading-snug text-red-700 dark:text-red-300">{opp.card.watch_out}</p>
+                    <p className="text-[8px] font-black uppercase tracking-[0.2em] text-rose-600 dark:text-rose-400">Watch out</p>
+                    <p className="text-xs font-semibold leading-snug text-rose-700 dark:text-rose-300">{opp.card.watch_out}</p>
                   </div>
                   {opp.card.attack_chain.length > 0 && (
                     <div className="flex items-center gap-1 flex-wrap">
@@ -396,16 +431,16 @@ function OpponentSection({ opp, tournamentId, index, total }: { opp: OpponentRow
           <div className="p-5 space-y-5">
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground/60">No footage scouted yet.</p>
-              <ScoutForm opponentId={opp.id} tournamentId={tournamentId} opponentName={opp.opponentLabel} hasMatches={false} />
+              <ScoutForm opponentId={opp.id} tournamentId={tournamentId} opponentName={opp.opponentLabel} hasMatches={false} usage={usage} />
             </div>
 
             {/* Fight card teaser — fills the space and surfaces the fight card */}
-            <div className="rounded-xl border border-red-500/15 bg-red-500/[0.03] p-4 space-y-3">
+            <div className="rounded-xl border border-rose-500/15 bg-rose-500/[0.03] p-4 space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">Fight card</p>
                 <Link
                   href={`/tournaments/${tournamentId}/fight-card/${opp.id}`}
-                  className="text-xs text-red-500/60 hover:text-red-600 dark:hover:text-red-400 transition-colors font-medium"
+                  className="text-xs text-rose-500/60 hover:text-rose-600 dark:hover:text-rose-400 transition-colors font-medium"
                 >
                   View →
                 </Link>
@@ -415,7 +450,7 @@ function OpponentSection({ opp, tournamentId, index, total }: { opp: OpponentRow
                   <div>
                     <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/40 mb-0.5">AJP record</p>
                     <p className="text-sm font-bold">
-                      <span className="text-red-500">{opp.ajpWins ?? 0}W</span>
+                      <span className="text-rose-500">{opp.ajpWins ?? 0}W</span>
                       <span className="text-foreground/30 ml-1">{opp.ajpLosses ?? 0}L</span>
                     </p>
                   </div>
@@ -424,15 +459,27 @@ function OpponentSection({ opp, tournamentId, index, total }: { opp: OpponentRow
                   <div>
                     <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/40 mb-0.5">Smoothcomp</p>
                     <p className="text-sm font-bold">
-                      <span className="text-red-500">{opp.smoothcompWins ?? 0}W</span>
+                      <span className="text-rose-500">{opp.smoothcompWins ?? 0}W</span>
                       <span className="text-foreground/30 ml-1">{opp.smoothcompLosses ?? 0}L</span>
                     </p>
                   </div>
                 )}
-                {opp.ibjjfBestResult && (
+                {opp.ibjjfBestResult ? (
                   <div>
                     <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/40 mb-0.5">IBJJF best</p>
                     <p className="text-xs font-semibold text-foreground/60">{opp.ibjjfBestResult.split('|')[0]?.trim()}</p>
+                  </div>
+                ) : opp.ibjjfProfileUrl && (
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/40 mb-0.5">IBJJF</p>
+                    <a
+                      href={opp.ibjjfProfileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-semibold text-foreground/60 underline underline-offset-2 hover:text-foreground transition-colors"
+                    >
+                      Profile
+                    </a>
                   </div>
                 )}
                 {opp.communityMatchCount > 0 && (
@@ -452,7 +499,7 @@ function OpponentSection({ opp, tournamentId, index, total }: { opp: OpponentRow
         {/* Footer — scout more button only */}
         {hasStats && (
           <div className="px-5 py-3 border-t border-border/30">
-            <ScoutForm opponentId={opp.id} tournamentId={tournamentId} opponentName={opp.opponentLabel} hasMatches />
+            <ScoutForm opponentId={opp.id} tournamentId={tournamentId} opponentName={opp.opponentLabel} hasMatches usage={usage} />
           </div>
         )}
       </div>
@@ -501,6 +548,7 @@ export function TournamentFightView({
   opponents,
   smoothcompUrl,
   userSmootcompAthleteId,
+  usage,
 }: {
   userName: string
   tournamentId: string
@@ -508,6 +556,7 @@ export function TournamentFightView({
   opponents: OpponentRow[]
   smoothcompUrl: string | null
   userSmootcompAthleteId: string | null | undefined
+  usage: UsageInfo
 }) {
   const [activeIndex, setActiveIndex] = useState(0)
   const active = opponents[activeIndex]
@@ -564,7 +613,7 @@ export function TournamentFightView({
                   <span className="truncate font-semibold">{opp.opponentLabel}</span>
                   {opp.gameplanVerdict && (
                     <span className={`ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                      opp.gameplanVerdict === 'favourable' ? 'bg-emerald-400' :
+                      opp.gameplanVerdict === 'favourable' ? 'bg-[#F5C518]' :
                       opp.gameplanVerdict === 'tough' ? 'bg-rose-400' : 'bg-amber-400'
                     }`} />
                   )}
@@ -576,7 +625,7 @@ export function TournamentFightView({
 
         {/* Active opponent + pagination */}
         <div className="flex-1 min-w-0 space-y-3">
-          {active && <OpponentSection opp={active} tournamentId={tournamentId} index={activeIndex} total={opponents.length} />}
+          {active && <OpponentSection opp={active} tournamentId={tournamentId} index={activeIndex} total={opponents.length} usage={usage} />}
           <PaginationControls index={activeIndex} total={opponents.length} onPrev={goPrev} onNext={goNext} />
         </div>
       </div>
@@ -588,13 +637,12 @@ export function TournamentFightView({
         <div className="rounded-xl overflow-hidden border border-border bg-zinc-100 dark:bg-zinc-900 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[7px] font-black uppercase tracking-[0.35em] text-emerald-600 dark:text-emerald-400/60 mb-1">You</p>
+              <p className="text-[7px] font-black uppercase tracking-[0.35em] text-blue-600 dark:text-blue-400/60 mb-1">You</p>
               <p className="font-black text-xl uppercase leading-tight text-foreground">{userName}</p>
               {userData.ownTotal > 0 && (
-                <p className="text-xs mt-1">
-                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">{userData.ownWins}W</span>
-                  <span className="text-foreground/40 font-bold ml-1">{userData.ownTotal - userData.ownWins}L</span>
-                  <span className="text-foreground/30 ml-1 text-[9px] uppercase">on RollPlan</span>
+                <p className="flex items-baseline gap-1.5 mt-1">
+                  <span className="text-2xl font-black tabular-nums text-blue-600 dark:text-blue-400">{userData.ownWins}-{userData.ownTotal - userData.ownWins}</span>
+                  <span className="text-foreground/30 text-[9px] uppercase tracking-wider font-bold">on RollPlan</span>
                 </p>
               )}
             </div>
@@ -606,7 +654,7 @@ export function TournamentFightView({
           </div>
         </div>
 
-        {active && <OpponentSection opp={active} tournamentId={tournamentId} index={activeIndex} total={opponents.length} />}
+        {active && <OpponentSection opp={active} tournamentId={tournamentId} index={activeIndex} total={opponents.length} usage={usage} />}
         <PaginationControls index={activeIndex} total={opponents.length} onPrev={goPrev} onNext={goNext} />
       </div>
     </div>

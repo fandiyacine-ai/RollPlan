@@ -5,12 +5,14 @@ import { eq } from 'drizzle-orm'
 import { currentUser } from '@clerk/nextjs/server'
 import {
   normalizeName,
+  normalizeIbjjfEventKey,
   nameMatchThreshold,
   findAjpAthleteIdByName,
   verifySmoothcompProfileName,
   findSmoothcompProfiles,
   fetchSmoothcompEventsPage,
   fetchAjpEventsPage,
+  fetchBjjmetricsMedalCounts,
   type AjpEventsPage,
 } from './build-opponent-intel'
 
@@ -194,7 +196,7 @@ export const fetchUserIntel = inngest.createFunction(
 
           const eventMap = new Map<string, typeof medals[0]>()
           for (const medal of medals) {
-            const key = medal.event_name.replace(/\s*\(Results\)\s*$/i, '').trim()
+            const key = normalizeIbjjfEventKey(medal.event_name)
             const existing = eventMap.get(key)
             if (!existing) {
               eventMap.set(key, medal)
@@ -215,6 +217,12 @@ export const fetchUserIntel = inngest.createFunction(
           break
         }
       } catch { /* non-fatal */ }
+
+      // Fallback: jiujitsu.net had no medals — try bjjmetrics career medal counts
+      if (!dbUpdate.ibjjfBestResult && bjjmetricsExactSlug) {
+        const medalCounts = await fetchBjjmetricsMedalCounts(bjjmetricsExactSlug)
+        if (medalCounts) dbUpdate.ibjjfBestResult = medalCounts
+      }
 
       if (Object.keys(dbUpdate).length > 0) {
         await db.update(users).set(dbUpdate as any).where(eq(users.id, userId))

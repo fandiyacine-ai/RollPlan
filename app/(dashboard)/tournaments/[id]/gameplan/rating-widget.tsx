@@ -29,7 +29,7 @@ export function GameplanRatingWidget({
         aria-label="Helpful"
         className={`p-1.5 rounded-lg transition-colors disabled:opacity-50 ${
           rating === 1
-            ? 'text-emerald-400 bg-emerald-950/40'
+            ? 'text-blue-400 bg-blue-950/40'
             : 'text-muted-foreground hover:text-foreground hover:bg-muted'
         }`}
       >

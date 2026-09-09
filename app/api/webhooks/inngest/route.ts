@@ -20,12 +20,13 @@ import { generateTrainingPlan } from '../../../../jobs/generate-training-plan'
 import { trialEndingReminder } from '../../../../jobs/trial-ending-reminder'
 import { smoothcompSyncBracketResults } from '../../../../jobs/smoothcomp-sync-bracket-results'
 import { postEventReengagement } from '../../../../jobs/post-event-reengagement'
+import { harvestRoboflowFrames, backfillRoboflowFrames } from '../../../../jobs/harvest-roboflow-frames'
 
 export const maxDuration = 300
 
 const handlers = serve({
   client: inngest,
-  functions: [analyzeVideo, generateGameplan, scanUrl, smoothcompMonitorBracket, smoothcompProcessBracket, smoothcompDiscoverFootage, generateExecutionDebrief, syncTournamentCatalog, ingestTechnique, techniqueKbAgent, rescanMatchesWithKb, kbTargetedScanMatch, backfillAthleteIntel, buildOpponentIntel, backfillReferenceImages, backfillReferenceImageOne, fetchUserIntel, generateTrainingPlan, trialEndingReminder, smoothcompSyncBracketResults, postEventReengagement],
+  functions: [analyzeVideo, generateGameplan, scanUrl, smoothcompMonitorBracket, smoothcompProcessBracket, smoothcompDiscoverFootage, generateExecutionDebrief, syncTournamentCatalog, ingestTechnique, techniqueKbAgent, rescanMatchesWithKb, kbTargetedScanMatch, backfillAthleteIntel, buildOpponentIntel, backfillReferenceImages, backfillReferenceImageOne, fetchUserIntel, generateTrainingPlan, trialEndingReminder, smoothcompSyncBracketResults, postEventReengagement, harvestRoboflowFrames, backfillRoboflowFrames],
 })
 
 function safe(handler: (req: NextRequest) => Promise<Response>) {

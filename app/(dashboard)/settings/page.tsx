@@ -7,7 +7,7 @@ import { CompetitionRecordSection } from './competition-record'
 import { ConnectionsToggle } from './connections-toggle'
 import Link from 'next/link'
 
-export const metadata = { title: 'Settings — RollPlan' }
+export const metadata = { title: 'Settings' }
 
 export default async function SettingsPage() {
   const userId = await getOrCreateDbUserId()

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { Suspense } from 'react'
 import { db } from '../../../lib/db'
 import { matches, insights, videos, positionSegments, matchEvents, users, tournaments, tournamentOpponents, gameplans, playerCards } from '../../../lib/db/schema'
 import { desc, eq, inArray, isNull, and, ne, or, sql } from 'drizzle-orm'
@@ -14,9 +14,13 @@ import { TransitionDiagram, type TransitionData } from './transition-diagram'
 import { ShareCardButton } from './share-card-button'
 import type { ShareCardData } from './share-card'
 import { RulesetBadge } from '@/components/ruleset-badge'
+import { StatArcGauge } from '@/components/stat-arc-gauge'
 import { TrainingPlanSection } from './training-plan-section'
 import type { TrainingPlan } from '../../../lib/ai/schemas/training-plan'
-import { getSubscriptionStatus } from '../../../lib/subscription'
+import { checkMonthlyLimit } from '../../../lib/db/usage'
+import { UpgradeConversion } from './upgrade-conversion'
+import { SignupConversion } from './signup-conversion'
+import { SamplePlayerCardPreview } from '@/components/sample-preview'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,7 +43,7 @@ function drillHint(posId: string): string | null {
 }
 
 function controlVerdict(pct: number): { label: string; colour: string; tip: string } {
-  if (pct >= 66) return { label: 'Dominant', colour: 'text-emerald-400', tip: 'You control the pace — maintain and attack.' }
+  if (pct >= 66) return { label: 'Dominant', colour: 'text-blue-400', tip: 'You control the pace — maintain and attack.' }
   if (pct >= 40) return { label: 'Solid', colour: 'text-amber-400', tip: 'Good base — work on converting control to finishes.' }
   return { label: 'Developing', colour: 'text-amber-400', tip: 'Focus on holding top position longer before attacking.' }
 }
@@ -88,8 +92,7 @@ export default async function PlayerCardPage() {
     dbUser = await db.query.users.findFirst({ where: eq(users.clerkId, clerkId) }) ?? null
   }
 
-  const tier = dbUser ? await getSubscriptionStatus(dbUser.id) : 'free'
-  const isPro = tier === 'pro' || tier === 'trial'
+  const canGenerate = dbUser ? (await checkMonthlyLimit(dbUser.id)).allowed : true
 
   const displayName = clerkUser
     ? [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || clerkUser.emailAddresses?.[0]?.emailAddress || 'Athlete'
@@ -112,7 +115,11 @@ export default async function PlayerCardPage() {
     })
     .from(matches)
     .leftJoin(videos, eq(matches.videoId, videos.id))
-    .where(and(matchFilter, or(isNull(videos.sourceType), ne(videos.sourceType, 'opponent'))))
+    .where(and(matchFilter, or(
+      isNull(videos.sourceType),
+      ne(videos.sourceType, 'opponent'),
+      and(eq(matches.competitorLabel, 'you'), isNull(matches.tournamentOpponentId)),
+    )))
     .orderBy(desc(matches.createdAt))
     .limit(50)
 
@@ -124,7 +131,12 @@ export default async function PlayerCardPage() {
     .select({ id: videos.id, originalFilename: videos.originalFilename, sourceType: videos.sourceType, status: videos.status })
     .from(videos)
     .leftJoin(matches, eq(matches.videoId, videos.id))
-    .where(and(isNull(matches.id), ne(videos.status, 'analysed'), ne(videos.sourceType, 'opponent'), videoFilter))
+    .where(and(
+      isNull(matches.id),
+      ne(videos.status, 'analysed'),
+      or(ne(videos.sourceType, 'opponent'), isNull(videos.tournamentOpponentId)),
+      videoFilter,
+    ))
     .limit(10)
 
   const scanningVideos = videosWithNoMatches.filter(v => v.status !== 'failed')
@@ -215,6 +227,8 @@ export default async function PlayerCardPage() {
   const losses = recentMatches.filter(m => m.status === 'analysed' && m.resultWinner === 'opponent').length
   const subWins = recentMatches.filter(m => m.resultWinner === 'user' && m.resultMethod === 'submission').length
   const hasRecord = wins > 0 || losses > 0
+  const winRatePct = hasRecord ? Math.round((wins / (wins + losses)) * 100) : null
+  const subRatePct = wins > 0 ? Math.round((subWins / wins) * 100) : null
 
   // ── Per-match trend (chronological) ──
   const perMatchTrend: TrendPoint[] = ownAnalysedIds
@@ -338,13 +352,34 @@ export default async function PlayerCardPage() {
 
   return (
     <div className="w-full max-w-7xl">
+      <Suspense fallback={null}>
+        <UpgradeConversion />
+      </Suspense>
+      <Suspense fallback={null}>
+        <SignupConversion />
+      </Suspense>
       {isProcessing && <RefreshPoller />}
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_280px] gap-6 items-start">
 
         {/* ── Left: Analytics ── */}
         <div className="space-y-5 min-w-0">
-          <ProfileHeader name={displayName} dbUser={dbUser} />
+          <ProfileHeader name={displayName} dbUser={dbUser} imageUrl={clerkUser?.imageUrl} />
+
+          {/* Updating banner — last-known card stays visible while new footage is analysed */}
+          {pendingCount > 0 && ownAnalysedIds.length > 0 && (
+            <div className="rounded-xl border border-border/60 bg-card px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                <p className="text-sm text-muted-foreground">
+                  Updating — {pendingCount} match{pendingCount !== 1 ? 'es' : ''} being analysed
+                </p>
+              </div>
+              <Link href="/matches" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                View →
+              </Link>
+            </div>
+          )}
 
           {isEmpty && hasAnyOpponent ? (
             <div className="rounded-xl border border-border/60 bg-card p-6 space-y-4">
@@ -370,7 +405,7 @@ export default async function PlayerCardPage() {
                   { step: '4', label: 'Generate gameplan', sub: 'AI analyses the footage', href: '/gameplans', done: hasAnyGameplan },
                 ].map(item => (
                   <Link key={item.step} href={item.href} className="flex items-center gap-3 group hover:text-foreground transition-colors">
-                    <span className={`w-6 h-6 rounded-full border text-[10px] font-bold flex items-center justify-center flex-shrink-0 transition-colors ${item.done ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-500' : 'border-border/60 bg-muted/40 text-muted-foreground group-hover:border-foreground/30'}`}>
+                    <span className={`w-6 h-6 rounded-full border text-[10px] font-bold flex items-center justify-center flex-shrink-0 transition-colors ${item.done ? 'border-blue-500/40 bg-blue-500/10 text-blue-500' : 'border-border/60 bg-muted/40 text-muted-foreground group-hover:border-foreground/30'}`}>
                       {item.done ? '✓' : item.step}
                     </span>
                     <div className="min-w-0">
@@ -395,26 +430,24 @@ export default async function PlayerCardPage() {
             <>
               {/* Hero stats strip */}
               {ownAnalysedIds.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {/* Control rate — most important, gets special treatment */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Performance gauges — the headline read on the whole card */}
                   {(() => {
                     const v = controlVerdict(controlPct)
                     return (
-                      <div className="rounded-xl border border-border/60 bg-card p-4 space-y-2 col-span-2 sm:col-span-1">
+                      <div className="rounded-xl border border-border/60 bg-card p-4 space-y-3">
                         <div className="flex items-center justify-between">
-                          <p className="text-xs text-muted-foreground font-medium">Control Rate</p>
-                          <span className={`text-[10px] font-bold uppercase tracking-wide ${v.colour}`}>{v.label}</span>
-                        </div>
-                        <div className="flex items-end gap-2">
-                          <span className="text-3xl font-bold tabular-nums leading-none">{controlPct}%</span>
+                          <p className="text-xs text-muted-foreground font-medium">Performance</p>
                           {trendDelta != null && trendDelta !== 0 && (
-                            <span className={`text-xs font-medium mb-1 ${trendDelta > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                              {trendDelta > 0 ? '↑' : '↓'}{Math.abs(trendDelta)}
+                            <span className={`text-[10px] font-bold ${trendDelta > 0 ? 'text-blue-500' : 'text-rose-500'}`}>
+                              {trendDelta > 0 ? '↑' : '↓'}{Math.abs(trendDelta)} control
                             </span>
                           )}
                         </div>
-                        <div className="h-1 rounded-full bg-muted overflow-hidden">
-                          <div className="h-full rounded-full bg-foreground/40 transition-all" style={{ width: `${controlPct}%` }} />
+                        <div className="flex items-center justify-around">
+                          <StatArcGauge pct={controlPct} label="Control" color="#3b82f6" />
+                          <StatArcGauge pct={winRatePct} label="Win rate" color="#F5C518" />
+                          <StatArcGauge pct={subRatePct} label="Sub rate" color="#818cf8" />
                         </div>
                         <p className="text-[10px] text-muted-foreground/70 leading-snug">{v.tip}</p>
                       </div>
@@ -468,7 +501,7 @@ export default async function PlayerCardPage() {
                       Progress over time
                     </h2>
                     {trendDelta !== null && trendDelta !== 0 && (
-                      <span className={`text-xs font-semibold ${trendDelta > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      <span className={`text-xs font-semibold ${trendDelta > 0 ? 'text-blue-400' : 'text-rose-400'}`}>
                         {trendDelta > 0 ? '↑' : '↓'} {Math.abs(trendDelta)}% vs prev 3
                       </span>
                     )}
@@ -476,7 +509,7 @@ export default async function PlayerCardPage() {
                   <div className="px-5 pt-3 pb-1">
                     <div className="flex items-center gap-5 text-xs text-muted-foreground mb-3">
                       <span className="flex items-center gap-1.5">
-                        <span className="inline-block w-4 h-0.5 bg-emerald-400 rounded-full" />Control Rate
+                        <span className="inline-block w-4 h-0.5 bg-blue-400 rounded-full" />Control Rate
                       </span>
                       <span className="flex items-center gap-1.5">
                         <span className="inline-block w-4 h-0.5 bg-rose-500/50 rounded-full" />Under Pressure
@@ -484,21 +517,6 @@ export default async function PlayerCardPage() {
                     </div>
                     <ControlTrendChart data={perMatchTrend} />
                   </div>
-                </div>
-              )}
-
-              {/* Processing banner */}
-              {pendingCount > 0 && (
-                <div className="rounded-xl border border-border/60 bg-card px-4 py-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-foreground/40 animate-pulse" />
-                    <p className="text-sm text-muted-foreground">
-                      {pendingCount} match{pendingCount !== 1 ? 'es' : ''} being analysed
-                    </p>
-                  </div>
-                  <Link href="/matches" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                    View →
-                  </Link>
                 </div>
               )}
 
@@ -517,17 +535,17 @@ export default async function PlayerCardPage() {
                   </div>
                   <div className="grid grid-cols-2 divide-x divide-border/60">
                     <div className="p-4 space-y-3.5">
-                      <p className="text-xs font-medium text-emerald-500">Strongest</p>
+                      <p className="text-xs font-medium text-blue-500">Strongest</p>
                       {sharpPositions.length > 0 ? sharpPositions.map(([id, s]) => {
                         const pct = Math.round((s.dominant / s.total) * 100)
                         return (
                           <div key={id}>
                             <div className="flex items-center justify-between mb-1.5">
                               <span className="text-sm font-medium">{POSITION_MAP[id] ?? id}</span>
-                              <span className="text-sm font-semibold text-emerald-500 tabular-nums">{pct}%</span>
+                              <span className="text-sm font-semibold text-blue-500 tabular-nums">{pct}%</span>
                             </div>
                             <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                              <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
+                              <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }} />
                             </div>
                           </div>
                         )
@@ -569,7 +587,7 @@ export default async function PlayerCardPage() {
                     {topMyTech.slice(0, 3).map(([tech, count]) => (
                       <div key={tech} className="flex items-center justify-between">
                         <span className="text-sm capitalize font-medium">{tech}</span>
-                        <span className="text-xs font-semibold text-emerald-400 tabular-nums">{count}×</span>
+                        <span className="text-xs font-semibold text-blue-400 tabular-nums">{count}×</span>
                       </div>
                     ))}
                   </div>
@@ -596,7 +614,7 @@ export default async function PlayerCardPage() {
                           </div>
                           <div className="h-1 rounded-full bg-muted overflow-hidden">
                             <div className="h-full flex rounded-full overflow-hidden">
-                              <div className="bg-emerald-500" style={{ width: `${domPct}%` }} />
+                              <div className="bg-blue-500" style={{ width: `${domPct}%` }} />
                               <div className="bg-zinc-500/50" style={{ width: `${neuPct}%` }} />
                               <div className="bg-rose-500" style={{ width: `${infPct}%` }} />
                             </div>
@@ -606,7 +624,7 @@ export default async function PlayerCardPage() {
                     })}
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium">
-                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" /> Control</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" /> Control</span>
                     <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" /> Pressure</span>
                   </div>
                 </div>
@@ -621,7 +639,7 @@ export default async function PlayerCardPage() {
                       Position flow
                     </h2>
                     <div className="flex items-center gap-4 text-[10px] text-muted-foreground/60">
-                      <span className="flex items-center gap-1.5"><span className="w-5 h-0.5 bg-emerald-500 inline-block rounded-full" />Your move</span>
+                      <span className="flex items-center gap-1.5"><span className="w-5 h-0.5 bg-blue-500 inline-block rounded-full" />Your move</span>
                       <span className="flex items-center gap-1.5"><span className="w-5 h-0.5 bg-rose-500 inline-block rounded-full" />Opponent move</span>
                     </div>
                   </div>
@@ -660,6 +678,8 @@ export default async function PlayerCardPage() {
               </div>
             </>
           )}
+
+          {isEmpty && <SamplePlayerCardPreview />}
         </div>
 
         {/* ── Right: Sidebar ── */}
@@ -673,7 +693,7 @@ export default async function PlayerCardPage() {
               </div>
               <div className="px-4 py-3 grid grid-cols-3 gap-2 text-center">
                 <div>
-                  <p className="text-2xl font-bold text-emerald-400 tabular-nums">{wins}</p>
+                  <p className="text-2xl font-bold text-blue-400 tabular-nums">{wins}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">Wins</p>
                 </div>
                 <div>
@@ -764,7 +784,7 @@ export default async function PlayerCardPage() {
             initialPlan={trainingPlanRow?.trainingPlan as TrainingPlan | null ?? null}
             generatedAt={trainingPlanRow?.trainingPlanGeneratedAt ?? null}
             isGenerating={trainingPlanRow?.trainingPlanStatus === 'generating'}
-            isPro={isPro}
+            canGenerate={canGenerate}
           />
 
           {/* Settings shortcut */}
@@ -786,15 +806,20 @@ export default async function PlayerCardPage() {
 
 // ── Sub-components ──
 
-function ProfileHeader({ name, dbUser }: { name: string; dbUser: typeof users.$inferSelect | null }) {
+function ProfileHeader({ name, dbUser, imageUrl }: { name: string; dbUser: typeof users.$inferSelect | null; imageUrl?: string | null }) {
   const belt = dbUser?.belt
   const gym = dbUser?.gym
   const style = dbUser?.primaryStyle
 
   return (
     <div className="flex items-center gap-4">
-      <div className="w-14 h-14 rounded-full bg-foreground/[0.06] border border-border/60 text-foreground flex items-center justify-center text-base font-semibold flex-shrink-0">
-        {initials(name)}
+      <div className="w-14 h-14 rounded-full bg-foreground/[0.06] border border-border/60 text-foreground flex items-center justify-center text-base font-semibold flex-shrink-0 overflow-hidden">
+        {imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={imageUrl} alt={name} className="w-full h-full object-cover" />
+        ) : (
+          initials(name)
+        )}
       </div>
       <div className="min-w-0">
         <h1 className="text-xl font-semibold leading-snug">{name}</h1>

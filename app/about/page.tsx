@@ -2,8 +2,13 @@ import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Wordmark } from '@/components/wordmark'
+import { InstagramIcon } from '@/components/icons/instagram'
 
-export const metadata = { title: 'About — RollPlan' }
+export const metadata = {
+  title: 'About',
+  description: 'Why RollPlan exists: an AI-powered BJJ match analysis and opponent scouting tool built by a grappler who got tired of going into matches blind.',
+  alternates: { canonical: '/about' },
+}
 
 export default function AboutPage() {
   return (
@@ -56,7 +61,7 @@ export default function AboutPage() {
             for someone to sit with our footage for two hours before every tournament.
           </p>
 
-          <div className="border-l-2 border-emerald-500/40 pl-5 my-8">
+          <div className="border-l-2 border-blue-500/40 pl-5 my-8">
             <p className="text-foreground font-medium text-base">
               I built RollPlan because I wanted what those athletes had — without needing a coaching staff to get it.
             </p>
@@ -96,7 +101,7 @@ export default function AboutPage() {
 
         {/* Founder sig */}
         <div className="flex items-center gap-4 py-2">
-          <div className="w-10 h-10 rounded-full bg-emerald-950 border border-emerald-800/50 flex items-center justify-center text-emerald-400 font-bold text-sm flex-shrink-0">
+          <div className="w-10 h-10 rounded-full bg-blue-950 border border-blue-800/50 flex items-center justify-center text-blue-400 font-bold text-sm flex-shrink-0">
             Y
           </div>
           <div>
@@ -144,7 +149,7 @@ export default function AboutPage() {
               Analyse my game
             </Link>
             <a
-              href="mailto:feedback@rollplan.app"
+              href="mailto:feedback@rollplan.ai"
               className={cn(buttonVariants({ variant: 'outline', size: 'lg' }))}
             >
               Send feedback
@@ -152,8 +157,8 @@ export default function AboutPage() {
           </div>
           <p className="text-xs text-muted-foreground">
             Have a question or found a bug?{' '}
-            <a href="mailto:support@rollplan.app" className="underline underline-offset-2 hover:text-foreground">
-              support@rollplan.app
+            <a href="mailto:support@rollplan.ai" className="underline underline-offset-2 hover:text-foreground">
+              support@rollplan.ai
             </a>
             {' '}— I read every message.
           </p>
@@ -166,6 +171,17 @@ export default function AboutPage() {
           <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
           <Link href="/faq" className="hover:text-foreground transition-colors">FAQ</Link>
           <Link href="/contact" className="hover:text-foreground transition-colors">Contact</Link>
+          <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+          <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+          <a
+            href="https://www.instagram.com/rollplan.ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="RollPlan on Instagram"
+            className="hover:text-foreground transition-colors"
+          >
+            <InstagramIcon className="w-4 h-4" />
+          </a>
         </div>
       </footer>
     </div>

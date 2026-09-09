@@ -25,6 +25,8 @@ export async function POST(req: NextRequest) {
 
   const origin = req.headers.get('origin') ?? 'https://rollplan-production.up.railway.app'
 
+  const value = price === process.env.STRIPE_PRICE_ANNUAL ? 50 : 5
+
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     customer: customerId,
@@ -34,7 +36,7 @@ export async function POST(req: NextRequest) {
       metadata: { userId },
     },
     metadata: { userId },
-    success_url: `${origin}/player-card?upgraded=1`,
+    success_url: `${origin}/player-card?upgraded=1&value=${value}&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/player-card`,
   })
 

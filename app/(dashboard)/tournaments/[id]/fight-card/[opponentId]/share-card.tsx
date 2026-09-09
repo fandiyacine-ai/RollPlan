@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { toPng } from 'html-to-image'
 import { condenseMedals } from '@/lib/tournament-utils'
+import { LogoMark } from '@/components/logo-mark'
 
 export type ShareCardData = {
   userName: string
@@ -125,7 +126,7 @@ export function ShareButton({ data }: { data: ShareCardData }) {
               }}
             >
               {/* Left accent strip */}
-              <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 4, background: 'linear-gradient(to bottom, #34d399, #059669)' }} />
+              <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 4, background: 'linear-gradient(to bottom, #60a5fa, #1D4FA8)' }} />
               {/* Right accent strip */}
               <div style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: 4, background: 'linear-gradient(to bottom, #fb7185, #e11d48)' }} />
 
@@ -154,14 +155,14 @@ export function ShareButton({ data }: { data: ShareCardData }) {
 
               {/* You */}
               <div style={{ padding: '24px 24px 20px', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                <div style={{ fontSize: 8, fontWeight: 900, letterSpacing: '0.3em', color: '#059669', textTransform: 'uppercase', marginBottom: 8 }}>You</div>
+                <div style={{ fontSize: 8, fontWeight: 900, letterSpacing: '0.3em', color: '#1D4FA8', textTransform: 'uppercase', marginBottom: 8 }}>You</div>
                 <div style={{ fontSize: 48, fontWeight: 900, color: '#18181b', lineHeight: 0.88, textTransform: 'uppercase', letterSpacing: '-0.01em', wordBreak: 'break-word' }}>
                   {data.userName}
                 </div>
                 {ownBestRecord && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
                     {ownRecordSource && <span style={{ fontSize: 9, color: 'rgba(0,0,0,0.3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{ownRecordSource}</span>}
-                    <span style={{ fontSize: 15, fontWeight: 800, color: '#059669' }}>{ownBestRecord.split(' ')[0]}</span>
+                    <span style={{ fontSize: 15, fontWeight: 800, color: '#1D4FA8' }}>{ownBestRecord.split(' ')[0]}</span>
                     <span style={{ fontSize: 15, fontWeight: 800, color: 'rgba(0,0,0,0.3)' }}>{ownBestRecord.split(' ')[1]}</span>
                   </div>
                 )}
@@ -204,8 +205,11 @@ export function ShareButton({ data }: { data: ShareCardData }) {
               {/* Powered by footer */}
               <div style={{ padding: '12px 24px 16px', borderTop: '1px solid rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
                 <span style={{ fontSize: 8, fontWeight: 600, letterSpacing: '0.12em', color: 'rgba(0,0,0,0.25)', textTransform: 'uppercase' }}>Powered by</span>
+                <span style={{ color: 'rgba(0,0,0,0.55)', display: 'inline-flex', width: 16, height: 16, marginLeft: 2 }}>
+                  <LogoMark />
+                </span>
                 <span style={{ fontSize: 11, fontWeight: 900, color: 'rgba(0,0,0,0.55)', letterSpacing: '0.02em', textTransform: 'uppercase' }}>ROLL</span>
-                <span style={{ fontSize: 9, fontWeight: 700, color: '#059669', letterSpacing: '0.08em', textTransform: 'uppercase' }}>PLAN</span>
+                <span style={{ fontSize: 9, fontWeight: 700, color: '#1D4FA8', letterSpacing: '0.08em', textTransform: 'uppercase' }}>PLAN</span>
                 <span style={{ fontSize: 8, fontWeight: 600, color: 'rgba(0,0,0,0.25)', letterSpacing: '0.08em' }}>.AI</span>
               </div>
             </div>

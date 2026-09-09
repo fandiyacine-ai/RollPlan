@@ -2,10 +2,10 @@ import Link from 'next/link'
 import { getConnectionsPageData } from './actions'
 import { ConnectionsView } from './connections-view'
 
-export const metadata = { title: 'Connections — RollPlan' }
+export const metadata = { title: 'Connections' }
 
 export default async function ConnectionsPage() {
-  const { candidates, pendingReceived, accepted } = await getConnectionsPageData()
+  const { candidates, pendingReceived, accepted, openToConnections } = await getConnectionsPageData()
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-12">
@@ -22,10 +22,21 @@ export default async function ConnectionsPage() {
 
       <div className="mt-10 pt-8 border-t border-border/60">
         <p className="text-xs text-muted-foreground">
-          Want to be discoverable to people you've competed against?{' '}
-          <Link href="/settings" className="underline underline-offset-2 hover:text-foreground">
-            Turn on connections in Settings
-          </Link>
+          {openToConnections ? (
+            <>
+              You're discoverable to people you've competed against.{' '}
+              <Link href="/settings" className="underline underline-offset-2 hover:text-foreground">
+                Manage in Settings
+              </Link>
+            </>
+          ) : (
+            <>
+              Want to be discoverable to people you've competed against?{' '}
+              <Link href="/settings" className="underline underline-offset-2 hover:text-foreground">
+                Turn on connections in Settings
+              </Link>
+            </>
+          )}
         </p>
       </div>
     </div>

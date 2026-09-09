@@ -163,6 +163,23 @@ export default async function FightCardPage({
     userTopPositions.sort((a, b) => b.secs - a.secs)
   }
 
+  // ── Position-time comparison (head-to-head, % of own match time) ───────────────
+  const positionIds = new Set<string>()
+  userTopPositions.slice(0, 4).forEach(p => positionIds.add(p.positionId))
+  oppTopPositions.slice(0, 4).forEach(p => positionIds.add(p.positionId))
+
+  const userPosMap = new Map(userTopPositions.map(p => [p.positionId, p.secs]))
+  const oppPosMap = new Map(oppTopPositions.map(p => [p.positionId, p.secs]))
+
+  const positionComparison = Array.from(positionIds)
+    .map(id => ({
+      positionId: id,
+      userPct: userTotalSecs > 0 ? Math.round(((userPosMap.get(id) ?? 0) / userTotalSecs) * 100) : 0,
+      oppPct: oppTotalSecs > 0 ? Math.round(((oppPosMap.get(id) ?? 0) / oppTotalSecs) * 100) : 0,
+    }))
+    .sort((a, b) => Math.max(b.userPct, b.oppPct) - Math.max(a.userPct, a.oppPct))
+    .slice(0, 4)
+
   // ── User key attacks ──────────────────────────────────────────────────────────
   let userAttacks: Array<{ label: string; count: number }> = []
   if (ownMatchIds.length > 0) {
@@ -226,7 +243,7 @@ export default async function FightCardPage({
     closed_guard: 'Closed guard', half_guard: 'Half guard', open_guard: 'Open guard',
     butterfly_guard: 'Butterfly', back_control: 'Back control', mount: 'Mount',
     side_control: 'Side control', turtle: 'Turtle', north_south: 'N/S',
-    knee_on_belly: 'Knee on belly', standing: 'Standing', rear_naked: 'RNC',
+    knee_on_belly: 'Knee on belly', standing: 'Standing',
     x_guard: 'X-guard', deep_half: 'Deep half', fifty_fifty: '50/50',
   }
 
@@ -244,7 +261,7 @@ export default async function FightCardPage({
         <div className="relative bg-zinc-100 dark:bg-zinc-900 overflow-hidden">
 
           {/* Side accent strips */}
-          <div className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-emerald-400 to-emerald-600" />
+          <div className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-blue-400 to-blue-600" />
           <div className="absolute inset-y-0 right-0 w-1.5 bg-gradient-to-b from-rose-400 to-rose-600" />
 
           {/* Meta row */}
@@ -277,7 +294,7 @@ export default async function FightCardPage({
 
             {/* User side */}
             <div className="min-w-0">
-              <p className="text-[7px] font-black uppercase tracking-[0.35em] text-emerald-600 dark:text-emerald-400/70 mb-1.5">You</p>
+              <p className="text-[7px] font-black uppercase tracking-[0.35em] text-blue-600 dark:text-blue-400/70 mb-1.5">You</p>
               <p className="font-display text-5xl sm:text-6xl uppercase leading-[0.88] tracking-wide text-foreground truncate">
                 {userName}
               </p>
@@ -286,14 +303,14 @@ export default async function FightCardPage({
                   {ownAjpRecord && (
                     <>
                       <span className="text-[9px] text-foreground/30 uppercase tracking-wider">AJP</span>
-                      <span className="text-sm font-bold text-emerald-500">{ownAjpRecord.split(' ')[0]}</span>
+                      <span className="text-sm font-bold text-blue-500">{ownAjpRecord.split(' ')[0]}</span>
                       <span className="text-sm font-bold text-foreground/30">{ownAjpRecord.split(' ')[1]}</span>
                     </>
                   )}
                   {!ownAjpRecord && ownScRecord && (
                     <>
                       <span className="text-[9px] text-foreground/30 uppercase tracking-wider">SC</span>
-                      <span className="text-sm font-bold text-emerald-500">{ownScRecord.split(' ')[0]}</span>
+                      <span className="text-sm font-bold text-blue-500">{ownScRecord.split(' ')[0]}</span>
                       <span className="text-sm font-bold text-foreground/30">{ownScRecord.split(' ')[1]}</span>
                     </>
                   )}
@@ -303,8 +320,8 @@ export default async function FightCardPage({
 
             {/* VS badge */}
             <div className="flex-shrink-0">
-              <div className="w-10 h-10 rounded-full border border-red-500/30 bg-red-500/[0.06] flex items-center justify-center">
-                <span className="text-[10px] font-black tracking-[0.1em] text-red-500 uppercase">vs</span>
+              <div className="w-10 h-10 rounded-full border border-rose-500/30 bg-rose-500/[0.06] flex items-center justify-center">
+                <span className="text-[10px] font-black tracking-[0.1em] text-rose-500 uppercase">vs</span>
               </div>
             </div>
 
@@ -354,7 +371,7 @@ export default async function FightCardPage({
 
           {/* Section headers — paired so every following section lines up row-by-row */}
           <div className="bg-card px-4 pt-4 pb-2">
-            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-emerald-400/80">Your game</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.25em] text-blue-400/80">Your game</p>
           </div>
           <div className="bg-card px-4 pt-4 pb-2 text-right">
             <p className="text-[10px] font-black uppercase tracking-[0.25em] text-rose-400/80">Their game</p>
@@ -373,26 +390,26 @@ export default async function FightCardPage({
           )}
 
           {/* Career records — same source/basis on both sides for a fair comparison */}
-          {(ownAjpRecord || ownScRecord || userRecord?.ibjjfBestResult || ajpRecord || scRecord || opponent.ibjjfBestResult) && (
+          {(ownAjpRecord || ownScRecord || userRecord?.ibjjfBestResult || userRecord?.ibjjfProfileUrl || ajpRecord || scRecord || opponent.ibjjfBestResult || opponent.ibjjfProfileUrl) && (
             <>
               <div className="bg-card px-4 pb-3">
-                {(ownAjpRecord || ownScRecord || userRecord?.ibjjfBestResult) && (
+                {(ownAjpRecord || ownScRecord || userRecord?.ibjjfBestResult || userRecord?.ibjjfProfileUrl) && (
                   <div className="flex flex-col items-start gap-1">
                     {ownAjpRecord && (
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-medium">AJP</span>
-                        <span className="text-sm font-bold text-emerald-400">{ownAjpRecord.split(' ')[0]}</span>
+                        <span className="text-sm font-bold text-blue-400">{ownAjpRecord.split(' ')[0]}</span>
                         <span className="text-sm font-bold text-foreground/60">{ownAjpRecord.split(' ')[1]}</span>
                       </div>
                     )}
                     {ownScRecord && (
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-medium">SC</span>
-                        <span className="text-sm font-bold text-emerald-400">{ownScRecord.split(' ')[0]}</span>
+                        <span className="text-sm font-bold text-blue-400">{ownScRecord.split(' ')[0]}</span>
                         <span className="text-sm font-bold text-foreground/60">{ownScRecord.split(' ')[1]}</span>
                       </div>
                     )}
-                    {userRecord?.ibjjfBestResult && (
+                    {(userRecord?.ibjjfBestResult || userRecord?.ibjjfProfileUrl) && (
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-medium">IBJJF</span>
                         {userRecord.ibjjfProfileUrl ? (
@@ -402,10 +419,10 @@ export default async function FightCardPage({
                             rel="noopener noreferrer"
                             className="text-[11px] text-muted-foreground/70 hover:text-foreground hover:underline underline-offset-2 transition-colors"
                           >
-                            {condenseMedals(userRecord.ibjjfBestResult) ?? userRecord.ibjjfBestResult}
+                            {userRecord.ibjjfBestResult ? (condenseMedals(userRecord.ibjjfBestResult) ?? userRecord.ibjjfBestResult) : 'Profile'}
                           </a>
                         ) : (
-                          <span className="text-[11px] text-muted-foreground/70">{condenseMedals(userRecord.ibjjfBestResult) ?? userRecord.ibjjfBestResult}</span>
+                          <span className="text-[11px] text-muted-foreground/70">{condenseMedals(userRecord.ibjjfBestResult!) ?? userRecord.ibjjfBestResult}</span>
                         )}
                       </div>
                     )}
@@ -413,7 +430,7 @@ export default async function FightCardPage({
                 )}
               </div>
               <div className="bg-card px-4 pb-3">
-                {(ajpRecord || scRecord || opponent.ibjjfBestResult) && (
+                {(ajpRecord || scRecord || opponent.ibjjfBestResult || opponent.ibjjfProfileUrl) && (
                   <div className="flex flex-col items-end gap-1">
                     {ajpRecord && (
                       <div className="flex items-center gap-2">
@@ -429,7 +446,7 @@ export default async function FightCardPage({
                         <span className="text-sm font-bold text-foreground/60">{scRecord.split(' ')[1]}</span>
                       </div>
                     )}
-                    {opponent.ibjjfBestResult && (
+                    {(opponent.ibjjfBestResult || opponent.ibjjfProfileUrl) && (
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-medium">IBJJF</span>
                         {opponent.ibjjfProfileUrl ? (
@@ -439,10 +456,10 @@ export default async function FightCardPage({
                             rel="noopener noreferrer"
                             className="text-[11px] text-muted-foreground/70 hover:text-foreground hover:underline underline-offset-2 transition-colors"
                           >
-                            {condenseMedals(opponent.ibjjfBestResult) ?? opponent.ibjjfBestResult}
+                            {opponent.ibjjfBestResult ? (condenseMedals(opponent.ibjjfBestResult) ?? opponent.ibjjfBestResult) : 'Profile'}
                           </a>
                         ) : (
-                          <span className="text-[11px] text-muted-foreground/70">{condenseMedals(opponent.ibjjfBestResult) ?? opponent.ibjjfBestResult}</span>
+                          <span className="text-[11px] text-muted-foreground/70">{condenseMedals(opponent.ibjjfBestResult!) ?? opponent.ibjjfBestResult}</span>
                         )}
                       </div>
                     )}
@@ -452,30 +469,16 @@ export default async function FightCardPage({
             </>
           )}
 
-          {/* Dominates from */}
-          {(userTopPositions.length > 0 || oppTopPositions.length > 0) && (
-            <>
-              <div className="bg-card px-4 pt-2 pb-3 border-t border-border/30">
-                {userTopPositions.length > 0 && (
-                  <div className="space-y-1.5">
-                    <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/55">Dominates from</p>
-                    {userTopPositions.slice(0, 2).map(p => (
-                      <StatRow key={p.positionId} label={fmtPos(p.positionId)} value={`${Math.round(p.secs)}s`} dim />
-                    ))}
-                  </div>
-                )}
+          {/* Dominates from — head-to-head position-time bars, % of each athlete's own match time */}
+          {positionComparison.length > 0 && (
+            <div className="col-span-2 bg-card px-4 pt-3 pb-4 border-t border-border/30 space-y-3">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/55 text-center">Dominates from</p>
+              <div className="space-y-3">
+                {positionComparison.map(p => (
+                  <PositionTimeBar key={p.positionId} label={fmtPos(p.positionId)} userPct={p.userPct} oppPct={p.oppPct} />
+                ))}
               </div>
-              <div className="bg-card px-4 pt-2 pb-3 border-t border-border/30">
-                {oppTopPositions.length > 0 && (
-                  <div className="space-y-1.5">
-                    <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/55 text-right">Dominates from</p>
-                    {oppTopPositions.slice(0, 2).map(p => (
-                      <StatRow key={p.positionId} label={fmtPos(p.positionId)} value={`${Math.round(p.secs)}s`} dim right />
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
+            </div>
           )}
 
           {/* Attacks (opponent side falls back to "no footage" when empty) */}
@@ -540,7 +543,7 @@ export default async function FightCardPage({
           <div className="grid grid-cols-[1fr_1px_1fr]">
             <Link
               href={`/upload?context=own&back=/tournaments/${tournamentId}/fight-card/${opponentId}`}
-              className="px-5 py-3 text-xs text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/[0.04] transition-colors font-medium"
+              className="px-5 py-3 text-xs text-muted-foreground hover:text-blue-400 hover:bg-blue-500/[0.04] transition-colors font-medium"
             >
               + Add your footage
             </Link>
@@ -584,8 +587,8 @@ export default async function FightCardPage({
         ) : plan && card ? (
           <div className="p-5 space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-xl border-l-2 border-emerald-500 bg-emerald-500/[0.06] px-4 py-3 space-y-1">
-                <p className="text-[8px] font-black uppercase tracking-[0.22em] text-emerald-600 dark:text-emerald-500">Open with</p>
+              <div className="rounded-xl border-l-2 border-blue-500 bg-blue-500/[0.06] px-4 py-3 space-y-1">
+                <p className="text-[8px] font-black uppercase tracking-[0.22em] text-blue-600 dark:text-blue-500">Open with</p>
                 <p className="text-sm font-bold leading-snug">{card.open_with}</p>
               </div>
               <div className="rounded-xl border-l-2 border-rose-500 bg-rose-500/[0.06] px-4 py-3 space-y-1">
@@ -650,9 +653,9 @@ export default async function FightCardPage({
 
 function GameStyleBar({ topPct, right = false }: { topPct: number; right?: boolean }) {
   const label = topPct >= 65 ? 'Top player' : topPct >= 50 ? 'Balanced' : topPct >= 35 ? 'Guard-heavy' : 'Guard player'
-  const fillClass = right ? 'bg-rose-500/60' : 'bg-emerald-500/60'
-  const bgClass = right ? 'bg-rose-500/[0.12]' : 'bg-emerald-500/[0.12]'
-  const labelClass = right ? 'text-rose-400' : 'text-emerald-400'
+  const fillClass = right ? 'bg-rose-500/60' : 'bg-blue-500/60'
+  const bgClass = right ? 'bg-rose-500/[0.12]' : 'bg-blue-500/[0.12]'
+  const labelClass = right ? 'text-rose-400' : 'text-blue-400'
   return (
     <div className="space-y-1.5">
       <div className={`flex items-center justify-between ${right ? 'flex-row-reverse' : ''}`}>
@@ -686,7 +689,7 @@ function StatRow({
   const valueClass = dim
     ? 'text-foreground/70'
     : accent === 'emerald'
-      ? 'text-emerald-400'
+      ? 'text-blue-400'
       : accent === 'rose'
         ? 'text-rose-400'
         : 'text-foreground/85'
@@ -694,7 +697,31 @@ function StatRow({
   return (
     <div className={`flex items-baseline gap-2 ${right ? 'flex-row-reverse' : ''}`}>
       <span className={`text-sm font-bold tabular-nums ${valueClass}`}>{value}</span>
-      <span className="text-[11px] text-muted-foreground/65 leading-none">{label}</span>
+      {label && <span className="text-[11px] text-muted-foreground/65 leading-none">{label}</span>}
+    </div>
+  )
+}
+
+// Head-to-head position-time row — both athletes' share of their own match time
+// in a given position, shown on one bidirectional scale (% of match, not raw seconds).
+function PositionTimeBar({ label, userPct, oppPct }: { label: string; userPct: number; oppPct: number }) {
+  const userDominant = userPct > oppPct
+  const oppDominant = oppPct > userPct
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between gap-2">
+        <StatRow label="" value={`${userPct}%`} accent={userDominant ? 'emerald' : undefined} />
+        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/55 text-center truncate">{label}</span>
+        <StatRow label="" value={`${oppPct}%`} right accent={oppDominant ? 'rose' : undefined} />
+      </div>
+      <div className="flex items-center gap-1">
+        <div className="flex-1 h-2 rounded-full bg-blue-500/[0.12] overflow-hidden flex justify-end">
+          <div className={`h-full rounded-full ${userDominant ? 'bg-blue-500/70' : 'bg-blue-500/40'}`} style={{ width: `${userPct}%` }} />
+        </div>
+        <div className="flex-1 h-2 rounded-full bg-rose-500/[0.12] overflow-hidden">
+          <div className={`h-full rounded-full ${oppDominant ? 'bg-rose-500/70' : 'bg-rose-500/40'}`} style={{ width: `${oppPct}%` }} />
+        </div>
+      </div>
     </div>
   )
 }

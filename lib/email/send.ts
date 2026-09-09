@@ -53,10 +53,10 @@ export async function sendUpgradeEmail(to: string) {
     body: `
       <p style="margin:0 0 12px 0;">Thanks for upgrading — your Pro features are live right now:</p>
       <ul style="margin:0; padding-left:20px;">
-        <li style="margin-bottom:6px;">Unlimited tournaments and video analysis</li>
-        <li style="margin-bottom:6px;">Full AI gameplans, no blur</li>
-        <li style="margin-bottom:6px;">AI training plans tailored to your matches</li>
-        <li style="margin-bottom:6px;">Match narration + Ask AI on every match</li>
+        <li style="margin-bottom:6px;">Unlimited video analysis</li>
+        <li style="margin-bottom:6px;">Unlimited opponent scouting</li>
+        <li style="margin-bottom:6px;">Unlimited tournaments</li>
+        <li style="margin-bottom:6px;">Everything in Free, no monthly cap</li>
       </ul>
       <p style="margin:12px 0 0 0;">Manage your billing anytime from Settings.</p>
     `,

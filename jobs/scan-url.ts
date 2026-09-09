@@ -71,6 +71,10 @@ function parseYouTubeTimestamp(url: string): number {
   } catch { return 0 }
 }
 
+const CHUNK_SECS = 20 * 60   // 20-minute windows — ~60 frames at 0.05fps
+const CHUNK_OVERLAP = 5 * 60 // 5-min overlap so matches near a boundary appear fully in the next chunk
+const NUM_CHUNKS = 20        // covers up to ~5h50m effective with overlap (handles full competition day)
+
 export const scanUrl = inngest.createFunction(
   {
     id: 'scan-url',
@@ -79,6 +83,54 @@ export const scanUrl = inngest.createFunction(
     triggers: [{ event: 'url/submitted' }],
     // Cap simultaneous Gemini calls — Railway Pro has 24 GB RAM; 4 concurrent jobs fit safely
     concurrency: { limit: 4 },
+    // Runs once all 10 retries are exhausted. Without this, a chunk that keeps hitting
+    // transient Gemini errors leaves its video (and the parent) stuck in 'processing'
+    // forever, and the sequential chunk chain never sends 'send-next-chunk' for the
+    // remaining chunks — the rest of the video is silently never scanned.
+    onFailure: async ({ event }: {
+      event: { data: { event: { data: { videoId: string; userId?: string; athleteName: string; format: string; sourceType: string; eventName?: string; appearanceHint?: string; tournamentOpponentId?: string; endSeconds?: number; chunkIndex?: number; chunkTotal?: number; chunkVideoIds?: string[]; matchesFoundSoFar?: number; consecutiveEmptyChunks?: number } } } }
+    }) => {
+      const { videoId, userId, athleteName, format, sourceType, eventName, appearanceHint, tournamentOpponentId, endSeconds, chunkIndex, chunkTotal, chunkVideoIds, matchesFoundSoFar, consecutiveEmptyChunks } = event.data.event.data
+
+      const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
+      if (video?.status === 'processing' || video?.status === 'uploaded') {
+        await db.update(videos).set({ status: 'failed', failureReason: 'Scan failed after repeated errors — try rescanning this video.' }).where(eq(videos.id, videoId))
+      }
+
+      if (chunkIndex === undefined || chunkTotal === undefined || !chunkVideoIds) return
+
+      // Chunk r2Keys are 'chunk/{parentVideoId}/{index}' — extract parent ID
+      const parentId = video?.r2Key.split('/')[1]
+      if (!parentId) return
+
+      if (chunkIndex < chunkTotal - 1) {
+        // Skip the failed chunk and continue the chain so the rest of the video still gets scanned
+        await inngest.send({
+          name: 'url/submitted',
+          data: {
+            videoId: chunkVideoIds[chunkIndex + 1],
+            userId, athleteName, format, sourceType, eventName, appearanceHint, tournamentOpponentId,
+            startSeconds: endSeconds! - CHUNK_OVERLAP,
+            endSeconds: endSeconds! - CHUNK_OVERLAP + CHUNK_SECS,
+            chunkIndex: chunkIndex + 1,
+            chunkTotal,
+            chunkVideoIds,
+            matchesFoundSoFar: matchesFoundSoFar ?? 0,
+            consecutiveEmptyChunks: (consecutiveEmptyChunks ?? 0) + 1,
+          },
+        })
+        return
+      }
+
+      // Last chunk failed permanently — finalize the parent based on whatever was found so far
+      const found = await db.select({ id: matches.id }).from(matches).where(inArray(matches.videoId, chunkVideoIds))
+      if (found.length === 0) {
+        const reason = `"${athleteName}" was not found in this video. Check the name matches exactly what's shown on screen.`
+        await db.update(videos).set({ status: 'failed', failureReason: reason }).where(eq(videos.id, parentId))
+      } else {
+        await db.update(videos).set({ status: 'analysed' }).where(eq(videos.id, parentId))
+      }
+    },
   },
   async ({ event, step }: {
     event: { data: { videoId: string; userId?: string; athleteName: string; format: string; sourceType: string; eventName?: string; appearanceHint?: string; tournamentOpponentId?: string; skipScan?: boolean; startSeconds?: number; endSeconds?: number; chunkIndex?: number; chunkTotal?: number; chunkVideoIds?: string[]; matchesFoundSoFar?: number; consecutiveEmptyChunks?: number; ytTimestampHint?: number } }
@@ -86,9 +138,25 @@ export const scanUrl = inngest.createFunction(
   }) => {
     const { videoId, userId, athleteName, format, sourceType, eventName, appearanceHint, tournamentOpponentId, skipScan, startSeconds, endSeconds, chunkIndex, chunkTotal, chunkVideoIds, matchesFoundSoFar, consecutiveEmptyChunks, ytTimestampHint } = event.data
 
-    const CHUNK_SECS = 20 * 60   // 20-minute windows — ~60 frames at 0.05fps
-    const CHUNK_OVERLAP = 5 * 60 // 5-min overlap so matches near a boundary appear fully in the next chunk
-    const NUM_CHUNKS = 20        // covers up to ~5h50m effective with overlap (handles full competition day)
+    // Self-terminating guard for chunk jobs: if the parent video was already finalized
+    // (by an earlier chunk's early-stop, or by manual recovery of a stuck chain), this
+    // chunk's work is moot — mark it done and stop instead of calling Gemini and
+    // continuing the chain. Without this, a chunk that's mid-retry when the parent
+    // resolves can wake up later, fail again, and resurrect the whole chain.
+    if (chunkIndex !== undefined) {
+      const alreadyDone = await step.run('check-parent-finalized', async () => {
+        const video = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
+        const parentId = video?.r2Key.split('/')[1]
+        if (!parentId) return false
+        const parent = await db.query.videos.findFirst({ where: eq(videos.id, parentId) })
+        if (parent?.status !== 'analysed' && parent?.status !== 'failed') return false
+        if (video!.status !== 'analysed' && video!.status !== 'failed') {
+          await db.update(videos).set({ status: 'analysed' }).where(eq(videos.id, videoId))
+        }
+        return true
+      })
+      if (alreadyDone) return
+    }
 
     // Non-YouTube (R2-uploaded) videos must go through the Gemini Files API.
     // Passing the R2 URL to generateObject as a file part makes the AI SDK download
@@ -291,7 +359,7 @@ export const scanUrl = inngest.createFunction(
 
     // ── Chunking: video was too long for a single Gemini pass ─────────────────
     if (scanStepResult === null) {
-      const { chunkVideoIds: newChunkIds, urlOffset } = await step.run('create-chunk-videos', async () => {
+      const { chunkVideoIds: newChunkIds, urlOffset, chunkTotal: dynamicChunkTotal } = await step.run('create-chunk-videos', async () => {
         const original = await db.query.videos.findFirst({ where: eq(videos.id, videoId) })
         if (!original) throw new Error('Original video not found')
 
@@ -301,12 +369,33 @@ export const scanUrl = inngest.createFunction(
           ? ytTimestampHint!
           : parseYouTubeTimestamp(original.publicUrl ?? '')
 
+        // Size the chunk plan to the video's actual remaining length. NUM_CHUNKS=20 assumes
+        // ~5h50m of footage — for shorter videos (the common case), chunks past the real end
+        // have startSeconds beyond the video's duration. Gemini errors on those in a way our
+        // error handling treats as transient, so each one burns through all 10 retries
+        // (~1.5-2.5h) before the chain can move on — for every remaining chunk.
+        let chunkTotal = NUM_CHUNKS
+        try {
+          const durationStr = execFileSync(
+            ytdlpBin,
+            ['--no-playlist', '--skip-download', '--no-warnings', '--print', 'duration', original.publicUrl!],
+            { encoding: 'utf8', timeout: 20_000 },
+          ).trim()
+          const duration = parseFloat(durationStr)
+          const remaining = duration - ytOffset
+          if (remaining > 0) {
+            chunkTotal = Math.min(NUM_CHUNKS, Math.max(1, Math.ceil((remaining - CHUNK_OVERLAP) / (CHUNK_SECS - CHUNK_OVERLAP))))
+          }
+        } catch (err) {
+          console.error('[scan-url] could not determine video duration, defaulting to', NUM_CHUNKS, 'chunks:', err)
+        }
+
         const ids: string[] = []
-        for (let i = 0; i < NUM_CHUNKS; i++) {
+        for (let i = 0; i < chunkTotal; i++) {
           const [v] = await db.insert(videos).values({
             userId: original.userId,
             r2Key: `chunk/${videoId}/${i}`,
-            originalFilename: `${original.originalFilename} · Part ${i + 1}/${NUM_CHUNKS}`,
+            originalFilename: `${original.originalFilename} · Part ${i + 1}/${chunkTotal}`,
             contentType: original.contentType,
             sizeBytes: 0,
             sourceType: original.sourceType,
@@ -318,7 +407,7 @@ export const scanUrl = inngest.createFunction(
         }
 
         // Keep parent as 'processing' while chunks scan — finalize-chunk-results will resolve it
-        return { chunkVideoIds: ids, urlOffset: ytOffset }
+        return { chunkVideoIds: ids, urlOffset: ytOffset, chunkTotal }
       })
 
       // Fire only chunk 0 — each chunk triggers the next on completion (sequential, not parallel)
@@ -336,7 +425,7 @@ export const scanUrl = inngest.createFunction(
           startSeconds: urlOffset,
           endSeconds: urlOffset + CHUNK_SECS,
           chunkIndex: 0,
-          chunkTotal: NUM_CHUNKS,
+          chunkTotal: dynamicChunkTotal,
           chunkVideoIds: newChunkIds,
         },
       })
@@ -1106,40 +1195,6 @@ export const scanUrl = inngest.createFunction(
       })
     }
 
-    // Transition auto_queued → auto_ready once all opponent videos have finished scanning
-    if (tournamentOpponentId && chunkIndex === undefined) {
-      await step.run('check-opponent-ready', async () => {
-        const opponentVideos = await db.query.videos.findMany({
-          where: eq(videos.tournamentOpponentId, tournamentOpponentId),
-        })
-        const allSettled = opponentVideos.every(v => v.status === 'analysed' || v.status === 'failed')
-        const anyAnalysed = opponentVideos.some(v => v.status === 'analysed')
-        if (allSettled && anyAnalysed) {
-          await db
-            .update(tournamentOpponents)
-            .set({ footageStatus: 'auto_ready' })
-            .where(and(
-              eq(tournamentOpponents.id, tournamentOpponentId),
-              eq(tournamentOpponents.footageStatus, 'auto_queued'),
-            ))
-          if (userId) {
-            const opponent = await db.query.tournamentOpponents.findFirst({
-              where: eq(tournamentOpponents.id, tournamentOpponentId),
-            })
-            if (opponent) {
-              await createNotification(
-                userId,
-                'scout_ready',
-                `Scouting ready — ${opponent.opponentLabel}`,
-                'Footage analysis complete. View timeline and generate a gameplan.',
-                `/tournaments/${opponent.tournamentId}/opponents`,
-              )
-            }
-          }
-        }
-      })
-    }
-
     // Track progress across the chunk chain so we can stop early.
     const thisChunkMatchCount = foundMatches.length
     const newMatchesFoundSoFar = (matchesFoundSoFar ?? 0) + thisChunkMatchCount
@@ -1171,6 +1226,48 @@ export const scanUrl = inngest.createFunction(
               `${found.length} match${found.length > 1 ? 'es' : ''} found and ready to review.`,
               found.length === 1 ? `/matches/${found[0].id}` : '/matches',
             )
+          }
+        }
+        // Chunks pre-created but never dispatched (early-stop, or the chunk plan ran
+        // past the video's actual end) are left at 'uploaded' forever — mark them done
+        // so they don't linger as permanent "Analysing…" rows in My Matches.
+        await db.update(videos)
+          .set({ status: 'analysed' })
+          .where(and(inArray(videos.id, chunkVideoIds), eq(videos.status, 'uploaded')))
+      })
+    }
+
+    // Transition auto_queued → auto_ready once opponent footage has finished scanning.
+    // For chunked scans (the common case for YouTube), chunkIndex is always defined here —
+    // only run this on the chunk that actually finalizes the parent (last chunk or early-stop).
+    if (tournamentOpponentId && (chunkIndex === undefined || isLastChunk || shouldStopEarly)) {
+      await step.run('check-opponent-ready', async () => {
+        const opponentVideos = await db.query.videos.findMany({
+          where: eq(videos.tournamentOpponentId, tournamentOpponentId),
+        })
+        const allSettled = opponentVideos.every(v => v.status === 'analysed' || v.status === 'failed')
+        const anyAnalysed = opponentVideos.some(v => v.status === 'analysed')
+        if (allSettled && anyAnalysed) {
+          await db
+            .update(tournamentOpponents)
+            .set({ footageStatus: 'auto_ready' })
+            .where(and(
+              eq(tournamentOpponents.id, tournamentOpponentId),
+              eq(tournamentOpponents.footageStatus, 'auto_queued'),
+            ))
+          if (userId) {
+            const opponent = await db.query.tournamentOpponents.findFirst({
+              where: eq(tournamentOpponents.id, tournamentOpponentId),
+            })
+            if (opponent) {
+              await createNotification(
+                userId,
+                'scout_ready',
+                `Scouting ready — ${opponent.opponentLabel}`,
+                'Footage analysis complete. View timeline and generate a gameplan.',
+                `/tournaments/${opponent.tournamentId}/opponents`,
+              )
+            }
           }
         }
       })

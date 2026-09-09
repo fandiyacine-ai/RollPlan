@@ -1,6 +1,6 @@
 import { db } from '../../../../lib/db'
 import { matches, videos, positionSegments, matchEvents, insights, tournamentOpponents, users } from '../../../../lib/db/schema'
-import { eq, asc } from 'drizzle-orm'
+import { eq, asc, and, or, ne, isNull, inArray } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
@@ -49,19 +49,12 @@ function MatchResultBadge({ winner, method, technique }: { winner: string; metho
   return (
     <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
       isWin
-        ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/30'
+        ? 'bg-blue-950/60 text-blue-400 border border-blue-800/30'
         : 'bg-rose-950/60 text-rose-400 border border-rose-800/30'
     }`}>
       {label}
     </span>
   )
-}
-
-function formatTime(seconds: number): string {
-  if (seconds < 60) return `${Math.round(seconds)}s`
-  const m = Math.floor(seconds / 60)
-  const s = Math.round(seconds % 60)
-  return s > 0 ? `${m}m ${s}s` : `${m}m`
 }
 
 function isAdmin(clerkId: string | null | undefined) {
@@ -101,6 +94,25 @@ export default async function MatchDetailPage({
       })
     : null
 
+  // Does this user already have their own analysed footage? Used to decide whether the
+  // scouting view's "Upload my footage" recruitment CTA still makes sense to show.
+  const hasOwnFootage = match.tournamentOpponentId && match.userId
+    ? !!(await db
+        .select({ id: matches.id })
+        .from(matches)
+        .innerJoin(videos, eq(videos.id, matches.videoId))
+        .where(and(
+          eq(matches.userId, match.userId),
+          eq(matches.status, 'analysed'),
+          or(
+            inArray(videos.sourceType, ['own_competition', 'own_sparring']),
+            and(eq(matches.competitorLabel, 'you'), isNull(matches.tournamentOpponentId)),
+          ),
+        ))
+        .limit(1)
+      ).length
+    : false
+
   const [segments, events, matchInsights] = await Promise.all([
     db.select().from(positionSegments).where(eq(positionSegments.matchId, matchId)).orderBy(asc(positionSegments.startSeconds)),
     db.select().from(matchEvents).where(eq(matchEvents.matchId, matchId)).orderBy(asc(matchEvents.timestampSeconds)),
@@ -121,11 +133,6 @@ export default async function MatchDetailPage({
 
   const sortedPositions = Object.entries(positionStats).sort((a, b) => b[1].total - a[1].total)
   const maxPositionTime = sortedPositions[0]?.[1].total ?? 1
-  const firstSegStart = segments[0]?.startSeconds ?? 0
-  const lastSegEnd = segments[segments.length - 1]?.endSeconds ?? 0
-  const lastEventTime = events.length > 0 ? events[events.length - 1].timestampSeconds : null
-  const matchEnd = lastEventTime !== null ? Math.min(lastEventTime + 30, lastSegEnd) : lastSegEnd
-  const totalMatchTime = matchEnd - firstSegStart
 
   // Build merged timeline
   const timelineItems: TimelineItem[] = [
@@ -186,6 +193,7 @@ export default async function MatchDetailPage({
         backLabel={backLabel}
         narration={match.narration ?? null}
         viewMode={match.tournamentOpponentId ? 'scouting' : 'analysis'}
+        hasOwnFootage={hasOwnFootage}
         opponentIntel={tournamentOpponentRow ? {
           ajpWins: tournamentOpponentRow.ajpWins ?? null,
           ajpLosses: tournamentOpponentRow.ajpLosses ?? null,

@@ -9,6 +9,7 @@ import { users } from '../../lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { OnboardingWizard } from './onboarding/wizard'
 import { FeedbackWidget } from './feedback/widget'
+import { InstagramIcon } from '@/components/icons/instagram'
 
 async function UsagePill() {
   try {
@@ -59,6 +60,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <Link href="/admin/feedback" className="hover:text-muted-foreground transition-colors">Feedback ↗</Link>
           </>
         )}
+        <a
+          href="https://www.instagram.com/rollplan.ai"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="RollPlan on Instagram"
+          className="hover:text-muted-foreground transition-colors"
+        >
+          <InstagramIcon className="w-4 h-4" />
+        </a>
       </footer>
     </div>
   )

@@ -12,7 +12,7 @@ import {
 } from './actions'
 
 const RESULT_LABEL: Record<string, { label: string; className: string }> = {
-  win:  { label: 'You won',  className: 'text-emerald-500' },
+  win:  { label: 'You won',  className: 'text-blue-500' },
   loss: { label: 'You lost', className: 'text-rose-500' },
   draw: { label: 'Draw',     className: 'text-muted-foreground' },
 }
@@ -21,7 +21,7 @@ function WLBadge({ label, wins, losses }: { label: string; wins: number | null; 
   if (wins === null && losses === null) return null
   return (
     <span className="text-xs tabular-nums text-muted-foreground">
-      {label} <span className="font-semibold text-emerald-500">{wins ?? 0}W</span>–<span className="font-semibold text-rose-500">{losses ?? 0}L</span>
+      {label} <span className="font-semibold text-blue-500">{wins ?? 0}W</span>–<span className="font-semibold text-rose-500">{losses ?? 0}L</span>
     </span>
   )
 }

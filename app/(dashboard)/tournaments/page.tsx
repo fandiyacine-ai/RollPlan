@@ -6,6 +6,7 @@ import { CreateTournamentForm, DeleteTournamentButton, EditTournamentButton } fr
 import { countryFlag, giNoGi } from '../../../lib/tournament-utils'
 import { RulesetBadge } from '@/components/ruleset-badge'
 import { getOrCreateDbUserId } from '../../../lib/db/get-user'
+import { SampleTournamentPreview } from '@/components/sample-preview'
 
 export const dynamic = 'force-dynamic'
 
@@ -79,11 +80,14 @@ export default async function TournamentsPage() {
       </div>
 
       {allTournaments.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground">
-          <p className="font-medium text-foreground">Your next fight starts here</p>
-          <p className="text-sm mt-1.5 max-w-sm mx-auto leading-relaxed">
-            Drop in a tournament and watch the picture build — opponents scouted, gameplans drafted, the countdown running. By fight day, nothing about them will surprise you.
-          </p>
+        <div className="space-y-4">
+          <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground">
+            <p className="font-medium text-foreground">Your next fight starts here</p>
+            <p className="text-sm mt-1.5 max-w-sm mx-auto leading-relaxed">
+              Drop in a tournament and watch the picture build — opponents scouted, gameplans drafted, the countdown running. By fight day, nothing about them will surprise you.
+            </p>
+          </div>
+          <SampleTournamentPreview />
         </div>
       ) : (
         <div className="space-y-2.5">

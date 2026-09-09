@@ -1,6 +1,6 @@
 import { db } from '../db'
 import { techniqueVariants } from '../db/schema'
-import { eq, and, or, inArray, isNull, not } from 'drizzle-orm'
+import { eq, and, or, inArray, isNull, not, asc } from 'drizzle-orm'
 
 export type TechniqueVariant = {
   id: string
@@ -114,6 +114,20 @@ export async function getTechniqueVariantsByEvents(
     limit: CHAT_CAP,
   })
   return rows
+}
+
+// ─── Drill library (browsable KB) ────────────────────────────────────────────
+// All active variants, alphabetical. Used by the /drills page — the KB
+// currently sits at ~700 active entries, well within a single query.
+const LIBRARY_CAP = 1000
+
+export async function getActiveTechniqueVariants(): Promise<TechniqueVariant[]> {
+  return db.query.techniqueVariants.findMany({
+    where: eq(techniqueVariants.status, 'active'),
+    columns: COLS,
+    orderBy: asc(techniqueVariants.name),
+    limit: LIBRARY_CAP,
+  })
 }
 
 // ─── Formatters ───────────────────────────────────────────────────────────────

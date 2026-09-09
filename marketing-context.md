@@ -1,6 +1,6 @@
 # RollPlan — Marketing Context
 
-*Last updated: 2026-05-31*
+*Last updated: 2026-06-11*
 
 ---
 
@@ -9,7 +9,7 @@
 **One-liner:** RollPlan turns BJJ competition footage into AI-powered match analysis, opponent scouting, and competition-day gameplans — automatically.
 
 **What it does:**
-RollPlan analyses Brazilian Jiu-Jitsu match videos using Google Gemini AI. Upload or link footage and the app produces a full position-by-position breakdown with timestamps, key event detection (submissions, sweeps, takedowns, guard passes), coaching notes, and pattern analysis. Athletes also use it to scout opponents: paste a competitor's footage URLs and the AI generates a personalised gameplan — their tendencies, favourite attacks, and vulnerabilities. On competition day, a single-screen briefing shows the key attack to open with and the danger to watch for each opponent in the draw.
+RollPlan analyses Brazilian Jiu-Jitsu match videos using Google Gemini AI. Upload or link footage and the app produces a full position-by-position breakdown with timestamps, key event detection (submissions, sweeps, takedowns, guard passes), coaching notes, and pattern analysis. Athletes also use it to scout opponents: import a bracket from AJP, IBJJF, or Smoothcomp and RollPlan pulls each opponent's record and footage automatically — or paste a long tournament stream and tell the AI who to look for, and it scans the full recording to clip out that athlete's matches. Each scouted opponent gets an AI gameplan with a win probability (Favourable/Even/Tough), which can be turned into a Fight Card — a shareable head-to-head page for your coach or squad. On Match Day, a single-screen briefing shows the key attack to open with and the danger to watch for each opponent in the draw.
 
 **Product category:** Sports performance analytics / AI sports coaching tool
 **Product type:** SaaS web app (mobile app in development)
@@ -95,9 +95,11 @@ RollPlan analyses Brazilian Jiu-Jitsu match videos using Google Gemini AI. Uploa
 **Key differentiators:**
 1. **Zero manual tagging** — paste a URL or upload a file, AI does the entire breakdown automatically. No other tool does this for BJJ.
 2. **BJJ-specific position taxonomy** — 25 position types (closed guard, half guard, back control, mount, etc.) recognised natively. Not a generic "zone" system.
-3. **Opponent scouting pipeline** — paste footage URL → AI scans for that athlete → full gameplan generated. Smoothcomp bracket import automates this at scale.
-4. **Competition Day screen** — single-glance briefing designed to be readable under pressure, one-handed, in a sports hall. No other tool has this.
-5. **Frame by Frame AI chat** — pause video at any moment, ask the AI "why did I lose the underhook here?" — it sees the same frame and responds in context.
+3. **Opponent scouting pipeline** — paste footage URL → AI scans for that athlete → full gameplan generated. Smoothcomp/AJP/IBJJF bracket import automates this at scale.
+4. **Long-stream scanning** — paste a multi-hour tournament stream or full mat-recording, name the athlete, and Gemini scans the whole thing to find and clip out every one of their matches. No manual scrubbing through hours of footage.
+5. **Match Day screen** — single-glance briefing designed to be readable under pressure, one-handed, in a sports hall. No other tool has this.
+6. **Fight Card** — a shareable head-to-head page for any matchup: stats, game styles, dominant positions, top attacks, and the condensed gameplan, ready to send to a coach or teammate before competing.
+7. **Frame by Frame AI chat** — pause video at any moment, ask the AI "why did I lose the underhook here?" — it sees the same frame and responds in context.
 
 **Why that's better:**
 - Saves 1–3 hours of manual work per match
@@ -135,8 +137,9 @@ RollPlan analyses Brazilian Jiu-Jitsu match videos using Google Gemini AI. Uploa
 
 **Pull (toward RollPlan):**
 - Automated analysis in 2 minutes
-- Gameplan generated from opponent footage
-- Competition Day screen as a pre-match ritual
+- Gameplan generated from opponent footage, with a win probability attached
+- Match Day screen as a pre-match ritual
+- Fight Card to share with coach/squad before competing
 
 **Habit (keeping them stuck):**
 - "I've always just watched footage manually" — familiarity, no cost, no tool change required
@@ -170,6 +173,7 @@ RollPlan analyses Brazilian Jiu-Jitsu match videos using Google Gemini AI. Uploa
 - patterns, tendencies, vulnerabilities
 - preparation, drill targets, coaching notes
 - gi, no-gi, IBJJF, AJP, ADCC, EBI, Smoothcomp
+- bracket import, win probability, Fight Card, Match Day, stream scan
 
 **Words to AVOID:**
 - "stats" (too generic — use "analysis" or "breakdown")
@@ -184,10 +188,12 @@ RollPlan analyses Brazilian Jiu-Jitsu match videos using Google Gemini AI. Uploa
 |------|---------------------|
 | Match analysis | Full AI breakdown of a video — positions, events, coaching notes |
 | Player card | Athlete's profile page showing patterns across all analysed matches |
-| Gameplan | AI-generated pre-match strategy based on opponent scouting + own match history |
-| Competition Day | Single-screen briefing for the morning of a tournament |
+| Gameplan | AI-generated pre-match strategy based on opponent scouting + own match history, includes a win probability (Favourable/Even/Tough) |
+| Match Day | Single-screen briefing for the morning of a tournament — one card per opponent with win probability, open-with, and watch-out |
+| Fight Card | Shareable head-to-head page for a matchup — stats, game styles, dominant positions, attacks, and condensed gameplan |
 | Frame by Frame | AI video chat — pause anywhere and ask questions in context |
-| Scouting | Analysing opponent footage to prepare a gameplan |
+| Scouting | Analysing opponent footage to prepare a gameplan — via bracket import (AJP/IBJJF/Smoothcomp) or pasted footage URLs |
+| Stream scan | Pointing the AI at a long tournament stream or full mat-recording + an athlete name; it finds and clips out every match for that athlete |
 | Position segment | A continuous period in one BJJ position (e.g. "in closed guard for 42 seconds") |
 | Source quality | AI confidence rating for a technique extraction: high / medium / low |
 

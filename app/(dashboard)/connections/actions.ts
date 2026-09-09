@@ -40,9 +40,12 @@ export async function getConnectionsPageData(): Promise<{
   candidates: ConnectionCandidate[]
   pendingReceived: PendingRequest[]
   accepted: ConnectionRecord[]
+  openToConnections: boolean
 }> {
   const userId = await getOrCreateDbUserId()
   const today = new Date().toISOString().slice(0, 10)
+
+  const [me] = await db.select({ openToConnections: users.openToConnections }).from(users).where(eq(users.id, userId)).limit(1)
 
   const candidates = await findEligibleConnections(userId)
 
@@ -127,7 +130,7 @@ export async function getConnectionsPageData(): Promise<{
     }
   })
 
-  return { candidates, pendingReceived, accepted }
+  return { candidates, pendingReceived, accepted, openToConnections: me?.openToConnections ?? false }
 }
 
 export async function sendConnectionRequestAction(recipientUserId: string, tournamentId: string): Promise<{ error?: string }> {

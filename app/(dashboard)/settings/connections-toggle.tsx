@@ -43,7 +43,7 @@ export function ConnectionsToggle({ defaultOpen }: { defaultOpen: boolean }) {
             aria-checked={open}
             onClick={toggle}
             disabled={pending}
-            className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors disabled:opacity-50 ${open ? 'bg-emerald-500' : 'bg-muted-foreground/30'}`}
+            className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors disabled:opacity-50 ${open ? 'bg-blue-500' : 'bg-muted-foreground/30'}`}
           >
             <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${open ? 'translate-x-5' : ''}`} />
           </button>
@@ -54,7 +54,7 @@ export function ConnectionsToggle({ defaultOpen }: { defaultOpen: boolean }) {
             Your gameplans, scouted match footage, and AI analysis stay completely private. Connections never see your prep work — before or after connecting. Only you do.
           </p>
           <p className="text-muted-foreground">
-            <span className="text-emerald-500 font-semibold">✓</span>{' '}
+            <span className="text-blue-500 font-semibold">✓</span>{' '}
             Connections can see your upcoming tournaments and public competition record — the same info already on your player card.
           </p>
         </div>

@@ -7,10 +7,14 @@ export function GenerateGameplanButton({
   tournamentId,
   opponentId,
   label = 'Generate Gameplan',
+  disabled = false,
+  title,
 }: {
   tournamentId: string
   opponentId: string
   label?: string
+  disabled?: boolean
+  title?: string
 }) {
   const [pending, setPending] = useState(false)
   const router = useRouter()
@@ -28,8 +32,9 @@ export function GenerateGameplanButton({
   return (
     <button
       onClick={handleGenerate}
-      disabled={pending}
-      className="text-sm px-4 py-2 rounded-full bg-foreground text-background font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+      disabled={pending || disabled}
+      title={title}
+      className="text-sm px-4 py-2 rounded-full bg-[#F5C518] text-zinc-900 font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
     >
       {pending ? 'Starting…' : label}
     </button>

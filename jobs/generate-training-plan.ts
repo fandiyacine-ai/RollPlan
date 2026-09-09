@@ -2,7 +2,7 @@ import { generateObject } from 'ai'
 import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
 import { matches, positionSegments, matchEvents, videos, tournaments, tournamentOpponents, playerCards } from '../lib/db/schema'
-import { eq, and, inArray, desc, gt, sql } from 'drizzle-orm'
+import { eq, and, or, ne, isNull, inArray, desc, gt, sql } from 'drizzle-orm'
 import { anthropic, CLAUDE_SYNTHESIS_MODEL } from '../lib/ai/clients'
 import { TrainingPlanSchema } from '../lib/ai/schemas/training-plan'
 
@@ -41,7 +41,10 @@ export const generateTrainingPlan = inngest.createFunction(
         .where(and(
           eq(matches.userId, userId),
           eq(matches.status, 'analysed'),
-          inArray(videos.sourceType, ['own_competition', 'own_sparring']),
+          or(
+            inArray(videos.sourceType, ['own_competition', 'own_sparring']),
+            and(eq(matches.competitorLabel, 'you'), isNull(matches.tournamentOpponentId)),
+          ),
         ))
         .orderBy(desc(matches.createdAt))
         .limit(10)

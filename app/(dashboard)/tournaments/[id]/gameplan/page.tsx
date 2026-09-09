@@ -3,7 +3,7 @@ import { db } from '../../../../../lib/db'
 import { gameplans, tournamentOpponents, matches, planExecutions, tournaments } from '../../../../../lib/db/schema'
 import { eq, inArray, and } from 'drizzle-orm'
 import { getOrCreateDbUserId } from '../../../../../lib/db/get-user'
-import { getSubscriptionStatus } from '../../../../../lib/subscription'
+import { checkMonthlyLimit, FREE_MONTHLY_VIDEO_LIMIT } from '../../../../../lib/db/usage'
 import Link from 'next/link'
 import { GenerateGameplanButton } from './generate-button'
 import { OpponentSelector } from './opponent-selector'
@@ -12,6 +12,7 @@ import { GameplanRatingWidget } from './rating-widget'
 import { AutoRefresh } from './auto-refresh'
 import { PlanExecutionSection } from './plan-execution-section'
 import { PrivateBadge } from '../../../../../components/private-badge'
+import { Wordmark } from '../../../../../components/wordmark'
 import type { GameplanOutput } from '../../../../../lib/ai/schemas/gameplan'
 import type { MatchupPrediction } from '../../../../../lib/ai/schemas/prediction'
 import type { ExecutionDebrief } from '../../../../../lib/ai/schemas/execution-debrief'
@@ -32,8 +33,7 @@ export default async function GameplanPage({
   const athleteName = clerkUser?.firstName ?? clerkUser?.username ?? null
 
   const userId = await getOrCreateDbUserId().catch(() => null)
-  const tier = userId ? await getSubscriptionStatus(userId) : 'free'
-  const isPro = tier === 'pro' || tier === 'trial'
+  const canGenerate = userId ? (await checkMonthlyLimit(userId)).allowed : false
 
   const tournamentOwned = userId ? await db
     .select({ id: tournaments.id })
@@ -142,6 +142,14 @@ export default async function GameplanPage({
         {backLabel}
       </Link>
 
+      {/* Print-only branding header — the nav (with logo) is hidden via @media print */}
+      <div className="hidden print:flex items-center justify-between pb-4 mb-2 border-b border-border">
+        <Wordmark />
+        <span className="text-xs text-muted-foreground">
+          {athleteName ? `${athleteName} vs. ${activeOpponent.opponentLabel}` : `vs. ${activeOpponent.opponentLabel}`} · Gameplan
+        </span>
+      </div>
+
       {/* Opponent selector */}
       {sortedOpponents.length > 1 && (
         <OpponentSelector
@@ -172,6 +180,8 @@ export default async function GameplanPage({
               tournamentId={tournamentId}
               opponentId={activeOpponent.id}
               label={plan ? 'Regen' : 'Generate'}
+              disabled={!canGenerate}
+              title={!canGenerate ? `Monthly limit of ${FREE_MONTHLY_VIDEO_LIMIT} analyses reached` : undefined}
             />
           </div>
 
@@ -214,7 +224,7 @@ export default async function GameplanPage({
                       : isWin ? 'W — Win' : 'L — Loss'
                     return (
                       <span key={m.id} className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                        isWin ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/30' : 'bg-rose-950/60 text-rose-400 border border-rose-800/30'
+                        isWin ? 'bg-blue-950/60 text-blue-400 border border-blue-800/30' : 'bg-rose-950/60 text-rose-400 border border-rose-800/30'
                       }`}>
                         {label}
                       </span>
@@ -235,13 +245,13 @@ export default async function GameplanPage({
                 tournamentId={tournamentId}
                 opponentId={activeOpponent.id}
                 label={plan ? 'Regenerate' : 'Generate Gameplan'}
+                disabled={!canGenerate}
+                title={!canGenerate ? `Monthly limit of ${FREE_MONTHLY_VIDEO_LIMIT} analyses reached` : undefined}
               />
             </div>
           </div>
 
-          {!isPro ? (
-            <UpgradeGate />
-          ) : plan ? (
+          {plan ? (
             <>
               {scoutedCount <= 1 && (
                 <ConfidenceBanner count={scoutedCount} />
@@ -275,12 +285,14 @@ export default async function GameplanPage({
                 )
               })()}
             </>
-          ) : (
+          ) : canGenerate ? (
             <ReadyToGenerateState
               tournamentId={tournamentId}
               opponentId={activeOpponent.id}
               scoutedCount={scoutedCount}
             />
+          ) : (
+            <LimitReachedGate />
           )}
         </>
       )}
@@ -442,8 +454,8 @@ function MatchCard({ card }: { card: GameplanOutput['match_card'] }) {
 
         {/* Open with + Watch out — left-bordered cells, high contrast */}
         <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-lg border-l-[3px] border-emerald-500 bg-emerald-500/[0.07] dark:bg-emerald-500/[0.08] px-3 py-2.5 space-y-1">
-            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-500">Open with</p>
+          <div className="rounded-lg border-l-[3px] border-blue-500 bg-blue-500/[0.07] dark:bg-blue-500/[0.08] px-3 py-2.5 space-y-1">
+            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-blue-600 dark:text-blue-500">Open with</p>
             <p className="text-xs font-bold leading-snug">{card.open_with}</p>
           </div>
           <div className="rounded-lg border-l-[3px] border-rose-500 bg-rose-500/[0.07] dark:bg-rose-500/[0.08] px-3 py-2.5 space-y-1">
@@ -556,7 +568,7 @@ function DrillLibrary({ drillRefs }: { drillRefs: DrillRef[] }) {
         />
         <DrillGroup
           label="Your attack drills"
-          accent="bg-emerald-950/30 text-emerald-400/80"
+          accent="bg-blue-950/30 text-blue-400/80"
           refs={attackRefs}
         />
       </div>
@@ -684,7 +696,7 @@ function GameplanDisplay({ plan, drillRefs }: { plan: GameplanOutput; drillRefs?
               <p className="text-xs leading-relaxed">{plan.opponent_intel.biggest_threat}</p>
             </div>
             <div className="rounded-xl border border-border/40 bg-card p-4 space-y-1.5">
-              <p className="text-xs font-medium text-emerald-500">Their gap</p>
+              <p className="text-xs font-medium text-blue-500">Their gap</p>
               <p className="text-xs leading-relaxed">{plan.opponent_intel.biggest_weakness}</p>
             </div>
           </div>
@@ -771,7 +783,7 @@ function Section({ title, children, mobileCollapsed = false }: { title: string; 
 }
 
 const VERDICT_STYLES: Record<string, { bar: string; label: string; text: string }> = {
-  favourable: { bar: 'bg-emerald-500', label: 'Favourable', text: 'text-emerald-400' },
+  favourable: { bar: 'bg-blue-500', label: 'Favourable', text: 'text-blue-400' },
   neutral:    { bar: 'bg-amber-500',   label: 'Neutral',    text: 'text-amber-400' },
   tough:      { bar: 'bg-rose-500',    label: 'Tough draw', text: 'text-rose-400' },
 }
@@ -815,7 +827,7 @@ function PredictionCard({ prediction }: { prediction: MatchupPrediction }) {
         {/* Advantages + Risks */}
         <div className="grid sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-border/60">
           <div className="px-5 py-4 space-y-2">
-            <p className="text-xs font-medium text-emerald-500">Your edge</p>
+            <p className="text-xs font-medium text-blue-500">Your edge</p>
             {prediction.key_advantages.map((a, i) => (
               <p key={i} className="text-xs text-muted-foreground leading-relaxed">{a}</p>
             ))}
@@ -836,42 +848,22 @@ function PredictionCard({ prediction }: { prediction: MatchupPrediction }) {
   )
 }
 
-function UpgradeGate() {
+function LimitReachedGate() {
   return (
-    <div className="relative rounded-xl border border-border/60 bg-card overflow-hidden">
-      {/* Blurred preview skeleton */}
-      <div className="p-5 space-y-4 blur-sm pointer-events-none select-none opacity-60">
-        <div className="space-y-2">
-          <div className="h-2.5 w-16 rounded bg-muted" />
-          <div className="h-4 w-3/4 rounded bg-foreground/10" />
-          <div className="h-3 w-full rounded bg-muted" />
-          <div className="h-3 w-5/6 rounded bg-muted" />
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          {[1, 2, 3].map(i => <div key={i} className="h-7 w-24 rounded-lg bg-muted" />)}
-        </div>
-        <div className="h-3 w-full rounded bg-muted" />
-        <div className="h-3 w-4/5 rounded bg-muted" />
+    <div className="rounded-xl border border-border/60 bg-card p-8 text-center space-y-5">
+      <div>
+        <p className="text-xs text-muted-foreground font-medium mb-3">Monthly limit reached</p>
+        <h3 className="font-semibold text-lg mb-2">No new gameplans this month</h3>
+        <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+          You&apos;ve used all {FREE_MONTHLY_VIDEO_LIMIT} of your free analyses this month. New gameplans unlock again next month — or upgrade for unlimited.
+        </p>
       </div>
-
-      {/* Upgrade CTA — overlaid on the blurred preview */}
-      <div className="absolute inset-0 flex items-center justify-center p-5">
-        <div className="max-w-sm w-full rounded-xl border border-border/60 bg-background/95 backdrop-blur-sm shadow-lg px-5 py-5 text-center space-y-3">
-          <p className="text-sm font-semibold">Unlock Gameplans</p>
-          <p className="text-xs text-muted-foreground">
-            Upgrade to Pro for full AI gameplans, training plans, and unlimited tournaments.
-          </p>
-          <Link
-            href="/upgrade"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-foreground text-background text-xs font-semibold px-4 py-2 hover:opacity-90 transition-opacity"
-          >
-            Upgrade — €5/mo
-          </Link>
-          <Link href="/game-day" className="block text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors underline underline-offset-2">
-            View this matchup in Match Day →
-          </Link>
-        </div>
-      </div>
+      <Link
+        href="/upgrade"
+        className="inline-flex items-center gap-1.5 rounded-lg bg-foreground text-background text-xs font-semibold px-4 py-2 hover:opacity-90 transition-opacity"
+      >
+        Upgrade — €5/mo
+      </Link>
     </div>
   )
 }

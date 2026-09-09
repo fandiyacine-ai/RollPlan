@@ -10,6 +10,7 @@ import { DeleteVideoButton } from '../player-card/delete-video-button'
 import { VideoThumbnail } from '../player-card/video-thumbnail'
 import { POSITIONS } from '../../../lib/taxonomy/positions'
 import { auth } from '@clerk/nextjs/server'
+import { SampleMatchCardPreview } from '@/components/sample-preview'
 
 export const dynamic = 'force-dynamic'
 
@@ -82,7 +83,11 @@ export default async function MatchesPage() {
     })
     .from(matches)
     .leftJoin(videos, eq(matches.videoId, videos.id))
-    .where(and(matchFilter, or(isNull(videos.sourceType), ne(videos.sourceType, 'opponent'))))
+    .where(and(matchFilter, or(
+      isNull(videos.sourceType),
+      ne(videos.sourceType, 'opponent'),
+      and(eq(matches.competitorLabel, 'you'), isNull(matches.tournamentOpponentId)),
+    )))
     .orderBy(desc(matches.createdAt))
     .limit(50)
 
@@ -99,7 +104,12 @@ export default async function MatchesPage() {
     })
     .from(videos)
     .leftJoin(matches, eq(matches.videoId, videos.id))
-    .where(and(isNull(matches.id), ne(videos.status, 'analysed'), ne(videos.sourceType, 'opponent'), videoFilter))
+    .where(and(
+      isNull(matches.id),
+      ne(videos.status, 'analysed'),
+      or(ne(videos.sourceType, 'opponent'), isNull(videos.tournamentOpponentId)),
+      videoFilter,
+    ))
     .orderBy(desc(videos.uploadedAt))
     .limit(20)
 
@@ -169,6 +179,7 @@ export default async function MatchesPage() {
               </div>
             ))}
           </div>
+          <SampleMatchCardPreview />
           <p className="text-xs text-muted-foreground border-t border-border/40 pt-4">
             Scouted opponent footage lives under{' '}
             <Link href="/tournaments" className="underline underline-offset-2 hover:text-foreground transition-colors">
@@ -227,7 +238,7 @@ export default async function MatchesPage() {
                 <p className="text-xs text-muted-foreground font-medium mb-1.5 lg:mb-2.5">Record</p>
                 <div className="flex items-end gap-3 lg:gap-4">
                   <div>
-                    <p className="text-xl lg:text-2xl font-bold text-emerald-500 tabular-nums leading-none">{wins}</p>
+                    <p className="text-xl lg:text-2xl font-bold text-blue-500 tabular-nums leading-none">{wins}</p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">wins</p>
                   </div>
                   <div>
@@ -416,7 +427,7 @@ function MatchCard({
                 {match.resultWinner && (
                   <span className={`text-xs font-medium px-1.5 py-0.5 rounded-sm border ${
                     match.resultWinner === 'user'
-                      ? 'text-emerald-500 border-emerald-500/30'
+                      ? 'text-blue-500 border-blue-500/30'
                       : 'text-rose-500 border-rose-500/30'
                   }`}>
                     {match.resultWinner === 'user'

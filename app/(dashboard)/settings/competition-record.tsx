@@ -20,7 +20,7 @@ function WLRow({ label, wins, losses, url }: { label: string; wins: number | nul
     <div className="flex items-center gap-2">
       <PBadge label={label} />
       <span className="text-sm tabular-nums">
-        <span className="font-bold text-emerald-400">{wins ?? 0}W</span>
+        <span className="font-bold text-blue-400">{wins ?? 0}W</span>
         <span className="text-muted-foreground mx-1">–</span>
         <span className="font-bold text-rose-400">{losses ?? 0}L</span>
       </span>

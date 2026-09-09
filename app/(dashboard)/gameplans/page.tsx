@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { getOrCreateDbUserId } from '@/lib/db/get-user'
 import type { GameplanOutput } from '@/lib/ai/schemas/gameplan'
 import type { MatchupPrediction } from '@/lib/ai/schemas/prediction'
+import { SampleGameplanPreview } from '@/components/sample-preview'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,8 +22,8 @@ function DataQualityNote({ matchCount }: { matchCount: number }) {
 
 function WinBar({ probability, verdict }: { probability: number; verdict: string }) {
   const verdictLabel = verdict === 'favourable' ? 'Favourable' : verdict === 'tough' ? 'Tough' : 'Even'
-  const verdictColor = verdict === 'favourable' ? 'text-emerald-400' : verdict === 'tough' ? 'text-rose-400' : 'text-amber-400'
-  const barColor = verdict === 'favourable' ? 'bg-emerald-500/60' : verdict === 'tough' ? 'bg-rose-500/60' : 'bg-amber-500/60'
+  const verdictColor = verdict === 'favourable' ? 'text-blue-400' : verdict === 'tough' ? 'text-rose-400' : 'text-amber-400'
+  const barColor = verdict === 'favourable' ? 'bg-blue-500/60' : verdict === 'tough' ? 'bg-rose-500/60' : 'bg-amber-500/60'
   return (
     <div className="space-y-1.5">
       <div className="flex items-end justify-between gap-2">
@@ -172,6 +173,7 @@ export default async function GameplansPage() {
             <Link href="/tournaments" className="underline underline-offset-2 hover:text-foreground transition-colors">Add your first tournament →</Link>
           </p>
         </div>
+        <SampleGameplanPreview />
       </div>
     )
   }

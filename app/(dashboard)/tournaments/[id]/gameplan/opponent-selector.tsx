@@ -60,7 +60,7 @@ export function OpponentSelector({
                   className={`text-[10px] font-bold px-1 py-0.5 rounded ${
                   opp.id === activeId
                     ? 'bg-background/20 text-background'
-                    : oppPred.verdict === 'favourable' ? 'text-emerald-400'
+                    : oppPred.verdict === 'favourable' ? 'text-blue-400'
                     : oppPred.verdict === 'tough' ? 'text-rose-400'
                     : 'text-zinc-400'
                 }`}>

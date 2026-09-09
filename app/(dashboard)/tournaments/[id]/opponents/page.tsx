@@ -10,6 +10,7 @@ import type { GameplanOutput } from '../../../../../lib/ai/schemas/gameplan'
 import { getOrCreateDbUserId } from '../../../../../lib/db/get-user'
 import { getCommunityMatchCounts } from './actions'
 import { currentUser } from '@clerk/nextjs/server'
+import { checkMonthlyLimit } from '../../../../../lib/db/usage'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +31,10 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
     getOrCreateDbUserId().catch(() => null),
     currentUser(),
   ])
+
+  const usage = userId
+    ? await checkMonthlyLimit(userId).catch(() => ({ allowed: true, used: 0, limit: Infinity }))
+    : { allowed: true, used: 0, limit: Infinity }
 
   const userName = [clerkUser?.firstName, clerkUser?.lastName].filter(Boolean).join(' ') || 'You'
 
@@ -60,7 +65,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
     id: string; opponentLabel: string; profilePhotoUrl: string | null
     ajpWins: number | null; ajpLosses: number | null; ajpProfileUrl: string | null
     smoothcompWins: number | null; smoothcompLosses: number | null; smoothcompProfileUrl: string | null
-    ibjjfBestResult: string | null; footageStatus: string; intelStatus: string | null
+    ibjjfBestResult: string | null; ibjjfProfileUrl: string | null; footageStatus: string; intelStatus: string | null
     smoothcompAthleteId: string | null
   }[]
 
@@ -76,6 +81,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
       smoothcompLosses: tournamentOpponents.smoothcompLosses,
       smoothcompProfileUrl: tournamentOpponents.smoothcompProfileUrl,
       ibjjfBestResult: tournamentOpponents.ibjjfBestResult,
+      ibjjfProfileUrl: tournamentOpponents.ibjjfProfileUrl,
       footageStatus: tournamentOpponents.footageStatus,
       intelStatus: tournamentOpponents.intelStatus,
       smoothcompAthleteId: tournamentOpponents.smoothcompAthleteId,
@@ -329,6 +335,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
       smoothcompLosses: opp.smoothcompLosses,
       smoothcompProfileUrl: opp.smoothcompProfileUrl,
       ibjjfBestResult: opp.ibjjfBestResult,
+      ibjjfProfileUrl: opp.ibjjfProfileUrl,
       footageStatus: opp.footageStatus ?? 'manual',
       intelStatus: opp.intelStatus,
       scoutedMatchCount: scoutedMatches.length,
@@ -396,6 +403,7 @@ export default async function OpponentsPage({ params }: { params: Promise<{ id: 
           opponents={opponentData}
           smoothcompUrl={tournamentRow.smoothcompUrl ?? null}
           userSmootcompAthleteId={userSmootcompAthleteId}
+          usage={usage}
         />
       )}
     </div>

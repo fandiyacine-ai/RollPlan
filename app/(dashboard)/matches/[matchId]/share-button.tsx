@@ -115,7 +115,7 @@ export function ShareButton({ matchId }: { matchId: string }) {
                     onClick={copy}
                     className={`flex-shrink-0 text-xs px-3 py-2 rounded-lg font-medium transition-all ${
                       copied
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                         : 'bg-foreground text-background hover:opacity-90'
                     }`}
                   >

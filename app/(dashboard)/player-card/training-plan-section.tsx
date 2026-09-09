@@ -8,7 +8,7 @@ import type { TrainingPlan } from '../../../lib/ai/schemas/training-plan'
 
 const FOCUS_COLORS: Record<string, string> = {
   defence: 'text-rose-400 bg-rose-400/10',
-  offence: 'text-emerald-400 bg-emerald-400/10',
+  offence: 'text-blue-400 bg-blue-400/10',
   transitions: 'text-amber-400 bg-amber-400/10',
 }
 
@@ -19,7 +19,7 @@ function YoutubeLink({ query }: { query: string }) {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors mt-1"
+      className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
     >
       <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="text-rose-500">
         <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
@@ -29,16 +29,30 @@ function YoutubeLink({ query }: { query: string }) {
   )
 }
 
+function DrillLibraryLink({ query }: { query: string }) {
+  return (
+    <Link
+      href={`/drills?q=${encodeURIComponent(query)}`}
+      className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+    >
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+      </svg>
+      Drill Library
+    </Link>
+  )
+}
+
 export function TrainingPlanSection({
   initialPlan,
   generatedAt,
   isGenerating = false,
-  isPro = false,
+  canGenerate = true,
 }: {
   initialPlan: TrainingPlan | null
   generatedAt: Date | null
   isGenerating?: boolean
-  isPro?: boolean
+  canGenerate?: boolean
 }) {
   const [state, setState] = useState<'idle' | 'queued' | 'error'>(isGenerating ? 'queued' : 'idle')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -77,14 +91,14 @@ export function TrainingPlanSection({
     <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
       <div className="px-4 py-2.5 border-b border-border/60 flex items-center justify-between">
         <div>
-          <h2 className="text-xs font-medium text-muted-foreground">Training plan</h2>
+          <h2 className="text-xs font-medium text-muted-foreground">Focus areas</h2>
           {generatedAt && (
             <p className="text-[10px] text-muted-foreground/60 mt-0.5">
               Generated {fmtDate(new Date(generatedAt))}
             </p>
           )}
         </div>
-        {isPro ? (
+        {canGenerate ? (
           <button
             onClick={handleGenerate}
             disabled={state === 'queued'}
@@ -103,12 +117,13 @@ export function TrainingPlanSection({
         ) : (
           <Link
             href="/upgrade"
+            title="Monthly analysis limit reached — upgrade for unlimited"
             className="text-[10px] px-2.5 py-1 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors flex items-center gap-1"
           >
             <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
             </svg>
-            Pro
+            Limit reached
           </Link>
         )}
       </div>
@@ -145,7 +160,10 @@ export function TrainingPlanSection({
               </div>
               <p className="text-[11px] text-muted-foreground leading-relaxed">{drill.evidence}</p>
               <p className="text-[11px] text-foreground/80 leading-relaxed">{drill.drill_description}</p>
-              <YoutubeLink query={drill.youtube_search} />
+              <div className="flex items-center gap-3 mt-1">
+                <YoutubeLink query={drill.youtube_search} />
+                <DrillLibraryLink query={drill.youtube_search} />
+              </div>
             </div>
           ))}
           {initialPlan.summary && (

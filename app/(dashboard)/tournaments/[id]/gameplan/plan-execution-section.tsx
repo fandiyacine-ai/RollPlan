@@ -15,7 +15,7 @@ function resultLabel(m: OwnMatch): string {
 }
 
 const VERDICT_CONFIG = {
-  executed_well:       { label: 'Executed well',       colour: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/40' },
+  executed_well:       { label: 'Executed well',       colour: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/40' },
   partially_executed:  { label: 'Partially executed',  colour: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/40' },
   not_executed:        { label: 'Not executed',         colour: 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800/40' },
   insufficient_data:   { label: 'Insufficient data',   colour: 'text-zinc-500 bg-muted border-border' },
@@ -23,7 +23,7 @@ const VERDICT_CONFIG = {
 
 const EXECUTION_LABEL = { yes: 'Executed', partial: 'Partial', no: 'Not executed' } as const
 const EXECUTION_COLOUR = {
-  yes:     'text-emerald-600 dark:text-emerald-400',
+  yes:     'text-blue-600 dark:text-blue-400',
   partial: 'text-amber-600 dark:text-amber-400',
   no:      'text-rose-500 dark:text-rose-400',
 } as const
@@ -65,7 +65,7 @@ function DebriefDisplay({ debrief }: { debrief: ExecutionDebrief }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
             What worked
           </p>
           <ul className="space-y-1">

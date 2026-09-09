@@ -41,7 +41,7 @@ export function SyncBracketButton({ tournamentId }: { tournamentId: string }) {
         ) : 'Sync results from bracket'}
       </button>
       {message && (
-        <span className={`text-xs ${state === 'error' ? 'text-rose-400' : 'text-emerald-400'}`}>
+        <span className={`text-xs ${state === 'error' ? 'text-rose-400' : 'text-blue-400'}`}>
           {message}
         </span>
       )}
