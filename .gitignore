@@ -9,3 +9,7 @@ tsconfig.tsbuildinfo
 # Browser screenshots from UX review sessions
 .screenshots/
 .playwright-mcp/
+
+# Python bytecode (gym-poc scripts)
+__pycache__/
+*.pyc

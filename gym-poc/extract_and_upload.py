@@ -30,6 +30,8 @@ from pathlib import Path
 import cv2
 from roboflow import Roboflow
 
+from split_util import split_for_video
+
 API_KEY   = "9qRhtkZOTlh4C38sjI2W"
 WORKSPACE = "hello-rollplan-ai"
 PROJECT   = "bjj-submissions"
@@ -83,7 +85,9 @@ def extract_frames(video_path: str, class_name: str, out_dir: Path) -> list[Path
     return saved
 
 
-def upload_frames(frames: list[Path], class_name: str, split: str = "train") -> tuple[int, int]:
+def upload_frames(frames: list[Path], class_name: str, source: str) -> tuple[int, int]:
+    # One bucket per source video — near-duplicate frames must not straddle splits.
+    split = split_for_video(source)
     rf = Roboflow(api_key=API_KEY)
     proj = rf.workspace(WORKSPACE).project(PROJECT)
 
@@ -126,8 +130,8 @@ def process_one(video_path: str, class_name: str, frames_dir: Path):
         return
 
     print(f"  Uploading {len(frames)} frames as class '{class_name}' ...")
-    ok, fail = upload_frames(frames, class_name)
-    print(f"  Done: {ok} uploaded, {fail} failed")
+    ok, fail = upload_frames(frames, class_name, video_path)
+    print(f"  Done: {ok} uploaded, {fail} failed  (split={split_for_video(video_path)})")
 
 
 def main():

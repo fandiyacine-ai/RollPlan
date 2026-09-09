@@ -14,6 +14,7 @@
  */
 
 import { spawn, execFileSync } from 'child_process'
+import { createHash } from 'crypto'
 import { mkdtempSync, rmSync, readdirSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
@@ -73,6 +74,39 @@ const ALL_CLASSES = [
 ]
 
 const CLASS_MAP = ROBOFLOW_CLASS_MAP
+
+
+// ── Train/valid/test split ────────────────────────────────────────────────────
+//
+// Frames are sampled at 1fps from a single ~60s window, so consecutive frames of
+// one video are near-duplicates. A random split would put visually identical
+// frames in both train and validation and make any accuracy number meaningless.
+// Split by SOURCE VIDEO instead: every frame of a video lands in one bucket.
+// The md5 bucketing is mirrored exactly in gym-poc/split_util.py so the
+// TypeScript and Python harvesters agree on where a given video belongs.
+// Change one, change the other.
+
+const SPLIT_TRAIN_PCT = 70
+const SPLIT_VALID_PCT = 20   // remainder (10%) goes to test
+
+/** Stable identity for a source video — the YouTube id when one is present. */
+export function videoGroupKey(sourceUrl: string): string {
+  const url = (sourceUrl ?? '').trim()
+  const long = url.match(/[?&]v=([\w-]+)/)
+  if (long) return long[1]
+  const short = url.match(/youtu\.be\/([\w-]+)/)
+  if (short) return short[1]
+  return url
+}
+
+/** Deterministic per-video split assignment. Same video → same split, always. */
+export function splitForVideo(sourceUrl: string): 'train' | 'valid' | 'test' {
+  const digest = createHash('md5').update(videoGroupKey(sourceUrl)).digest('hex').slice(0, 8)
+  const bucket = parseInt(digest, 16) % 100
+  if (bucket < SPLIT_TRAIN_PCT) return 'train'
+  if (bucket < SPLIT_TRAIN_PCT + SPLIT_VALID_PCT) return 'valid'
+  return 'test'
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -184,12 +218,14 @@ async function classifyFrame(
   }
 }
 
-/** Upload a single frame to Roboflow bjj-submissions via REST API. */
-async function uploadToRoboflow(framePath: string, className: string): Promise<boolean> {
+/** Upload a single frame to the Roboflow project via REST API. */
+async function uploadToRoboflow(
+  framePath: string, className: string, split: 'train' | 'valid' | 'test',
+): Promise<boolean> {
   const imageData = readFileSync(framePath).toString('base64')
   const url = `https://api.roboflow.com/dataset/${ROBOFLOW_PROJ}/upload`
     + `?api_key=${ROBOFLOW_KEY}&name=${encodeURIComponent(framePath.split('/').pop()!)}`
-    + `&split=train&annotation=${encodeURIComponent(className)}`
+    + `&split=${split}&annotation=${encodeURIComponent(className)}`
 
   const res = await fetch(url, {
     method: 'POST',
@@ -213,6 +249,9 @@ async function harvestRecord(record: {
     console.log(`[harvest] no class mapping for event_id=${record.eventId}, skipping`)
     return { uploaded: 0, corrections: 0 }
   }
+
+  // Every frame of this video shares one split bucket — see splitForVideo above.
+  const split = splitForVideo(record.sourceUrl)
 
   const tmpDir = mkdtempSync(join(tmpdir(), 'rp-harvest-'))
   try {
@@ -244,11 +283,11 @@ async function harvestRecord(record: {
 
       if (detectedClass !== expectedClass) corrections++
 
-      const ok = await uploadToRoboflow(framePath, detectedClass)
+      const ok = await uploadToRoboflow(framePath, detectedClass, split)
       if (ok) uploaded++
     }
 
-    console.log(`[harvest] ${record.eventId} → uploaded=${uploaded} corrections=${corrections}`)
+    console.log(`[harvest] ${record.eventId} → uploaded=${uploaded} corrections=${corrections} split=${split}`)
     return { uploaded, corrections }
   } finally {
     rmSync(tmpDir, { recursive: true, force: true })

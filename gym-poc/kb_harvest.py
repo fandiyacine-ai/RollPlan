@@ -32,6 +32,8 @@ from pathlib import Path
 import cv2
 from roboflow import Roboflow
 
+from split_util import split_for_video
+
 # ── Config ────────────────────────────────────────────────────────────────────
 
 DATABASE_URL    = os.environ["DATABASE_URL"]
@@ -437,18 +439,21 @@ def extract_classified_frames(video_path, expected_class, visual_cues, frames_di
 
 # ── Upload ────────────────────────────────────────────────────────────────────
 
-def upload_batch(items):
+def upload_batch(items, source_url):
     """
     items: list of (frame_path, class_name) — each frame may have its own label.
+    source_url: the video every frame came from; fixes the split for the batch so
+                near-duplicate frames can never straddle train/valid/test.
     """
     rf   = Roboflow(api_key=ROBOFLOW_KEY)
     proj = rf.workspace(WORKSPACE).project(PROJECT)
+    split = split_for_video(source_url)
     ok = fail = 0
 
     def _up(path, cls):
         try:
             proj.single_upload(image_path=str(path), annotation_path=cls,
-                               split="train", num_retry_uploads=2)
+                               split=split, num_retry_uploads=2)
             return True
         except Exception:
             return False
@@ -535,7 +540,7 @@ def main():
             ):
                 batch.append((frame_path, detected_class))
                 if len(batch) >= 50:
-                    ok, fail = upload_batch(batch)
+                    ok, fail = upload_batch(batch, url)
                     total_uploaded += ok
                     total_fail     += fail
                     for p, _ in batch:
@@ -544,7 +549,7 @@ def main():
                     print(f"      → batch uploaded  total_ok={total_uploaded}", flush=True)
 
             if batch:
-                ok, fail = upload_batch(batch)
+                ok, fail = upload_batch(batch, url)
                 total_uploaded += ok
                 total_fail     += fail
                 for p, _ in batch:
@@ -557,7 +562,7 @@ def main():
 
     print(f"\n{'═'*60}")
     print(f"Done.  Uploaded: {total_uploaded}  Failed: {total_fail}")
-    print("Next step: Roboflow → bjj-submissions → Generate new version → Train")
+    print(f"Next step: Roboflow → {PROJECT} → Generate new version → Train")
 
 
 if __name__ == "__main__":
