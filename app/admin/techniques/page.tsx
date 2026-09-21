@@ -180,7 +180,7 @@ export default function AdminTechniquesPage() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="font-semibold text-zinc-200">Autonomous agent</p>
-            <p className="text-xs text-zinc-500 mt-1">Claude searches YouTube, evaluates instructionals, and fills coverage gaps automatically. Runs daily at 3am UTC or on demand. High-quality extractions auto-approve.</p>
+            <p className="text-xs text-zinc-500 mt-1">Claude searches YouTube, evaluates instructionals, and fills coverage gaps automatically. Runs weekly (Sunday 3am UTC) or on demand. A run skips itself if coverage is already complete or the monthly AI budget is spent — check Inngest for the outcome. High-quality extractions auto-approve.</p>
           </div>
           <button
             onClick={runAgent}
