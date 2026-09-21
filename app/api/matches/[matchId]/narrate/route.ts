@@ -5,11 +5,16 @@ import { eq, asc } from 'drizzle-orm'
 import { generateText } from 'ai'
 import { anthropic, CLAUDE_SYNTHESIS_MODEL } from '../../../../../lib/ai/clients'
 import { buildNarrationSystemPrompt, buildNarrationUserPrompt } from '../../../../../lib/ai/prompts/generate-narration'
+import { logAiCall } from '../../../../../lib/ai/usage'
 import { POSITIONS } from '../../../../../lib/taxonomy/positions'
 import { EVENT_TYPES } from '../../../../../lib/taxonomy/events'
 import { auth } from '@clerk/nextjs/server'
 
 export const maxDuration = 60
+
+// The narration prompt lives in lib/ai/prompts/generate-narration but exports no
+// version constant; bump this when that prompt changes.
+const NARRATION_PROMPT_VERSION = 'v1'
 
 const POSITION_MAP = Object.fromEntries(POSITIONS.map(p => [p.id, p.name]))
 const EVENT_MAP = Object.fromEntries(EVENT_TYPES.map(e => [e.id, e.name]))
@@ -70,7 +75,8 @@ export async function POST(
       .sort((a, b) => a.time - b.time)
       .map(t => ({ type: t.type, time: fmt(t.time), description: t.description }))
 
-    const { text } = await generateText({
+    const start = Date.now()
+    const { text, usage } = await generateText({
       model: anthropic(CLAUDE_SYNTHESIS_MODEL),
       system: buildNarrationSystemPrompt(),
       prompt: buildNarrationUserPrompt({
@@ -91,6 +97,15 @@ export async function POST(
         })),
       }),
       maxOutputTokens: 600,
+    })
+
+    await logAiCall({
+      userId: match.userId ?? null,
+      jobId: matchId,
+      model: CLAUDE_SYNTHESIS_MODEL,
+      promptVersion: NARRATION_PROMPT_VERSION,
+      usage,
+      latencyMs: Date.now() - start,
     })
 
     await db.update(matches).set({ narration: text.trim() }).where(eq(matches.id, matchId))

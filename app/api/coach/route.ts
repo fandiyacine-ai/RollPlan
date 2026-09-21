@@ -6,10 +6,14 @@ import { matches, videos, positionSegments, matchEvents, insights } from '../../
 import { eq, asc } from 'drizzle-orm'
 import { getTechniqueVariantsByEvents, formatVariantsAsPromptBlock, formatVariantsAsCounterGuide } from '../../../lib/ai/technique-retrieval'
 import { EVENT_TYPES } from '../../../lib/taxonomy/events'
+import { logAiCall } from '../../../lib/ai/usage'
 
 const EVENT_MAP = Object.fromEntries(EVENT_TYPES.map(e => [e.id, e.name]))
 
 export const maxDuration = 30
+
+// The coach system prompt is built inline below; bump this when it changes.
+const COACH_PROMPT_VERSION = 'v1'
 
 function fmt(seconds: number): string {
   const m = Math.floor(seconds / 60)
@@ -134,6 +138,8 @@ Coaching guidelines:
 - Be actionable — what to fix or drill, not just what went wrong
 - Respond in the same language as the athlete's question`
 
+  const start = Date.now()
+
   const result = streamText({
     model: anthropic(CLAUDE_SYNTHESIS_MODEL),
     system,
@@ -145,6 +151,18 @@ Coaching guidelines:
       ],
     }],
     maxOutputTokens: 400,
+    // Usage is only known once the stream finishes, so log from onFinish rather than
+    // at the return below. logAiCall never throws, so this cannot break the response.
+    onFinish: async ({ totalUsage }) => {
+      await logAiCall({
+        userId: match.userId ?? null,
+        jobId: matchId,
+        model: CLAUDE_SYNTHESIS_MODEL,
+        promptVersion: COACH_PROMPT_VERSION,
+        usage: totalUsage,
+        latencyMs: Date.now() - start,
+      })
+    },
   })
 
   return result.toTextStreamResponse()

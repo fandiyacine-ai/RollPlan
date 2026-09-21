@@ -4,6 +4,7 @@ import { db } from '../lib/db'
 import { gameplans, planExecutions, positionSegments, matchEvents, matches } from '../lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { anthropic, CLAUDE_SYNTHESIS_MODEL } from '../lib/ai/clients'
+import { logAiCall } from '../lib/ai/usage'
 import { ExecutionDebriefSchema, type ExecutionDebrief } from '../lib/ai/schemas/execution-debrief'
 import { buildDebriefSystemPrompt, buildDebriefUserPrompt, GENERATE_EXECUTION_DEBRIEF_PROMPT_VERSION } from '../lib/ai/prompts/generate-execution-debrief'
 import type { GameplanOutput } from '../lib/ai/schemas/gameplan'
@@ -36,7 +37,8 @@ export const generateExecutionDebrief = inngest.createFunction(
     })
 
     const debrief = await step.run('generate-debrief', async () => {
-      const { object } = await generateObject({
+      const start = Date.now()
+      const { object, usage } = await generateObject({
         model: anthropic(CLAUDE_SYNTHESIS_MODEL),
         schema: ExecutionDebriefSchema,
         maxRetries: 0,
@@ -65,6 +67,15 @@ export const generateExecutionDebrief = inngest.createFunction(
           },
         }),
       })
+      await logAiCall({
+        userId: debriefData.match.userId ?? null,
+        jobId: matchId,
+        model: CLAUDE_SYNTHESIS_MODEL,
+        promptVersion: GENERATE_EXECUTION_DEBRIEF_PROMPT_VERSION,
+        usage,
+        latencyMs: Date.now() - start,
+      })
+
       return object as ExecutionDebrief
     })
 

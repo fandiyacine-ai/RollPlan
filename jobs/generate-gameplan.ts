@@ -8,6 +8,7 @@ import { GameplanOutputSchema, GameplanOutput } from '../lib/ai/schemas/gameplan
 import { MatchupPredictionSchema, MatchupPrediction } from '../lib/ai/schemas/prediction'
 import { buildGameplanSystemPrompt, buildGameplanUserPrompt, GENERATE_GAMEPLAN_PROMPT_VERSION } from '../lib/ai/prompts/generate-gameplan'
 import { buildPredictionSystemPrompt, buildPredictionUserPrompt, GENERATE_PREDICTION_PROMPT_VERSION } from '../lib/ai/prompts/generate-prediction'
+import { logAiCall } from '../lib/ai/usage'
 import { createNotification } from '../lib/db/notifications'
 import { getTechniqueVariantsByEvents, formatVariantsAsPromptBlock, formatVariantsAsCounterGuide } from '../lib/ai/technique-retrieval'
 import { captureServerEvent } from '../lib/posthog-server'
@@ -324,7 +325,8 @@ export const generateGameplan = inngest.createFunction(
       const yourStats = computeMatchStats(yourMatchRows, yourSegments, yourEvents, 'user')
       const opponentStats = computeMatchStats(oppMatchRows, oppSegments, oppEvents, 'opponent')
 
-      const { object } = await generateObject({
+      const start = Date.now()
+      const { object, usage } = await generateObject({
         model: anthropic(CLAUDE_SYNTHESIS_MODEL),
         schema: MatchupPredictionSchema,
         maxRetries: 0,
@@ -336,6 +338,15 @@ export const generateGameplan = inngest.createFunction(
           opponentStats,
         }),
       })
+      await logAiCall({
+        userId: userId ?? null,
+        jobId: tournamentId,
+        model: CLAUDE_SYNTHESIS_MODEL,
+        promptVersion: GENERATE_PREDICTION_PROMPT_VERSION,
+        usage,
+        latencyMs: Date.now() - start,
+      })
+
       return object as MatchupPrediction
     }).catch(() => null)  // prediction failure must never block the gameplan
 

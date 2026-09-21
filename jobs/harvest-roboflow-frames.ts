@@ -21,6 +21,11 @@ import { tmpdir } from 'os'
 import { isNull, eq, and } from 'drizzle-orm'
 import { generateText } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
+import { CLAUDE_VISION_MODEL } from '../lib/ai/clients'
+import { logAiCall } from '../lib/ai/usage'
+
+// The frame-classification prompt is built inline below; bump when it changes.
+const HARVEST_CLASSIFY_PROMPT_VERSION = 'v1'
 import ffmpegStaticPath from 'ffmpeg-static'
 
 const ffmpegBin: string = (ffmpegStaticPath && existsSync(ffmpegStaticPath)) ? ffmpegStaticPath : 'ffmpeg'
@@ -170,12 +175,19 @@ async function passesPositionGate(framePath: string): Promise<boolean> {
   )
 }
 
-/** Stage 2: Claude Haiku vision — returns the detected class name or null to discard. */
+/**
+ * Stage 2: Claude Haiku vision — returns the detected class name (null to discard)
+ * plus the call's token usage, so the caller can aggregate spend across frames.
+ * One ai_call_logs row per frame would mean ~60 rows per variant, so the harvest
+ * logs a single aggregated row per record instead.
+ */
+type FrameClassification = { label: string | null; tokensIn: number; tokensOut: number }
+
 async function classifyFrame(
   framePath: string,
   expectedClass: string,
   visualCues: string,
-): Promise<string | null> {
+): Promise<FrameClassification> {
   const classList = ALL_CLASSES.map(c => `  - ${c}`).join('\n')
   const hint = expectedClass.replace(/_/g, ' ')
   const prompt = [
@@ -200,8 +212,8 @@ async function classifyFrame(
   try {
     const imageBytes = readFileSync(framePath)
     const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-    const { text } = await generateText({
-      model: anthropic('claude-haiku-4-5-20251001'),
+    const { text, usage } = await generateText({
+      model: anthropic(CLAUDE_VISION_MODEL),
       maxOutputTokens: 20,
       messages: [{
         role: 'user',
@@ -212,9 +224,13 @@ async function classifyFrame(
       }],
     })
     const raw = text.trim().toLowerCase().replace(/ /g, '_')
-    return ALL_CLASSES.includes(raw) ? raw : null
+    return {
+      label: ALL_CLASSES.includes(raw) ? raw : null,
+      tokensIn: usage.inputTokens ?? 0,
+      tokensOut: usage.outputTokens ?? 0,
+    }
   } catch {
-    return null
+    return { label: null, tokensIn: 0, tokensOut: 0 }
   }
 }
 
@@ -271,6 +287,8 @@ async function harvestRecord(record: {
     console.log(`[harvest] extracted ${frames.length} frames`)
 
     let uploaded = 0, corrections = 0
+    let visionTokensIn = 0, visionTokensOut = 0, visionCalls = 0
+    const visionStart = Date.now()
 
     for (const framePath of frames) {
       // Stage 1: position gate
@@ -278,7 +296,11 @@ async function harvestRecord(record: {
       if (!isGround) continue
 
       // Stage 2: Claude multi-class classification
-      const detectedClass = await classifyFrame(framePath, expectedClass, record.visualCues)
+      const { label: detectedClass, tokensIn, tokensOut } = await classifyFrame(framePath, expectedClass, record.visualCues)
+      visionTokensIn += tokensIn
+      visionTokensOut += tokensOut
+      visionCalls++
+
       if (!detectedClass) continue
 
       if (detectedClass !== expectedClass) corrections++
@@ -287,7 +309,21 @@ async function harvestRecord(record: {
       if (ok) uploaded++
     }
 
-    console.log(`[harvest] ${record.eventId} → uploaded=${uploaded} corrections=${corrections} split=${split}`)
+    // One aggregated row for the whole record's vision pass — up to ~60 Haiku calls per
+    // variant, previously unlogged entirely. The row's token totals carry the volume;
+    // promptVersion stays a plain version so `group by prompt_version` still works.
+    if (visionCalls > 0) {
+      await logAiCall({
+        userId: null,
+        jobId: record.id,
+        model: CLAUDE_VISION_MODEL,
+        promptVersion: HARVEST_CLASSIFY_PROMPT_VERSION,
+        usage: { inputTokens: visionTokensIn, outputTokens: visionTokensOut },
+        latencyMs: Date.now() - visionStart,
+      })
+    }
+
+    console.log(`[harvest] ${record.eventId} → uploaded=${uploaded} corrections=${corrections} split=${split} visionCalls=${visionCalls}`)
     return { uploaded, corrections }
   } finally {
     rmSync(tmpDir, { recursive: true, force: true })
