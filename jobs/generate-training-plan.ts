@@ -5,6 +5,11 @@ import { matches, positionSegments, matchEvents, videos, tournaments, tournament
 import { eq, and, or, ne, isNull, inArray, desc, gt, sql } from 'drizzle-orm'
 import { anthropic, CLAUDE_SYNTHESIS_MODEL } from '../lib/ai/clients'
 import { TrainingPlanSchema } from '../lib/ai/schemas/training-plan'
+import { logAiCall } from '../lib/ai/usage'
+
+// The training-plan prompt is built inline below rather than in lib/ai/prompts, so its
+// version lives here. Bump it when the prompt text changes.
+const TRAINING_PLAN_PROMPT_VERSION = 'v1'
 
 const POSITION_LABELS: Record<string, string> = {
   closed_guard: 'closed guard', half_guard: 'half guard', open_guard: 'open guard',
@@ -164,7 +169,8 @@ export const generateTrainingPlan = inngest.createFunction(
         sections.push(`UPCOMING OPPONENTS (${opponents.length}):\n${oppLines.join('\n')}`)
       }
 
-      const { object } = await generateObject({
+      const start = Date.now()
+      const { object, usage } = await generateObject({
         model: anthropic(CLAUDE_SYNTHESIS_MODEL),
         schema: TrainingPlanSchema,
         temperature: 0,
@@ -183,6 +189,15 @@ Rules:
 
 Return 3 drills ordered: most critical first.`,
         }],
+      })
+
+      await logAiCall({
+        userId,
+        jobId: userId,
+        model: CLAUDE_SYNTHESIS_MODEL,
+        promptVersion: TRAINING_PLAN_PROMPT_VERSION,
+        usage,
+        latencyMs: Date.now() - start,
       })
 
       return object
