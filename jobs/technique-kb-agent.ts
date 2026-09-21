@@ -17,7 +17,7 @@ import { z } from 'zod'
 import { inngest } from '../lib/inngest'
 import { db } from '../lib/db'
 import { techniqueVariants, aiCallLogs } from '../lib/db/schema'
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, gte, sql } from 'drizzle-orm'
 import { anthropic, CLAUDE_SYNTHESIS_MODEL, estimateCostUsd } from '../lib/ai/clients'
 import { EVENT_TYPES } from '../lib/taxonomy/events'
 import { POSITIONS } from '../lib/taxonomy/positions'
@@ -30,6 +30,45 @@ const MIN_ACTIVE_VARIANTS = 1     // target coverage per event/position combo
 // re-triggers the KB rescan across every eligible match. The budgets above are the
 // only thing bounding that fan-out, so keep them small and let coverage build over
 // weeks rather than trying to fill the whole matrix in one run.
+
+// Hard ceiling on platform-wide month-to-date AI spend, from ai_call_logs. This job is
+// discretionary background curation — when the month's budget has already gone on
+// user-facing analysis, skip the run rather than push the account into auto-recharge.
+// Set KB_AGENT_MONTHLY_BUDGET_USD=0 to disable the agent entirely.
+//
+// Parsed defensively: an unset, blank, or unparseable value falls back to the default
+// rather than to Number('') === 0, which would silently disable the agent forever.
+// An explicit 0 is honoured.
+const MONTHLY_BUDGET_USD: number = (() => {
+  const DEFAULT_BUDGET_USD = 50
+  const raw = process.env.KB_AGENT_MONTHLY_BUDGET_USD
+  if (raw === undefined || raw.trim() === '') return DEFAULT_BUDGET_USD
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_BUDGET_USD
+})()
+
+/**
+ * Platform-wide estimated AI spend since the start of the current UTC month.
+ *
+ * NOTE: this is a LOWER BOUND. Several call sites never write to ai_call_logs at all
+ * (generate-training-plan, generate-execution-debrief, the Haiku vision calls in
+ * harvest-roboflow-frames, the narrate route), and others log only some of their
+ * calls, so real spend is higher than this returns and the ceiling trips later than
+ * the nominal figure suggests. Set the budget conservatively until logging is
+ * complete.
+ */
+async function monthToDateSpendUsd(): Promise<number> {
+  const startOfMonth = new Date()
+  startOfMonth.setUTCDate(1)
+  startOfMonth.setUTCHours(0, 0, 0, 0)
+
+  const [row] = await db
+    .select({ total: sql<number>`coalesce(sum(${aiCallLogs.costUsdEstimate}), 0)` })
+    .from(aiCallLogs)
+    .where(gte(aiCallLogs.createdAt, startOfMonth))
+
+  return Number(row?.total ?? 0)
+}
 
 // Trusted channel keywords — Claude uses this list to evaluate results
 const TRUSTED_CHANNELS = [
@@ -290,6 +329,21 @@ export const techniqueKbAgent = inngest.createFunction(
   async ({ step }: { step: any }) => {
     const runStartedAt = new Date().toISOString()
 
+    // Spend ceiling first: it is the cheaper query and the harder stop.
+    const spentUsd: number = await step.run('check-monthly-budget', monthToDateSpendUsd)
+
+    if (spentUsd >= MONTHLY_BUDGET_USD) {
+      return {
+        skipped: 'monthly AI budget reached',
+        spentUsd,
+        budgetUsd: MONTHLY_BUDGET_USD,
+        searchesUsed: 0,
+        videosQueued: 0,
+        agentSteps: 0,
+        summary: '',
+      }
+    }
+
     // Bail before any model call when coverage is already complete. Without this the
     // agent runs its full budget on every trigger forever, and each run re-fires the
     // KB rescan across every eligible match.
@@ -311,7 +365,7 @@ export const techniqueKbAgent = inngest.createFunction(
       const state = { searchCount: 0, queuedCount: 0, queuedUrls: new Set<string>(), existingUrls: new Set(existingSourceUrls) }
       const start = Date.now()
 
-      const { text, usage, steps } = await generateText({
+      const { text, totalUsage, steps } = await generateText({
         model: anthropic(CLAUDE_SYNTHESIS_MODEL),
         // No prompt caching: every step resends the whole transcript, so the token
         // cost of a run grows quadratically with the step count. Keep this just above
@@ -361,14 +415,21 @@ Be efficient — one good search per gap, queue 1–2 videos, move on. Don't ove
         tools: buildTools(state),
       })
 
+      // `usage` is the usage of the LAST step only. This is a multi-step tool loop with
+      // no prompt caching, so every step resends the whole transcript — logging `usage`
+      // under-reported this job by roughly the step count, which is why it never showed
+      // up on /admin/usage. `totalUsage` aggregates all steps.
+      const tokensIn = totalUsage.inputTokens ?? 0
+      const tokensOut = totalUsage.outputTokens ?? 0
+
       await db.insert(aiCallLogs).values({
         userId: null,
         jobId: 'technique-kb-agent',
         model: CLAUDE_SYNTHESIS_MODEL,
         promptVersion: 'agent-v1',
-        tokensIn: usage.inputTokens ?? 0,
-        tokensOut: usage.outputTokens ?? 0,
-        costUsdEstimate: estimateCostUsd(CLAUDE_SYNTHESIS_MODEL, usage.inputTokens ?? 0, usage.outputTokens ?? 0),
+        tokensIn,
+        tokensOut,
+        costUsdEstimate: estimateCostUsd(CLAUDE_SYNTHESIS_MODEL, tokensIn, tokensOut),
         latencyMs: Date.now() - start,
         status: 'success',
       })
