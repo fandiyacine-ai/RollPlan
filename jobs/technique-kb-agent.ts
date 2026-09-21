@@ -22,9 +22,14 @@ import { anthropic, CLAUDE_SYNTHESIS_MODEL, estimateCostUsd } from '../lib/ai/cl
 import { EVENT_TYPES } from '../lib/taxonomy/events'
 import { POSITIONS } from '../lib/taxonomy/positions'
 
-const MAX_SEARCHES_PER_RUN = 40   // YouTube API budget: 100 units/search, 10k/day free
-const MAX_VIDEOS_QUEUED = 120     // cap total ingest jobs triggered per run
-const MIN_ACTIVE_VARIANTS = 2     // target coverage per event/position combo
+const MAX_SEARCHES_PER_RUN = 15   // YouTube API budget: 100 units/search, 10k/day free
+const MAX_VIDEOS_QUEUED = 15      // cap total ingest jobs triggered per run
+const MIN_ACTIVE_VARIANTS = 1     // target coverage per event/position combo
+
+// Each queued video costs a Gemini video extraction, and each newly *active* variant
+// re-triggers the KB rescan across every eligible match. The budgets above are the
+// only thing bounding that fan-out, so keep them small and let coverage build over
+// weeks rather than trying to fill the whole matrix in one run.
 
 // Trusted channel keywords — Claude uses this list to evaluate results
 const TRUSTED_CHANNELS = [
@@ -61,7 +66,7 @@ type YTVideo = {
   publishedAt: string
 }
 
-async function youtubeSearch(query: string, maxResults = 8): Promise<YTVideo[]> {
+async function youtubeSearch(query: string, maxResults = 5): Promise<YTVideo[]> {
   const apiKey = process.env.YOUTUBE_DATA_API_KEY
   if (!apiKey) throw new Error('YOUTUBE_DATA_API_KEY not set')
 
@@ -92,6 +97,67 @@ async function youtubeSearch(query: string, maxResults = 8): Promise<YTVideo[]> 
   }))
 }
 
+// ── Coverage gaps ─────────────────────────────────────────────────────────────
+
+// High-frequency competition positions only. The full POSITIONS taxonomy multiplied
+// by every submission event produced a matrix far larger than the library could ever
+// fill, so the gap list never emptied and the agent burned its whole budget nightly.
+const KEY_POSITIONS = [
+  // ── Top positions ─────────────────────────────────────────────────────────
+  'mount', 'side_control', 'back_control',
+  // ── Guard family ──────────────────────────────────────────────────────────
+  'closed_guard', 'half_guard', 'open_guard', 'butterfly_guard',
+  // ── Modern guard / leg entanglement ───────────────────────────────────────
+  'de_la_riva', 'single_leg_x', 'ashi_garami',
+  // ── Turtle / standing ─────────────────────────────────────────────────────
+  'turtle', 'standing',
+]
+
+export type CoverageGap = {
+  eventId: string
+  eventName: string
+  positionId: string | null
+  positionName: string
+  currentCount: number
+}
+
+/** Event/position combos with fewer than MIN_ACTIVE_VARIANTS active variants. */
+async function computeCoverageGaps(): Promise<CoverageGap[]> {
+  const rows = await db.query.techniqueVariants.findMany({
+    where: eq(techniqueVariants.status, 'active'),
+    columns: { eventId: true, positionId: true, format: true },
+  })
+
+  // Count active variants per event/position combo
+  const counts: Record<string, number> = {}
+  for (const row of rows) {
+    const key = `${row.eventId}::${row.positionId ?? 'null'}`
+    counts[key] = (counts[key] ?? 0) + 1
+  }
+
+  const submissionEvents = EVENT_TYPES.filter(e => e.parent === 'submission')
+  const gaps: CoverageGap[] = []
+
+  for (const event of submissionEvents) {
+    // General variant (no position)
+    const generalKey = `${event.id}::null`
+    if ((counts[generalKey] ?? 0) < MIN_ACTIVE_VARIANTS) {
+      gaps.push({ eventId: event.id, eventName: event.name, positionId: null, positionName: 'general', currentCount: counts[generalKey] ?? 0 })
+    }
+    // Position-specific
+    for (const posId of KEY_POSITIONS) {
+      const pos = POSITIONS.find(p => p.id === posId)
+      if (!pos) continue
+      const key = `${event.id}::${posId}`
+      if ((counts[key] ?? 0) < MIN_ACTIVE_VARIANTS) {
+        gaps.push({ eventId: event.id, eventName: event.name, positionId: posId, positionName: pos.name, currentCount: counts[key] ?? 0 })
+      }
+    }
+  }
+
+  return gaps
+}
+
 // ── Agent tools ───────────────────────────────────────────────────────────────
 
 function buildTools(state: { searchCount: number; queuedCount: number; queuedUrls: Set<string>; existingUrls: Set<string> }) {
@@ -99,65 +165,16 @@ function buildTools(state: { searchCount: number; queuedCount: number; queuedUrl
 
     get_coverage_gaps: tool({
       description: 'Query the technique library to find event/position combos with fewer than the minimum number of active variants. Returns a prioritised list of what needs to be filled.',
-      inputSchema: z.object({
-        format: z.enum(['gi', 'no_gi', 'both']).optional().describe('Filter by format. Omit to get all gaps.'),
-      }),
-      execute: async ({ format }: { format?: 'gi' | 'no_gi' | 'both' }) => {
-        const rows = await db.query.techniqueVariants.findMany({
-          where: eq(techniqueVariants.status, 'active'),
-          columns: { eventId: true, positionId: true, format: true },
-        })
-
-        // Count active variants per event/position combo
-        const counts: Record<string, number> = {}
-        for (const row of rows) {
-          const key = `${row.eventId}::${row.positionId ?? 'null'}`
-          counts[key] = (counts[key] ?? 0) + 1
-        }
-
-        // Build gap list from the submission events that matter most
-        const submissionEvents = EVENT_TYPES.filter(e => e.parent === 'submission')
-        const keyPositions = [
-          // ── Top positions ───────────────────────────────────────────────────
-          'mount', 'side_control', 'back_control', 'north_south', 'knee_on_belly',
-          // ── Guard family ────────────────────────────────────────────────────
-          'closed_guard', 'half_guard', 'deep_half', 'butterfly_guard',
-          'open_guard', 'rubber_guard',
-          // ── Modern guard systems ────────────────────────────────────────────
-          'de_la_riva', 'reverse_de_la_riva', 'x_guard', 'single_leg_x',
-          'spider_guard', 'lasso_guard', 'worm_guard', 'k_guard',
-          // ── Leg entanglement ────────────────────────────────────────────────
-          'ashi_garami', 'inside_sankaku', 'fifty_fifty',
-          // ── Turtle / back-taking / advanced ─────────────────────────────────
-          'turtle', 'truck', 'crucifix',
-          // ── Standing ────────────────────────────────────────────────────────
-          'standing',
-        ]
-
-        const gaps: Array<{ eventId: string; eventName: string; positionId: string | null; positionName: string; currentCount: number }> = []
-
-        for (const event of submissionEvents) {
-          // General variant (no position)
-          const generalKey = `${event.id}::null`
-          if ((counts[generalKey] ?? 0) < MIN_ACTIVE_VARIANTS) {
-            gaps.push({ eventId: event.id, eventName: event.name, positionId: null, positionName: 'general', currentCount: counts[generalKey] ?? 0 })
-          }
-          // Position-specific
-          for (const posId of keyPositions) {
-            const pos = POSITIONS.find(p => p.id === posId)
-            if (!pos) continue
-            const key = `${event.id}::${posId}`
-            if ((counts[key] ?? 0) < MIN_ACTIVE_VARIANTS) {
-              gaps.push({ eventId: event.id, eventName: event.name, positionId: posId, positionName: pos.name, currentCount: counts[key] ?? 0 })
-            }
-          }
-        }
-
+      inputSchema: z.object({}),
+      execute: async () => {
+        const gaps = await computeCoverageGaps()
         return {
           total_gaps: gaps.length,
           budget_remaining: MAX_SEARCHES_PER_RUN - state.searchCount,
           videos_queued_so_far: state.queuedCount,
-          gaps: gaps.slice(0, 50), // return top 50 to keep context manageable
+          // Every tool result is resent on every subsequent step (no prompt caching),
+          // so keep the payload small — the search budget is the real limiter anyway.
+          gaps: gaps.slice(0, 20),
         }
       },
     }),
@@ -266,12 +283,23 @@ export const techniqueKbAgent = inngest.createFunction(
     name: 'Technique KB Agent',
     triggers: [
       { event: 'technique/kb-agent.run' },               // manual trigger
-      { cron: '0 3 * * *' },                             // daily at 3am UTC
+      { cron: '0 3 * * 0' },                             // weekly, Sunday 3am UTC
     ],
     concurrency: { limit: 1 },                           // never run two at once
   },
   async ({ step }: { step: any }) => {
     const runStartedAt = new Date().toISOString()
+
+    // Bail before any model call when coverage is already complete. Without this the
+    // agent runs its full budget on every trigger forever, and each run re-fires the
+    // KB rescan across every eligible match.
+    const gapCount: number = await step.run('check-coverage', async () => {
+      return (await computeCoverageGaps()).length
+    })
+
+    if (gapCount === 0) {
+      return { skipped: 'coverage complete', searchesUsed: 0, videosQueued: 0, agentSteps: 0, summary: '' }
+    }
 
     // Source URLs already ingested (any run, any status) — never re-queue these.
     const existingSourceUrls: string[] = await step.run('load-existing-sources', async () => {
@@ -285,7 +313,10 @@ export const techniqueKbAgent = inngest.createFunction(
 
       const { text, usage, steps } = await generateText({
         model: anthropic(CLAUDE_SYNTHESIS_MODEL),
-        stopWhen: stepCountIs(120), // enough for ~40 gaps × 2 searches + overhead
+        // No prompt caching: every step resends the whole transcript, so the token
+        // cost of a run grows quadratically with the step count. Keep this just above
+        // MAX_SEARCHES_PER_RUN × 2 (search + queue) plus a little overhead.
+        stopWhen: stepCountIs(35),
         system: `You are an autonomous BJJ technique library curator. Your job is to fill gaps in a technique knowledge base that powers match analysis and gameplans for competitive BJJ athletes.
 
 The library stores technique variants — visual descriptions of how specific submissions look on camera, used to help AI detect them in competition footage.
@@ -296,7 +327,7 @@ The library stores technique variants — visual descriptions of how specific su
    - Call search_youtube with a specific query
    - Review the results — prefer trusted coaches with clear narration, avoid highlight reels or compilations
    - Call queue_video for 1–2 good matches per gap
-3. Continue until all gaps are addressed or the search budget runs out
+3. Continue until the search budget runs out (you will not get through every gap — see Budget below)
 4. Call finish with a summary
 
 ## Technique coverage — all belt levels
@@ -320,6 +351,9 @@ The library must cover white through black belt techniques. Priority order:
 - "Top 10" compilation videos
 - Unknown channels with few subscribers (indicated by is_trusted_channel: false and a vague description)
 - Videos already marked as already_queued — this includes videos ingested in earlier runs, not just this one. If the top result for a gap is already_queued, try a more specific or different search query rather than queueing it again or skipping the gap entirely.
+
+## Budget
+You get ${MAX_SEARCHES_PER_RUN} searches and ${MAX_VIDEOS_QUEUED} queued videos per run — far fewer than the number of open gaps. That is deliberate: coverage is meant to build up over many weekly runs. Spend the budget on the highest-priority gaps, then call finish(). Do not try to address every gap.
 
 Be efficient — one good search per gap, queue 1–2 videos, move on. Don't over-search the same technique.`,
 

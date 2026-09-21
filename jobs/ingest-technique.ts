@@ -64,6 +64,14 @@ export const ingestTechnique = inngest.createFunction(
       const result = await geminiVideoObject(GEMINI_VIDEO_MODEL, {
         system: buildExtractTechniqueSystemPrompt(),
         videoUrl: youtubeUrl,
+        // Without these Gemini samples the whole instructional at 1fps and full
+        // resolution — ~150–200k input tokens per video. Extraction only needs the
+        // gross body mechanics, which survive 0.5fps at LOW resolution, and the
+        // transcript already carries the coach's step-by-step narration.
+        videoOptions: {
+          fps: 0.5,
+          resolution: 'LOW' as const,
+        },
         userPrompt,
         schema: TechniqueExtractionOutputSchema,
       })
