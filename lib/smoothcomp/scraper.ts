@@ -82,7 +82,7 @@ async function callGeminiExtract(parts: Array<Record<string, unknown>>): Promise
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts }],
-          generationConfig: { temperature: 0, responseMimeType: 'application/json' },
+          generationConfig: { responseMimeType: 'application/json' },
         }),
         signal: AbortSignal.timeout(30000),
       }
